@@ -99,13 +99,14 @@ export function AssignTechnicianModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Atribuir Técnico - {service.code}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="space-y-6 px-6 py-4">
             <FormField
               control={form.control}
               name="technician_id"
@@ -221,7 +222,9 @@ export function AssignTechnicianModal({
               )}
             />
 
-            <DialogFooter className="gap-2">
+            </div>
+
+            <DialogFooter className="px-6 py-4 border-t flex-shrink-0 gap-2">
               <Button
                 type="button"
                 variant="outline"
