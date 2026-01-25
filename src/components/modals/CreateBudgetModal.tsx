@@ -277,7 +277,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 px-6">
+              <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
                 <div className="space-y-6 py-4 pr-4">
                   {/* Customer Section */}
                   <div className="space-y-4">
