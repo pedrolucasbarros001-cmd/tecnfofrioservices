@@ -65,21 +65,46 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
   const handleSubmit = async (values: FormValues) => {
     setIsLoading(true);
     try {
-      // Note: Creating users with passwords requires admin API or invites
-      // For now, we'll create the profile and role entries
-      // The user will need to be invited via Supabase Auth or created manually
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
 
-      toast.info(
-        'Funcionalidade de convite de utilizador requer configuração de email no Supabase. ' +
-        'Por favor, adicione o utilizador manualmente no painel do Supabase Auth.'
+      // Call the invite-user edge function
+      const response = await fetch(
+        `https://flialeqlwrtfnonxtsnx.supabase.co/functions/v1/invite-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: values.email,
+            full_name: values.full_name,
+            role: values.role,
+            phone: values.phone || undefined,
+            specialization: values.specialization || undefined,
+          }),
+        }
       );
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao convidar utilizador');
+      }
+
+      toast.success(`Convite enviado para ${values.email}`);
       onOpenChange(false);
       form.reset();
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
-      toast.error('Erro ao criar utilizador');
+      toast.error(error.message || 'Erro ao criar utilizador');
     } finally {
       setIsLoading(false);
     }

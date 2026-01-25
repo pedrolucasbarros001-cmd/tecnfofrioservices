@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
+import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -43,6 +44,8 @@ export default function OrcamentosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
 
   const { data: budgets = [], isLoading, refetch } = useQuery({
     queryKey: ['budgets'],
@@ -126,6 +129,15 @@ export default function OrcamentosPage() {
     }
   };
 
+  const handleViewDetails = (budget: any) => {
+    setSelectedBudget(budget);
+    setShowDetailPanel(true);
+  };
+
+  const handleRowClick = (budget: any) => {
+    handleViewDetails(budget);
+  };
+
   const formatCurrency = (value: number | null) => {
     if (!value) return '€0.00';
     return new Intl.NumberFormat('pt-PT', {
@@ -205,7 +217,11 @@ export default function OrcamentosPage() {
                   const statusConfig = STATUS_CONFIG[budget.status as keyof typeof STATUS_CONFIG];
 
                   return (
-                    <TableRow key={budget.id}>
+                    <TableRow
+                      key={budget.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleRowClick(budget)}
+                    >
                       <TableCell className="font-mono font-semibold text-primary">
                         {budget.code}
                       </TableCell>
@@ -230,26 +246,35 @@ export default function OrcamentosPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                             <Button variant="ghost" size="sm">
                               Ações
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetails(budget);
+                            }}>
                               <FileText className="h-4 w-4 mr-2" />
                               Ver Detalhes
                             </DropdownMenuItem>
                             {budget.status === 'pendente' && (
                               <>
                                 <DropdownMenuItem
-                                  onClick={() => handleUpdateStatus(budget.id, 'aprovado')}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateStatus(budget.id, 'aprovado');
+                                  }}
                                 >
                                   <Check className="h-4 w-4 mr-2 text-green-500" />
                                   Aprovar
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => handleUpdateStatus(budget.id, 'recusado')}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateStatus(budget.id, 'recusado');
+                                  }}
                                 >
                                   <X className="h-4 w-4 mr-2 text-red-500" />
                                   Recusar
@@ -258,7 +283,10 @@ export default function OrcamentosPage() {
                             )}
                             {budget.status === 'aprovado' && !budget.converted_service_id && (
                               <DropdownMenuItem
-                                onClick={() => handleConvertToService(budget)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConvertToService(budget);
+                                }}
                               >
                                 <ArrowRight className="h-4 w-4 mr-2 text-blue-500" />
                                 Converter em Serviço
@@ -281,6 +309,14 @@ export default function OrcamentosPage() {
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
         onSuccess={() => refetch()}
+      />
+
+      {/* Budget Detail Panel */}
+      <BudgetDetailPanel
+        open={showDetailPanel}
+        onOpenChange={setShowDetailPanel}
+        budget={selectedBudget}
+        onUpdate={() => refetch()}
       />
     </div>
   );
