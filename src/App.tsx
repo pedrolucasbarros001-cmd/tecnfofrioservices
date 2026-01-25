@@ -23,6 +23,7 @@ import TechnicianWorkshopFlow from "@/pages/technician/TechnicianWorkshopFlow";
 import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
 import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
 import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
+import TVMonitorPage from "@/pages/TVMonitorPage";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
 
@@ -38,6 +39,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/tv-monitor" element={<TVMonitorPage />} />
             
             {/* Protected routes with layout */}
             <Route

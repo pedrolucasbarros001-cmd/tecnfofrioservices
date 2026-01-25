@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Search, Calendar, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Calendar, MapPin, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service } from '@/types/database';
 
 export default function ServicosPage() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +71,19 @@ export default function ServicosPage() {
     );
   });
 
+  // Navigate to the appropriate workflow based on service type
+  const handleStartService = (service: Service) => {
+    if (service.service_type === 'entrega') {
+      navigate(`/technician/delivery/${service.id}`);
+    } else if (service.service_type === 'instalacao') {
+      navigate(`/technician/installation/${service.id}`);
+    } else if (service.service_location === 'oficina') {
+      navigate(`/technician/workshop/${service.id}`);
+    } else {
+      navigate(`/technician/visit/${service.id}`);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -108,6 +124,7 @@ export default function ServicosPage() {
               <Card
                 key={service.id}
                 className="cursor-pointer hover:shadow-md transition-all"
+                onClick={() => handleStartService(service)}
               >
                 <CardContent className="p-4">
                   <div className="space-y-3">
@@ -133,6 +150,19 @@ export default function ServicosPage() {
                             .join(' • ')}
                         </p>
                       </div>
+
+                      {/* Start Button */}
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartService(service);
+                        }}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        Iniciar
+                      </Button>
                     </div>
 
                     {/* Schedule info */}
@@ -165,6 +195,23 @@ export default function ServicosPage() {
                         </span>
                       </div>
                     )}
+
+                    {/* Service Type Badge */}
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {service.service_location === 'oficina' ? 'Oficina' : 'Visita'}
+                      </Badge>
+                      {service.service_type === 'instalacao' && (
+                        <Badge variant="outline" className="text-xs bg-purple-50">
+                          Instalação
+                        </Badge>
+                      )}
+                      {service.service_type === 'entrega' && (
+                        <Badge variant="outline" className="text-xs bg-teal-50">
+                          Entrega
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

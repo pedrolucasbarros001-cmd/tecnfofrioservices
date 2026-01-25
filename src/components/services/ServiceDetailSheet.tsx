@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
   Phone, 
@@ -26,13 +27,36 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ServiceTagModal } from '@/components/modals/ServiceTagModal';
 import { ServicePrintModal } from '@/components/modals/ServicePrintModal';
+import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
+import { SetPriceModal } from '@/components/modals/SetPriceModal';
+import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
+import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementModal';
+import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
+import { ForceStateModal } from '@/components/modals/ForceStateModal';
+import { RequestPartModal } from '@/components/modals/RequestPartModal';
+import { ContactClientModal } from '@/components/modals/ContactClientModal';
+import { StateActionButtons } from './StateActionButtons';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ServiceDetailSheetProps {
   service: Service | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onServiceUpdated?: () => void;
 }
 
 const STATUS_TIMELINE: ServiceStatus[] = [
@@ -47,20 +71,88 @@ const STATUS_TIMELINE: ServiceStatus[] = [
   'finalizado',
 ];
 
-export function ServiceDetailSheet({ service, open, onOpenChange }: ServiceDetailSheetProps) {
+export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdated }: ServiceDetailSheetProps) {
+  const navigate = useNavigate();
+  const { role } = useAuth();
+  const updateService = useUpdateService();
+  const deleteService = useDeleteService();
+  
+  // Modal states
   const [showTagModal, setShowTagModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showSetPriceModal, setShowSetPriceModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showAssignDeliveryModal, setShowAssignDeliveryModal] = useState(false);
+  const [showForceStateModal, setShowForceStateModal] = useState(false);
+  const [showRequestPartModal, setShowRequestPartModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (!service) return null;
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
   const currentStatusIndex = STATUS_TIMELINE.indexOf(service.status as ServiceStatus);
 
+  const handleStartExecution = () => {
+    // Navigate to appropriate technician flow
+    if (service.service_type === 'entrega') {
+      navigate(`/technician/delivery/${service.id}`);
+    } else if (service.service_type === 'instalacao') {
+      navigate(`/technician/installation/${service.id}`);
+    } else if (service.service_location === 'oficina') {
+      navigate(`/technician/workshop/${service.id}`);
+    } else {
+      navigate(`/technician/visit/${service.id}`);
+    }
+  };
+
+  const handleFinalize = async () => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'finalizado',
+      });
+      toast.success('Serviço finalizado!');
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error finalizing service:', error);
+    }
+  };
+
+  const handleMarkPartArrived = async () => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'na_oficina', // Return to workshop status
+      });
+      toast.success('Peça marcada como chegada!');
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error marking part arrived:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteService.mutateAsync(service.id);
+      onOpenChange(false);
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error deleting service:', error);
+    }
+  };
+
+  const handleModalSuccess = () => {
+    onServiceUpdated?.();
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-[600px] p-0">
-          <ScrollArea className="h-full">
+        <SheetContent className="w-full sm:max-w-[600px] p-0 flex flex-col">
+          <ScrollArea className="flex-1">
             {/* Header */}
             <SheetHeader className="sticky top-0 z-10 bg-card p-4 border-b">
               <div className="flex items-center justify-between">
@@ -238,6 +330,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange }: ServiceDetai
                     <p className="text-sm">{service.detected_fault}</p>
                   </div>
                 )}
+
+                {service.work_performed && (
+                  <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-xs text-green-600 uppercase mb-1">Trabalho Realizado</p>
+                    <p className="text-sm">{service.work_performed}</p>
+                  </div>
+                )}
               </Section>
 
               {/* Schedule Info */}
@@ -320,6 +419,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange }: ServiceDetai
                         <span>{service.amount_paid.toFixed(2)} €</span>
                       </div>
                     )}
+                    {service.final_price && service.final_price > (service.amount_paid || 0) && (
+                      <div className="flex justify-between text-sm text-red-600 font-medium">
+                        <span>Em Débito</span>
+                        <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
+                      </div>
+                    )}
                   </div>
                 </Section>
               )}
@@ -356,10 +461,32 @@ export function ServiceDetailSheet({ service, open, onOpenChange }: ServiceDetai
               )}
             </div>
           </ScrollArea>
+
+          {/* Fixed Footer with Actions */}
+          <div className="flex-shrink-0 border-t bg-card p-4">
+            <StateActionButtons
+              service={service}
+              onAssignTechnician={() => setShowAssignModal(true)}
+              onViewDetails={() => {}}
+              onStartExecution={role === 'tecnico' ? handleStartExecution : undefined}
+              onSetPrice={role === 'dono' ? () => setShowSetPriceModal(true) : undefined}
+              onRegisterPayment={(role === 'dono' || role === 'secretaria') ? () => setShowPaymentModal(true) : undefined}
+              onManageDelivery={(role === 'dono' || role === 'secretaria') ? () => setShowDeliveryModal(true) : undefined}
+              onFinalize={(role === 'dono' || role === 'secretaria') ? handleFinalize : undefined}
+              onRequestPart={(role === 'dono' || role === 'tecnico') ? () => setShowRequestPartModal(true) : undefined}
+              onMarkPartArrived={role === 'dono' ? handleMarkPartArrived : undefined}
+              onForceState={role === 'dono' ? () => setShowForceStateModal(true) : undefined}
+              onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}
+              onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
+            />
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
+            </p>
+          </div>
         </SheetContent>
       </Sheet>
 
-      {/* Print Modals */}
+      {/* All Modals */}
       <ServiceTagModal
         service={service}
         open={showTagModal}
@@ -370,6 +497,92 @@ export function ServiceDetailSheet({ service, open, onOpenChange }: ServiceDetai
         open={showPrintModal}
         onOpenChange={setShowPrintModal}
       />
+      <AssignTechnicianModal
+        open={showAssignModal}
+        onOpenChange={(open) => {
+          setShowAssignModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <SetPriceModal
+        open={showSetPriceModal}
+        onOpenChange={(open) => {
+          setShowSetPriceModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <RegisterPaymentModal
+        open={showPaymentModal}
+        onOpenChange={(open) => {
+          setShowPaymentModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <DeliveryManagementModal
+        open={showDeliveryModal}
+        onOpenChange={(open) => {
+          setShowDeliveryModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+        onAssignDelivery={() => {
+          setShowDeliveryModal(false);
+          setShowAssignDeliveryModal(true);
+        }}
+      />
+      <ForceStateModal
+        open={showForceStateModal}
+        onOpenChange={(open) => {
+          setShowForceStateModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <RequestPartModal
+        open={showRequestPartModal}
+        onOpenChange={(open) => {
+          setShowRequestPartModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <ContactClientModal
+        open={showContactModal}
+        onOpenChange={setShowContactModal}
+        service={service}
+      />
+      <AssignDeliveryModal
+        open={showAssignDeliveryModal}
+        onOpenChange={(open) => {
+          setShowAssignDeliveryModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Serviço</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja eliminar o serviço {service.code}? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

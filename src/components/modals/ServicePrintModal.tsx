@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Printer, Snowflake } from 'lucide-react';
@@ -10,8 +11,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import type { Service } from '@/types/database';
+import type { Service, ServicePart, ServicePayment } from '@/types/database';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -20,6 +22,38 @@ interface ServicePrintModalProps {
 }
 
 export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintModalProps) {
+  // Fetch parts used for this service
+  const { data: parts = [] } = useQuery({
+    queryKey: ['service-parts', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_parts')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data as ServicePart[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch payment history
+  const { data: payments = [] } = useQuery({
+    queryKey: ['service-payments', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_payments')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('payment_date', { ascending: false });
+      if (error) throw error;
+      return data as ServicePayment[];
+    },
+    enabled: !!service?.id && open,
+  });
+
   if (!service) return null;
 
   const handlePrint = () => {
@@ -28,6 +62,10 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
   const qrData = JSON.stringify({ code: service.code, id: service.id });
+
+  const usedParts = parts.filter(p => !p.is_requested);
+  const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
+  const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,8 +199,161 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 <span className="text-muted-foreground">Avaria Reportada:</span>{' '}
                 <span className="font-medium">{service.fault_description || 'N/A'}</span>
               </div>
+              {service.detected_fault && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Avaria Detectada:</span>{' '}
+                  <span className="font-medium">{service.detected_fault}</span>
+                </div>
+              )}
             </div>
           </section>
+
+          {/* Warranty Section */}
+          {service.is_warranty && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6 bg-purple-50 rounded-lg p-4">
+                <h2 className="text-lg font-semibold mb-3 text-purple-800">Serviço em Garantia</h2>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div>
+                    <span className="text-purple-600">Marca da Garantia:</span>{' '}
+                    <span className="font-medium">{service.warranty_brand || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-purple-600">Nº Processo:</span>{' '}
+                    <span className="font-medium">{service.warranty_process_number || 'N/A'}</span>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Work Performed */}
+          {service.work_performed && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1">Trabalho Realizado</h2>
+                <p className="text-sm whitespace-pre-wrap">{service.work_performed}</p>
+              </section>
+            </>
+          )}
+
+          {/* Parts Used */}
+          {usedParts.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1">Peças Utilizadas</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2">Peça</th>
+                      <th className="text-left py-2">Código</th>
+                      <th className="text-center py-2">Qtd</th>
+                      <th className="text-right py-2">Custo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usedParts.map((part) => (
+                      <tr key={part.id} className="border-b">
+                        <td className="py-2">{part.part_name}</td>
+                        <td className="py-2">{part.part_code || '-'}</td>
+                        <td className="py-2 text-center">{part.quantity || 1}</td>
+                        <td className="py-2 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
+                      </tr>
+                    ))}
+                    <tr className="font-medium">
+                      <td colSpan={3} className="py-2 text-right">Total Peças:</td>
+                      <td className="py-2 text-right">{totalPartsCost.toFixed(2)} €</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+            </>
+          )}
+
+          {/* Pricing Summary */}
+          {(service.final_price && service.final_price > 0) && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1">Resumo Financeiro</h2>
+                <div className="grid grid-cols-2 gap-2 text-sm max-w-xs ml-auto">
+                  {service.labor_cost > 0 && (
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-muted-foreground">Mão de Obra:</span>
+                      <span>{service.labor_cost.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.parts_cost > 0 && (
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-muted-foreground">Peças:</span>
+                      <span>{service.parts_cost.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.discount > 0 && (
+                    <div className="flex justify-between col-span-2 text-green-600">
+                      <span>Desconto:</span>
+                      <span>-{service.discount.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between col-span-2 font-bold text-base border-t pt-2">
+                    <span>TOTAL:</span>
+                    <span>{service.final_price.toFixed(2)} €</span>
+                  </div>
+                  {totalPayments > 0 && (
+                    <>
+                      <div className="flex justify-between col-span-2 text-green-600">
+                        <span>Pago:</span>
+                        <span>{totalPayments.toFixed(2)} €</span>
+                      </div>
+                      {service.final_price > totalPayments && (
+                        <div className="flex justify-between col-span-2 text-red-600 font-medium">
+                          <span>Em Débito:</span>
+                          <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Payment History */}
+          {payments.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1">Histórico de Pagamentos</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2">Data</th>
+                      <th className="text-left py-2">Método</th>
+                      <th className="text-left py-2">Descrição</th>
+                      <th className="text-right py-2">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((payment) => (
+                      <tr key={payment.id} className="border-b">
+                        <td className="py-2">
+                          {payment.payment_date 
+                            ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })
+                            : '-'}
+                        </td>
+                        <td className="py-2 capitalize">{payment.payment_method || '-'}</td>
+                        <td className="py-2">{payment.description || '-'}</td>
+                        <td className="py-2 text-right">{payment.amount.toFixed(2)} €</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            </>
+          )}
 
           <Separator className="my-4" />
 
