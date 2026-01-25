@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Search, UserPlus, Check } from 'lucide-react';
+import { CalendarIcon, Search, UserPlus, Check, MapPin, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -209,20 +209,20 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         </DialogHeader>
 
         {step === 'location' ? (
-          <div className="grid grid-cols-2 gap-4 py-6 px-6">
+          <div className="grid grid-cols-2 gap-6 py-8 px-6">
             <button
               onClick={() => {
                 form.setValue('service_location', 'cliente');
                 setStep('form');
               }}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all"
+              className="flex flex-col items-center gap-4 p-8 rounded-xl border-2 border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100 transition-all"
             >
-              <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <span className="text-3xl">🏠</span>
+              <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <MapPin className="h-8 w-8 text-blue-600" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold">Visita ao Cliente</h3>
-                <p className="text-sm text-muted-foreground">Serviço no local do cliente</p>
+                <h3 className="font-semibold text-lg text-blue-900">Visita</h3>
+                <p className="text-sm text-blue-700/70 mt-1">Serviço no local do cliente</p>
               </div>
             </button>
             
@@ -231,14 +231,14 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                 form.setValue('service_location', 'oficina');
                 setStep('form');
               }}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all"
+              className="flex flex-col items-center gap-4 p-8 rounded-xl border-2 border-orange-200 bg-orange-50 hover:border-orange-400 hover:bg-orange-100 transition-all"
             >
-              <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <span className="text-3xl">🔧</span>
+              <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center">
+                <Package className="h-8 w-8 text-orange-600" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold">Deixou na Oficina</h3>
-                <p className="text-sm text-muted-foreground">Cliente trouxe equipamento</p>
+                <h3 className="font-semibold text-lg text-orange-900">Deixou na Oficina</h3>
+                <p className="text-sm text-orange-700/70 mt-1">Cliente trouxe equipamento</p>
               </div>
             </button>
           </div>
