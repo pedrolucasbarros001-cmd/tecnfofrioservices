@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, MapPin, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +13,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { WeeklyAgenda } from '@/components/agenda/WeeklyAgenda';
-import { ServiceTypeSelector, type ServiceCreationType } from '@/components/modals/ServiceTypeSelector';
 import { CreateServiceModal } from '@/components/modals/CreateServiceModal';
 import { CreateInstallationModal } from '@/components/modals/CreateInstallationModal';
 import { CreateDeliveryModal } from '@/components/modals/CreateDeliveryModal';
+import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { useServices } from '@/hooks/useServices';
-import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
-import { Calendar } from 'lucide-react';
+import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,10 +39,11 @@ export default function GeralPage() {
   );
   
   // Modals
-  const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
   
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -61,15 +72,14 @@ export default function GeralPage() {
     setSearchParams(searchParams);
   };
 
-  const handleServiceTypeSelect = (type: ServiceCreationType) => {
-    if (type === 'reparacao') setShowServiceModal(true);
-    else if (type === 'instalacao') setShowInstallationModal(true);
-    else if (type === 'entrega') setShowDeliveryModal(true);
-  };
-
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);
     setShowDetailSheet(true);
+  };
+
+  const handleAssignTechnician = (service: Service) => {
+    setServiceToAssign(service);
+    setShowAssignModal(true);
   };
 
   return (
@@ -146,89 +156,162 @@ export default function GeralPage() {
         />
       )}
 
-      {/* Services List */}
-      <div className="space-y-3">
-        {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            A carregar serviços...
-          </div>
-        ) : filteredServices.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
+      {/* Services Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              A carregar serviços...
+            </div>
+          ) : filteredServices.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
               {searchTerm || selectedStatus !== 'all'
                 ? 'Nenhum serviço encontrado com os filtros aplicados.'
                 : 'Ainda não existem serviços. Crie o primeiro!'}
-            </CardContent>
-          </Card>
-        ) : (
-          filteredServices.map((service) => {
-            const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-            return (
-              <Card
-                key={service.id}
-                className="cursor-pointer hover:shadow-md transition-all"
-                onClick={() => handleServiceClick(service)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono font-semibold text-primary">
-                          {service.code}
-                        </span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Tipo</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Aparelho e Avaria</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead>Técnico</TableHead>
+                  <TableHead>Data + Turno</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredServices.map((service) => {
+                  const statusConfig = SERVICE_STATUS_CONFIG[service.status];
+                  const isVisit = service.service_location === 'cliente';
+                  
+                  return (
+                    <TableRow
+                      key={service.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleServiceClick(service)}
+                    >
+                      {/* Tipo */}
+                      <TableCell>
+                        {isVisit ? (
+                          <MapPin className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">OFICINA</Badge>
+                        )}
+                      </TableCell>
+                      
+                      {/* Código */}
+                      <TableCell className="font-mono font-semibold text-primary">
+                        {service.code}
+                      </TableCell>
+                      
+                      {/* Cliente */}
+                      <TableCell className="font-medium">
+                        {service.customer?.name || 'Sem cliente'}
+                      </TableCell>
+                      
+                      {/* Aparelho e Avaria */}
+                      <TableCell>
+                        <p className="font-medium text-sm">
+                          {[service.appliance_type, service.brand].filter(Boolean).join(' ') || '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {service.fault_description || '-'}
+                        </p>
+                      </TableCell>
+                      
+                      {/* Estado */}
+                      <TableCell>
                         <Badge className={statusConfig.color}>
                           {statusConfig.label}
                         </Badge>
-                        {service.is_urgent && (
-                          <Badge variant="destructive" className="animate-pulse">Urgente</Badge>
-                        )}
-                        {service.is_warranty && (
-                          <Badge className="bg-purple-500 text-white">Garantia</Badge>
-                        )}
-                      </div>
-                      <p className="font-medium truncate">
-                        {service.customer?.name || 'Cliente não definido'}
-                      </p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {[service.appliance_type, service.brand, service.model]
-                          .filter(Boolean)
-                          .join(' • ') || 'Equipamento não definido'}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      {service.scheduled_date && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {new Date(service.scheduled_date).toLocaleDateString('pt-PT')}
+                      </TableCell>
+                      
+                      {/* Tags */}
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                          {service.pending_pricing && (
+                            <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>
+                          )}
+                          {service.is_urgent && (
+                            <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>
+                          )}
+                          {service.is_warranty && (
+                            <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>
+                          )}
                         </div>
-                      )}
-                      {service.technician?.profile && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {service.technician.profile.full_name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                      </TableCell>
+                      
+                      {/* Técnico */}
+                      <TableCell>
+                        {service.technician?.profile ? (
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                              style={{ backgroundColor: service.technician.color || '#3B82F6' }}
+                            >
+                              {service.technician.profile.full_name?.charAt(0) || 'T'}
+                            </div>
+                            <span className="text-sm">{service.technician.profile.full_name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      
+                      {/* Data + Turno */}
+                      <TableCell>
+                        {service.scheduled_date ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                              {format(new Date(service.scheduled_date), 'dd/MM/yy', { locale: pt })}
+                            </div>
+                            {service.scheduled_shift && (
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {SHIFT_CONFIG[service.scheduled_shift as keyof typeof SHIFT_CONFIG]?.label || service.scheduled_shift}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      
+                      {/* Ações */}
+                      <TableCell className="text-right">
+                        <StateActionButtons
+                          service={service}
+                          onAssignTechnician={() => handleAssignTechnician(service)}
+                          onViewDetails={() => handleServiceClick(service)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <p className="text-sm text-muted-foreground">
         {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} encontrado{filteredServices.length !== 1 ? 's' : ''}
       </p>
 
       {/* Modals */}
-      <ServiceTypeSelector
-        open={showTypeSelector}
-        onOpenChange={setShowTypeSelector}
-        onSelect={handleServiceTypeSelect}
-      />
       <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
       <CreateInstallationModal open={showInstallationModal} onOpenChange={setShowInstallationModal} />
       <CreateDeliveryModal open={showDeliveryModal} onOpenChange={setShowDeliveryModal} />
+      <AssignTechnicianModal
+        service={serviceToAssign}
+        open={showAssignModal}
+        onOpenChange={setShowAssignModal}
+      />
       
       {/* Detail Sheet */}
       <ServiceDetailSheet

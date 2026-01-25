@@ -80,6 +80,14 @@ export function TechnicianSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
+        {/* TECNOFRIO Branding */}
+        {!isCollapsed && (
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 mb-4">
+            <p className="font-bold text-slate-800">TECNOFRIO</p>
+            <p className="text-xs text-slate-500">Sistema de Gestão</p>
+          </div>
+        )}
+        
         {!isCollapsed && profile && (
           <div className="mb-3 px-2">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
