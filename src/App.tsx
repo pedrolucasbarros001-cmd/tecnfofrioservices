@@ -14,6 +14,15 @@ import GeralPage from "@/pages/GeralPage";
 import OficinaPage from "@/pages/OficinaPage";
 import ClientesPage from "@/pages/ClientesPage";
 import ServicosPage from "@/pages/ServicosPage";
+import OrcamentosPage from "@/pages/OrcamentosPage";
+import ColaboradoresPage from "@/pages/ColaboradoresPage";
+import PerformancePage from "@/pages/PerformancePage";
+import SecretaryConcluidosPage from "@/pages/secretary/SecretaryConcluidosPage";
+import SecretaryDebitoPage from "@/pages/secretary/SecretaryDebitoPage";
+import TechnicianWorkshopFlow from "@/pages/technician/TechnicianWorkshopFlow";
+import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
+import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
+import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
 
@@ -40,20 +49,24 @@ const App = () => (
             >
               {/* Owner routes */}
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/orcamentos" element={<PlaceholderPage />} />
-              <Route path="/colaboradores" element={<PlaceholderPage />} />
+              <Route path="/orcamentos" element={<OrcamentosPage />} />
+              <Route path="/colaboradores" element={<ColaboradoresPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
               
               {/* Owner + Secretary routes */}
               <Route path="/geral" element={<GeralPage />} />
               <Route path="/oficina" element={<OficinaPage />} />
               <Route path="/clientes" element={<ClientesPage />} />
-              <Route path="/concluidos" element={<PlaceholderPage />} />
-              <Route path="/em-debito" element={<PlaceholderPage />} />
-              <Route path="/performance" element={<PlaceholderPage />} />
+              <Route path="/concluidos" element={<SecretaryConcluidosPage />} />
+              <Route path="/em-debito" element={<SecretaryDebitoPage />} />
               
               {/* Technician routes */}
               <Route path="/servicos" element={<ServicosPage />} />
               <Route path="/perfil" element={<PlaceholderPage />} />
+              <Route path="/technician/workshop/:serviceId" element={<TechnicianWorkshopFlow />} />
+              <Route path="/technician/visit/:serviceId" element={<TechnicianVisitFlow />} />
+              <Route path="/technician/installation/:serviceId" element={<TechnicianInstallationFlow />} />
+              <Route path="/technician/delivery/:serviceId" element={<TechnicianDeliveryFlow />} />
               
               {/* Shared routes */}
               <Route path="/preferencias" element={<PlaceholderPage />} />
