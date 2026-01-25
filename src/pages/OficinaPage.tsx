@@ -1,41 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Search, Wrench } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Wrench, Copy, Monitor } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { useServices } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
+import { toast } from 'sonner';
 
 export default function OficinaPage() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    fetchServices();
-  }, []);
-
-  async function fetchServices() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('services')
-        .select(`
-          *,
-          customer:customers(*),
-          technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
-        `)
-        .eq('service_location', 'oficina')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setServices((data as unknown as Service[]) || []);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
+  
+  const { data: services = [], isLoading } = useServices({ location: 'oficina' });
 
   const filteredServices = services.filter((service) => {
     if (!searchTerm) return true;
@@ -46,6 +25,21 @@ export default function OficinaPage() {
       service.appliance_type?.toLowerCase().includes(search)
     );
   });
+
+  const handleCopyTVLink = () => {
+    const url = `${window.location.origin}/tv-monitor`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link copiado para a área de transferência!');
+  };
+
+  const handleOpenMonitor = () => {
+    window.open('/tv-monitor', '_blank');
+  };
+
+  const handleServiceClick = (service: Service) => {
+    setSelectedService(service);
+    setShowDetailSheet(true);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -60,22 +54,38 @@ export default function OficinaPage() {
             <p className="text-muted-foreground">Serviços atualmente na oficina</p>
           </div>
         </div>
+        
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCopyTVLink}>
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar Link TV
+          </Button>
+          <Button onClick={handleOpenMonitor} className="bg-purple-600 hover:bg-purple-700">
+            <Monitor className="h-4 w-4 mr-2" />
+            Abrir Monitor
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Badge variant="secondary">
+          {filteredServices.length} na oficina
+        </Badge>
       </div>
 
       {/* Services List */}
       <div className="space-y-3">
-        {loading ? (
+        {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">
             A carregar serviços...
           </div>
@@ -92,6 +102,7 @@ export default function OficinaPage() {
               <Card
                 key={service.id}
                 className="cursor-pointer hover:shadow-md transition-all"
+                onClick={() => handleServiceClick(service)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
@@ -103,6 +114,9 @@ export default function OficinaPage() {
                         <Badge className={statusConfig.color}>
                           {statusConfig.label}
                         </Badge>
+                        {service.is_urgent && (
+                          <Badge variant="destructive" className="animate-pulse">Urgente</Badge>
+                        )}
                       </div>
                       <p className="font-medium truncate">
                         {service.customer?.name || 'Cliente não definido'}
@@ -113,6 +127,17 @@ export default function OficinaPage() {
                           .join(' • ')}
                       </p>
                     </div>
+                    {service.technician?.profile && (
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: service.technician.color || '#3B82F6' }}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {service.technician.profile.full_name}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -121,9 +146,11 @@ export default function OficinaPage() {
         )}
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} na oficina
-      </p>
+      <ServiceDetailSheet
+        service={selectedService}
+        open={showDetailSheet}
+        onOpenChange={setShowDetailSheet}
+      />
     </div>
   );
 }

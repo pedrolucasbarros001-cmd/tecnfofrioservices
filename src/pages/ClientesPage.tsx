@@ -1,36 +1,33 @@
-import { useEffect, useState } from 'react';
-import { Plus, Search, Phone, Mail, MapPin } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { useState } from 'react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { CreateCustomerModal } from '@/components/modals/CreateCustomerModal';
+import { useCustomers, useDeleteCustomer } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/database';
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  async function fetchCustomers() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setCustomers((data as Customer[]) || []);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [showModal, setShowModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  
+  const { data: customers = [], isLoading } = useCustomers();
+  const deleteCustomer = useDeleteCustomer();
 
   const filteredCustomers = customers.filter((customer) => {
     if (!searchTerm) return true;
@@ -43,6 +40,22 @@ export default function ClientesPage() {
     );
   });
 
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Tem certeza que deseja eliminar este cliente?')) {
+      await deleteCustomer.mutateAsync(id);
+    }
+  };
+
+  const handleModalClose = (open: boolean) => {
+    setShowModal(open);
+    if (!open) setEditingCustomer(null);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -51,84 +64,106 @@ export default function ClientesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
           <p className="text-muted-foreground">Gerir clientes do sistema</p>
         </div>
-        <Button className="shrink-0">
+        <Button className="shrink-0" onClick={() => setShowModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
+          Criar Cliente
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar por nome, email, telefone..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search + Counter */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar por nome, email, telefone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Badge variant="secondary">
+          {filteredCustomers.length} cliente{filteredCustomers.length !== 1 ? 's' : ''}
+        </Badge>
       </div>
 
-      {/* Customers List */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            A carregar clientes...
-          </div>
-        ) : filteredCustomers.length === 0 ? (
-          <Card className="col-span-full">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              {searchTerm
-                ? 'Nenhum cliente encontrado com a pesquisa.'
-                : 'Ainda não existem clientes. Crie o primeiro!'}
-            </CardContent>
-          </Card>
-        ) : (
-          filteredCustomers.map((customer) => (
-            <Card
-              key={customer.id}
-              className="cursor-pointer hover:shadow-md transition-all"
-            >
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <div>
-                    <h3 className="font-semibold truncate">{customer.name}</h3>
-                    {customer.nif && (
-                      <p className="text-xs text-muted-foreground">
-                        NIF: {customer.nif}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1 text-sm">
-                    {customer.phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5" />
-                        <span>{customer.phone}</span>
-                      </div>
-                    )}
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        <span className="truncate">{customer.email}</span>
-                      </div>
-                    )}
-                    {customer.address && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{customer.address}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+      {/* Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Telefone</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Morada</TableHead>
+              <TableHead>Código Postal</TableHead>
+              <TableHead className="w-[70px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  A carregar clientes...
+                </TableCell>
+              </TableRow>
+            ) : filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  {searchTerm
+                    ? 'Nenhum cliente encontrado com a pesquisa.'
+                    : 'Ainda não existem clientes. Crie o primeiro!'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCustomers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">{customer.name}</TableCell>
+                  <TableCell>{customer.phone || '-'}</TableCell>
+                  <TableCell>{customer.email || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant={customer.customer_type === 'empresa' ? 'outline' : 'secondary'}>
+                      {customer.customer_type === 'empresa' ? 'Empresa' : 'Final'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate">
+                    {customer.address || '-'}
+                  </TableCell>
+                  <TableCell>{customer.postal_code || '-'}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(customer.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {filteredCustomers.length} cliente{filteredCustomers.length !== 1 ? 's' : ''}
-      </p>
+      <CreateCustomerModal
+        open={showModal}
+        onOpenChange={handleModalClose}
+        customer={editingCustomer}
+      />
     </div>
   );
 }
