@@ -402,7 +402,7 @@ export default function TechnicianVisitFlow() {
         <SignatureCanvas
           open={showSignature}
           onOpenChange={setShowSignature}
-          onComplete={(sig) => handleSignatureComplete(sig, form.getValues())}
+          onConfirm={(signatureData, _signerName) => handleSignatureComplete(signatureData, form.getValues())}
           title="Assinatura do Cliente para Conclusão de Visita"
         />
       )}

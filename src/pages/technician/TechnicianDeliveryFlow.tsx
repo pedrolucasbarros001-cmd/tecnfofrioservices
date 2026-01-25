@@ -46,7 +46,7 @@ export default function TechnicianDeliveryFlow() {
     }
   };
 
-  const handleSignatureComplete = async (signatureData: string) => {
+  const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     if (!service) return;
     try {
       // Save signature
@@ -196,7 +196,7 @@ export default function TechnicianDeliveryFlow() {
         <SignatureCanvas
           open={showSignature}
           onOpenChange={setShowSignature}
-          onComplete={handleSignatureComplete}
+          onConfirm={handleSignatureComplete}
           title="Assinatura do Cliente para Comprovativo de Entrega"
         />
       )}
