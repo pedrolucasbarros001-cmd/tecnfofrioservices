@@ -21,15 +21,33 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { WeeklyAgenda } from '@/components/agenda/WeeklyAgenda';
 import { CreateServiceModal } from '@/components/modals/CreateServiceModal';
 import { CreateInstallationModal } from '@/components/modals/CreateInstallationModal';
 import { CreateDeliveryModal } from '@/components/modals/CreateDeliveryModal';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
+import { SetPriceModal } from '@/components/modals/SetPriceModal';
+import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
+import { RequestPartModal } from '@/components/modals/RequestPartModal';
+import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementModal';
+import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
+import { ForceStateModal } from '@/components/modals/ForceStateModal';
+import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
-import { useServices } from '@/hooks/useServices';
+import { useServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
+import { toast } from 'sonner';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,18 +56,32 @@ export default function GeralPage() {
     (searchParams.get('status') as ServiceStatus) || 'all'
   );
   
-  // Modals
+  // Current service for actions
+  const [currentService, setCurrentService] = useState<Service | null>(null);
+  
+  // Modals - Creation
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  
+  // Modals - Management
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
+  const [showSetPriceModal, setShowSetPriceModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showRequestPartModal, setShowRequestPartModal] = useState(false);
+  const [showDeliveryMgmtModal, setShowDeliveryMgmtModal] = useState(false);
+  const [showAssignDeliveryModal, setShowAssignDeliveryModal] = useState(false);
+  const [showForceStateModal, setShowForceStateModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
 
   const { data: services = [], isLoading } = useServices({ status: selectedStatus });
+  const updateService = useUpdateService();
+  const deleteService = useDeleteService();
 
   const filteredServices = services.filter((service) => {
     if (!searchTerm) return true;
@@ -77,9 +109,85 @@ export default function GeralPage() {
     setShowDetailSheet(true);
   };
 
+  // Action handlers
   const handleAssignTechnician = (service: Service) => {
-    setServiceToAssign(service);
+    setCurrentService(service);
     setShowAssignModal(true);
+  };
+
+  const handleSetPrice = (service: Service) => {
+    setCurrentService(service);
+    setShowSetPriceModal(true);
+  };
+
+  const handleRegisterPayment = (service: Service) => {
+    setCurrentService(service);
+    setShowPaymentModal(true);
+  };
+
+  const handleRequestPart = (service: Service) => {
+    setCurrentService(service);
+    setShowRequestPartModal(true);
+  };
+
+  const handleManageDelivery = (service: Service) => {
+    setCurrentService(service);
+    setShowDeliveryMgmtModal(true);
+  };
+
+  const handleAssignDelivery = () => {
+    setShowAssignDeliveryModal(true);
+  };
+
+  const handleForceState = (service: Service) => {
+    setCurrentService(service);
+    setShowForceStateModal(true);
+  };
+
+  const handleContactClient = (service: Service) => {
+    setCurrentService(service);
+    setShowContactModal(true);
+  };
+
+  const handleDeleteService = (service: Service) => {
+    setCurrentService(service);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!currentService) return;
+    try {
+      await deleteService.mutateAsync(currentService.id);
+      setShowDeleteDialog(false);
+      setCurrentService(null);
+    } catch (error) {
+      console.error('Error deleting service:', error);
+    }
+  };
+
+  const handleFinalize = async (service: Service) => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'finalizado',
+        service_location: 'entregue',
+      });
+      toast.success('Serviço finalizado!');
+    } catch (error) {
+      console.error('Error finalizing service:', error);
+    }
+  };
+
+  const handleMarkPartArrived = async (service: Service) => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'por_fazer',
+      });
+      toast.success('Peça marcada como chegada. Serviço pronto para retomar.');
+    } catch (error) {
+      console.error('Error marking part arrived:', error);
+    }
   };
 
   return (
@@ -288,6 +396,15 @@ export default function GeralPage() {
                           service={service}
                           onAssignTechnician={() => handleAssignTechnician(service)}
                           onViewDetails={() => handleServiceClick(service)}
+                          onSetPrice={() => handleSetPrice(service)}
+                          onRegisterPayment={() => handleRegisterPayment(service)}
+                          onRequestPart={() => handleRequestPart(service)}
+                          onManageDelivery={() => handleManageDelivery(service)}
+                          onFinalize={() => handleFinalize(service)}
+                          onMarkPartArrived={() => handleMarkPartArrived(service)}
+                          onForceState={() => handleForceState(service)}
+                          onContactClient={() => handleContactClient(service)}
+                          onDelete={() => handleDeleteService(service)}
                         />
                       </TableCell>
                     </TableRow>
@@ -303,15 +420,76 @@ export default function GeralPage() {
         {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} encontrado{filteredServices.length !== 1 ? 's' : ''}
       </p>
 
-      {/* Modals */}
+      {/* Creation Modals */}
       <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
       <CreateInstallationModal open={showInstallationModal} onOpenChange={setShowInstallationModal} />
       <CreateDeliveryModal open={showDeliveryModal} onOpenChange={setShowDeliveryModal} />
+      
+      {/* Management Modals */}
       <AssignTechnicianModal
-        service={serviceToAssign}
+        service={currentService}
         open={showAssignModal}
         onOpenChange={setShowAssignModal}
       />
+      <SetPriceModal
+        service={currentService}
+        open={showSetPriceModal}
+        onOpenChange={setShowSetPriceModal}
+      />
+      <RegisterPaymentModal
+        service={currentService}
+        open={showPaymentModal}
+        onOpenChange={setShowPaymentModal}
+      />
+      <RequestPartModal
+        service={currentService}
+        open={showRequestPartModal}
+        onOpenChange={setShowRequestPartModal}
+        requireSignature={currentService?.service_location === 'cliente'}
+      />
+      <DeliveryManagementModal
+        service={currentService}
+        open={showDeliveryMgmtModal}
+        onOpenChange={setShowDeliveryMgmtModal}
+        onAssignDelivery={handleAssignDelivery}
+      />
+      <AssignDeliveryModal
+        service={currentService}
+        open={showAssignDeliveryModal}
+        onOpenChange={setShowAssignDeliveryModal}
+      />
+      <ForceStateModal
+        service={currentService}
+        open={showForceStateModal}
+        onOpenChange={setShowForceStateModal}
+      />
+      <ContactClientModal
+        service={currentService}
+        open={showContactModal}
+        onOpenChange={setShowContactModal}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Eliminação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja eliminar o serviço {currentService?.code}? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Detail Sheet */}
       <ServiceDetailSheet

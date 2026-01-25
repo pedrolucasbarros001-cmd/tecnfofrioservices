@@ -7,14 +7,21 @@ import {
   CheckCircle,
   Eye,
   MoreHorizontal,
+  Package,
+  RefreshCw,
+  Phone,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Service, ServiceStatus } from '@/types/database';
 
 interface StateActionButtonsProps {
@@ -26,6 +33,11 @@ interface StateActionButtonsProps {
   onRegisterPayment?: () => void;
   onManageDelivery?: () => void;
   onFinalize?: () => void;
+  onRequestPart?: () => void;
+  onMarkPartArrived?: () => void;
+  onForceState?: () => void;
+  onContactClient?: () => void;
+  onDelete?: () => void;
 }
 
 interface ActionConfig {
@@ -44,7 +56,21 @@ export function StateActionButtons({
   onRegisterPayment,
   onManageDelivery,
   onFinalize,
+  onRequestPart,
+  onMarkPartArrived,
+  onForceState,
+  onContactClient,
+  onDelete,
 }: StateActionButtonsProps) {
+  const { role } = useAuth();
+  const isDono = role === 'dono';
+  const isSecretaria = role === 'secretaria';
+  const isTecnico = role === 'tecnico';
+
+  const isServicePriced = (service.final_price || 0) > 0;
+  const isServiceInDebit = isServicePriced && (service.amount_paid || 0) < (service.final_price || 0);
+  const canBeFinalized = isServicePriced && !isServiceInDebit && service.status === 'concluidos';
+
   const getMainAction = (): ActionConfig | null => {
     switch (service.status as ServiceStatus) {
       case 'por_fazer':
@@ -56,11 +82,18 @@ export function StateActionButtons({
             className: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white',
           };
         }
+        if (isTecnico && onStartExecution) {
+          return {
+            label: 'Iniciar',
+            icon: Play,
+            onClick: onStartExecution,
+            className: 'bg-green-600 hover:bg-green-700 text-white',
+          };
+        }
         return {
-          label: 'Iniciar',
-          icon: Play,
-          onClick: onStartExecution || (() => {}),
-          className: 'bg-green-600 hover:bg-green-700 text-white',
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
         };
 
       case 'em_execucao':
@@ -72,8 +105,44 @@ export function StateActionButtons({
         };
 
       case 'na_oficina':
+        if (isTecnico && onStartExecution) {
+          return {
+            label: 'Iniciar',
+            icon: Play,
+            onClick: onStartExecution,
+            className: 'bg-green-600 hover:bg-green-700 text-white',
+          };
+        }
+        return {
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
+        };
+
       case 'para_pedir_peca':
+        if (isDono && onMarkPartArrived) {
+          return {
+            label: 'Registar Pedido',
+            icon: Package,
+            onClick: onMarkPartArrived,
+            className: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+          };
+        }
+        return {
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
+        };
+
       case 'em_espera_de_peca':
+        if (isDono && onMarkPartArrived) {
+          return {
+            label: 'Peça Chegou',
+            icon: CheckCircle,
+            onClick: onMarkPartArrived,
+            className: 'bg-green-600 hover:bg-green-700 text-white',
+          };
+        }
         return {
           label: 'Ver Detalhes',
           icon: Eye,
@@ -81,27 +150,48 @@ export function StateActionButtons({
         };
 
       case 'a_precificar':
+        if ((isDono) && onSetPrice) {
+          return {
+            label: 'Definir Preço',
+            icon: DollarSign,
+            onClick: onSetPrice,
+            className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+          };
+        }
         return {
-          label: 'Definir Preço',
-          icon: DollarSign,
-          onClick: onSetPrice || (() => {}),
-          className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
         };
 
       case 'concluidos':
+        if ((isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
+          return {
+            label: 'Gerir Entrega',
+            icon: Truck,
+            onClick: onManageDelivery,
+            className: 'bg-teal-600 hover:bg-teal-700 text-white',
+          };
+        }
         return {
-          label: 'Gerir Entrega',
-          icon: Truck,
-          onClick: onManageDelivery || (() => {}),
-          className: 'bg-teal-600 hover:bg-teal-700 text-white',
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
         };
 
       case 'em_debito':
+        if ((isDono || isSecretaria) && onRegisterPayment) {
+          return {
+            label: 'Registar Pagamento',
+            icon: CreditCard,
+            onClick: onRegisterPayment,
+            className: 'bg-orange-600 hover:bg-orange-700 text-white',
+          };
+        }
         return {
-          label: 'Registar Pagamento',
-          icon: CreditCard,
-          onClick: onRegisterPayment || (() => {}),
-          className: 'bg-orange-600 hover:bg-orange-700 text-white',
+          label: 'Ver Detalhes',
+          icon: Eye,
+          onClick: onViewDetails,
         };
 
       case 'finalizado':
@@ -149,23 +239,86 @@ export function StateActionButtons({
             <Eye className="h-4 w-4 mr-2" />
             Ver Detalhes
           </DropdownMenuItem>
-          {!service.technician_id && (
+
+          {/* Assign/Reassign Technician */}
+          {!service.technician_id && (isDono || isSecretaria) && (
             <DropdownMenuItem onClick={onAssignTechnician}>
               <UserPlus className="h-4 w-4 mr-2" />
               Atribuir Técnico
             </DropdownMenuItem>
           )}
-          {service.status === 'concluidos' && onRegisterPayment && (
+          {service.technician_id && service.status !== 'finalizado' && isDono && (
+            <DropdownMenuItem onClick={onAssignTechnician}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reatribuir Técnico
+            </DropdownMenuItem>
+          )}
+
+          {/* Request Part - Technician or Dono during execution */}
+          {(service.status === 'em_execucao' || service.status === 'na_oficina') && onRequestPart && (isTecnico || isDono) && (
+            <DropdownMenuItem onClick={onRequestPart}>
+              <Package className="h-4 w-4 mr-2" />
+              Solicitar Peça
+            </DropdownMenuItem>
+          )}
+
+          {/* Set Price - Only Dono */}
+          {(service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && isDono && onSetPrice && (
+            <DropdownMenuItem onClick={onSetPrice}>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Definir Preço
+            </DropdownMenuItem>
+          )}
+
+          {/* Register Payment - Dono or Secretaria */}
+          {isServicePriced && isServiceInDebit && (isDono || isSecretaria) && onRegisterPayment && (
             <DropdownMenuItem onClick={onRegisterPayment}>
               <CreditCard className="h-4 w-4 mr-2" />
               Registar Pagamento
             </DropdownMenuItem>
           )}
-          {(service.status === 'em_debito' || service.status === 'concluidos') && onFinalize && (
+
+          {/* Contact Client - Secretaria for debit */}
+          {isServiceInDebit && isSecretaria && onContactClient && (
+            <DropdownMenuItem onClick={onContactClient}>
+              <Phone className="h-4 w-4 mr-2" />
+              Contactar Cliente
+            </DropdownMenuItem>
+          )}
+
+          {/* Manage Delivery - Concluidos with workshop location */}
+          {service.status === 'concluidos' && service.service_location === 'oficina' && (isDono || isSecretaria) && onManageDelivery && (
+            <DropdownMenuItem onClick={onManageDelivery}>
+              <Truck className="h-4 w-4 mr-2" />
+              Gerir Entrega
+            </DropdownMenuItem>
+          )}
+
+          {/* Finalize - When conditions met */}
+          {canBeFinalized && (isDono || isSecretaria) && onFinalize && (
             <DropdownMenuItem onClick={onFinalize}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Finalizar Serviço
             </DropdownMenuItem>
+          )}
+
+          {/* Dono only actions */}
+          {isDono && (
+            <>
+              <DropdownMenuSeparator />
+              {onForceState && (
+                <DropdownMenuItem onClick={onForceState} className="text-amber-600">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Mudar Status (Forçado)
+                </DropdownMenuItem>
+              )}
+              {onDelete && (
+                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar Serviço
+                </DropdownMenuItem>
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
