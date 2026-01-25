@@ -1,52 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Filter, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Search, ChevronDown } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { WeeklyAgenda } from '@/components/agenda/WeeklyAgenda';
+import { ServiceTypeSelector, type ServiceCreationType } from '@/components/modals/ServiceTypeSelector';
+import { CreateServiceModal } from '@/components/modals/CreateServiceModal';
+import { CreateInstallationModal } from '@/components/modals/CreateInstallationModal';
+import { CreateDeliveryModal } from '@/components/modals/CreateDeliveryModal';
+import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { useServices } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
+import { Calendar } from 'lucide-react';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(
     (searchParams.get('status') as ServiceStatus) || 'all'
   );
+  
+  // Modals
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showInstallationModal, setShowInstallationModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  
+  // Detail sheet
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
 
-  useEffect(() => {
-    fetchServices();
-  }, [selectedStatus]);
-
-  async function fetchServices() {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('services')
-        .select(`
-          *,
-          customer:customers(*),
-          technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setServices((data as unknown as Service[]) || []);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: services = [], isLoading } = useServices({ status: selectedStatus });
 
   const filteredServices = services.filter((service) => {
     if (!searchTerm) return true;
@@ -69,21 +61,61 @@ export default function GeralPage() {
     setSearchParams(searchParams);
   };
 
+  const handleServiceTypeSelect = (type: ServiceCreationType) => {
+    if (type === 'reparacao') setShowServiceModal(true);
+    else if (type === 'instalacao') setShowInstallationModal(true);
+    else if (type === 'entrega') setShowDeliveryModal(true);
+  };
+
+  const handleServiceClick = (service: Service) => {
+    setSelectedService(service);
+    setShowDetailSheet(true);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Geral</h1>
-          <p className="text-muted-foreground">Todos os serviços do sistema</p>
+          <h1 className="text-2xl font-bold tracking-tight">Gestão Geral</h1>
+          <p className="text-muted-foreground">Gerir todos os serviços</p>
         </div>
-        <Button className="shrink-0">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Serviço
-        </Button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="shrink-0">
+              Novo Serviço
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-popover">
+            <DropdownMenuItem onClick={() => setShowServiceModal(true)}>
+              Nova Reparação
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowInstallationModal(true)}>
+              Nova Instalação
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowDeliveryModal(true)}>
+              Nova Entrega Direta
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Status Filter Cards */}
+      {/* Search */}
+      <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar por código, cliente, equipamento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Status Filter */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         <Button
           variant={selectedStatus === 'all' ? 'default' : 'outline'}
@@ -106,22 +138,17 @@ export default function GeralPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Pesquisar por código, cliente, equipamento..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
+      {/* Weekly Agenda - only show when no status filter */}
+      {selectedStatus === 'all' && (
+        <WeeklyAgenda
+          services={services}
+          onServiceClick={handleServiceClick}
+        />
+      )}
 
       {/* Services List */}
       <div className="space-y-3">
-        {loading ? (
+        {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">
             A carregar serviços...
           </div>
@@ -140,6 +167,7 @@ export default function GeralPage() {
               <Card
                 key={service.id}
                 className="cursor-pointer hover:shadow-md transition-all"
+                onClick={() => handleServiceClick(service)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
@@ -152,10 +180,10 @@ export default function GeralPage() {
                           {statusConfig.label}
                         </Badge>
                         {service.is_urgent && (
-                          <Badge variant="destructive">Urgente</Badge>
+                          <Badge variant="destructive" className="animate-pulse">Urgente</Badge>
                         )}
                         {service.is_warranty && (
-                          <Badge variant="secondary">Garantia</Badge>
+                          <Badge className="bg-purple-500 text-white">Garantia</Badge>
                         )}
                       </div>
                       <p className="font-medium truncate">
@@ -166,11 +194,6 @@ export default function GeralPage() {
                           .filter(Boolean)
                           .join(' • ') || 'Equipamento não definido'}
                       </p>
-                      {service.fault_description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                          {service.fault_description}
-                        </p>
-                      )}
                     </div>
                     <div className="text-right shrink-0">
                       {service.scheduled_date && (
@@ -193,12 +216,26 @@ export default function GeralPage() {
         )}
       </div>
 
-      {/* Results count */}
-      {!loading && (
-        <p className="text-sm text-muted-foreground">
-          {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} encontrado{filteredServices.length !== 1 ? 's' : ''}
-        </p>
-      )}
+      <p className="text-sm text-muted-foreground">
+        {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} encontrado{filteredServices.length !== 1 ? 's' : ''}
+      </p>
+
+      {/* Modals */}
+      <ServiceTypeSelector
+        open={showTypeSelector}
+        onOpenChange={setShowTypeSelector}
+        onSelect={handleServiceTypeSelect}
+      />
+      <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
+      <CreateInstallationModal open={showInstallationModal} onOpenChange={setShowInstallationModal} />
+      <CreateDeliveryModal open={showDeliveryModal} onOpenChange={setShowDeliveryModal} />
+      
+      {/* Detail Sheet */}
+      <ServiceDetailSheet
+        service={selectedService}
+        open={showDetailSheet}
+        onOpenChange={setShowDetailSheet}
+      />
     </div>
   );
 }
