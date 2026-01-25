@@ -13,6 +13,30 @@ interface InviteUserRequest {
   specialization?: string;
 }
 
+// Generate a secure temporary password
+function generateTempPassword(): string {
+  const upperChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lowerChars = 'abcdefghjkmnpqrstuvwxyz';
+  const numbers = '23456789';
+  const symbols = '!@#$%&*';
+  
+  let password = '';
+  // Ensure at least one of each type
+  password += upperChars.charAt(Math.floor(Math.random() * upperChars.length));
+  password += lowerChars.charAt(Math.floor(Math.random() * lowerChars.length));
+  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
+  
+  // Fill remaining 8 characters
+  const allChars = upperChars + lowerChars + numbers + symbols;
+  for (let i = 0; i < 8; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -88,27 +112,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Invite user via Supabase Auth Admin API
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        data: {
-          full_name,
-          phone,
-          role,
-        },
-      }
-    );
+    // Generate temporary password
+    const tempPassword = generateTempPassword();
 
-    if (inviteError) {
-      console.error('Error inviting user:', inviteError);
+    // Create user directly with temporary password (no email required)
+    const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true, // Mark email as confirmed to bypass email verification
+      user_metadata: {
+        full_name,
+        phone,
+        role,
+      },
+    });
+
+    if (createError) {
+      console.error('Error creating user:', createError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao enviar convite: ' + inviteError.message }),
+        JSON.stringify({ error: 'Erro ao criar utilizador: ' + createError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const newUser = inviteData.user;
+    const newUser = createData.user;
 
     if (!newUser) {
       return new Response(
@@ -169,11 +196,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Return success with the temporary password
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Convite enviado para ${email}`,
+        message: `Utilizador criado com sucesso`,
         user_id: newUser.id,
+        email: email,
+        temp_password: tempPassword, // Return the temp password to the admin
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
