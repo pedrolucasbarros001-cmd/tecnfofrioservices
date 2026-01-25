@@ -2,47 +2,131 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
-  Wrench,
+  Play,
+  Building2,
+  Package,
   Clock,
-  CheckCircle2,
+  Truck,
+  DollarSign,
   AlertCircle,
-  TrendingUp,
-  Calendar,
-  Users,
+  CheckSquare,
+  FileText,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG, type ServiceStatus } from '@/types/database';
+import type { ServiceStatus } from '@/types/database';
 
 interface DashboardStats {
-  total: number;
   por_fazer: number;
   em_execucao: number;
   na_oficina: number;
+  para_pedir_peca: number;
+  em_espera_de_peca: number;
   concluidos: number;
+  a_precificar: number;
   em_debito: number;
+  finalizado: number;
+  orcamentos: number;
 }
 
-const statusCards = [
-  { key: 'por_fazer' as ServiceStatus, icon: ClipboardList, label: 'Por Fazer' },
-  { key: 'em_execucao' as ServiceStatus, icon: Clock, label: 'Em Execução' },
-  { key: 'na_oficina' as ServiceStatus, icon: Wrench, label: 'Na Oficina' },
-  { key: 'concluidos' as ServiceStatus, icon: CheckCircle2, label: 'Concluídos' },
-  { key: 'em_debito' as ServiceStatus, icon: AlertCircle, label: 'Em Débito' },
+const DASHBOARD_CARDS = [
+  { 
+    key: 'por_fazer' as const, 
+    label: 'Por Fazer', 
+    icon: ClipboardList,
+    bgClass: 'bg-gray-200/50',
+    iconClass: 'text-gray-600',
+    route: '/geral?status=por_fazer'
+  },
+  { 
+    key: 'em_execucao' as const, 
+    label: 'Em Execução', 
+    icon: Play,
+    bgClass: 'bg-blue-100',
+    iconClass: 'text-blue-600',
+    route: '/geral?status=em_execucao'
+  },
+  { 
+    key: 'na_oficina' as const, 
+    label: 'Na Oficina', 
+    icon: Building2,
+    bgClass: 'bg-orange-100',
+    iconClass: 'text-orange-600',
+    route: '/geral?status=na_oficina'
+  },
+  { 
+    key: 'para_pedir_peca' as const, 
+    label: 'Para Pedir Peça', 
+    icon: Package,
+    bgClass: 'bg-purple-100',
+    iconClass: 'text-purple-600',
+    route: '/geral?status=para_pedir_peca'
+  },
+  { 
+    key: 'em_espera_de_peca' as const, 
+    label: 'Em Espera de Peça', 
+    icon: Clock,
+    bgClass: 'bg-yellow-100',
+    iconClass: 'text-yellow-700',
+    route: '/geral?status=em_espera_de_peca'
+  },
+  { 
+    key: 'concluidos' as const, 
+    label: 'Concluídos', 
+    icon: Truck,
+    bgClass: 'bg-teal-100',
+    iconClass: 'text-teal-600',
+    route: '/geral?status=concluidos'
+  },
+  { 
+    key: 'a_precificar' as const, 
+    label: 'A Precificar', 
+    icon: DollarSign,
+    bgClass: 'bg-green-200',
+    iconClass: 'text-green-700',
+    route: '/geral?status=a_precificar'
+  },
+  { 
+    key: 'em_debito' as const, 
+    label: 'Em Débito', 
+    icon: AlertCircle,
+    bgClass: 'bg-red-100',
+    iconClass: 'text-red-600',
+    route: '/geral?status=em_debito'
+  },
+  { 
+    key: 'finalizado' as const, 
+    label: 'Finalizados', 
+    icon: CheckSquare,
+    bgClass: 'bg-violet-100',
+    iconClass: 'text-violet-600',
+    route: '/geral?status=finalizado'
+  },
+  { 
+    key: 'orcamentos' as const, 
+    label: 'Orçamentos', 
+    icon: FileText,
+    bgClass: 'bg-purple-100',
+    iconClass: 'text-purple-600',
+    route: '/orcamentos'
+  },
 ];
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { profile, role } = useAuth();
+  const { role } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
-    total: 0,
     por_fazer: 0,
     em_execucao: 0,
     na_oficina: 0,
+    para_pedir_peca: 0,
+    em_espera_de_peca: 0,
     concluidos: 0,
+    a_precificar: 0,
     em_debito: 0,
+    finalizado: 0,
+    orcamentos: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -58,24 +142,41 @@ export default function DashboardPage() {
 
   async function fetchStats() {
     try {
-      const { data, error } = await supabase
+      // Fetch services stats
+      const { data: services, error: servicesError } = await supabase
         .from('services')
-        .select('status');
+        .select('status, pending_pricing');
 
-      if (error) throw error;
+      if (servicesError) throw servicesError;
+
+      // Fetch budgets count
+      const { count: budgetsCount, error: budgetsError } = await supabase
+        .from('budgets')
+        .select('*', { count: 'exact', head: true });
+
+      if (budgetsError) throw budgetsError;
 
       const counts: DashboardStats = {
-        total: data?.length || 0,
         por_fazer: 0,
         em_execucao: 0,
         na_oficina: 0,
+        para_pedir_peca: 0,
+        em_espera_de_peca: 0,
         concluidos: 0,
+        a_precificar: 0,
         em_debito: 0,
+        finalizado: 0,
+        orcamentos: budgetsCount || 0,
       };
 
-      data?.forEach((service) => {
-        if (service.status in counts) {
-          counts[service.status as keyof DashboardStats]++;
+      services?.forEach((service) => {
+        const status = service.status as ServiceStatus;
+        if (status in counts) {
+          counts[status as keyof Omit<DashboardStats, 'orcamentos'>]++;
+        }
+        // Count pending pricing separately
+        if (service.pending_pricing) {
+          counts.a_precificar++;
         }
       });
 
@@ -87,129 +188,43 @@ export default function DashboardPage() {
     }
   }
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia';
-    if (hour < 19) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {getGreeting()}, {profile?.full_name?.split(' ')[0] || 'Utilizador'}! 👋
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Aqui está o resumo dos seus serviços.
+          Visão geral de todos os serviços
         </p>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {statusCards.map((card) => {
-          const config = SERVICE_STATUS_CONFIG[card.key];
+      {/* Status Cards Grid - 5 columns x 2 rows */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {DASHBOARD_CARDS.map((card) => {
+          const Icon = card.icon;
+          const count = stats[card.key as keyof DashboardStats];
+          
           return (
             <Card
               key={card.key}
-              className="cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
-              onClick={() => navigate(`/geral?status=${card.key}`)}
+              className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${card.bgClass} border-0`}
+              onClick={() => navigate(card.route)}
             >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardContent className="p-4 h-[120px] flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <Icon className={`h-6 w-6 ${card.iconClass}`} />
+                  <span className="text-3xl font-bold text-foreground">
+                    {loading ? '...' : count}
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-muted-foreground mt-auto">
                   {card.label}
-                </CardTitle>
-                <div className={`p-2 rounded-lg ${config.color}`}>
-                  <card.icon className="h-4 w-4 text-white" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {loading ? '...' : stats[card.key as keyof DashboardStats]}
-                </div>
+                </p>
               </CardContent>
             </Card>
           );
         })}
       </div>
-
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => navigate('/geral')}>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <ClipboardList className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Ver Serviços</CardTitle>
-                <CardDescription>Todos os serviços</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => navigate('/oficina')}>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Wrench className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Oficina</CardTitle>
-                <CardDescription>Serviços na oficina</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => navigate('/clientes')}>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Users className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Clientes</CardTitle>
-                <CardDescription>Gerir clientes</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-all" onClick={() => navigate('/performance')}>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10">
-                <TrendingUp className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Performance</CardTitle>
-                <CardDescription>Estatísticas</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Total Services Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Resumo Total
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-4xl font-bold text-primary">
-            {loading ? '...' : stats.total}
-          </div>
-          <p className="text-muted-foreground mt-1">
-            Total de serviços no sistema
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
