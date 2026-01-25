@@ -201,15 +201,15 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
             {step === 'location' ? 'Tipo de Serviço' : 'Nova Reparação'}
           </DialogTitle>
         </DialogHeader>
 
         {step === 'location' ? (
-          <div className="grid grid-cols-2 gap-4 py-6">
+          <div className="grid grid-cols-2 gap-4 py-6 px-6">
             <button
               onClick={() => {
                 form.setValue('service_location', 'cliente');
@@ -244,9 +244,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)}>
-              <ScrollArea className="max-h-[60vh] pr-4">
-                <div className="space-y-6 py-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+              <ScrollArea className="flex-1 px-6">
+                <div className="space-y-6 py-4 pr-4">
                   {/* Customer Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -708,7 +708,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                 </div>
               </ScrollArea>
 
-              <DialogFooter className="mt-4">
+              <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button type="button" variant="outline" onClick={() => setStep('location')}>
                   Voltar
                 </Button>
