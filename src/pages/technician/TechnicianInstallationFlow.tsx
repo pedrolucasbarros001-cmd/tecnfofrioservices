@@ -72,7 +72,7 @@ export default function TechnicianInstallationFlow() {
     }
   };
 
-  const handleSignatureComplete = async (signatureData: string) => {
+  const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     if (!service) return;
     try {
       // Save signature
@@ -245,7 +245,7 @@ export default function TechnicianInstallationFlow() {
         <SignatureCanvas
           open={showSignature}
           onOpenChange={setShowSignature}
-          onComplete={handleSignatureComplete}
+          onConfirm={handleSignatureComplete}
           title="Assinatura do Cliente para Conclusão de Instalação"
         />
       )}
