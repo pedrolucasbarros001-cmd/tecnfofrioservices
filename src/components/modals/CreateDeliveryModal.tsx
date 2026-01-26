@@ -40,6 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
@@ -517,18 +519,26 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Turno</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecionar" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="manha">Manhã</SelectItem>
-                                <SelectItem value="tarde">Tarde</SelectItem>
-                                <SelectItem value="noite">Noite</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormControl>
+                              <RadioGroup
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                className="flex gap-4 pt-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="manha" id="delivery-manha" />
+                                  <Label htmlFor="delivery-manha" className="font-normal cursor-pointer">Manhã</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="tarde" id="delivery-tarde" />
+                                  <Label htmlFor="delivery-tarde" className="font-normal cursor-pointer">Tarde</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="noite" id="delivery-noite" />
+                                  <Label htmlFor="delivery-noite" className="font-normal cursor-pointer">Noite</Label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -598,8 +608,9 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                 <Button 
                   type="submit" 
                   disabled={createService.isPending || createCustomer.isPending}
+                  className="bg-green-600 hover:bg-green-700 text-white"
                 >
-                  {createService.isPending ? 'A criar...' : 'Criar Entrega'}
+                  {createService.isPending ? 'A agendar...' : 'Agendar Entrega'}
                 </Button>
               </DialogFooter>
             </form>
