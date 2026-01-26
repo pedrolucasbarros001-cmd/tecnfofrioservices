@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Users,
-  BarChart3,
   Settings,
   LogOut,
   Snowflake,
@@ -30,7 +29,6 @@ const menuItems = [
   { title: 'Concluídos', url: '/concluidos', icon: CheckCircle2 },
   { title: 'Em Débito', url: '/em-debito', icon: AlertCircle },
   { title: 'Clientes', url: '/clientes', icon: Users },
-  { title: 'Performance', url: '/performance', icon: BarChart3 },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
 ];
 
