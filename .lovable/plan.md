@@ -1,293 +1,386 @@
 
+# Plano: Desenvolver Paginas Perfil e Preferencias do Tecnico
 
-# Plano: Ajustar Ficha de Impressao para A4 sem Fotos
+## Resumo
 
-## Resumo das Alteracoes
-
-1. Remover a seccao de fotos da ficha de impressao
-2. Manter assinaturas com descricoes
-3. Formatar o documento para caber numa folha A4
-4. A etiqueta (ServiceTagModal) permanece inalterada
+Implementar as duas paginas em falta na interface do tecnico:
+1. **Perfil** (/perfil) - Visualizar e editar dados pessoais
+2. **Preferencias** (/preferencias) - Configuracoes da aplicacao
 
 ---
 
-## 1. Remover Seccao de Fotos
+## 1. Pagina de Perfil (PerfilPage.tsx)
 
-**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
+### 1.1 Funcionalidades
 
-**Remover linhas 423-448:**
-```tsx
-{/* Service Photos */}
-{photos.length > 0 && (
-  <>
-    <Separator className="my-4" />
-    <section className="mb-6">
-      <h2 className="...">Evidências Fotográficas</h2>
-      ...
-    </section>
-  </>
-)}
-```
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| Visualizar dados | Nome, email, telefone, especializacao |
+| Editar dados | Nome e telefone (email apenas leitura) |
+| Avatar | Iniciais coloridas baseadas no nome |
+| Estatisticas | Total de servicos, concluidos este mes, em andamento |
+| Informacao da conta | Data de criacao, cargo atual |
 
-**Tambem remover:**
-- Import do icone `Camera` (linha 4)
-- Query `service-photos-print` (linhas 87-100)
-- Helper `getPhotoTypeLabel` (linhas 40-51) - ja nao e necessario
-
----
-
-## 2. Adicionar Estilos CSS para Impressao A4
-
-**Ficheiro:** `src/index.css`
-
-Adicionar media query `@media print` com estilos optimizados para A4:
-
-```css
-@media print {
-  /* Configurar pagina A4 */
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
-
-  /* Esconder elementos que nao devem ser impressos */
-  body * {
-    visibility: hidden;
-  }
-
-  .print-content,
-  .print-content * {
-    visibility: visible;
-  }
-
-  .print-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-
-  /* Ajustar tamanhos de fonte para caber em A4 */
-  .print-content {
-    font-size: 11px !important;
-  }
-
-  .print-content h1 {
-    font-size: 16px !important;
-  }
-
-  .print-content h2 {
-    font-size: 13px !important;
-    margin-bottom: 6px !important;
-    padding-bottom: 4px !important;
-  }
-
-  .print-content section {
-    margin-bottom: 8px !important;
-  }
-
-  .print-content .separator {
-    margin: 6px 0 !important;
-  }
-
-  /* Compactar espacamentos */
-  .print-content .grid {
-    gap: 4px 16px !important;
-  }
-
-  /* Evitar quebras de pagina indesejaveis */
-  .print-content section {
-    break-inside: avoid;
-  }
-
-  /* Esconder botoes e header do modal */
-  [role="dialog"] > div:first-child,
-  .no-print {
-    display: none !important;
-  }
-}
-```
-
----
-
-## 3. Ajustar Estrutura do Modal para Impressao
-
-**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
-
-### 3.1 Adicionar classe `print-content` ao container principal
-
-**Alterar linha 143:**
-```tsx
-// De:
-<div className="border rounded-lg p-6 bg-white print:border-0 print:p-0">
-
-// Para:
-<div className="print-content border rounded-lg p-6 bg-white print:border-0 print:p-0">
-```
-
-### 3.2 Reduzir tamanhos para caber em A4
-
-**Ajustar espacamentos e margens:**
-- Reduzir `mb-6` para `mb-4` nas seccoes
-- Reduzir `my-4` para `my-2` nos separadores
-- Usar fonte menor para texto (`text-xs` em vez de `text-sm`)
-
-### 3.3 Compactar seccao de assinaturas
-
-**Alterar layout das assinaturas (linhas 459-477):**
-```tsx
-<div className="grid grid-cols-2 gap-2">
-  {signatures.map((sig) => (
-    <div key={sig.id} className="flex items-center gap-2 p-2 border rounded bg-gray-50">
-      <img 
-        src={sig.file_url} 
-        alt="Assinatura" 
-        className="w-20 h-10 object-contain border bg-white rounded"
-      />
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-xs truncate">{sig.signer_name || 'Cliente'}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2">
-          {getSignatureDescription(sig.signature_type)}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {format(new Date(sig.signed_at), "dd/MM/yy HH:mm")}
-        </p>
-      </div>
-    </div>
-  ))}
-</div>
-```
-
-### 3.4 Compactar termos de guarda
-
-**Reduzir padding e texto:**
-```tsx
-<section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-  ...
-</section>
-```
-
----
-
-## 4. Estrutura Final da Ficha A4
-
-A ficha impressa tera as seguintes seccoes (todas compactadas):
+### 1.2 Estrutura Visual
 
 ```text
 ┌─────────────────────────────────────────────────────┐
-│ TECNOFRIO              Ficha de Servico            │
-│ Codigo: SV-2026-0001   QR [■■]                     │
+│ Perfil                                              │
 ├─────────────────────────────────────────────────────┤
-│ DADOS DO CLIENTE                                    │
-│ Nome: ...  NIF: ...  Telefone: ...  Email: ...     │
-│ Morada: ...                                         │
-├─────────────────────────────────────────────────────┤
-│ DETALHES DO SERVICO                                 │
-│ Categoria: ...  Tipo: ...  Estado: ...  Prioridade │
-├─────────────────────────────────────────────────────┤
-│ DETALHES DO EQUIPAMENTO                             │
-│ Tipo: ...  Marca: ...  Modelo: ...  Serie: ...     │
-│ Avaria: ...                                         │
-├─────────────────────────────────────────────────────┤
-│ GARANTIA (se aplicavel)                             │
-├─────────────────────────────────────────────────────┤
-│ TRABALHO REALIZADO (se aplicavel)                   │
-├─────────────────────────────────────────────────────┤
-│ PECAS UTILIZADAS (tabela compacta)                  │
-├─────────────────────────────────────────────────────┤
-│ RESUMO FINANCEIRO                                   │
-│ Mao de Obra / Pecas / Desconto / TOTAL             │
-│ Valor Pago / Em Debito / Falta Pagar               │
-├─────────────────────────────────────────────────────┤
-│ HISTORICO DE PAGAMENTOS (tabela compacta)           │
-├─────────────────────────────────────────────────────┤
-│ ASSINATURAS (grid 2 colunas, compacto)              │
-│ ┌──────────────────┐ ┌──────────────────┐          │
-│ │ [Assin] Nome     │ │ [Assin] Nome     │          │
-│ │ Descricao breve  │ │ Descricao breve  │          │
-│ └──────────────────┘ └──────────────────┘          │
-├─────────────────────────────────────────────────────┤
-│ ⚠ IMPORTANTE - Termos de Guarda (30 dias)    [QR] │
-├─────────────────────────────────────────────────────┤
-│ _____________          _____________               │
-│ Assin. Cliente         Assin. Funcionario          │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │  ┌──────┐                                       │ │
+│ │  │  JD  │  Joao Dias                            │ │
+│ │  │(icon)│  tecnico@tecnofrio.pt                 │ │
+│ │  └──────┘  +351 912 345 678                     │ │
+│ │           Especializacao: Ar Condicionado       │ │
+│ │                                                 │ │
+│ │  [Editar Perfil]                                │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Estatisticas                                    │ │
+│ │ ┌──────────┐ ┌──────────┐ ┌──────────┐         │ │
+│ │ │   127    │ │    23    │ │     5    │         │ │
+│ │ │ Servicos │ │ Este Mes │ │ Ativos   │         │ │
+│ │ │ Total    │ │Concluidos│ │          │         │ │
+│ │ └──────────┘ └──────────┘ └──────────┘         │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Informacao da Conta                             │ │
+│ │ • Cargo: Tecnico                                │ │
+│ │ • Membro desde: Janeiro 2025                    │ │
+│ │ • Estado: Ativo                                 │ │
+│ └─────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
 
+### 1.3 Componentes a Usar
+
+- Card, CardHeader, CardContent, CardTitle
+- Avatar, AvatarFallback
+- Badge (para estado ativo/inativo)
+- Button (editar perfil)
+- Dialog (modal de edicao)
+- Form com Input (nome, telefone)
+
+### 1.4 Dados a Buscar
+
+```typescript
+// 1. Profile do AuthContext (ja disponivel)
+const { profile, user } = useAuth();
+
+// 2. Dados do tecnico (especializacao, cor)
+const { data: technicianData } = useQuery({
+  queryKey: ['technician-profile', profile?.id],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from('technicians')
+      .select('*')
+      .eq('profile_id', profile.id)
+      .single();
+    return data;
+  },
+});
+
+// 3. Estatisticas de servicos
+const { data: stats } = useQuery({
+  queryKey: ['technician-stats', technicianId],
+  queryFn: async () => {
+    // Total de servicos
+    // Concluidos este mes
+    // Servicos ativos
+  },
+});
+```
+
+### 1.5 Modal de Edicao
+
+Campos editaveis:
+- Nome completo
+- Telefone
+
+Campos somente leitura:
+- Email (gerido pelo Supabase Auth)
+
 ---
 
-## 5. Ficheiros a Modificar
+## 2. Pagina de Preferencias (PreferenciasPage.tsx)
 
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `src/components/modals/ServicePrintModal.tsx` | Remover seccao de fotos; Adicionar classe `print-content`; Compactar espacamentos |
-| `src/index.css` | Adicionar media query `@media print` com estilos A4 |
+### 2.1 Funcionalidades
+
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| Notificacoes | Toggle para receber notificacoes (visual apenas) |
+| Tema | Selector claro/escuro (usando next-themes) |
+| Idioma | Portugues (fixo, apenas informativo) |
+| Alteracao de senha | Link/botao para alterar palavra-passe |
+| Versao | Mostrar versao da aplicacao |
+
+### 2.2 Estrutura Visual
+
+```text
+┌─────────────────────────────────────────────────────┐
+│ Preferencias                                        │
+├─────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Aparencia                                       │ │
+│ │ ─────────────────────────────────────────────── │ │
+│ │ Tema               [Claro ▼] ou [Toggle]        │ │
+│ │                                                 │ │
+│ │ Idioma             Portugues (Portugal)         │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Notificacoes                                    │ │
+│ │ ─────────────────────────────────────────────── │ │
+│ │ Novos servicos     [====] ON                    │ │
+│ │ Pecas chegaram     [====] ON                    │ │
+│ │ Alertas urgentes   [====] ON                    │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Seguranca                                       │ │
+│ │ ─────────────────────────────────────────────── │ │
+│ │ Palavra-passe      [Alterar Palavra-passe]      │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Sobre                                           │ │
+│ │ ─────────────────────────────────────────────── │ │
+│ │ TECNOFRIO Sistema de Gestao                     │ │
+│ │ Versao 1.0.0                                    │ │
+│ └─────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+### 2.3 Componentes a Usar
+
+- Card, CardHeader, CardContent, CardTitle
+- Switch (para toggles de notificacao)
+- Select (para tema)
+- Separator
+- Button (alterar senha)
+- Dialog (modal de alteracao de senha)
+
+### 2.4 Tema (next-themes)
+
+O projeto ja tem `next-themes` instalado. Implementar:
+
+```typescript
+import { useTheme } from 'next-themes';
+
+const { theme, setTheme } = useTheme();
+```
+
+### 2.5 Alteracao de Palavra-passe
+
+Usar `supabase.auth.updateUser({ password: newPassword })` dentro de um modal com:
+- Password atual (validacao)
+- Nova password
+- Confirmar nova password
 
 ---
 
-## 6. Seccao Tecnica
+## 3. Rotas no App.tsx
 
-### 6.1 Media Query para A4
+Alterar de `PlaceholderPage` para os novos componentes:
 
-```css
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 8mm 10mm;
-  }
+```typescript
+// De:
+<Route path="/perfil" element={<PlaceholderPage />} />
+<Route path="/preferencias" element={<PlaceholderPage />} />
 
-  /* Esconder tudo exceto conteudo de impressao */
-  body > *:not(.print-area) {
-    display: none !important;
-  }
+// Para:
+<Route path="/perfil" element={
+  <ProtectedRoute allowedRoles={['tecnico']}>
+    <PerfilPage />
+  </ProtectedRoute>
+} />
+<Route path="/preferencias" element={
+  <ProtectedRoute>
+    <PreferenciasPage />
+  </ProtectedRoute>
+} />
+```
 
-  /* Estilos compactos para A4 */
-  .print-content {
-    width: 190mm;
-    max-height: 277mm;
-    font-size: 10px;
-    line-height: 1.3;
-  }
+---
 
-  .print-content h2 {
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
+## 4. Ficheiros a Criar/Modificar
 
-  .print-content section {
-    margin-bottom: 6px;
-    page-break-inside: avoid;
-  }
+| Ficheiro | Acao | Descricao |
+|----------|------|-----------|
+| `src/pages/PerfilPage.tsx` | Criar | Pagina de perfil do tecnico |
+| `src/pages/PreferenciasPage.tsx` | Criar | Pagina de preferencias |
+| `src/App.tsx` | Modificar | Atualizar rotas para usar novos componentes |
 
-  .print-content table {
-    font-size: 9px;
-  }
+---
 
-  .print-content table th,
-  .print-content table td {
-    padding: 2px 4px;
-  }
+## 5. Seccao Tecnica
+
+### 5.1 PerfilPage.tsx - Estrutura
+
+```typescript
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { User, Mail, Phone, Wrench, Calendar, Edit2, Award } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, ... } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { format, startOfMonth } from 'date-fns';
+import { pt } from 'date-fns/locale';
+
+export default function PerfilPage() {
+  const { profile, user } = useAuth();
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Query technician data
+  // Query service statistics
+  
+  return (
+    <div className="p-6 space-y-6">
+      {/* Profile Card */}
+      {/* Stats Cards */}
+      {/* Account Info Card */}
+      {/* Edit Modal */}
+    </div>
+  );
 }
 ```
 
-### 6.2 Calculos de Espaco A4
+### 5.2 PreferenciasPage.tsx - Estrutura
 
-- Dimensoes A4: 210mm x 297mm
-- Margens: 10mm (deixa 190mm x 277mm utilizaveis)
-- Cabecalho + QR: ~25mm
-- Cada seccao: ~20-25mm
-- Assinaturas: ~30mm
-- Termos: ~25mm
+```typescript
+import { useState } from 'react';
+import { useTheme } from 'next-themes';
+import { Moon, Sun, Bell, Lock, Globe, Info } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Select, ... } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, ... } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 
-**Total estimado: ~200-250mm** - cabe numa folha A4
+export default function PreferenciasPage() {
+  const { theme, setTheme } = useTheme();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  // Notification preferences (local state for now)
+  const [notifications, setNotifications] = useState({
+    newServices: true,
+    partsArrived: true,
+    urgentAlerts: true,
+  });
+  
+  return (
+    <div className="p-6 space-y-6">
+      {/* Appearance Card */}
+      {/* Notifications Card */}
+      {/* Security Card */}
+      {/* About Card with TECNOFRIO branding */}
+      {/* Password Change Modal */}
+    </div>
+  );
+}
+```
+
+### 5.3 Estatisticas do Tecnico
+
+```typescript
+// Query para estatisticas
+const { data: stats } = useQuery({
+  queryKey: ['technician-stats', technicianId],
+  queryFn: async () => {
+    if (!technicianId) return null;
+    
+    // Total de servicos
+    const { count: total } = await supabase
+      .from('services')
+      .select('*', { count: 'exact', head: true })
+      .eq('technician_id', technicianId);
+    
+    // Concluidos este mes
+    const startOfCurrentMonth = startOfMonth(new Date()).toISOString();
+    const { count: thisMonth } = await supabase
+      .from('services')
+      .select('*', { count: 'exact', head: true })
+      .eq('technician_id', technicianId)
+      .in('status', ['concluidos', 'em_debito', 'finalizado'])
+      .gte('updated_at', startOfCurrentMonth);
+    
+    // Servicos ativos
+    const { count: active } = await supabase
+      .from('services')
+      .select('*', { count: 'exact', head: true })
+      .eq('technician_id', technicianId)
+      .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca']);
+    
+    return { total, thisMonth, active };
+  },
+  enabled: !!technicianId,
+});
+```
+
+### 5.4 Modal de Alteracao de Senha
+
+```typescript
+const handlePasswordChange = async (currentPassword: string, newPassword: string) => {
+  try {
+    // Re-authenticate with current password first
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user?.email || '',
+      password: currentPassword,
+    });
+    
+    if (signInError) {
+      toast.error('Palavra-passe atual incorreta');
+      return;
+    }
+    
+    // Update password
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    
+    if (error) throw error;
+    
+    toast.success('Palavra-passe alterada com sucesso');
+    setShowPasswordModal(false);
+  } catch (error) {
+    toast.error('Erro ao alterar palavra-passe');
+  }
+};
+```
+
+---
+
+## 6. Cores e Estilos
+
+Seguir o padrao existente no sistema:
+- Cards com `CardHeader` e `CardContent`
+- Icones da biblioteca `lucide-react`
+- Badge com cores semanticas
+- Botoes primarios com `bg-primary`
+- Avatar com cores baseadas no nome (reutilizar logica do ColaboradoresPage)
 
 ---
 
 ## 7. Resultado Esperado
 
-1. Ficha de impressao SEM fotos (apenas assinaturas)
-2. Documento formatado para A4 que imprime correctamente numa unica pagina
-3. Assinaturas mantidas com descricao do proposito
-4. Etiqueta (ServiceTagModal) inalterada
-5. Espacamentos e fontes optimizados para impressao
+1. **Perfil**:
+   - Exibir dados do tecnico (nome, email, telefone, especializacao)
+   - Permitir edicao de nome e telefone
+   - Mostrar estatisticas de servicos
+   - Mostrar informacao da conta (cargo, data de registo)
 
+2. **Preferencias**:
+   - Toggle entre tema claro/escuro
+   - Switches de notificacoes (visual, preparado para futuro)
+   - Botao para alterar palavra-passe com modal funcional
+   - Branding TECNOFRIO na seccao "Sobre"
