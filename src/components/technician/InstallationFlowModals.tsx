@@ -1,0 +1,431 @@
+import { useState, useEffect } from 'react';
+import { 
+  Navigation, 
+  MapPin, 
+  Camera, 
+  ArrowLeft, 
+  ArrowRight,
+  ImageIcon
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { useUpdateService } from '@/hooks/useServices';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { CameraCapture } from '@/components/shared/CameraCapture';
+import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
+import type { Service } from '@/types/database';
+
+type ModalStep = 'resumo' | 'deslocacao' | 'foto_antes' | 'foto_depois' | 'finalizacao';
+
+interface InstallationFlowModalsProps {
+  service: Service;
+  isOpen: boolean;
+  onClose: () => void;
+  onComplete: () => void;
+}
+
+interface FormData {
+  photoAntes: string | null;
+  photoDepois: string | null;
+}
+
+export function InstallationFlowModals({ service, isOpen, onClose, onComplete }: InstallationFlowModalsProps) {
+  const updateService = useUpdateService();
+  const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
+  const [formData, setFormData] = useState<FormData>({
+    photoAntes: null,
+    photoDepois: null,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'antes' | 'depois'>('antes');
+
+  // Reset when opened
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep('resumo');
+      setFormData({
+        photoAntes: null,
+        photoDepois: null,
+      });
+    }
+  }, [isOpen]);
+
+  const handleNavigateToClient = () => {
+    const address = service.service_address || service.customer?.address;
+    if (address) {
+      const encodedAddress = encodeURIComponent(address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+    } else {
+      toast.error('Morada não disponível');
+    }
+  };
+
+  const handlePhotoCapture = async (imageData: string) => {
+    try {
+      await supabase.from('service_photos').insert({
+        service_id: service.id,
+        photo_type: cameraMode === 'antes' ? 'instalacao_antes' : 'instalacao_depois',
+        file_url: imageData,
+        description: cameraMode === 'antes' ? 'Foto antes da instalação' : 'Foto após instalação',
+      });
+      
+      if (cameraMode === 'antes') {
+        setFormData(prev => ({ ...prev, photoAntes: imageData }));
+      } else {
+        setFormData(prev => ({ ...prev, photoDepois: imageData }));
+      }
+      
+      setShowCamera(false);
+      toast.success('Foto guardada!');
+    } catch (error) {
+      console.error('Error saving photo:', error);
+      toast.error('Erro ao guardar foto');
+    }
+  };
+
+  const handleSignatureComplete = async (signatureData: string, signerName: string) => {
+    setIsSubmitting(true);
+    try {
+      // Save signature
+      await supabase.from('service_signatures').insert({
+        service_id: service.id,
+        signature_type: 'instalacao',
+        file_url: signatureData,
+        signer_name: signerName || service.customer?.name,
+      });
+
+      // Update service to finalizado
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'finalizado',
+        service_location: 'entregue',
+      });
+
+      setShowSignature(false);
+      toast.success('Instalação concluída com sucesso!');
+      onComplete();
+    } catch (error) {
+      console.error('Error completing installation:', error);
+      toast.error('Erro ao concluir instalação');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setCurrentStep('resumo');
+    setFormData({
+      photoAntes: null,
+      photoDepois: null,
+    });
+    onClose();
+  };
+
+  const openCameraAntes = () => {
+    setCameraMode('antes');
+    setShowCamera(true);
+  };
+
+  const openCameraDepois = () => {
+    setCameraMode('depois');
+    setShowCamera(true);
+  };
+
+  // Validation
+  const canProceedFromFotoAntes = formData.photoAntes !== null;
+  const canProceedFromFotoDepois = formData.photoDepois !== null;
+
+  // Progress calculation (steps 2-5 = indices 0-3)
+  const stepIndex = ['deslocacao', 'foto_antes', 'foto_depois', 'finalizacao'].indexOf(currentStep);
+  const showProgress = currentStep !== 'resumo';
+
+  const ProgressBar = () => (
+    <div className="flex gap-1.5 mb-4">
+      {[0, 1, 2, 3].map((idx) => (
+        <div
+          key={idx}
+          className={cn(
+            'h-1.5 flex-1 rounded-full transition-colors',
+            idx <= stepIndex ? 'bg-yellow-500' : 'bg-muted'
+          )}
+        />
+      ))}
+    </div>
+  );
+
+  const ModalHeader = ({ title, step }: { title: string; step: string }) => (
+    <DialogHeader className="p-0 mb-4">
+      <div className="bg-yellow-500 text-black px-4 py-3 rounded-lg -mx-6 -mt-6 mb-4">
+        <DialogTitle className="text-lg font-bold text-black">Instalação</DialogTitle>
+        <DialogDescription className="text-yellow-800 text-sm mt-0.5">
+          {service.code} - {service.customer?.name || 'Cliente'}
+        </DialogDescription>
+      </div>
+      {showProgress && <ProgressBar />}
+      <div className="flex items-center gap-2">
+        <Badge className="bg-yellow-100 text-yellow-700 text-xs">{step}</Badge>
+        <span className="font-semibold text-base">{title}</span>
+      </div>
+    </DialogHeader>
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Modal 1: Resumo */}
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Resumo da Instalação" step="Passo 1" />
+
+          <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-muted-foreground text-xs">Cliente</p>
+                <p className="font-medium">{service.customer?.name || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Telefone</p>
+                <p className="font-medium">{service.customer?.phone || 'N/A'}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs flex items-center gap-1">
+                <MapPin className="h-3 w-3" /> Morada
+              </p>
+              <p className="font-medium">
+                {service.service_address || service.customer?.address || 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Equipamento a Instalar</p>
+              <p className="font-medium">
+                {[service.appliance_type, service.brand, service.model].filter(Boolean).join(' ') || 'N/A'}
+              </p>
+            </div>
+            {service.fault_description && (
+              <div>
+                <p className="text-muted-foreground text-xs">Observações</p>
+                <p className="font-medium">{service.fault_description}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={handleClose}>
+              Cancelar
+            </Button>
+            <Button 
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black" 
+              onClick={() => setCurrentStep('deslocacao')}
+            >
+              Começar Instalação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 2: Deslocação */}
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Deslocação" step="Passo 2" />
+
+          <div className="space-y-4">
+            <div className="bg-yellow-50 rounded-lg p-4 text-sm">
+              <p className="text-muted-foreground text-xs flex items-center gap-1 mb-1">
+                <MapPin className="h-3 w-3" /> Morada do Cliente
+              </p>
+              <p className="font-medium">
+                {service.service_address || service.customer?.address || 'N/A'}
+              </p>
+              <p className="text-muted-foreground mt-2">
+                {service.customer?.phone || ''}
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full h-14 text-base"
+              onClick={handleNavigateToClient}
+            >
+              <Navigation className="h-5 w-5 mr-2" />
+              Caminho para o Cliente
+            </Button>
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('resumo')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => setCurrentStep('foto_antes')}
+            >
+              Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 3: Foto Antes */}
+      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Foto Antes da Instalação" step="Passo 3" />
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tire uma foto do local <strong>antes</strong> de iniciar a instalação.
+            </p>
+
+            {formData.photoAntes ? (
+              <div className="relative">
+                <img
+                  src={formData.photoAntes}
+                  alt="Foto antes"
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute bottom-2 right-2"
+                  onClick={openCameraAntes}
+                >
+                  Nova Foto
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full h-32 flex-col gap-2"
+                onClick={openCameraAntes}
+              >
+                <Camera className="h-8 w-8 text-muted-foreground" />
+                <span>Tirar Foto (Antes)</span>
+              </Button>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => setCurrentStep('foto_depois')}
+              disabled={!canProceedFromFotoAntes}
+            >
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 4: Foto Depois */}
+      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Foto Após a Instalação" step="Passo 4" />
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tire uma foto do equipamento instalado <strong>após</strong> a conclusão.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Preview foto antes */}
+              <div className="relative">
+                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  <ImageIcon className="h-3 w-3" /> Antes
+                </p>
+                {formData.photoAntes && (
+                  <img
+                    src={formData.photoAntes}
+                    alt="Foto antes"
+                    className="w-full h-24 object-cover rounded-lg opacity-70"
+                  />
+                )}
+              </div>
+              
+              {/* Foto depois */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  <ImageIcon className="h-3 w-3" /> Depois
+                </p>
+                {formData.photoDepois ? (
+                  <div className="relative">
+                    <img
+                      src={formData.photoDepois}
+                      alt="Foto depois"
+                      className="w-full h-24 object-cover rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex-col gap-1 text-xs"
+                    onClick={openCameraDepois}
+                  >
+                    <Camera className="h-5 w-5 text-muted-foreground" />
+                    <span>Tirar Foto</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {formData.photoDepois && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={openCameraDepois}
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Tirar Nova Foto (Depois)
+              </Button>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('foto_antes')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => setShowSignature(true)}
+              disabled={!canProceedFromFotoDepois || isSubmitting}
+            >
+              Concluir Instalação <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Camera Modal */}
+      <CameraCapture
+        open={showCamera}
+        onOpenChange={setShowCamera}
+        onCapture={handlePhotoCapture}
+        title={cameraMode === 'antes' ? 'Foto Antes da Instalação' : 'Foto Após a Instalação'}
+      />
+
+      {/* Signature Modal */}
+      <SignatureCanvas
+        open={showSignature}
+        onOpenChange={setShowSignature}
+        onConfirm={handleSignatureComplete}
+        title="Assinatura de Conclusão da Instalação"
+      />
+    </>
+  );
+}
