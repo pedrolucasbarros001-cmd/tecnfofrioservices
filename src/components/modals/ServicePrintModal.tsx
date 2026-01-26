@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Printer, Snowflake } from 'lucide-react';
+import { AlertTriangle, Printer, Snowflake } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Dialog,
@@ -357,15 +357,30 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
           <Separator className="my-4" />
 
-          {/* Terms */}
+          {/* Terms Section with QR */}
           <section className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
-            <h3 className="font-semibold text-amber-800 mb-2">IMPORTANTE - Termos de Guarda</h3>
-            <p className="text-amber-700 text-xs leading-relaxed">
-              O equipamento será guardado pelo período máximo de 30 dias após a conclusão do serviço 
-              ou notificação do orçamento. Após este prazo, a empresa reserva-se o direito de 
-              dispor do equipamento sem qualquer responsabilidade. O cliente é responsável pelo 
-              levantamento do equipamento dentro do prazo estipulado.
-            </p>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  IMPORTANTE - Termos de Guarda
+                </h3>
+                <p className="text-amber-700 text-xs leading-relaxed mb-2">
+                  Os equipamentos deixados para reparação, venda ou instalação só podem 
+                  permanecer nas nossas instalações por um período máximo de{' '}
+                  <strong>30 (trinta) dias</strong> após a conclusão do serviço e 
+                  notificação ao cliente.
+                </p>
+                <p className="text-amber-700 text-xs leading-relaxed">
+                  Após este prazo, a empresa <strong>não se responsabiliza</strong> pela 
+                  guarda, estado ou eventuais danos ao equipamento. O cliente será 
+                  notificado por telefone e/ou email para proceder ao levantamento.
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <QRCodeSVG value={qrData} size={80} level="M" />
+              </div>
+            </div>
           </section>
 
           {/* Signature Area */}

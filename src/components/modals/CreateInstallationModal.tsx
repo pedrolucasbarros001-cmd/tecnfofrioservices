@@ -40,6 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
@@ -517,18 +519,26 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Turno</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecionar" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="manha">Manhã</SelectItem>
-                                <SelectItem value="tarde">Tarde</SelectItem>
-                                <SelectItem value="noite">Noite</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormControl>
+                              <RadioGroup
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                className="flex gap-4 pt-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="manha" id="install-manha" />
+                                  <Label htmlFor="install-manha" className="font-normal cursor-pointer">Manhã</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="tarde" id="install-tarde" />
+                                  <Label htmlFor="install-tarde" className="font-normal cursor-pointer">Tarde</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <RadioGroupItem value="noite" id="install-noite" />
+                                  <Label htmlFor="install-noite" className="font-normal cursor-pointer">Noite</Label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -598,8 +608,9 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                 <Button 
                   type="submit" 
                   disabled={createService.isPending || createCustomer.isPending}
+                  className="bg-pink-600 hover:bg-pink-700 text-white"
                 >
-                  {createService.isPending ? 'A criar...' : 'Criar Instalação'}
+                  {createService.isPending ? 'A agendar...' : 'Agendar Instalação'}
                 </Button>
               </DialogFooter>
             </form>
