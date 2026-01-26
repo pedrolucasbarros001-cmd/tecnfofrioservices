@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Copy, Check, Key } from 'lucide-react';
+import { Key } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,11 @@ import { toast } from 'sonner';
 const formSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
+  password: z.string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .regex(/[A-Z]/, 'Deve conter pelo menos uma letra maiúscula')
+    .regex(/[a-z]/, 'Deve conter pelo menos uma letra minúscula')
+    .regex(/[0-9]/, 'Deve conter pelo menos um número'),
   phone: z.string().optional(),
   role: z.enum(['dono', 'secretaria', 'tecnico']),
   specialization: z.string().optional(),
@@ -49,20 +54,19 @@ interface CreateUserModalProps {
 
 interface CreatedUserCredentials {
   email: string;
-  tempPassword: string;
   role: 'dono' | 'secretaria' | 'tecnico';
 }
 
 export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<CreatedUserCredentials | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       full_name: '',
       email: '',
+      password: '',
       phone: '',
       role: 'tecnico',
       specialization: '',
@@ -94,6 +98,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
           body: JSON.stringify({
             email: values.email,
             full_name: values.full_name,
+            password: values.password,
             role: values.role,
             phone: values.phone || undefined,
             specialization: values.specialization || undefined,
@@ -110,7 +115,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
       // Show credentials to admin
       setCreatedCredentials({
         email: result.email,
-        tempPassword: result.temp_password,
         role: values.role,
       });
 
@@ -125,19 +129,8 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
     }
   };
 
-  const handleCopyCredentials = async () => {
-    if (!createdCredentials) return;
-    
-    const text = `Email: ${createdCredentials.email}\nSenha Temporária: ${createdCredentials.tempPassword}`;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success('Credenciais copiadas!');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleClose = () => {
     setCreatedCredentials(null);
-    setCopied(false);
     onOpenChange(false);
     form.reset();
   };
@@ -167,10 +160,8 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   <p className="font-mono font-medium">{createdCredentials.email}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground uppercase">Senha Temporária</span>
-                  <p className="font-mono font-bold text-lg tracking-wider">
-                    {createdCredentials.tempPassword}
-                  </p>
+                  <span className="text-xs text-muted-foreground uppercase">Senha</span>
+                  <p className="text-green-700 font-medium">Definida pelo administrador</p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground uppercase">Nível de Acesso</span>
@@ -189,27 +180,10 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   </span>
                 </div>
               </div>
-
-              <p className="text-xs text-amber-600">
-                ⚠️ O utilizador deve alterar a senha após o primeiro login.
-              </p>
             </AlertDescription>
           </Alert>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleCopyCredentials}>
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Copiado!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copiar Credenciais
-                </>
-              )}
-            </Button>
+          <DialogFooter>
             <Button onClick={handleClose}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
@@ -248,6 +222,20 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="email@exemplo.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Senha *</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Mínimo 8 caracteres" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
