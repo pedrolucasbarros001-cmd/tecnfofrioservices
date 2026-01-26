@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { DollarSign } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,8 +27,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   useEffect(() => {
     if (service && open) {
-      setLaborCost(service.labor_cost?.toString() || '0');
-      setPartsCost(service.parts_cost?.toString() || '0');
+      setLaborCost(service.labor_cost?.toString() || '');
+      setPartsCost(service.parts_cost?.toString() || '');
       setDiscount(service.discount?.toString() || '0');
     }
   }, [service, open]);
@@ -37,7 +36,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const laborValue = parseFloat(laborCost) || 0;
   const partsValue = parseFloat(partsCost) || 0;
   const discountValue = parseFloat(discount) || 0;
-  const finalPrice = Math.max(0, laborValue + partsValue - discountValue);
+  const subtotal = laborValue + partsValue;
+  const finalPrice = Math.max(0, subtotal - discountValue);
 
   const handleSubmit = async () => {
     if (!service) return;
@@ -84,24 +84,14 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-emerald-600" />
-            Precificar Serviço
+          <DialogTitle className="text-xl font-semibold">
+            Definir Preço - {service?.code}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {service && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              <p className="font-medium">{service.code}</p>
-              <p className="text-muted-foreground">
-                {service.customer?.name} - {service.appliance_type} {service.brand}
-              </p>
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label htmlFor="laborCost">Custo de Mão de Obra (€)</Label>
+            <Label htmlFor="laborCost">Mão de Obra (€) *</Label>
             <Input
               id="laborCost"
               type="number"
@@ -114,7 +104,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="partsCost">Custo de Peças (€)</Label>
+            <Label htmlFor="partsCost">Peças (€) *</Label>
             <Input
               id="partsCost"
               type="number"
@@ -133,16 +123,24 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               type="number"
               min="0"
               step="0.01"
-              placeholder="0.00"
+              placeholder="0"
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
             />
           </div>
 
-          <div className="border-t pt-4">
-            <div className="flex justify-between items-center text-lg font-semibold">
-              <span>Preço Final:</span>
-              <span className="text-emerald-600">€{finalPrice.toFixed(2)}</span>
+          {/* Summary Box */}
+          <div className="p-4 bg-violet-50 border border-violet-100 rounded-lg space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Subtotal:</span>
+              <span>€{subtotal.toFixed(2)}</span>
+            </div>
+            <div className="border-t border-violet-200" />
+            <div className="flex justify-between items-center">
+              <span className="font-semibold">Total:</span>
+              <span className="text-violet-600 font-bold text-lg">
+                €{finalPrice.toFixed(2)}
+              </span>
             </div>
           </div>
         </div>
@@ -154,9 +152,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           <Button
             onClick={handleSubmit}
             disabled={updateService.isPending}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-violet-600 hover:bg-violet-700"
           >
-            {updateService.isPending ? 'A guardar...' : 'Guardar Preço'}
+            {updateService.isPending ? 'A confirmar...' : 'Confirmar Preço'}
           </Button>
         </DialogFooter>
       </DialogContent>
