@@ -5,36 +5,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface InviteUserRequest {
+interface CreateUserRequest {
   email: string;
   full_name: string;
+  password: string;
   role: 'dono' | 'secretaria' | 'tecnico';
   phone?: string;
   specialization?: string;
-}
-
-// Generate a secure temporary password
-function generateTempPassword(): string {
-  const upperChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lowerChars = 'abcdefghjkmnpqrstuvwxyz';
-  const numbers = '23456789';
-  const symbols = '!@#$%&*';
-  
-  let password = '';
-  // Ensure at least one of each type
-  password += upperChars.charAt(Math.floor(Math.random() * upperChars.length));
-  password += lowerChars.charAt(Math.floor(Math.random() * lowerChars.length));
-  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
-  
-  // Fill remaining 8 characters
-  const allChars = upperChars + lowerChars + numbers + symbols;
-  for (let i = 0; i < 8; i++) {
-    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
-  }
-  
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
 Deno.serve(async (req) => {
@@ -84,19 +61,27 @@ Deno.serve(async (req) => {
 
     if (roleError || callerRole?.role !== 'dono') {
       return new Response(
-        JSON.stringify({ error: 'Apenas administradores podem convidar utilizadores' }),
+        JSON.stringify({ error: 'Apenas administradores podem criar utilizadores' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Parse request body
-    const body: InviteUserRequest = await req.json();
-    const { email, full_name, role, phone, specialization } = body;
+    const body: CreateUserRequest = await req.json();
+    const { email, full_name, password, role, phone, specialization } = body;
 
     // Validate required fields
     if (!email || !full_name || !role) {
       return new Response(
         JSON.stringify({ error: 'Email, nome e nível de acesso são obrigatórios' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate password
+    if (!password || password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'Senha é obrigatória e deve ter pelo menos 8 caracteres' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -112,14 +97,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate temporary password
-    const tempPassword = generateTempPassword();
-
-    // Create user directly with temporary password (no email required)
+    // Create user with the provided password
     const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: tempPassword,
-      email_confirm: true, // Mark email as confirmed to bypass email verification
+      password,
+      email_confirm: true,
       user_metadata: {
         full_name,
         phone,
@@ -144,10 +126,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // The profile should be created automatically by the trigger
-    // But we need to update it with additional data and create the role
-
-    // Wait a moment for the trigger to execute
+    // Wait for the trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Update profile with phone
@@ -168,12 +147,10 @@ Deno.serve(async (req) => {
 
     if (roleInsertError) {
       console.error('Error creating user role:', roleInsertError);
-      // Don't fail the whole operation, the user was created
     }
 
     // If technician, create technician record
     if (role === 'tecnico') {
-      // Get the profile ID
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -191,19 +168,17 @@ Deno.serve(async (req) => {
 
         if (techError) {
           console.error('Error creating technician:', techError);
-          // Don't fail the whole operation
         }
       }
     }
 
-    // Return success with the temporary password
+    // Return success
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Utilizador criado com sucesso`,
+        message: 'Utilizador criado com sucesso',
         user_id: newUser.id,
         email: email,
-        temp_password: tempPassword, // Return the temp password to the admin
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
