@@ -24,10 +24,8 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
     window.print();
   };
 
-  const qrData = JSON.stringify({
-    code: service.code,
-    id: service.id,
-  });
+  // Generate a full URL for QR code that redirects to the appropriate technician flow
+  const qrData = `${window.location.origin}/technician/service/${service.id}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -23,6 +23,7 @@ import TechnicianWorkshopFlow from "@/pages/technician/TechnicianWorkshopFlow";
 import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
 import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
 import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
+import ServiceRedirect from "@/pages/technician/ServiceRedirect";
 import TVMonitorPage from "@/pages/TVMonitorPage";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="/technician/visit/:serviceId" element={<TechnicianVisitFlow />} />
               <Route path="/technician/installation/:serviceId" element={<TechnicianInstallationFlow />} />
               <Route path="/technician/delivery/:serviceId" element={<TechnicianDeliveryFlow />} />
+              <Route path="/technician/service/:serviceId" element={<ServiceRedirect />} />
               
               {/* Shared routes */}
               <Route path="/preferencias" element={<PlaceholderPage />} />

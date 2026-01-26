@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -38,6 +39,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
+import { notifyServiceAssigned } from '@/utils/notificationUtils';
+import { supabase } from '@/integrations/supabase/client';
 import type { Service } from '@/types/database';
 
 const formSchema = z.object({
@@ -86,6 +89,26 @@ export function AssignTechnicianModal({
         scheduled_shift: values.scheduled_shift,
         status: 'por_fazer',
       });
+
+      // Get the technician's user_id to send notification
+      const selectedTech = technicians.find(t => t.id === values.technician_id);
+      if (selectedTech?.profile_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('id', selectedTech.profile_id)
+          .maybeSingle();
+
+        if (profileData?.user_id) {
+          await notifyServiceAssigned(
+            service.id,
+            service.code || 'N/A',
+            profileData.user_id,
+            values.scheduled_date.toISOString().split('T')[0],
+            values.scheduled_shift
+          );
+        }
+      }
 
       onOpenChange(false);
       form.reset();
