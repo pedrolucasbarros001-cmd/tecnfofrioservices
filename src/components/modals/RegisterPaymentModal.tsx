@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { CreditCard } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -47,16 +46,20 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (service && open) {
-      const remaining = (service.final_price || 0) - (service.amount_paid || 0);
-      setAmount(remaining > 0 ? remaining.toFixed(2) : '');
-    }
-  }, [service, open]);
-
   const amountPaid = service?.amount_paid || 0;
   const finalPrice = service?.final_price || 0;
   const remainingBalance = finalPrice - amountPaid;
+
+  useEffect(() => {
+    if (service && open) {
+      // Pre-fill with remaining balance
+      setAmount(remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
+      setPaymentMethod('dinheiro');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setDescription('');
+    }
+  }, [service, open, remainingBalance]);
+
   const paymentValue = parseFloat(amount) || 0;
   const newBalance = Math.max(0, remainingBalance - paymentValue);
 
@@ -116,51 +119,35 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-orange-600" />
-            Registar Pagamento
+          <DialogTitle className="text-xl font-semibold">
+            Registar Pagamento - {service?.code}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {service && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              <p className="font-medium">{service.code}</p>
-              <p className="text-muted-foreground">{service.customer?.name}</p>
+          {/* Financial Summary Box */}
+          <div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Valor Total:</span>
+              <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
             </div>
-          )}
-
-          {/* Financial Summary */}
-          <div className="grid grid-cols-3 gap-2 p-3 bg-muted/50 rounded-lg text-sm">
-            <div className="text-center">
-              <p className="text-muted-foreground">Total</p>
-              <p className="font-semibold">€{finalPrice.toFixed(2)}</p>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Já Pago:</span>
+              <span className="text-green-600 font-semibold">
+                €{amountPaid.toFixed(2)}
+              </span>
             </div>
-            <div className="text-center">
-              <p className="text-muted-foreground">Pago</p>
-              <p className="font-semibold text-green-600">€{amountPaid.toFixed(2)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-muted-foreground">Em Falta</p>
-              <p className="font-semibold text-red-600">€{remainingBalance.toFixed(2)}</p>
+            <div className="flex justify-between items-center">
+              <span className="text-red-600 font-semibold">Em Falta:</span>
+              <span className="text-red-600 font-bold">
+                €{remainingBalance.toFixed(2)}
+              </span>
             </div>
           </div>
 
+          {/* Payment Method */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Valor do Pagamento (€)</Label>
-            <Input
-              id="amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Método de Pagamento</Label>
+            <Label htmlFor="paymentMethod">Método de Pagamento *</Label>
             <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar método" />
@@ -175,8 +162,36 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
             </Select>
           </div>
 
+          {/* Payment Amount */}
           <div className="space-y-2">
-            <Label htmlFor="paymentDate">Data do Pagamento</Label>
+            <Label htmlFor="amount">Valor a Pagar (€) *</Label>
+            <Input
+              id="amount"
+              type="number"
+              min="0.01"
+              max={remainingBalance}
+              step="0.01"
+              placeholder={`Max: €${remainingBalance.toFixed(2)}`}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição (Opcional)</Label>
+            <Textarea
+              id="description"
+              placeholder="Ex: Pagamento parcial"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          {/* Payment Date */}
+          <div className="space-y-2">
+            <Label htmlFor="paymentDate">Data do Pagamento *</Label>
             <Input
               id="paymentDate"
               type="date"
@@ -185,17 +200,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição (opcional)</Label>
-            <Textarea
-              id="description"
-              placeholder="Notas sobre o pagamento..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-
+          {/* New Balance Preview */}
           {paymentValue > 0 && (
             <div className="border-t pt-4">
               <div className="flex justify-between items-center text-sm">
@@ -215,9 +220,9 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || paymentValue <= 0}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-green-600 hover:bg-green-700"
           >
-            {isSubmitting ? 'A registar...' : 'Registar Pagamento'}
+            {isSubmitting ? 'A confirmar...' : 'Confirmar Pagamento'}
           </Button>
         </DialogFooter>
       </DialogContent>
