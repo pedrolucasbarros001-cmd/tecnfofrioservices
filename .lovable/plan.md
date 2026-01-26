@@ -1,347 +1,288 @@
 
-# Plano: Alinhamento do Sistema com o Documento Tecnico de Permissoes e Estados
+# Plano: Corrigir Flickering/Piscar da Câmara no Mobile
 
-## Resumo da Analise
+## Problema Identificado
 
-Apos analise detalhada do codigo actual vs. a documentacao tecnica fornecida, identifiquei **discrepancias criticas** que precisam de correcao para garantir a integridade do sistema.
+O componente `CameraCapture.tsx` está a sofrer de **re-renderizações excessivas** que causam o efeito de "piscar" (flickering) na câmara e nos botões. Isto acontece devido a:
 
----
+1. **Ciclos de dependências nos `useEffect`** - As funções `startCamera` e `stopCamera` são recriadas a cada render, e como estão nas dependências do `useEffect`, causam loops infinitos.
 
-## Discrepancias Identificadas
+2. **Gestão de estado fragmentada** - Múltiplos estados (`isLoading`, `cameraReady`, `permissionState`, `stream`) a mudar quase simultaneamente causam múltiplos re-renders.
 
-### 1. CRITICO: "Reparar no Local" Viola Regra de Localizacao
-
-**Documentacao (Regra):**
-> "Servicos com service_location === 'cliente' NUNCA podem ter status 'concluidos'. O estado 'concluidos' e EXCLUSIVO para servicos com service_location === 'oficina'."
-
-**Implementacao Actual (VisitFlowModals.tsx, linhas 114-121):**
-```typescript
-if (formData.decision === 'reparar_local') {
-  await updateService.mutateAsync({
-    id: service.id,
-    status: 'concluidos',  // ERRO: location ainda e 'cliente'
-    pending_pricing: true,
-    detected_fault: formData.detectedFault,
-  });
-}
-```
-
-**Problema:** O servico fica com `status='concluidos'` MAS `service_location='cliente'`, violando a regra de negocio.
-
-**Correcao Proposta:** Servicos reparados no local do cliente devem transitar para `a_precificar` (aguardam preco) e nao para `concluidos`:
-```typescript
-if (formData.decision === 'reparar_local') {
-  await updateService.mutateAsync({
-    id: service.id,
-    status: 'a_precificar',  // CORRIGIDO
-    pending_pricing: true,
-    detected_fault: formData.detectedFault,
-    work_performed: 'Reparado no local do cliente',
-  });
-}
-```
+3. **Falta de debounce/estabilização** - A câmara tenta iniciar antes de estar completamente pronta.
 
 ---
 
-### 2. Falta Estado de Transicao: Peca Pedida → Em Espera
+## Solução Proposta
 
-**Documentacao:**
-> "para_pedir_peca: Confirmacao do pedido de peca (Modal PartRequestModal) → em_espera_de_peca"
+### 1. Usar `useRef` para o Stream (evitar re-renders)
 
-**Implementacao Actual (StateActionButtons.tsx, linhas 110-119):**
+Mover o `stream` de `useState` para `useRef`. Isto evita re-renders desnecessários quando o stream muda.
+
 ```typescript
-case 'para_pedir_peca':
-  if (isDono && onMarkPartArrived) {
-    return {
-      label: 'Registar Pedido',  // CORRECTO
-      ...
-    };
+// Antes
+const [stream, setStream] = useState<MediaStream | null>(null);
+
+// Depois  
+const streamRef = useRef<MediaStream | null>(null);
+```
+
+### 2. Remover Dependências Problemáticas do useEffect
+
+Usar referências estáveis em vez de callbacks que mudam.
+
+```typescript
+// Antes (problema: startCamera e stopCamera recriam a cada render)
+useEffect(() => {
+  if (open) {
+    startCamera();
+  } else {
+    stopCamera();
   }
+}, [open, status, startCamera, stopCamera]);
+
+// Depois (usar função inline ou mover lógica para dentro)
+useEffect(() => {
+  if (!open) {
+    // Parar câmara inline
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    return;
+  }
+  // Lógica de iniciar...
+}, [open, status]);
 ```
 
-**Problema:** A acao "Registar Pedido" existe, mas nao ha implementacao do modal `PartRequestModal` para o Dono confirmar o pedido e mover para `em_espera_de_peca`.
+### 3. Consolidar Estados num Único Estado
 
-**Correcao Proposta:** Implementar logica no `onMarkPartArrived`:
-- Se `status === 'para_pedir_peca'` → Mover para `em_espera_de_peca`
-- Se `status === 'em_espera_de_peca'` → Mover para `em_execucao` (peca chegou)
+Reduzir múltiplos estados para um único estado de máquina:
 
----
-
-### 3. RegisterPaymentModal: Status Apos Pagamento Total
-
-**Documentacao:**
-> "Se final_price <= amount_paid, vai para finalizado."
-
-**Implementacao Actual (RegisterPaymentModal.tsx, linha 88):**
 ```typescript
-status: isPaidOff ? 'concluidos' : 'em_debito',
+// Antes
+const [isLoading, setIsLoading] = useState(false);
+const [cameraReady, setCameraReady] = useState(false);
+const [error, setError] = useState<string | null>(null);
+const [permissionState, setPermissionState] = useState<PermissionStatus>('checking');
+
+// Depois
+type CameraState = 
+  | { phase: 'checking' }
+  | { phase: 'prompt' }
+  | { phase: 'loading' }
+  | { phase: 'ready' }
+  | { phase: 'denied' }
+  | { phase: 'unsupported' }
+  | { phase: 'error'; message: string }
+  | { phase: 'captured'; image: string };
+
+const [cameraState, setCameraState] = useState<CameraState>({ phase: 'checking' });
 ```
 
-**Problema:** Quando pago totalmente, volta para `concluidos` em vez de `finalizado`.
+### 4. Adicionar Flag de Montagem para Evitar Updates Após Desmontagem
 
-**Analise Adicional:** Este comportamento pode ser intencional se o servico ainda estiver na oficina aguardando entrega. A transicao para `finalizado` deve ocorrer apenas quando:
-1. Pagamento completo **E**
-2. Entrega efectuada (cliente recolheu ou tecnico entregou)
-
-**Decisao:** Manter como esta, pois o documento indica que `finalizado` e o estado terminal apos entrega/recolha.
-
----
-
-### 4. DeliveryManagementModal: Falta Transicao para Finalizado
-
-**Documentacao:**
-> "Botao 'Gerir Entrega' (Cliente vem buscar) → status 'finalizado', define Service.pickup_date"
-
-**Implementacao Actual (DeliveryManagementModal.tsx, linha 32-35):**
 ```typescript
-await updateService.mutateAsync({
-  id: service.id,
-  delivery_method: 'client_pickup',
-  // FALTA: pickup_date e transicao para finalizado
-});
+useEffect(() => {
+  let isMounted = true;
+  
+  const initCamera = async () => {
+    // ... lógica
+    if (isMounted) {
+      setCameraState({ phase: 'ready' });
+    }
+  };
+  
+  initCamera();
+  
+  return () => {
+    isMounted = false;
+    // cleanup
+  };
+}, [open]);
 ```
 
-**Problema:** Definir `client_pickup` nao finaliza o servico automaticamente. O `Dar Baixa` em SecretaryConcluidosPage faz isso correctamente.
+### 5. Adicionar Delay para Estabilização da Câmara
 
-**Analise:** O fluxo actual esta correcto:
-1. `Gerir Entrega` → Define metodo (client_pickup ou technician_delivery)
-2. `Dar Baixa` (separadamente) → Finaliza o servico quando cliente recolhe
+Garantir que o vídeo está a reproduzir antes de mostrar a UI de captura:
 
-Nenhuma correcao necessaria, mas deve ser documentado claramente na UI.
-
----
-
-### 5. Falta Guardar `last_status_before_part_request`
-
-**Documentacao:**
-> "em_espera_de_peca: O status anterior e guardado em last_status_before_part_request. Peca Recebida → restaura last_status_before_part_request."
-
-**Implementacao Actual:** O campo `last_status_before_part_request` nao existe na tabela `services` nem na logica.
-
-**Correcao Proposta:** 
-1. Adicionar coluna `last_status_before_part_request` na tabela `services`
-2. Ao transitar para `para_pedir_peca`, guardar o status actual
-3. Ao receber a peca, restaurar para o status guardado
-
----
-
-### 6. StateActionButtons: Falta Acao "Finalizar Servico" Completa
-
-**Documentacao:**
-> "Botao 'Finalizar Servico' estara disabled se isServicePriced === false ou isServiceInDebit === true."
-
-**Implementacao Actual (StateActionButtons.tsx, linhas 257-263):**
 ```typescript
-{canBeFinalized && (isDono || isSecretaria) && onFinalize && (
-  <DropdownMenuItem onClick={onFinalize}>
-    <CheckCircle className="h-4 w-4 mr-2" />
-    Finalizar Serviço
-  </DropdownMenuItem>
-)}
+videoRef.current.onloadedmetadata = () => {
+  videoRef.current?.play()
+    .then(() => {
+      // Pequeno delay para estabilizar
+      setTimeout(() => {
+        if (isMounted) {
+          setCameraState({ phase: 'ready' });
+        }
+      }, 300);
+    });
+};
 ```
-
-**Problema:** A acao existe no dropdown, mas a funcao `onFinalize` nao esta implementada nas paginas que usam o componente.
 
 ---
 
 ## Ficheiros a Modificar
 
-| Ficheiro | Alteracao |
+| Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/technician/VisitFlowModals.tsx` | Corrigir "Reparar no Local" para `a_precificar` |
-| `src/components/services/StateActionButtons.tsx` | Melhorar logica de transicoes de pecas |
-| `src/pages/GeralPage.tsx` | Implementar handlers para todas as acoes |
-| `src/components/modals/RequestPartModal.tsx` | Implementar logica de transicao completa |
+| `src/components/shared/CameraCapture.tsx` | Refactoring completo da gestão de estado |
 
 ---
 
-## Diagrama de Fluxo Corrigido
+## Código Refactorado Principal
 
-```text
-VISITA NO CLIENTE
-       │
-       ├─── "Reparar no Local"
-       │         │
-       │         └──► status = 'a_precificar' (CORRIGIDO)
-       │              pending_pricing = true
-       │              service_location = 'cliente' (mantém)
-       │                    │
-       │                    ▼
-       │              Dono define preco
-       │                    │
-       │              ┌─────┴─────┐
-       │              ▼           ▼
-       │         em_debito    finalizado
-       │              │           │
-       │              ▼           │
-       │         Pagamento       │
-       │         completo        │
-       │              │           │
-       │              └─────┬─────┘
-       │                    ▼
-       │              finalizado
-       │
-       ├─── "Levantar para Oficina"
-       │         │
-       │         └──► status = 'na_oficina'
-       │              service_location = 'oficina'
-       │              pickup_signature_url = [assinatura]
-       │                    │
-       │                    ▼
-       │              FLUXO OFICINA
-       │                    │
-       │              ┌─────┴─────┐
-       │              ▼           ▼
-       │         Pedir Peca    Concluir
-       │              │           │
-       │              ▼           ▼
-       │         para_pedir_peca  │
-       │              │           │
-       │              ▼           │
-       │         Dono regista     │
-       │         pedido           │
-       │              │           │
-       │              ▼           │
-       │         em_espera_peca   │
-       │              │           │
-       │              ▼           │
-       │         Peca chegou      │
-       │              │           │
-       │              ▼           │
-       │         em_execucao ◄────┘
-       │              │
-       │              ▼
-       │         concluidos (location=oficina OK)
-       │              │
-       │              ▼
-       │         Gerir Entrega
-       │              │
-       │         ┌────┴────┐
-       │         ▼         ▼
-       │    Tecnico    Cliente
-       │    Entrega    Recolhe
-       │         │         │
-       │         ▼         ▼
-       │    Entrega    Dar Baixa
-       │    Flow          │
-       │         │         │
-       │         └────┬────┘
-       │              ▼
-       │         finalizado
-       │
-       └─── "Pedir Peça"
-                 │
-                 └──► status = 'para_pedir_peca'
-                      (mesma logica acima)
-```
+### Nova Estrutura de Estado
 
----
-
-## Seccao Tecnica: Alteracoes Detalhadas
-
-### Alteracao 1: VisitFlowModals.tsx (Linhas 114-121)
-
-**De:**
 ```typescript
-if (formData.decision === 'reparar_local') {
-  await updateService.mutateAsync({
-    id: service.id,
-    status: 'concluidos',
-    pending_pricing: true,
-    detected_fault: formData.detectedFault,
-  });
-  toast.success('Visita concluída! Aguarda precificação.');
+type CameraPhase = 
+  | 'idle'
+  | 'checking'
+  | 'prompt'
+  | 'loading'
+  | 'ready'
+  | 'denied'
+  | 'unsupported'
+  | 'error'
+  | 'captured';
+
+interface CameraState {
+  phase: CameraPhase;
+  errorMessage?: string;
+  capturedImage?: string;
 }
 ```
 
-**Para:**
-```typescript
-if (formData.decision === 'reparar_local') {
-  await updateService.mutateAsync({
-    id: service.id,
-    status: 'a_precificar',
-    pending_pricing: true,
-    detected_fault: formData.detectedFault,
-    work_performed: 'Reparado no local do cliente',
-  });
-  toast.success('Visita concluída! Aguarda precificação pelo Dono.');
-}
-```
-
-### Alteracao 2: SetPriceModal.tsx (Linha 52)
-
-Quando o preco e definido para um servico com `service_location === 'cliente'`, deve ir directamente para `finalizado` ou `em_debito` (sem passar por `concluidos`):
-
-**De:**
-```typescript
-status: finalPrice > (service.amount_paid || 0) ? 'em_debito' : 'concluidos',
-```
-
-**Para:**
-```typescript
-// Para servicos no cliente, vai para finalizado/em_debito
-// Para servicos na oficina, vai para concluidos/em_debito
-const isClientLocation = service.service_location === 'cliente';
-const hasDebt = finalPrice > (service.amount_paid || 0);
-
-let newStatus: string;
-if (hasDebt) {
-  newStatus = 'em_debito';
-} else if (isClientLocation) {
-  newStatus = 'finalizado'; // Cliente: sem entrega necessaria
-} else {
-  newStatus = 'concluidos'; // Oficina: aguarda entrega
-}
-```
-
-### Alteracao 3: StateActionButtons.tsx
-
-Adicionar condicao para mostrar "Definir Preco" em `a_precificar`:
+### Hook useEffect Simplificado
 
 ```typescript
-case 'a_precificar':
-  if (isDono && onSetPrice) {
-    return {
-      label: 'Definir Preço',
-      icon: DollarSign,
-      onClick: onSetPrice,
-      className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-    };
+useEffect(() => {
+  if (!open) {
+    // Cleanup ao fechar
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setState({ phase: 'idle' });
+    return;
   }
-  return null;
+
+  let isMounted = true;
+  
+  const initCamera = async () => {
+    // Verificar suporte
+    if (!navigator.mediaDevices?.getUserMedia) {
+      if (isMounted) setState({ phase: 'unsupported' });
+      return;
+    }
+
+    // Verificar permissão
+    if (status === 'denied') {
+      if (isMounted) setState({ phase: 'denied' });
+      return;
+    }
+
+    if (status === 'prompt' || status === 'checking') {
+      if (isMounted) setState({ phase: 'prompt' });
+      return;
+    }
+
+    // Tentar iniciar câmara
+    if (isMounted) setState({ phase: 'loading' });
+    
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      
+      if (!isMounted) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        return;
+      }
+      
+      streamRef.current = mediaStream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        await videoRef.current.play();
+        
+        // Delay de estabilização
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        if (isMounted) setState({ phase: 'ready' });
+      }
+    } catch (err) {
+      if (!isMounted) return;
+      
+      if ((err as Error).name === 'NotAllowedError') {
+        setState({ phase: 'denied' });
+      } else {
+        setState({ phase: 'error', errorMessage: 'Não foi possível aceder à câmara.' });
+      }
+    }
+  };
+
+  initCamera();
+
+  return () => {
+    isMounted = false;
+  };
+}, [open, status]); // Dependências mínimas e estáveis
 ```
 
 ---
 
-## Tabela de Transicoes Corrigida
+## Secção Técnica: Detalhes de Implementação
 
-| Status Actual | Acao | Condicao | Novo Status |
-|---------------|------|----------|-------------|
-| `por_fazer` | Atribuir Tecnico | Dono/Secretaria | `por_fazer` (tecnico atribuido) |
-| `por_fazer` | Iniciar | Tecnico, location=cliente | `em_execucao` |
-| `por_fazer` | Assumir | Tecnico, location=oficina | `na_oficina` |
-| `em_execucao` | Reparar no Local | Tecnico, location=cliente | `a_precificar` |
-| `em_execucao` | Levantar Oficina | Tecnico, location=cliente | `na_oficina` |
-| `em_execucao` | Pedir Peca | Tecnico | `para_pedir_peca` |
-| `na_oficina` | Comecar | Tecnico | `em_execucao` |
-| `para_pedir_peca` | Registar Pedido | Dono | `em_espera_de_peca` |
-| `em_espera_de_peca` | Peca Chegou | Dono | `em_execucao` |
-| `em_execucao` (oficina) | Concluir | Tecnico | `concluidos` |
-| `a_precificar` | Definir Preco | Dono | `em_debito` ou `finalizado` |
-| `concluidos` | Definir Preco | Dono (se !priced) | `em_debito` ou `concluidos` |
-| `concluidos` | Gerir Entrega | Dono/Secretaria, loc=oficina | `concluidos` (delivery_method set) |
-| `concluidos` | Dar Baixa | Dono/Secretaria, client_pickup | `finalizado` |
-| `em_debito` | Registar Pagamento | Dono/Secretaria | `em_debito` ou `concluidos` |
-| Instalacao | Concluir | Tecnico + assinatura | `finalizado` |
-| Entrega | Concluir | Tecnico + assinatura | `finalizado` |
+### Por que o flickering acontece?
+
+1. **Dependências Instáveis**: Funções como `startCamera` e `stopCamera` criadas com `useCallback` dependem de estados que mudam, recriando-as a cada mudança.
+
+2. **Efeito Cascata**:
+   ```
+   open=true → startCamera() chamado → 
+   setIsLoading(true) → re-render → 
+   startCamera recriado → useEffect dispara novamente →
+   startCamera() chamado OUTRA VEZ → loop!
+   ```
+
+3. **Múltiplos setStates Rápidos**:
+   ```typescript
+   // Cada um destes causa um re-render
+   setIsLoading(true);      // render 1
+   setCameraReady(false);   // render 2
+   setError(null);          // render 3
+   // ...câmara pronta...
+   setStream(mediaStream);  // render 4
+   setCameraReady(true);    // render 5
+   setIsLoading(false);     // render 6
+   ```
+
+### Solução: Batching de Estado
+
+React 18 faz batching automático, mas dentro de `async/await` pode falhar. A solução é usar um único estado:
+
+```typescript
+// Um único setState = um único re-render
+setState({ phase: 'ready' });
+```
+
+### Benefícios da Refactoração
+
+1. **Performance**: Menos re-renders = UI mais fluída
+2. **Previsibilidade**: Estado de máquina claro
+3. **Manutenção**: Código mais fácil de debugar
+4. **Mobile**: Comportamento estável em dispositivos com menos recursos
 
 ---
 
-## Conclusao
+## Resultado Esperado
 
-Este plano alinha a implementacao actual com o documento tecnico original, corrigindo a violacao critica da regra de localizacao e garantindo que:
+Após a implementação:
 
-1. Servicos reparados no cliente vao para `a_precificar` (nao `concluidos`)
-2. O estado `concluidos` e exclusivo para servicos na oficina
-3. A precificacao de servicos no cliente leva directamente a `finalizado` ou `em_debito`
-4. Todas as transicoes respeitam as regras de permissao por role
+1. A câmara abre sem piscar
+2. Os botões ficam estáveis
+3. A transição entre estados é suave
+4. Funciona correctamente em dispositivos móveis
+5. O fallback para galeria continua a funcionar
