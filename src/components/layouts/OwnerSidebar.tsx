@@ -49,16 +49,14 @@ export function OwnerSidebar() {
   } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const isActive = (path: string) => location.pathname === path;
-  return <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+  return <Sidebar collapsible="icon" className="border-r border-sidebar-border/50">
+      <SidebarHeader className="border-b border-sidebar-border/50 px-4 py-3">
         <div className="flex items-center gap-3">
-          <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-10 w-10 shrink-0 rounded-lg object-contain" />
-          {!isCollapsed && <div className="flex flex-col">
-              <span className="text-lg font-bold">
-                <span className="text-[#2B4F84]">TECNO</span>
-                <span className="text-slate-700">FRIO</span>
-              </span>
-            </div>}
+          <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+          {!isCollapsed && <span className="text-lg font-bold">
+              <span className="text-[#2B4F84]">TECNO</span>
+              <span className="text-sidebar-foreground/80">FRIO</span>
+            </span>}
         </div>
       </SidebarHeader>
 
@@ -66,7 +64,7 @@ export function OwnerSidebar() {
         <SidebarMenu>
           {menuItems.map(item => <SidebarMenuItem key={item.url}>
               <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                <NavLink to={item.url} className={cn('flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all', isActive(item.url) ? 'bg-sidebar-accent text-sidebar-primary font-medium' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground')}>
+                <NavLink to={item.url} className={cn('flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200', isActive(item.url) ? 'bg-sidebar-primary/10 text-sidebar-primary font-medium' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground')}>
                   <item.icon className="h-5 w-5 shrink-0" />
                   {!isCollapsed && <span>{item.title}</span>}
                 </NavLink>
@@ -75,17 +73,14 @@ export function OwnerSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        {/* TECNOFRIO Branding */}
-        {!isCollapsed}
-        
+      <SidebarFooter className="border-t border-sidebar-border/50 p-4">
         {!isCollapsed && profile && <div className="mb-3 px-2">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {profile.full_name || profile.email}
             </p>
             <p className="text-xs text-sidebar-foreground/60">Dono</p>
           </div>}
-        <Button variant="ghost" className={cn('w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent', isCollapsed && 'justify-center px-2')} onClick={signOut}>
+        <Button variant="ghost" className={cn('w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50', isCollapsed && 'justify-center px-2')} onClick={signOut}>
           <LogOut className="h-5 w-5 shrink-0" />
           {!isCollapsed && <span className="ml-3">Sair</span>}
         </Button>

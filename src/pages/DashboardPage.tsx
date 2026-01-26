@@ -207,7 +207,7 @@ export default function DashboardPage() {
           return (
             <Card
               key={card.key}
-              className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${card.bgClass} border-0`}
+              className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5 border border-border/50 ${card.bgClass}`}
               onClick={() => navigate(card.route)}
             >
               <CardContent className="p-4 h-[120px] flex flex-col justify-between">

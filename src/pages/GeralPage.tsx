@@ -216,21 +216,22 @@ export default function GeralPage() {
               A carregar serviços...
             </div> : filteredServices.length === 0 ? <div className="py-12 text-center text-muted-foreground">
               {searchTerm || selectedStatus !== 'all' ? 'Nenhum serviço encontrado com os filtros aplicados.' : 'Ainda não existem serviços. Crie o primeiro!'}
-            </div> : <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">Tipo</TableHead>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Técnico</TableHead>
-                  <TableHead>Data + Turno</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            </div> : <div className="overflow-x-auto">
+              <Table className="min-w-[900px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">Tipo</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead>Técnico</TableHead>
+                    <TableHead>Data + Turno</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
               {filteredServices.map(service => {
               const statusConfig = SERVICE_STATUS_CONFIG[service.status];
               
@@ -344,7 +345,8 @@ export default function GeralPage() {
                     </TableRow>;
             })}
               </TableBody>
-            </Table>}
+            </Table>
+          </div>}
         </CardContent>
       </Card>
 
