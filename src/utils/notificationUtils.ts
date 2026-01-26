@@ -11,7 +11,9 @@ type NotificationType =
   | 'servico_atribuido' 
   | 'precificacao' 
   | 'entrega_agendada' 
-  | 'tarefa_tecnico';
+  | 'tarefa_tecnico'
+  | 'tarefa_secretaria'
+  | 'tarefa_geral';
 
 interface NotificationData {
   user_id: string;

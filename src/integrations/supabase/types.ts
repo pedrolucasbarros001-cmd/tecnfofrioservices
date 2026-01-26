@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          created_at: string
+          description: string
+          id: string
+          is_public: boolean | null
+          metadata: Json | null
+          service_id: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          is_public?: boolean | null
+          metadata?: Json | null
+          service_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          is_public?: boolean | null
+          metadata?: Json | null
+          service_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           appliance_type: string | null
