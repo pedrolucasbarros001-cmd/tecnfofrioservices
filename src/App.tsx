@@ -50,27 +50,87 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              {/* Owner routes */}
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/orcamentos" element={<OrcamentosPage />} />
-              <Route path="/colaboradores" element={<ColaboradoresPage />} />
-              <Route path="/performance" element={<PerformancePage />} />
+              {/* Owner-only routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute allowedRoles={['dono']}>
+                  <DashboardPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/orcamentos" element={
+                <ProtectedRoute allowedRoles={['dono']}>
+                  <OrcamentosPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/colaboradores" element={
+                <ProtectedRoute allowedRoles={['dono']}>
+                  <ColaboradoresPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/performance" element={
+                <ProtectedRoute allowedRoles={['dono']}>
+                  <PerformancePage />
+                </ProtectedRoute>
+              } />
               
               {/* Owner + Secretary routes */}
-              <Route path="/geral" element={<GeralPage />} />
-              <Route path="/oficina" element={<OficinaPage />} />
-              <Route path="/clientes" element={<ClientesPage />} />
-              <Route path="/concluidos" element={<SecretaryConcluidosPage />} />
-              <Route path="/em-debito" element={<SecretaryDebitoPage />} />
+              <Route path="/geral" element={
+                <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                  <GeralPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/oficina" element={
+                <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                  <OficinaPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/clientes" element={
+                <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                  <ClientesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/concluidos" element={
+                <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                  <SecretaryConcluidosPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/em-debito" element={
+                <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                  <SecretaryDebitoPage />
+                </ProtectedRoute>
+              } />
               
               {/* Technician routes */}
-              <Route path="/servicos" element={<ServicosPage />} />
+              <Route path="/servicos" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <ServicosPage />
+                </ProtectedRoute>
+              } />
               <Route path="/perfil" element={<PlaceholderPage />} />
-              <Route path="/technician/workshop/:serviceId" element={<TechnicianWorkshopFlow />} />
-              <Route path="/technician/visit/:serviceId" element={<TechnicianVisitFlow />} />
-              <Route path="/technician/installation/:serviceId" element={<TechnicianInstallationFlow />} />
-              <Route path="/technician/delivery/:serviceId" element={<TechnicianDeliveryFlow />} />
-              <Route path="/technician/service/:serviceId" element={<ServiceRedirect />} />
+              <Route path="/technician/workshop/:serviceId" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <TechnicianWorkshopFlow />
+                </ProtectedRoute>
+              } />
+              <Route path="/technician/visit/:serviceId" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <TechnicianVisitFlow />
+                </ProtectedRoute>
+              } />
+              <Route path="/technician/installation/:serviceId" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <TechnicianInstallationFlow />
+                </ProtectedRoute>
+              } />
+              <Route path="/technician/delivery/:serviceId" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <TechnicianDeliveryFlow />
+                </ProtectedRoute>
+              } />
+              <Route path="/technician/service/:serviceId" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <ServiceRedirect />
+                </ProtectedRoute>
+              } />
               
               {/* Shared routes */}
               <Route path="/preferencias" element={<PlaceholderPage />} />

@@ -1,24 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, MapPin, Play, UserPlus, CheckCircle, Wrench, Package } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, Building2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service } from '@/types/database';
-import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { format, addDays, isSameDay, startOfWeek } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import type { Service } from '@/types/database';
+
+const WEEK_DAYS = [
+  { key: 'segunda', label: 'Segunda', offset: 0 },
+  { key: 'terca', label: 'Terça', offset: 1 },
+  { key: 'quarta', label: 'Quarta', offset: 2 },
+  { key: 'quinta', label: 'Quinta', offset: 3 },
+  { key: 'sexta', label: 'Sexta', offset: 4 },
+  { key: 'sabado', label: 'Sábado', offset: 5 },
+];
+
+const SHIFT_ICONS: Record<string, { icon: typeof Sun; color: string }> = {
+  manha: { icon: Sunrise, color: 'text-amber-500' },
+  tarde: { icon: Sun, color: 'text-orange-500' },
+  noite: { icon: Moon, color: 'text-indigo-500' },
+};
 
 export default function ServicosPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [technicianId, setTechnicianId] = useState<string | null>(null);
-  const [availableServices, setAvailableServices] = useState<Service[]>([]);
-  const [myServices, setMyServices] = useState<Service[]>([]);
-  const [completedServices, setCompletedServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Get Monday of current week
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
 
   useEffect(() => {
     if (profile) {
@@ -31,7 +49,7 @@ export default function ServicosPage() {
     
     setLoading(true);
     try {
-      // First get the technician record for this profile
+      // Get the technician record for this profile
       const { data: technicianData, error: techError } = await supabase
         .from('technicians')
         .select('id')
@@ -51,67 +69,22 @@ export default function ServicosPage() {
 
       setTechnicianId(technicianData.id);
 
-      // Fetch all three categories in parallel
-      const [availableResult, myResult, completedResult] = await Promise.all([
-        // Available to assume: workshop services without technician
-        supabase
-          .from('services')
-          .select(`*, customer:customers(*)`)
-          .eq('service_location', 'oficina')
-          .is('technician_id', null)
-          .in('status', ['por_fazer', 'na_oficina'])
-          .order('created_at', { ascending: false }),
+      // Fetch all services assigned to this technician (active ones)
+      const { data, error } = await supabase
+        .from('services')
+        .select(`*, customer:customers(*)`)
+        .eq('technician_id', technicianData.id)
+        .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca'])
+        .order('scheduled_date', { ascending: true });
 
-        // My active services
-        supabase
-          .from('services')
-          .select(`*, customer:customers(*)`)
-          .eq('technician_id', technicianData.id)
-          .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca'])
-          .order('scheduled_date', { ascending: true }),
-
-        // Completed by me (recent)
-        supabase
-          .from('services')
-          .select(`*, customer:customers(*)`)
-          .eq('technician_id', technicianData.id)
-          .in('status', ['concluidos', 'a_precificar', 'finalizado'])
-          .order('updated_at', { ascending: false })
-          .limit(20),
-      ]);
-
-      if (availableResult.error) throw availableResult.error;
-      if (myResult.error) throw myResult.error;
-      if (completedResult.error) throw completedResult.error;
-
-      setAvailableServices((availableResult.data as Service[]) || []);
-      setMyServices((myResult.data as Service[]) || []);
-      setCompletedServices((completedResult.data as Service[]) || []);
+      if (error) throw error;
+      setServices((data as Service[]) || []);
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
       setLoading(false);
     }
   }
-
-  const handleAssumeService = async (serviceId: string) => {
-    if (!technicianId) return;
-
-    try {
-      const { error } = await supabase
-        .from('services')
-        .update({ technician_id: technicianId })
-        .eq('id', serviceId);
-
-      if (error) throw error;
-
-      toast.success('Serviço assumido com sucesso!');
-      fetchTechnicianAndServices();
-    } catch (error) {
-      console.error('Error assuming service:', error);
-      toast.error('Erro ao assumir serviço');
-    }
-  };
 
   const handleStartService = (service: Service) => {
     if (service.service_type === 'entrega') {
@@ -125,120 +98,119 @@ export default function ServicosPage() {
     }
   };
 
-  const filterServices = (services: Service[]) => {
-    if (!searchTerm) return services;
-    const search = searchTerm.toLowerCase();
-    return services.filter(
-      (s) =>
-        s.code?.toLowerCase().includes(search) ||
-        s.customer?.name?.toLowerCase().includes(search) ||
-        s.appliance_type?.toLowerCase().includes(search)
-    );
+  const navigateWeek = (direction: -1 | 1) => {
+    setCurrentWeekStart(prev => addDays(prev, direction * 7));
   };
 
-  const ServiceCard = ({
-    service,
-    showAssumeButton = false,
-    showStartButton = false,
-    isCompleted = false,
-  }: {
-    service: Service;
-    showAssumeButton?: boolean;
-    showStartButton?: boolean;
-    isCompleted?: boolean;
-  }) => {
-    const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-    const shiftConfig = service.scheduled_shift ? SHIFT_CONFIG[service.scheduled_shift] : null;
+  const goToCurrentWeek = () => {
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  };
 
+  // Organize services by day
+  const servicesByDay = useMemo(() => {
+    const result: Record<number, Service[]> = {};
+    WEEK_DAYS.forEach((_, idx) => { result[idx] = []; });
+    
+    services.forEach(service => {
+      if (!service.scheduled_date) return;
+      
+      const serviceDate = new Date(service.scheduled_date);
+      WEEK_DAYS.forEach((day, idx) => {
+        const targetDate = addDays(currentWeekStart, day.offset);
+        if (isSameDay(serviceDate, targetDate)) {
+          result[idx].push(service);
+        }
+      });
+    });
+    
+    return result;
+  }, [services, currentWeekStart]);
+
+  // Check if current week
+  const isCurrentWeek = useMemo(() => {
+    const today = new Date();
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+    return isSameDay(currentWeekStart, todayWeekStart);
+  }, [currentWeekStart]);
+
+  // Get today's day index
+  const todayIndex = useMemo(() => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    // Convert Sunday (0) to -1 (not shown), Monday (1) to 0, etc.
+    return dayOfWeek === 0 ? -1 : dayOfWeek - 1;
+  }, []);
+
+  const ServiceCard = ({ service }: { service: Service }) => {
+    const isWorkshop = service.service_location === 'oficina';
+    const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
+    const ShiftIcon = shiftInfo?.icon || Sun;
+    
     return (
       <Card
-        className={`cursor-pointer hover:shadow-md transition-all ${isCompleted ? 'opacity-70' : ''}`}
-        onClick={() => !showAssumeButton && handleStartService(service)}
+        className={cn(
+          'cursor-pointer hover:shadow-md transition-all border-l-4',
+          isWorkshop 
+            ? 'bg-orange-50 border-l-orange-500' 
+            : 'bg-blue-50 border-l-blue-500'
+        )}
+        onClick={() => handleStartService(service)}
       >
-        <CardContent className="p-4">
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-mono font-semibold text-primary">{service.code}</span>
-                  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                  {service.is_urgent && <Badge variant="destructive">Urgente</Badge>}
-                  {service.is_warranty && (
-                    <Badge variant="outline" className="border-green-500 text-green-700">
-                      Garantia
-                    </Badge>
-                  )}
-                </div>
-                <p className="font-medium truncate">{service.customer?.name || 'Cliente não definido'}</p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {[service.appliance_type, service.brand, service.model].filter(Boolean).join(' • ')}
-                </p>
-              </div>
-
-              {showAssumeButton && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 border-blue-500 text-blue-600 hover:bg-blue-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAssumeService(service.id);
-                  }}
-                >
-                  <UserPlus className="h-4 w-4 mr-1" />
-                  Assumir
-                </Button>
-              )}
-
-              {showStartButton && (
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStartService(service);
-                  }}
-                >
-                  <Play className="h-4 w-4 mr-1" />
-                  Iniciar
-                </Button>
-              )}
+        <CardContent className="p-3">
+          <div className="space-y-2">
+            {/* Code + Badge */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono font-bold text-sm text-foreground">
+                {service.code}
+              </span>
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  'text-xs',
+                  isWorkshop ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                )}
+              >
+                {isWorkshop ? 'Oficina' : 'Visita'}
+              </Badge>
             </div>
 
-            {service.scheduled_date && (
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>
-                    {new Date(service.scheduled_date).toLocaleDateString('pt-PT', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </span>
-                  {shiftConfig && <span className="text-primary font-medium">• {shiftConfig.label}</span>}
-                </div>
-              </div>
-            )}
+            {/* Client Name */}
+            <p className="font-medium text-sm truncate">
+              {service.customer?.name || 'Cliente não definido'}
+            </p>
 
-            {(service.service_address || service.customer?.address) && (
-              <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                <span className="line-clamp-2">{service.service_address || service.customer?.address}</span>
-              </div>
-            )}
+            {/* Appliance + Fault */}
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {service.appliance_type || 'Aparelho'} - {service.fault_description || 'Sem descrição'}
+            </p>
 
-            <div className="flex gap-2">
-              <Badge variant="outline" className="text-xs">
-                {service.service_location === 'oficina' ? 'Oficina' : 'Visita'}
-              </Badge>
+            {/* Shift indicator */}
+            <div className="flex items-center gap-1.5 pt-1">
+              <ShiftIcon className={cn('h-4 w-4', shiftInfo?.color || 'text-muted-foreground')} />
+              <span className="text-xs text-muted-foreground capitalize">
+                {service.scheduled_shift || 'Sem turno'}
+              </span>
+            </div>
+
+            {/* Tags */}
+            <div className="flex flex-wrap gap-1 pt-1">
+              {service.is_urgent && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  Urgente
+                </Badge>
+              )}
+              {service.is_warranty && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-500 text-green-700">
+                  Garantia
+                </Badge>
+              )}
               {service.service_type === 'instalacao' && (
-                <Badge variant="outline" className="text-xs bg-purple-50 border-purple-200">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-500 text-purple-700">
                   Instalação
                 </Badge>
               )}
               {service.service_type === 'entrega' && (
-                <Badge variant="outline" className="text-xs bg-teal-50 border-teal-200">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-teal-500 text-teal-700">
                   Entrega
                 </Badge>
               )}
@@ -249,116 +221,93 @@ export default function ServicosPage() {
     );
   };
 
-  const filteredAvailable = filterServices(availableServices);
-  const filteredMy = filterServices(myServices);
-  const filteredCompleted = filterServices(completedServices);
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full flex flex-col">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Oficina - Técnico</h1>
-        <p className="text-muted-foreground">Gerir serviços atribuídos e disponíveis</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Building2 className="h-6 w-6 text-orange-500" />
+          <h1 className="text-2xl font-bold tracking-tight">Serviços</h1>
+        </div>
+        
+        {/* Week Navigation */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigateWeek(-1)}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          
+          <Button
+            variant={isCurrentWeek ? "default" : "outline"}
+            size="sm"
+            onClick={goToCurrentWeek}
+            className="min-w-[200px]"
+          >
+            {format(currentWeekStart, "dd/MM", { locale: pt })} - {format(addDays(currentWeekStart, 5), "dd/MM/yyyy", { locale: pt })}
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigateWeek(1)}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar por código, cliente ou aparelho..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
+      {/* Weekly Grid */}
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">A carregar serviços...</div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          A carregar serviços...
+        </div>
       ) : (
-        <div className="space-y-8">
-          {/* Section 1: Available to Assume */}
-          <section>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  Serviços Disponíveis para Assumir
-                  <Badge variant="secondary" className="ml-2">
-                    {filteredAvailable.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredAvailable.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Não há serviços disponíveis para assumir.
-                  </p>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredAvailable.map((service) => (
-                      <ServiceCard key={service.id} service={service} showAssumeButton />
-                    ))}
-                  </div>
+        <div className="flex-1 grid grid-cols-6 gap-4 min-h-0">
+          {WEEK_DAYS.map((day, idx) => {
+            const dayDate = addDays(currentWeekStart, day.offset);
+            const dayServices = servicesByDay[idx];
+            const isToday = isCurrentWeek && idx === todayIndex;
+            
+            return (
+              <div 
+                key={day.key} 
+                className={cn(
+                  'flex flex-col rounded-lg border bg-card overflow-hidden',
+                  isToday && 'ring-2 ring-primary'
                 )}
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Section 2: My Workshop Services */}
-          <section>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Wrench className="h-5 w-5 text-orange-600" />
-                  Meus Serviços na Oficina
-                  <Badge variant="secondary" className="ml-2">
-                    {filteredMy.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredMy.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Não tem serviços atribuídos no momento.
+              >
+                {/* Day Header */}
+                <div className={cn(
+                  'p-3 text-center border-b',
+                  isToday ? 'bg-primary text-primary-foreground' : 'bg-muted/50'
+                )}>
+                  <p className="font-semibold">{day.label}</p>
+                  <p className={cn(
+                    'text-sm',
+                    isToday ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                  )}>
+                    {format(dayDate, "dd/MM", { locale: pt })}
                   </p>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredMy.map((service) => (
-                      <ServiceCard key={service.id} service={service} showStartButton />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Section 3: Completed by Me */}
-          <section>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Serviços Concluídos por Mim
-                  <Badge variant="secondary" className="ml-2">
-                    {filteredCompleted.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredCompleted.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Ainda não concluiu nenhum serviço.
-                  </p>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredCompleted.map((service) => (
-                      <ServiceCard key={service.id} service={service} isCompleted />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
+                </div>
+                
+                {/* Services List */}
+                <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+                  {dayServices.length === 0 ? (
+                    <p className="text-center text-xs text-muted-foreground py-4">
+                      Sem serviços
+                    </p>
+                  ) : (
+                    dayServices.map(service => (
+                      <ServiceCard key={service.id} service={service} />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

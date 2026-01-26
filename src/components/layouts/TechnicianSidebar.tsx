@@ -23,7 +23,6 @@ import {
 
 const menuItems = [
   { title: 'Serviços', url: '/servicos', icon: ClipboardList },
-  { title: 'Oficina', url: '/oficina', icon: Wrench },
   { title: 'Perfil', url: '/perfil', icon: User },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
 ];
