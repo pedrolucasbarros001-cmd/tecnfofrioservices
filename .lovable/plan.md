@@ -1,163 +1,206 @@
 
-# Plano: Ajustes de Texto/Tamanho e Verificação do Workflow do Técnico
 
-## Resumo das Alterações
+# Plano: Sistema de Permissões para Câmara e Galeria
 
-Este plano aborda dois objetivos principais:
-1. **Ajustes de texto e tamanho** - Prevenir sobreposição visual e simplificar botões
-2. **Verificação do workflow** - Confirmar que o fluxo está correto segundo as especificações
+## Problema Identificado
+
+Actualmente, quando o modal de câmara abre, tenta aceder directamente ao `getUserMedia()` sem:
+1. Verificar primeiro o estado das permissões
+2. Guiar o utilizador sobre como conceder permissões se negadas
+3. Ter uma estratégia de fallback clara para dispositivos móveis
 
 ---
 
-## Parte 1: Ajustes de UI
+## Solução Proposta
 
-### 1.1 Simplificar Botão "Começar" em ServicosPage.tsx
+### 1. Criar Hook de Permissões de Câmara
 
-**Ficheiro:** `src/pages/ServicosPage.tsx`
+**Ficheiro:** `src/hooks/useCameraPermissions.ts` (NOVO)
 
-**Alteração:** Mudar o texto de "Começar Visita/Instalação/Entrega" para simplesmente "Começar"
+Hook dedicado para gerir permissões de câmara com:
+- Verificação do estado actual da permissão (`granted`, `denied`, `prompt`)
+- Função para solicitar permissão
+- Listener para mudanças de estado
+- Detecção de suporte do browser
 
-**Linhas 152-180:** Actualizar a função `getButtonConfig`:
 ```typescript
-const getButtonConfig = (service: Service) => {
-  if (service.service_type === 'entrega') {
-    return { 
-      label: 'Começar',  // Era "Começar Entrega"
-      color: 'bg-green-500 hover:bg-green-600 text-white',
-      // ... resto mantém
-    };
+interface CameraPermissionState {
+  status: 'checking' | 'granted' | 'denied' | 'prompt' | 'unsupported';
+  isSupported: boolean;
+  canRequest: boolean;
+}
+
+export function useCameraPermissions() {
+  const [state, setState] = useState<CameraPermissionState>({
+    status: 'checking',
+    isSupported: false,
+    canRequest: false,
+  });
+
+  // Verificar suporte e estado da permissão
+  // Listener para mudanças
+  // Função requestPermission()
+  
+  return { ...state, requestPermission };
+}
+```
+
+---
+
+### 2. Actualizar CameraCapture.tsx
+
+**Alterações principais:**
+
+#### 2.1 Verificar Permissão Antes de Iniciar
+
+Antes de chamar `getUserMedia()`, verificar o estado:
+
+```typescript
+// Verificar estado da permissão primeiro
+const checkPermission = async () => {
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      return result.state; // 'granted', 'denied', 'prompt'
+    } catch {
+      return 'unknown';
+    }
   }
-  if (service.service_type === 'instalacao') {
-    return { 
-      label: 'Começar',  // Era "Começar Instalação"
-      color: 'bg-yellow-500 hover:bg-yellow-600 text-black',
-      // ... resto mantém
-    };
-  }
-  return { 
-    label: 'Começar',  // Era "Começar Visita"
-    color: 'bg-blue-500 hover:bg-blue-600 text-white',
-    // ... resto mantém
-  };
+  return 'unknown';
 };
 ```
 
-### 1.2 Melhorar Responsividade dos Cards
+#### 2.2 Fluxo de Permissão Melhorado
 
-**Ficheiro:** `src/pages/ServicosPage.tsx`
+```text
+1. Modal abre
+2. Verificar se browser suporta mediaDevices
+3. Verificar estado da permissão:
+   - 'granted' → Iniciar câmara directamente
+   - 'prompt' → Mostrar ecrã explicativo + botão "Permitir Câmara"
+   - 'denied' → Mostrar instruções para activar nas definições
+   - 'unknown' → Tentar iniciar (trigger nativo do browser)
+4. Se falhar → Mostrar opção de upload como alternativa
+```
 
-**Alterações no ServiceCard (linhas 182-254):**
-- Reduzir padding do botão
-- Usar `text-[11px]` em mobile para o botão
-- Garantir que ícones e textos não sobrepõem
+#### 2.3 Ecrã de Solicitação de Permissão
+
+Novo estado `permissionState` com UI dedicada:
 
 ```typescript
-// Linha 242-249 - Botão mais compacto
-<Button
-  size="sm"
-  className={cn('w-full h-7 text-[11px] md:h-8 md:text-xs mt-1.5', buttonConfig.color)}
-  onClick={(e) => handleStartFlow(service, e)}
->
-  <Play className="h-3 w-3 mr-1" />
-  {buttonConfig.label}
+{permissionState === 'prompt' && (
+  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+    <Camera className="h-16 w-16 text-blue-500 mb-4" />
+    <h3 className="text-lg font-semibold mb-2">Acesso à Câmara</h3>
+    <p className="text-sm text-muted-foreground mb-4">
+      Para tirar fotos, precisamos de permissão para aceder à câmara do dispositivo.
+    </p>
+    <Button onClick={requestCameraAccess} className="gap-2">
+      <Camera className="h-4 w-4" />
+      Permitir Acesso à Câmara
+    </Button>
+  </div>
+)}
+```
+
+#### 2.4 Ecrã de Permissão Negada
+
+```typescript
+{permissionState === 'denied' && (
+  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+    <X className="h-16 w-16 text-red-500 mb-4" />
+    <h3 className="text-lg font-semibold mb-2">Permissão Negada</h3>
+    <p className="text-sm text-muted-foreground mb-4">
+      O acesso à câmara foi bloqueado. Para usar a câmara:
+    </p>
+    <div className="text-left text-sm bg-muted p-3 rounded-lg mb-4">
+      <p className="font-medium mb-1">📱 No telemóvel:</p>
+      <p className="text-muted-foreground mb-2">
+        Definições → Aplicações → Browser → Permissões → Câmara
+      </p>
+      <p className="font-medium mb-1">💻 No computador:</p>
+      <p className="text-muted-foreground">
+        Clique no ícone 🔒 na barra de endereço → Permissões → Câmara
+      </p>
+    </div>
+    <Button variant="outline" onClick={triggerFileUpload} className="gap-2">
+      <Upload className="h-4 w-4" />
+      Usar Galeria em vez
+    </Button>
+  </div>
+)}
+```
+
+---
+
+### 3. Input de Ficheiro Melhorado para Mobile
+
+O input de ficheiro actual já tem `capture="environment"`, que em dispositivos móveis abre directamente a câmara nativa.
+
+**Melhoria:** Adicionar dois botões separados para clareza:
+
+```typescript
+// Opção 1: Câmara nativa (abre câmara do sistema)
+<input
+  ref={cameraInputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  className="hidden"
+  onChange={handleFileUpload}
+/>
+
+// Opção 2: Galeria (abre seletor de ficheiros)
+<input
+  ref={galleryInputRef}
+  type="file"
+  accept="image/*"
+  className="hidden"
+  onChange={handleFileUpload}
+/>
+
+// Botões na UI
+<Button onClick={() => cameraInputRef.current?.click()}>
+  <Camera /> Tirar Foto
+</Button>
+<Button onClick={() => galleryInputRef.current?.click()}>
+  <ImageIcon /> Da Galeria
 </Button>
 ```
 
-### 1.3 Corrigir Espaçamentos nos Modais
-
-**Ficheiros afetados:**
-- `VisitFlowModals.tsx`
-- `InstallationFlowModals.tsx`
-- `DeliveryFlowModals.tsx`
-- `WorkshopFlowModals.tsx`
-
-**Alterações comuns:**
-- Reduzir padding do header de `py-3` para `py-2`
-- Usar tamanho de fonte menor no título do modal (`text-base` em vez de `text-lg`)
-- Garantir que o DialogContent tem `overflow-hidden` para evitar scroll horizontal
-
 ---
 
-## Parte 2: Verificação do Workflow do Técnico
+### 4. Estratégia Híbrida (Melhor UX)
 
-### Análise do Fluxo Actual vs. Especificação
+Para garantir que funciona em todos os dispositivos:
 
-#### Fluxo de Visita (VisitFlowModals.tsx) ✅ CORRECTO
-
-| Passo | Especificação | Implementação Actual | Status |
-|-------|---------------|----------------------|--------|
-| 1 | Resumo (Cliente, Morada, Aparelho, Avaria) | ✅ Presente | OK |
-| 2 | Deslocação (Caminho p/ Cliente, Cheguei ao Local) | ✅ Presente | OK |
-| 3 | Foto (obrigatória) | ✅ Presente, obrigatória | OK |
-| 4 | Diagnóstico (Textarea obrigatória) | ✅ Presente, obrigatória | OK |
-| 5 | Decisão (Reparar no Local, Levantar para Oficina, Pedir Peça) | ✅ Presente | OK |
-| 6 | Finalização (Assinatura obrigatória) | ✅ Presente | OK |
-
-**Transições de Estado Correctas:**
-- "Reparar no Local" → `status: 'concluidos'`, `pending_pricing: true` ✅
-- "Levantar para Oficina" → `status: 'na_oficina'`, `service_location: 'oficina'` ✅
-- "Pedir Peça" → `status: 'para_pedir_peca'` ✅
-
----
-
-#### Fluxo de Instalação (InstallationFlowModals.tsx) ✅ CORRECTO
-
-| Passo | Especificação | Implementação Actual | Status |
-|-------|---------------|----------------------|--------|
-| 1 | Resumo | ✅ Presente | OK |
-| 2 | Deslocação | ✅ Presente | OK |
-| 3 | Foto Antes (obrigatória) | ✅ Presente | OK |
-| 4 | Foto Depois (obrigatória) | ✅ Presente | OK |
-| 5 | Assinatura (obrigatória) | ✅ Presente | OK |
-
-**Transição de Estado Correcta:**
-- Conclusão → `status: 'finalizado'`, `service_location: 'entregue'` ✅
-
----
-
-#### Fluxo de Entrega (DeliveryFlowModals.tsx) ✅ CORRECTO
-
-| Passo | Especificação | Implementação Actual | Status |
-|-------|---------------|----------------------|--------|
-| 1 | Resumo | ✅ Presente | OK |
-| 2 | Deslocação | ✅ Presente | OK |
-| 3 | Foto (opcional) | ✅ Presente, opcional | OK |
-| 4 | Assinatura (obrigatória) | ✅ Presente | OK |
-
-**Transição de Estado Correcta:**
-- "Marcar como Entregue" → `status: 'finalizado'`, `service_location: 'entregue'`, `delivery_date` ✅
-
----
-
-#### Fluxo de Oficina (WorkshopFlowModals.tsx) ✅ CORRECTO
-
-| Passo | Especificação | Implementação Actual | Status |
-|-------|---------------|----------------------|--------|
-| 1 | Resumo | ✅ Presente | OK |
-| 2 | Contexto + Foto | ✅ Avaria detectada obrigatória, foto opcional | OK |
-| 3 | Identificação (Marca, Modelo, Série) | ✅ Presente | OK |
-| 4 | Revisão | ✅ Presente | OK |
-| 5 | Finalização (Pedir Peça ou Concluir) | ✅ Presente | OK |
-
-**Transições de Estado Correctas:**
-- "Iniciar Reparação" → `status: 'em_execucao'` ✅
-- "Pedir Peça" → `status: 'para_pedir_peca'` ✅
-- "Reparação Concluída" → `status: 'concluidos'`, `pending_pricing: true` ✅
-
----
-
-## Parte 3: Pequenas Correções Identificadas
-
-### 3.1 Botão já está "Começar" na Oficina
-
-O `TechnicianOfficePage.tsx` já usa apenas "Começar" (linha 171) - CORRECTO
-
-### 3.2 Garantir Consistência Visual
-
-Todos os modais já seguem o padrão correto:
-- Cores temáticas nos headers (Azul, Amarelo, Verde, Laranja)
-- Barra de progresso presente
-- Botões "Anterior" e "Continuar"
+```text
+Fluxo Principal:
+┌─────────────────────────────────────────┐
+│           MODAL ABRE                    │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│  Browser suporta mediaDevices.getUserMedia?│
+└─────────────────┬───────────────────────┘
+         ┌────────┴────────┐
+         │ SIM             │ NÃO
+         ▼                 ▼
+┌─────────────────┐  ┌─────────────────┐
+│Verificar permissão│ │ Mostrar opções  │
+│navigator.permissions│ │ de upload/galeria│
+└────────┬────────┘  └─────────────────┘
+         │
+    ┌────┴────┬──────────┐
+    ▼         ▼          ▼
+ granted   prompt     denied
+    │         │          │
+    ▼         ▼          ▼
+ Iniciar   Mostrar    Mostrar
+ câmara    botão de   instruções
+ directo   permissão  + fallback
+```
 
 ---
 
@@ -165,77 +208,55 @@ Todos os modais já seguem o padrão correto:
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/pages/ServicosPage.tsx` | Simplificar label do botão para "Começar", ajustar tamanhos |
-| `src/components/technician/VisitFlowModals.tsx` | Pequenos ajustes de espaçamento |
-| `src/components/technician/InstallationFlowModals.tsx` | Pequenos ajustes de espaçamento |
-| `src/components/technician/DeliveryFlowModals.tsx` | Pequenos ajustes de espaçamento |
-| `src/components/technician/WorkshopFlowModals.tsx` | Pequenos ajustes de espaçamento |
+| `src/hooks/useCameraPermissions.ts` | NOVO - Hook de gestão de permissões |
+| `src/components/shared/CameraCapture.tsx` | Integrar hook, UI de permissões, fallbacks |
 
 ---
 
-## Secção Técnica: Diagrama do Workflow do Técnico
+## Secção Técnica
 
-```text
-                    ┌─────────────────────────────────────────┐
-                    │         AGENDA SEMANAL (ServicosPage)   │
-                    │  Cards com botão "Começar" por dia      │
-                    └─────────────────────┬───────────────────┘
-                                          │
-           ┌──────────────────────────────┼──────────────────────────────┐
-           │                              │                              │
-           ▼                              ▼                              ▼
-    ┌──────────────┐              ┌───────────────┐              ┌──────────────┐
-    │    VISITA    │              │  INSTALAÇÃO   │              │   ENTREGA    │
-    │  (6 passos)  │              │   (5 passos)  │              │  (4 passos)  │
-    │    AZUL      │              │   AMARELO     │              │    VERDE     │
-    └──────┬───────┘              └───────┬───────┘              └──────┬───────┘
-           │                              │                              │
-           ▼                              ▼                              ▼
-    Resumo → Deslocação           Resumo → Deslocação            Resumo → Deslocação
-    → Foto → Diagnóstico          → Foto Antes                   → Foto (opcional)
-    → Decisão → Assinatura        → Foto Depois                  → Assinatura
-           │                      → Assinatura                          │
-           │                              │                              │
-    ┌──────┼──────┐                       ▼                              ▼
-    │      │      │               status: 'finalizado'           status: 'finalizado'
-    ▼      ▼      ▼               location: 'entregue'           location: 'entregue'
-    │      │      │
-    │      │      └─► status: 'para_pedir_peca'
-    │      │
-    │      └─────────► status: 'na_oficina'
-    │                  location: 'oficina'
-    │                         │
-    │                         ▼
-    │              ┌──────────────────┐
-    │              │     OFICINA      │
-    │              │   (5 passos)     │
-    │              │    LARANJA       │
-    │              └────────┬─────────┘
-    │                       │
-    │                       ▼
-    │              Resumo → Contexto/Foto
-    │              → Identificação → Revisão
-    │              → Finalização
-    │                       │
-    │              ┌────────┴────────┐
-    │              │                 │
-    │              ▼                 ▼
-    │      status: 'para_pedir_peca' │
-    │                                │
-    └────────────────────────────────┘
-                     │
-                     ▼
-           status: 'concluidos'
-           pending_pricing: true
+### API de Permissões
+
+```typescript
+// Verificar suporte
+const hasPermissionsAPI = 'permissions' in navigator;
+
+// Query estado actual
+const result = await navigator.permissions.query({ name: 'camera' });
+// result.state: 'granted' | 'denied' | 'prompt'
+
+// Escutar mudanças
+result.addEventListener('change', () => {
+  console.log('Permissão mudou para:', result.state);
+});
 ```
 
+### Nota sobre Safari/iOS
+
+O Safari não suporta `navigator.permissions.query({ name: 'camera' })`. Nesses casos:
+- Fallback para tentar `getUserMedia()` directamente
+- O browser mostrará o prompt nativo
+- Tratar erro `NotAllowedError` como permissão negada
+
+### Compatibilidade
+
+| Browser | permissions.query('camera') | getUserMedia | input[capture] |
+|---------|----------------------------|--------------|----------------|
+| Chrome  | ✅ | ✅ | ✅ |
+| Firefox | ✅ | ✅ | ✅ |
+| Safari  | ❌ | ✅ | ✅ |
+| Edge    | ✅ | ✅ | ✅ |
+| iOS Safari | ❌ | ✅ | ✅ |
+
 ---
 
-## Conclusão
+## Resultado Final
 
-O workflow do técnico está **correctamente implementado** segundo as especificações. As únicas alterações necessárias são:
+Após implementação:
 
-1. **UI**: Simplificar o texto do botão de "Começar [Tipo]" para apenas "Começar"
-2. **Layout**: Pequenos ajustes de tamanho/espaçamento para evitar sobreposição visual
+1. **Primeira utilização:** Utilizador vê ecrã explicativo com botão "Permitir Câmara"
+2. **Permissão concedida:** Câmara inicia automaticamente
+3. **Permissão negada:** Instruções claras + opção de galeria
+4. **Browser sem suporte:** Fallback automático para upload de ficheiro
+5. **Dispositivo móvel:** Input com `capture="environment"` abre câmara nativa
 
-Todos os fluxos sequenciais (modal por modal), gatilhos, bifurcações e transições de estado estão a funcionar conforme esperado.
