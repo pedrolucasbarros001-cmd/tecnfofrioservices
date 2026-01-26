@@ -82,22 +82,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md shadow-xl border-0">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <Card className="w-full max-w-md shadow-2xl border-0 bg-white/10 backdrop-blur-xl">
         <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto">
+          <div className="mx-auto p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
             <img 
               src={tecnofrioLogoIcon} 
               alt="TECNOFRIO" 
-              className="h-20 w-20 object-contain mx-auto"
+              className="h-20 w-20 object-contain"
             />
           </div>
           <div>
             <CardTitle className="text-3xl font-bold tracking-tight">
-              <span className="text-[#2B4F84]">TECNO</span>
-              <span className="text-slate-700">FRIO</span>
+              <span className="text-blue-400">TECNO</span>
+              <span className="text-slate-200">FRIO</span>
             </CardTitle>
-            <CardDescription className="text-base mt-2">
+            <CardDescription className="text-base mt-2 text-slate-400">
               Sistema de Gestão de Serviços
             </CardDescription>
           </div>
@@ -110,13 +110,14 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-slate-300">Email</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
                         placeholder="seu@email.com"
                         autoComplete="email"
                         disabled={isLoading}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
                         {...field}
                       />
                     </FormControl>
@@ -129,13 +130,14 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Palavra-passe</FormLabel>
+                    <FormLabel className="text-slate-300">Palavra-passe</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
                         placeholder="••••••••"
                         autoComplete="current-password"
                         disabled={isLoading}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
                         {...field}
                       />
                     </FormControl>
@@ -143,7 +145,11 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full h-11 text-base" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200" 
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
