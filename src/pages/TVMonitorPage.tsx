@@ -1,13 +1,111 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity } from 'lucide-react';
+import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { usePublicActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+
+// Section definitions for organized display
+const MONITOR_SECTIONS = [
+  { status: 'em_execucao' as ServiceStatus, label: 'Em Execução', icon: Play, color: 'text-blue-400' },
+  { status: 'na_oficina' as ServiceStatus, label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
+  { status: 'para_pedir_peca' as ServiceStatus, label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
+  { status: 'em_espera_de_peca' as ServiceStatus, label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
+  { status: 'concluidos' as ServiceStatus, label: 'Concluídos (Prontos para Entrega)', icon: CheckCircle, color: 'text-emerald-400' },
+];
+
+// Service Card Component
+function ServiceCard({ service }: { service: Service }) {
+  const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
+  const isUrgent = service.is_urgent;
+  const hasTechnician = !!service.technician;
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl p-5 bg-slate-800 border-l-4 transition-all",
+        isUrgent ? "border-red-500" : "border-slate-600",
+        statusConfig?.color?.replace('bg-', 'border-l-')
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <p className="font-mono text-xl lg:text-2xl font-bold text-primary">
+            {service.code}
+          </p>
+          <div className={cn(
+            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1",
+            statusConfig?.color
+          )}>
+            {statusConfig?.label}
+          </div>
+        </div>
+        {isUrgent && (
+          <div className="flex items-center gap-1 bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs animate-pulse">
+            <AlertCircle className="h-3 w-3" />
+            URGENTE
+          </div>
+        )}
+      </div>
+
+      {/* Customer */}
+      <div className="mb-3">
+        <p className="text-lg font-semibold truncate">
+          {service.customer?.name || 'Sem cliente'}
+        </p>
+        <p className="text-slate-400 text-sm truncate">
+          {[service.appliance_type, service.brand, service.model]
+            .filter(Boolean)
+            .join(' • ') || 'Equipamento não especificado'}
+        </p>
+      </div>
+
+      {/* Fault */}
+      {service.fault_description && (
+        <div className="bg-slate-700/50 rounded-lg p-2 mb-3">
+          <p className="text-xs text-slate-400 uppercase mb-0.5">Avaria</p>
+          <p className="text-sm line-clamp-2">{service.fault_description}</p>
+        </div>
+      )}
+
+      {/* Technician or DISPONÍVEL */}
+      {hasTechnician ? (
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+            style={{ backgroundColor: service.technician?.color || '#3B82F6' }}
+          >
+            {service.technician?.profile?.full_name?.charAt(0) || 'T'}
+          </div>
+          <span className="text-sm text-slate-300">
+            {service.technician?.profile?.full_name}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 bg-yellow-500/20 rounded-lg p-2">
+          <User className="h-5 w-5 text-yellow-400" />
+          <span className="text-sm font-semibold text-yellow-400">
+            DISPONÍVEL
+          </span>
+        </div>
+      )}
+
+      {/* Entry date */}
+      <div className="flex items-center gap-2 mt-3 text-slate-500 text-xs">
+        <Clock className="h-3 w-3" />
+        <span>
+          Entrada: {format(new Date(service.created_at), "dd/MM 'às' HH:mm")}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function TVMonitorPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -21,7 +119,7 @@ export default function TVMonitorPage() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  // Fetch services in workshop (removed 'a_precificar')
+  // Fetch services in workshop
   const { data: services = [], refetch } = useQuery({
     queryKey: ['tv-monitor-services'],
     queryFn: async () => {
@@ -39,7 +137,7 @@ export default function TVMonitorPage() {
       if (error) throw error;
       return (data as unknown as Service[]) || [];
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
   // Fetch public activity logs
@@ -62,44 +160,44 @@ export default function TVMonitorPage() {
     return acc;
   }, {} as Record<ServiceStatus, Service[]>);
 
-  // Status order WITHOUT 'a_precificar'
+  // Status order for stats bar
   const statusOrder: ServiceStatus[] = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-6 lg:p-8 pb-32">
+    <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6 pb-40">
       {/* Header */}
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <img
             src={tecnofrioLogoIcon}
             alt="TECNOFRIO"
-            className="h-16 w-16 lg:h-20 lg:w-20 object-contain"
+            className="h-14 w-14 lg:h-16 lg:w-16 object-contain"
           />
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
               <span className="text-[#2B4F84]">TECNO</span>
               <span className="text-slate-300">FRIO</span>
             </h1>
-            <p className="text-slate-400 text-lg">Monitor da Oficina</p>
+            <p className="text-slate-400 text-base">Monitor da Oficina</p>
           </div>
         </div>
 
         <div className="text-right">
-          <p className="text-4xl lg:text-5xl font-mono font-bold">
+          <p className="text-3xl lg:text-4xl font-mono font-bold">
             {format(currentTime, 'HH:mm:ss')}
           </p>
-          <p className="text-slate-400 text-lg">
+          <p className="text-slate-400 text-sm lg:text-base">
             {format(currentTime, "EEEE, d 'de' MMMM", { locale: pt })}
           </p>
-          <div className="flex items-center justify-end gap-2 mt-2 text-slate-500 text-sm">
-            <RefreshCw className="h-4 w-4" />
+          <div className="flex items-center justify-end gap-2 mt-1 text-slate-500 text-xs">
+            <RefreshCw className="h-3 w-3" />
             <span>Atualizado às {format(lastRefresh, 'HH:mm:ss')}</span>
           </div>
         </div>
       </header>
 
-      {/* Stats Bar - 5 columns without 'a_precificar' */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      {/* Stats Bar */}
+      <div className="grid grid-cols-5 gap-3 mb-6">
         {statusOrder.map((status) => {
           const config = SERVICE_STATUS_CONFIG[status];
           const count = groupedServices[status]?.length || 0;
@@ -107,138 +205,89 @@ export default function TVMonitorPage() {
             <div
               key={status}
               className={cn(
-                "rounded-xl p-4 text-center",
+                "rounded-lg p-3 text-center",
                 count > 0 ? config.color : "bg-slate-800"
               )}
             >
-              <p className="text-4xl lg:text-5xl font-bold">{count}</p>
-              <p className="text-sm lg:text-base opacity-90">{config.label}</p>
+              <p className="text-3xl lg:text-4xl font-bold">{count}</p>
+              <p className="text-xs lg:text-sm opacity-90">{config.label}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Services Grid - Larger cards, max 3 columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
-        {services.map((service) => {
-          const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
-          const isUrgent = service.is_urgent;
-          const hasTechnician = !!service.technician;
-
+      {/* Services by Section */}
+      <div className="space-y-6 mb-6">
+        {MONITOR_SECTIONS.map((section) => {
+          const sectionServices = groupedServices[section.status] || [];
+          
+          // Always show section header, even if empty (shows 0)
           return (
-            <div
-              key={service.id}
-              className={cn(
-                "rounded-xl p-6 bg-slate-800 border-l-4 transition-all",
-                isUrgent ? "border-red-500" : "border-slate-600",
-                statusConfig.color.replace('bg-', 'border-l-')
-              )}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="font-mono text-2xl lg:text-3xl font-bold text-primary">
-                    {service.code}
-                  </p>
-                  <div className={cn(
-                    "inline-flex items-center px-3 py-1 rounded text-sm font-medium mt-2",
-                    statusConfig.color
-                  )}>
-                    {statusConfig.label}
-                  </div>
-                </div>
-                {isUrgent && (
-                  <div className="flex items-center gap-1 bg-red-500/20 text-red-400 px-3 py-1.5 rounded text-sm animate-pulse">
-                    <AlertCircle className="h-4 w-4" />
-                    URGENTE
-                  </div>
-                )}
+            <div key={section.status}>
+              {/* Section Header with separator line */}
+              <div className="flex items-center gap-3 mb-3 pb-2 border-b border-slate-700">
+                <section.icon className={cn("h-5 w-5", section.color)} />
+                <h2 className="text-lg font-bold text-slate-300">
+                  {section.label}
+                </h2>
+                <Badge 
+                  variant="secondary" 
+                  className={cn(
+                    "text-xs",
+                    sectionServices.length > 0 ? "bg-slate-700" : "bg-slate-800 text-slate-500"
+                  )}
+                >
+                  {sectionServices.length}
+                </Badge>
               </div>
-
-              {/* Customer - Larger text */}
-              <div className="mb-4">
-                <p className="text-xl lg:text-2xl font-semibold truncate">
-                  {service.customer?.name || 'Sem cliente'}
-                </p>
-                <p className="text-slate-400 text-base lg:text-lg truncate">
-                  {[service.appliance_type, service.brand, service.model]
-                    .filter(Boolean)
-                    .join(' • ') || 'Equipamento não especificado'}
-                </p>
-              </div>
-
-              {/* Fault */}
-              {service.fault_description && (
-                <div className="bg-slate-700/50 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-slate-400 uppercase mb-1">Avaria</p>
-                  <p className="text-sm lg:text-base line-clamp-2">{service.fault_description}</p>
-                </div>
-              )}
-
-              {/* Technician or DISPONÍVEL */}
-              {hasTechnician ? (
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold"
-                    style={{ backgroundColor: service.technician?.color || '#3B82F6' }}
-                  >
-                    {service.technician?.profile?.full_name?.charAt(0) || 'T'}
-                  </div>
-                  <span className="text-base lg:text-lg text-slate-300">
-                    {service.technician?.profile?.full_name}
-                  </span>
+              
+              {/* Section Cards */}
+              {sectionServices.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {sectionServices.map((service) => (
+                    <ServiceCard key={service.id} service={service} />
+                  ))}
                 </div>
               ) : (
-                <div className="flex items-center gap-3 bg-yellow-500/20 rounded-lg p-3">
-                  <User className="h-6 w-6 text-yellow-400" />
-                  <span className="text-lg font-semibold text-yellow-400">
-                    DISPONÍVEL
-                  </span>
-                </div>
+                <p className="text-slate-600 text-sm italic pl-8">
+                  Nenhum serviço nesta secção
+                </p>
               )}
-
-              {/* Entry date */}
-              <div className="flex items-center gap-2 mt-4 text-slate-500 text-sm">
-                <Clock className="h-4 w-4" />
-                <span>
-                  Entrada: {format(new Date(service.created_at), "dd/MM 'às' HH:mm")}
-                </span>
-              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Empty State */}
+      {/* Empty State - Only if no services at all */}
       {services.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <Wrench className="h-20 w-20 mb-4" />
-          <p className="text-2xl">Nenhum serviço na oficina</p>
+        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+          <Wrench className="h-16 w-16 mb-4" />
+          <p className="text-xl">Nenhum serviço na oficina</p>
         </div>
       )}
 
       {/* Footer with Activity Feed */}
       <footer className="fixed bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur-sm">
         {/* Activity Feed */}
-        <div className="border-t border-slate-700 px-6 py-3">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="border-t border-slate-700 px-4 py-2">
+          <div className="flex items-center gap-2 mb-1">
             <Activity className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-400 font-medium">Atividades Recentes</span>
+            <span className="text-xs text-slate-400 font-medium">Atividades Recentes</span>
           </div>
-          <div className="flex overflow-x-auto gap-4 pb-2">
+          <div className="flex overflow-x-auto gap-3 pb-1">
             {activityLogs.length === 0 ? (
-              <span className="text-slate-500 text-sm">Nenhuma atividade recente</span>
+              <span className="text-slate-500 text-xs">Nenhuma atividade recente</span>
             ) : (
               activityLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="flex-shrink-0 bg-slate-700/50 rounded-lg px-4 py-2 max-w-md"
+                  className="flex-shrink-0 bg-slate-700/50 rounded-lg px-3 py-1.5 max-w-sm"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">
                       {format(new Date(log.created_at), 'HH:mm')}
                     </span>
-                    <span className="text-sm text-slate-300 truncate">
+                    <span className="text-xs text-slate-300 truncate">
                       {log.description}
                     </span>
                   </div>
@@ -249,7 +298,7 @@ export default function TVMonitorPage() {
         </div>
 
         {/* Brand Bar */}
-        <div className="flex items-center justify-between text-slate-400 text-sm px-6 py-3 border-t border-slate-700">
+        <div className="flex items-center justify-between text-slate-400 text-xs px-4 py-2 border-t border-slate-700">
           <span>
             <span className="text-[#2B4F84]">TECNO</span>
             <span className="text-slate-300">FRIO</span>
