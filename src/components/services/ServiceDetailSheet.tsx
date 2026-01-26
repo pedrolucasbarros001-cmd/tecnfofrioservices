@@ -561,6 +561,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           if (!open) handleModalSuccess();
         }}
         service={service}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
