@@ -7,8 +7,8 @@ import {
   Users,
   Settings,
   LogOut,
-  Snowflake,
 } from 'lucide-react';
+import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -44,12 +44,17 @@ export function SecretarySidebar() {
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary">
-            <Snowflake className="h-6 w-6 text-sidebar-primary-foreground" />
-          </div>
+          <img 
+            src={tecnofrioLogoIcon} 
+            alt="TECNOFRIO" 
+            className="h-10 w-10 shrink-0 rounded-lg object-contain"
+          />
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-sidebar-foreground">TECNOFRIO</span>
+              <span className="text-lg font-bold">
+                <span className="text-[#2B4F84]">TECNO</span>
+                <span className="text-slate-700">FRIO</span>
+              </span>
               <span className="text-xs text-sidebar-foreground/60">Secretaria</span>
             </div>
           )}
@@ -87,7 +92,10 @@ export function SecretarySidebar() {
         {/* TECNOFRIO Branding */}
         {!isCollapsed && (
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 mb-4">
-            <p className="font-bold text-slate-800">TECNOFRIO</p>
+            <p className="font-bold">
+              <span className="text-[#2B4F84]">TECNO</span>
+              <span className="text-slate-700">FRIO</span>
+            </p>
             <p className="text-xs text-slate-500">Sistema de Gestão</p>
           </div>
         )}
