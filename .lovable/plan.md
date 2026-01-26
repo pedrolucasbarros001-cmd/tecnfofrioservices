@@ -1,386 +1,402 @@
 
-# Plano: Desenvolver Paginas Perfil e Preferencias do Tecnico
 
-## Resumo
+# Plano: Melhorias na Pagina Oficina, Sistema de Historico e Codigo TF-
 
-Implementar as duas paginas em falta na interface do tecnico:
-1. **Perfil** (/perfil) - Visualizar e editar dados pessoais
-2. **Preferencias** (/preferencias) - Configuracoes da aplicacao
+## Resumo das Alteracoes
+
+1. **Reformular pagina Oficina** para Dono/Secretaria com cards e botoes de atribuicao
+2. **Criar sistema de historico de atividades** (activity log) 
+3. **Sistema de notificacoes para tarefas** com exibicao publica no monitor
+4. **Atualizar TV Monitor** - remover "a precificar", cards maiores e legiveis
+5. **Alterar codigo dos servicos** de "OS-" para "TF-"
 
 ---
 
-## 1. Pagina de Perfil (PerfilPage.tsx)
+## 1. Sistema de Historico de Atividades
 
-### 1.1 Funcionalidades
+### 1.1 Nova Tabela: `activity_logs`
 
-| Funcionalidade | Descricao |
-|----------------|-----------|
-| Visualizar dados | Nome, email, telefone, especializacao |
-| Editar dados | Nome e telefone (email apenas leitura) |
-| Avatar | Iniciais coloridas baseadas no nome |
-| Estatisticas | Total de servicos, concluidos este mes, em andamento |
-| Informacao da conta | Data de criacao, cargo atual |
+Criar tabela para registar todas as acoes do sistema:
 
-### 1.2 Estrutura Visual
-
-```text
-┌─────────────────────────────────────────────────────┐
-│ Perfil                                              │
-├─────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────┐ │
-│ │  ┌──────┐                                       │ │
-│ │  │  JD  │  Joao Dias                            │ │
-│ │  │(icon)│  tecnico@tecnofrio.pt                 │ │
-│ │  └──────┘  +351 912 345 678                     │ │
-│ │           Especializacao: Ar Condicionado       │ │
-│ │                                                 │ │
-│ │  [Editar Perfil]                                │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Estatisticas                                    │ │
-│ │ ┌──────────┐ ┌──────────┐ ┌──────────┐         │ │
-│ │ │   127    │ │    23    │ │     5    │         │ │
-│ │ │ Servicos │ │ Este Mes │ │ Ativos   │         │ │
-│ │ │ Total    │ │Concluidos│ │          │         │ │
-│ │ └──────────┘ └──────────┘ └──────────┘         │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Informacao da Conta                             │ │
-│ │ • Cargo: Tecnico                                │ │
-│ │ • Membro desde: Janeiro 2025                    │ │
-│ │ • Estado: Ativo                                 │ │
-│ └─────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
+```sql
+CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id UUID REFERENCES public.services(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  action_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  metadata JSONB,
+  is_public BOOLEAN DEFAULT false,  -- Para mostrar no monitor
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+);
 ```
 
-### 1.3 Componentes a Usar
+**Tipos de acao (`action_type`):**
+- `atribuicao` - "Secretaria atribuiu servico X ao tecnico Y"
+- `inicio_execucao` - "Tecnico Y comecou servico X"
+- `levantamento` - "Tecnico levantou equipamento para oficina"
+- `pedido_peca` - "Tecnico solicitou peca X"
+- `peca_chegou` - "Peca X chegou"
+- `conclusao` - "Tecnico concluiu reparacao"
+- `precificacao` - "Dono definiu preco X para servico"
+- `pagamento` - "Registado pagamento de X€"
+- `entrega` - "Equipamento entregue ao cliente"
+- `tarefa` - "Notificacao de tarefa enviada"
 
-- Card, CardHeader, CardContent, CardTitle
-- Avatar, AvatarFallback
-- Badge (para estado ativo/inativo)
-- Button (editar perfil)
-- Dialog (modal de edicao)
-- Form com Input (nome, telefone)
+### 1.2 Funcao Utilitaria para Registar Atividade
 
-### 1.4 Dados a Buscar
+**Novo ficheiro:** `src/utils/activityLogUtils.ts`
 
 ```typescript
-// 1. Profile do AuthContext (ja disponivel)
-const { profile, user } = useAuth();
-
-// 2. Dados do tecnico (especializacao, cor)
-const { data: technicianData } = useQuery({
-  queryKey: ['technician-profile', profile?.id],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('technicians')
-      .select('*')
-      .eq('profile_id', profile.id)
-      .single();
-    return data;
-  },
-});
-
-// 3. Estatisticas de servicos
-const { data: stats } = useQuery({
-  queryKey: ['technician-stats', technicianId],
-  queryFn: async () => {
-    // Total de servicos
-    // Concluidos este mes
-    // Servicos ativos
-  },
-});
+export async function logActivity({
+  serviceId,
+  actorId,
+  actionType,
+  description,
+  metadata,
+  isPublic
+}: ActivityLogData): Promise<void> {
+  await supabase.from('activity_logs').insert({
+    service_id: serviceId,
+    actor_id: actorId,
+    action_type: actionType,
+    description: description,
+    metadata: metadata || null,
+    is_public: isPublic || false,
+  });
+}
 ```
-
-### 1.5 Modal de Edicao
-
-Campos editaveis:
-- Nome completo
-- Telefone
-
-Campos somente leitura:
-- Email (gerido pelo Supabase Auth)
 
 ---
 
-## 2. Pagina de Preferencias (PreferenciasPage.tsx)
+## 2. Sistema de Notificacoes para Tarefas
 
-### 2.1 Funcionalidades
+### 2.1 Novo Tipo de Notificacao
 
-| Funcionalidade | Descricao |
-|----------------|-----------|
-| Notificacoes | Toggle para receber notificacoes (visual apenas) |
-| Tema | Selector claro/escuro (usando next-themes) |
-| Idioma | Portugues (fixo, apenas informativo) |
-| Alteracao de senha | Link/botao para alterar palavra-passe |
-| Versao | Mostrar versao da aplicacao |
-
-### 2.2 Estrutura Visual
-
-```text
-┌─────────────────────────────────────────────────────┐
-│ Preferencias                                        │
-├─────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Aparencia                                       │ │
-│ │ ─────────────────────────────────────────────── │ │
-│ │ Tema               [Claro ▼] ou [Toggle]        │ │
-│ │                                                 │ │
-│ │ Idioma             Portugues (Portugal)         │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Notificacoes                                    │ │
-│ │ ─────────────────────────────────────────────── │ │
-│ │ Novos servicos     [====] ON                    │ │
-│ │ Pecas chegaram     [====] ON                    │ │
-│ │ Alertas urgentes   [====] ON                    │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Seguranca                                       │ │
-│ │ ─────────────────────────────────────────────── │ │
-│ │ Palavra-passe      [Alterar Palavra-passe]      │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ Sobre                                           │ │
-│ │ ─────────────────────────────────────────────── │ │
-│ │ TECNOFRIO Sistema de Gestao                     │ │
-│ │ Versao 1.0.0                                    │ │
-│ └─────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-```
-
-### 2.3 Componentes a Usar
-
-- Card, CardHeader, CardContent, CardTitle
-- Switch (para toggles de notificacao)
-- Select (para tema)
-- Separator
-- Button (alterar senha)
-- Dialog (modal de alteracao de senha)
-
-### 2.4 Tema (next-themes)
-
-O projeto ja tem `next-themes` instalado. Implementar:
+Adicionar novos tipos em `notificationUtils.ts`:
 
 ```typescript
-import { useTheme } from 'next-themes';
-
-const { theme, setTheme } = useTheme();
+type NotificationType = 
+  | 'peca_pedida' 
+  | 'peca_chegou' 
+  | 'servico_atrasado' 
+  | 'servico_atribuido' 
+  | 'precificacao' 
+  | 'entrega_agendada' 
+  | 'tarefa_tecnico'
+  | 'tarefa_secretaria'  // NOVO
+  | 'tarefa_geral';       // NOVO - publica
 ```
 
-### 2.5 Alteracao de Palavra-passe
+### 2.2 Modal de Enviar Tarefa
 
-Usar `supabase.auth.updateUser({ password: newPassword })` dentro de um modal com:
-- Password atual (validacao)
-- Nova password
-- Confirmar nova password
+**Novo componente:** `src/components/modals/SendTaskModal.tsx`
+
+- Campo de destinatario (tecnico especifico ou todos)
+- Campo de mensagem/tarefa
+- Toggle "Mostrar no Monitor" (is_public)
+- Envia notificacao e cria activity_log
 
 ---
 
-## 3. Rotas no App.tsx
+## 3. Reformular Pagina Oficina (Dono/Secretaria)
 
-Alterar de `PlaceholderPage` para os novos componentes:
+### 3.1 Layout em Cards
+
+**Ficheiro:** `src/pages/OficinaPage.tsx`
+
+Estrutura visual:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ Oficina                     [Enviar Tarefa] [Monitor] [Link]   │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌──────────────────────────┐ ┌──────────────────────────────┐  │
+│ │ TF-00045                 │ │ TF-00046                     │  │
+│ │ ━━━━━━━━━━━━━━━━━━━━━━  │ │ ━━━━━━━━━━━━━━━━━━━━━━━━━━  │  │
+│ │ Cliente: Joao Silva     │ │ Cliente: Maria Santos        │  │
+│ │ Frigorifico • Samsung   │ │ Ar Condicionado • LG         │  │
+│ │ Status: Na Oficina      │ │ Status: Em Espera de Peca   │  │
+│ │                          │ │                               │  │
+│ │ ┌────────────────┐       │ │ Tecnico: Pedro Costa         │  │
+│ │ │ ⚡ Sem Tecnico │       │ │ [    Reatribuir    ]         │  │
+│ │ │ [Atribuir Tec] │       │ │                               │  │
+│ │ └────────────────┘       │ └──────────────────────────────┘  │
+│ └──────────────────────────┘                                    │
+│                                                                  │
+│ ┌──────────────────────────────────────────────────────────────┐│
+│ │ Historico de Atividades                           [Ver Mais] ││
+│ │ ─────────────────────────────────────────────────────────────││
+│ │ 14:32 - Secretaria atribuiu TF-00044 ao tecnico Pedro       ││
+│ │ 14:25 - Tecnico Pedro comecou TF-00043                      ││
+│ │ 14:10 - Equipamento TF-00042 levantado para oficina         ││
+│ └──────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 Componentes do Card
+
+Cada card de servico inclui:
+- Codigo TF-XXXXX
+- Cliente e equipamento
+- Badge de status
+- Tecnico atribuido (ou "Disponivel para assumir")
+- Botao [Atribuir Tecnico] ou [Reatribuir]
+- Tags urgente/garantia
+
+### 3.3 Seccao de Historico
+
+- Lista compacta das ultimas 5-10 atividades
+- Ordenado por data (mais recente primeiro)
+- Link "Ver Mais" abre painel completo
+
+---
+
+## 4. Atualizar TV Monitor
+
+### 4.1 Remover Status "a_precificar" dos Contadores
+
+**Ficheiro:** `src/pages/TVMonitorPage.tsx`
 
 ```typescript
 // De:
-<Route path="/perfil" element={<PlaceholderPage />} />
-<Route path="/preferencias" element={<PlaceholderPage />} />
+const statusOrder: ServiceStatus[] = [
+  'em_execucao', 'na_oficina', 'para_pedir_peca', 
+  'em_espera_de_peca', 'a_precificar', 'concluidos'
+];
 
 // Para:
-<Route path="/perfil" element={
-  <ProtectedRoute allowedRoles={['tecnico']}>
-    <PerfilPage />
-  </ProtectedRoute>
-} />
-<Route path="/preferencias" element={
-  <ProtectedRoute>
-    <PreferenciasPage />
-  </ProtectedRoute>
-} />
+const statusOrder: ServiceStatus[] = [
+  'em_execucao', 'na_oficina', 'para_pedir_peca', 
+  'em_espera_de_peca', 'concluidos'
+];
+```
+
+### 4.2 Cards Maiores e Mais Legiveis
+
+- Aumentar tamanho base dos cards
+- Grid 3 colunas maximo (xl:grid-cols-3)
+- Fonte maior para codigo e cliente
+- Mostrar "Disponivel para Assumir" quando sem tecnico
+
+### 4.3 Adicionar Feed de Atividades Publicas
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ TECNOFRIO        Monitor da Oficina              15:32:45      │
+├─────────────────────────────────────────────────────────────────┤
+│ Contadores: [Em Exec] [Na Oficina] [Pedir Peca] [Espera] [Conc]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ │
+│ │    TF-00045      │ │    TF-00046      │ │    TF-00047      │ │
+│ │ ━━━━━━━━━━━━━━━━ │ │ ━━━━━━━━━━━━━━━━ │ │ ━━━━━━━━━━━━━━━━ │ │
+│ │                   │ │                   │ │                   │ │
+│ │ Joao Silva       │ │ Maria Santos     │ │ Antonio Pereira  │ │
+│ │ Frigorifico      │ │ Ar Condicionado  │ │ Maquina Lavar    │ │
+│ │                   │ │                   │ │                   │ │
+│ │ [🟢 Na Oficina]  │ │ [🟡 Pedir Peca]  │ │ [🟢 Concluido]   │ │
+│ │                   │ │                   │ │                   │ │
+│ │ ⚡ DISPONIVEL    │ │ Pedro Costa      │ │ Joao Tecnico     │ │
+│ └──────────────────┘ └──────────────────┘ └──────────────────┘ │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ 📋 Atividades Recentes (publicas)                               │
+│ ─────────────────────────────────────────────────────────────── │
+│ 15:30 - Secretaria atribuiu TF-00044 ao tecnico Pedro          │
+│ 15:25 - Tecnico Pedro concluiu TF-00043                        │
+│ 15:10 - ⚠️ TAREFA: Verificar stock de pecas (para todos)       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Ficheiros a Criar/Modificar
+## 5. Alterar Codigo de Servico para TF-
+
+### 5.1 Atualizar Funcao no Banco de Dados
+
+**Migracao SQL:**
+
+```sql
+-- Atualizar funcao de geracao de codigo
+CREATE OR REPLACE FUNCTION public.generate_service_code()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  next_num INTEGER;
+BEGIN
+  -- Buscar o maior numero existente (de OS- ou TF-)
+  SELECT COALESCE(
+    GREATEST(
+      COALESCE(MAX(CAST(SUBSTRING(code FROM 4) AS INTEGER)) FILTER (WHERE code LIKE 'TF-%'), 0),
+      COALESCE(MAX(CAST(SUBSTRING(code FROM 4) AS INTEGER)) FILTER (WHERE code LIKE 'OS-%'), 0)
+    ), 0) + 1
+  INTO next_num
+  FROM public.services;
+  
+  NEW.code := 'TF-' || LPAD(next_num::TEXT, 5, '0');
+  RETURN NEW;
+END;
+$$;
+```
+
+### 5.2 Manter Retrocompatibilidade
+
+Os codigos existentes "OS-XXXXX" continuam validos. Apenas novos servicos usam "TF-XXXXX".
+
+---
+
+## 6. Ficheiros a Criar/Modificar
 
 | Ficheiro | Acao | Descricao |
 |----------|------|-----------|
-| `src/pages/PerfilPage.tsx` | Criar | Pagina de perfil do tecnico |
-| `src/pages/PreferenciasPage.tsx` | Criar | Pagina de preferencias |
-| `src/App.tsx` | Modificar | Atualizar rotas para usar novos componentes |
+| Migracao SQL | Criar | Tabela `activity_logs` + atualizar funcao codigo |
+| `src/utils/activityLogUtils.ts` | Criar | Funcoes para registar atividades |
+| `src/components/modals/SendTaskModal.tsx` | Criar | Modal para enviar tarefas/notificacoes |
+| `src/pages/OficinaPage.tsx` | Modificar | Reformular para cards com atribuicao |
+| `src/pages/TVMonitorPage.tsx` | Modificar | Remover "a_precificar", cards maiores, feed de atividades |
+| `src/utils/notificationUtils.ts` | Modificar | Adicionar novos tipos de notificacao |
+| `src/components/modals/AssignTechnicianModal.tsx` | Modificar | Registar atividade ao atribuir |
 
 ---
 
-## 5. Seccao Tecnica
+## 7. Seccao Tecnica
 
-### 5.1 PerfilPage.tsx - Estrutura
+### 7.1 Schema da Tabela activity_logs
 
-```typescript
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { User, Mail, Phone, Wrench, Calendar, Edit2, Award } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, ... } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth } from 'date-fns';
-import { pt } from 'date-fns/locale';
+```sql
+CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id UUID REFERENCES public.services(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  action_type TEXT NOT NULL CHECK (action_type IN (
+    'atribuicao', 'inicio_execucao', 'levantamento', 'pedido_peca',
+    'peca_chegou', 'conclusao', 'precificacao', 'pagamento', 'entrega', 'tarefa'
+  )),
+  description TEXT NOT NULL,
+  metadata JSONB,
+  is_public BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+);
 
-export default function PerfilPage() {
-  const { profile, user } = useAuth();
-  const [showEditModal, setShowEditModal] = useState(false);
-  
-  // Query technician data
-  // Query service statistics
-  
-  return (
-    <div className="p-6 space-y-6">
-      {/* Profile Card */}
-      {/* Stats Cards */}
-      {/* Account Info Card */}
-      {/* Edit Modal */}
-    </div>
-  );
-}
+-- RLS
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Activity logs viewable by dono and secretaria"
+  ON public.activity_logs FOR SELECT
+  TO authenticated
+  USING (is_dono(auth.uid()) OR is_secretaria(auth.uid()) OR is_public = true);
+
+CREATE POLICY "Insert logs for authenticated"
+  ON public.activity_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
 ```
 
-### 5.2 PreferenciasPage.tsx - Estrutura
+### 7.2 Hook para Activity Logs
 
 ```typescript
-import { useState } from 'react';
-import { useTheme } from 'next-themes';
-import { Moon, Sun, Bell, Lock, Globe, Info } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Select, ... } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, ... } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
-import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
+// src/hooks/useActivityLogs.ts
+export function useActivityLogs(options: { serviceId?: string; limit?: number; publicOnly?: boolean }) {
+  return useQuery({
+    queryKey: ['activity-logs', options],
+    queryFn: async () => {
+      let query = supabase
+        .from('activity_logs')
+        .select(`
+          *,
+          actor:profiles!activity_logs_actor_id_fkey(full_name),
+          service:services(code, customer:customers(name))
+        `)
+        .order('created_at', { ascending: false })
+        .limit(options.limit || 20);
 
-export default function PreferenciasPage() {
-  const { theme, setTheme } = useTheme();
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  
-  // Notification preferences (local state for now)
-  const [notifications, setNotifications] = useState({
-    newServices: true,
-    partsArrived: true,
-    urgentAlerts: true,
+      if (options.serviceId) {
+        query = query.eq('service_id', options.serviceId);
+      }
+      if (options.publicOnly) {
+        query = query.eq('is_public', true);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
   });
-  
-  return (
-    <div className="p-6 space-y-6">
-      {/* Appearance Card */}
-      {/* Notifications Card */}
-      {/* Security Card */}
-      {/* About Card with TECNOFRIO branding */}
-      {/* Password Change Modal */}
-    </div>
-  );
 }
 ```
 
-### 5.3 Estatisticas do Tecnico
+### 7.3 Integracao ao Atribuir Tecnico
 
 ```typescript
-// Query para estatisticas
-const { data: stats } = useQuery({
-  queryKey: ['technician-stats', technicianId],
-  queryFn: async () => {
-    if (!technicianId) return null;
-    
-    // Total de servicos
-    const { count: total } = await supabase
-      .from('services')
-      .select('*', { count: 'exact', head: true })
-      .eq('technician_id', technicianId);
-    
-    // Concluidos este mes
-    const startOfCurrentMonth = startOfMonth(new Date()).toISOString();
-    const { count: thisMonth } = await supabase
-      .from('services')
-      .select('*', { count: 'exact', head: true })
-      .eq('technician_id', technicianId)
-      .in('status', ['concluidos', 'em_debito', 'finalizado'])
-      .gte('updated_at', startOfCurrentMonth);
-    
-    // Servicos ativos
-    const { count: active } = await supabase
-      .from('services')
-      .select('*', { count: 'exact', head: true })
-      .eq('technician_id', technicianId)
-      .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca']);
-    
-    return { total, thisMonth, active };
-  },
-  enabled: !!technicianId,
+// Em AssignTechnicianModal.tsx, apos sucesso:
+await logActivity({
+  serviceId: service.id,
+  actorId: user?.id,
+  actionType: 'atribuicao',
+  description: `Secretaria atribuiu ${service.code} ao tecnico ${technicianName}`,
+  isPublic: true,
 });
 ```
 
-### 5.4 Modal de Alteracao de Senha
+### 7.4 SendTaskModal - Estrutura
 
 ```typescript
-const handlePasswordChange = async (currentPassword: string, newPassword: string) => {
-  try {
-    // Re-authenticate with current password first
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user?.email || '',
-      password: currentPassword,
-    });
-    
-    if (signInError) {
-      toast.error('Palavra-passe atual incorreta');
-      return;
-    }
-    
-    // Update password
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    
-    if (error) throw error;
-    
-    toast.success('Palavra-passe alterada com sucesso');
-    setShowPasswordModal(false);
-  } catch (error) {
-    toast.error('Erro ao alterar palavra-passe');
-  }
-};
+interface SendTaskModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+// Campos:
+// - recipientType: 'tecnico' | 'secretaria' | 'todos'
+// - recipientId: string (se tecnico especifico)
+// - message: string
+// - showOnMonitor: boolean
 ```
 
 ---
 
-## 6. Cores e Estilos
+## 8. Fluxo de Dados do Monitor
 
-Seguir o padrao existente no sistema:
-- Cards com `CardHeader` e `CardContent`
-- Icones da biblioteca `lucide-react`
-- Badge com cores semanticas
-- Botoes primarios com `bg-primary`
-- Avatar com cores baseadas no nome (reutilizar logica do ColaboradoresPage)
+```text
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Oficina      │     │  Activity Logs  │     │   TV Monitor    │
+│  (Secretaria)   │────▶│    (Supabase)   │◀────│   (Publico)     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                        │                       │
+        │ Atribuir tecnico       │                       │
+        │ Enviar tarefa          │                       │
+        ▼                        ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ logActivity()   │────▶│  is_public=true │────▶│ Feed de         │
+│ notify()        │     │  is_public=false│     │ Atividades      │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
 
 ---
 
-## 7. Resultado Esperado
+## 9. Resultado Esperado
 
-1. **Perfil**:
-   - Exibir dados do tecnico (nome, email, telefone, especializacao)
-   - Permitir edicao de nome e telefone
-   - Mostrar estatisticas de servicos
-   - Mostrar informacao da conta (cargo, data de registo)
+1. **Oficina (Dono/Secretaria)**:
+   - Cards de servico com informacao completa
+   - Botao "Atribuir Tecnico" em servicos sem tecnico
+   - Secao de historico de atividades recentes
 
-2. **Preferencias**:
-   - Toggle entre tema claro/escuro
-   - Switches de notificacoes (visual, preparado para futuro)
-   - Botao para alterar palavra-passe com modal funcional
-   - Branding TECNOFRIO na seccao "Sobre"
+2. **TV Monitor**:
+   - Sem contador "a_precificar"
+   - Cards maiores e mais legiveis
+   - Servicos sem tecnico mostram "DISPONIVEL"
+   - Feed de atividades publicas em tempo real
+
+3. **Codigos de Servico**:
+   - Novos servicos usam "TF-XXXXX"
+   - Compatibilidade com codigos "OS-" existentes
+
+4. **Sistema de Tarefas**:
+   - Modal para enviar notificacoes/tarefas
+   - Opcao de mostrar no monitor (publico)
+   - Historico de todas as acoes
+
