@@ -29,6 +29,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -71,17 +72,18 @@ const formSchema = z.object({
   appliance_type: z.string().min(1, 'Tipo de aparelho é obrigatório'),
   brand: z.string().optional(),
   model: z.string().optional(),
+  serial_number: z.string().optional(),
   
   // Schedule
   technician_id: z.string().optional(),
   scheduled_date: z.date().optional(),
   scheduled_shift: z.string().optional(),
   
-  // Pricing
-  final_price: z.number().optional(),
-  
   // Notes
   notes: z.string().optional(),
+  
+  // Pricing
+  final_price: z.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -211,6 +213,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         appliance_type: values.appliance_type,
         brand: values.brand,
         model: values.model,
+        serial_number: values.serial_number,
         service_location: 'cliente',
         technician_id: values.technician_id || null,
         scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
@@ -261,7 +264,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                 <div className="space-y-6 py-4 pr-4">
                   {/* Customer Section */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Dados do Cliente</h3>
+                    <h3 className="font-semibold text-lg text-foreground">Informações do Cliente</h3>
                     
                     {selectedCustomer ? (
                       <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -318,7 +321,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                         name="customer_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Nome *</FormLabel>
+                            <FormLabel>Nome do Cliente *</FormLabel>
                             <FormControl>
                               <Input {...field} disabled={!!selectedCustomer} />
                             </FormControl>
@@ -326,6 +329,22 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="customer_nif"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contribuinte</FormLabel>
+                            <FormControl>
+                              <Input placeholder="NIF" {...field} disabled={!!selectedCustomer} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="customer_phone"
@@ -339,29 +358,28 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="customer_email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} disabled={!!selectedCustomer} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-
-                    <FormField
-                      control={form.control}
-                      name="customer_address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Morada de Entrega *</FormLabel>
-                          <FormControl>
-                            <Input {...field} disabled={!!selectedCustomer} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="customer_postal_code"
+                        name="customer_address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Código Postal</FormLabel>
+                            <FormLabel>Morada de Entrega *</FormLabel>
                             <FormControl>
                               <Input {...field} disabled={!!selectedCustomer} />
                             </FormControl>
@@ -371,10 +389,10 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                       />
                       <FormField
                         control={form.control}
-                        name="customer_city"
+                        name="customer_postal_code"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Cidade</FormLabel>
+                            <FormLabel>Código Postal</FormLabel>
                             <FormControl>
                               <Input {...field} disabled={!!selectedCustomer} />
                             </FormControl>
@@ -389,15 +407,15 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
                   {/* Equipment Section */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Equipamento a Entregar</h3>
+                    <h3 className="font-semibold text-lg text-foreground">Equipamento a Entregar</h3>
                     
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="appliance_type"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Tipo *</FormLabel>
+                            <FormLabel>Tipo de Aparelho *</FormLabel>
                             <FormControl>
                               <Input placeholder="Ex: Frigorífico" {...field} />
                             </FormControl>
@@ -418,6 +436,9 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           </FormItem>
                         )}
                       />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="model"
@@ -431,6 +452,19 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="serial_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número de Série</FormLabel>
+                            <FormControl>
+                              <Input placeholder="S/N" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </div>
 
@@ -438,40 +472,39 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
                   {/* Schedule Section */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Agendamento da Entrega</h3>
+                    <h3 className="font-semibold text-lg text-foreground">Agendamento da Entrega</h3>
                     
-                    <FormField
-                      control={form.control}
-                      name="technician_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Técnico Responsável</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecionar técnico" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {technicians.map((tech) => (
-                                <SelectItem key={tech.id} value={tech.id}>
-                                  <div className="flex items-center gap-2">
-                                    <div 
-                                      className="w-3 h-3 rounded-full"
-                                      style={{ backgroundColor: tech.color || '#3B82F6' }}
-                                    />
-                                    {tech.profile?.full_name || 'Técnico'}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="technician_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Técnico Responsável</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecionar técnico" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {technicians.map((tech) => (
+                                  <SelectItem key={tech.id} value={tech.id}>
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: tech.color || '#3B82F6' }}
+                                      />
+                                      {tech.profile?.full_name || 'Técnico'}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={form.control}
                         name="scheduled_date"
@@ -512,60 +545,50 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           </FormItem>
                         )}
                       />
-
-                      <FormField
-                        control={form.control}
-                        name="scheduled_shift"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Turno</FormLabel>
-                            <FormControl>
-                              <RadioGroup
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                className="flex gap-4 pt-2"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="manha" id="delivery-manha" />
-                                  <Label htmlFor="delivery-manha" className="font-normal cursor-pointer">Manhã</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="tarde" id="delivery-tarde" />
-                                  <Label htmlFor="delivery-tarde" className="font-normal cursor-pointer">Tarde</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="noite" id="delivery-noite" />
-                                  <Label htmlFor="delivery-noite" className="font-normal cursor-pointer">Noite</Label>
-                                </div>
-                              </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
-                  </div>
 
-                  <Separator />
-
-                  {/* Price Section */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Preço</h3>
-                    
                     <FormField
                       control={form.control}
-                      name="final_price"
+                      name="scheduled_shift"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Valor da Entrega (€)</FormLabel>
+                          <FormLabel>Turno</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                            <RadioGroup
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              className="flex gap-6 pt-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="manha" id="delivery-manha" />
+                                <Label htmlFor="delivery-manha" className="font-normal cursor-pointer">Manhã</Label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="tarde" id="delivery-tarde" />
+                                <Label htmlFor="delivery-tarde" className="font-normal cursor-pointer">Tarde</Label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="noite" id="delivery-noite" />
+                                <Label htmlFor="delivery-noite" className="font-normal cursor-pointer">Noite</Label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notas</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Notas sobre a entrega..." 
+                              className="min-h-[60px]"
+                              {...field} 
                             />
                           </FormControl>
                           <FormMessage />
@@ -576,23 +599,29 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
                   <Separator />
 
-                  {/* Notes Section */}
+                  {/* Price Section */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Notas</h3>
+                    <h3 className="font-semibold text-lg text-foreground">Precificação (Opcional)</h3>
                     
                     <FormField
                       control={form.control}
-                      name="notes"
+                      name="final_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Observações</FormLabel>
+                          <FormLabel>Preço Definido</FormLabel>
                           <FormControl>
-                            <Textarea 
-                              placeholder="Notas sobre a entrega..." 
-                              className="min-h-[60px]"
-                              {...field} 
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Ex: 150.00"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                             />
                           </FormControl>
+                          <FormDescription className="text-muted-foreground">
+                            Se definir o preço agora, o serviço aparecerá automaticamente em 'Em Débito' após a criação.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
