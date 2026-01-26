@@ -25,7 +25,8 @@ import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallatio
 import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
 import ServiceRedirect from "@/pages/technician/ServiceRedirect";
 import TVMonitorPage from "@/pages/TVMonitorPage";
-import PlaceholderPage from "@/pages/PlaceholderPage";
+import PerfilPage from "@/pages/PerfilPage";
+import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -110,7 +111,11 @@ const App = () => (
                   <TechnicianOfficePage />
                 </ProtectedRoute>
               } />
-              <Route path="/perfil" element={<PlaceholderPage />} />
+              <Route path="/perfil" element={
+                <ProtectedRoute allowedRoles={['tecnico']}>
+                  <PerfilPage />
+                </ProtectedRoute>
+              } />
               <Route path="/technician/visit/:serviceId" element={
                 <ProtectedRoute allowedRoles={['tecnico']}>
                   <TechnicianVisitFlow />
@@ -133,7 +138,7 @@ const App = () => (
               } />
               
               {/* Shared routes */}
-              <Route path="/preferencias" element={<PlaceholderPage />} />
+              <Route path="/preferencias" element={<PreferenciasPage />} />
             </Route>
             
             {/* Redirects */}
