@@ -50,6 +50,7 @@ interface CreateUserModalProps {
 interface CreatedUserCredentials {
   email: string;
   tempPassword: string;
+  role: 'dono' | 'secretaria' | 'tecnico';
 }
 
 export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserModalProps) {
@@ -110,6 +111,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
       setCreatedCredentials({
         email: result.email,
         tempPassword: result.temp_password,
+        role: values.role,
       });
 
       toast.success('Utilizador criado com sucesso!');
@@ -159,7 +161,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                 Guarde estas credenciais e comunique-as ao novo utilizador de forma segura.
               </p>
               
-              <div className="bg-white rounded-lg p-4 border border-green-200 space-y-2">
+              <div className="bg-white rounded-lg p-4 border border-green-200 space-y-3">
                 <div>
                   <span className="text-xs text-muted-foreground uppercase">Email</span>
                   <p className="font-mono font-medium">{createdCredentials.email}</p>
@@ -169,6 +171,22 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   <p className="font-mono font-bold text-lg tracking-wider">
                     {createdCredentials.tempPassword}
                   </p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground uppercase">Nível de Acesso</span>
+                  <p className="font-medium">
+                    {createdCredentials.role === 'dono' ? 'Administrador' : 
+                     createdCredentials.role === 'secretaria' ? 'Secretária' : 'Técnico'}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-green-200">
+                  <span className="text-xs text-muted-foreground">
+                    Após login, será redirecionado para:{' '}
+                    <strong className="text-green-700">
+                      {createdCredentials.role === 'dono' ? '/dashboard' : 
+                       createdCredentials.role === 'secretaria' ? '/geral' : '/servicos'}
+                    </strong>
+                  </span>
                 </div>
               </div>
 
