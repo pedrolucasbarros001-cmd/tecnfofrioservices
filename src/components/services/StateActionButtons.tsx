@@ -130,7 +130,7 @@ export function StateActionButtons({
         return null;
 
       case 'a_precificar':
-        if ((isDono) && onSetPrice) {
+        if (isDono && onSetPrice) {
           return {
             label: 'Definir Preço',
             icon: DollarSign,
