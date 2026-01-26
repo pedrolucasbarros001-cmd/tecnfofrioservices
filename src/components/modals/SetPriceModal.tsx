@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUpdateService } from '@/hooks/useServices';
-import type { Service } from '@/types/database';
+import type { Service, ServiceStatus } from '@/types/database';
 
 interface SetPriceModalProps {
   service: Service | null;
@@ -42,6 +42,19 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const handleSubmit = async () => {
     if (!service) return;
 
+    // Determinar status baseado na localização e débito
+    const isClientLocation = service.service_location === 'cliente';
+    const hasDebt = finalPrice > (service.amount_paid || 0);
+
+    let newStatus: ServiceStatus;
+    if (hasDebt) {
+      newStatus = 'em_debito';
+    } else if (isClientLocation) {
+      newStatus = 'finalizado'; // Cliente: sem entrega necessária
+    } else {
+      newStatus = 'concluidos'; // Oficina: aguarda entrega
+    }
+
     await updateService.mutateAsync({
       id: service.id,
       labor_cost: laborValue,
@@ -49,7 +62,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       discount: discountValue,
       final_price: finalPrice,
       pending_pricing: false,
-      status: finalPrice > (service.amount_paid || 0) ? 'em_debito' : 'concluidos',
+      status: newStatus,
     });
 
     onOpenChange(false);

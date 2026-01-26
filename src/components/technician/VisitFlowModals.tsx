@@ -114,11 +114,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
       if (formData.decision === 'reparar_local') {
         await updateService.mutateAsync({
           id: service.id,
-          status: 'concluidos',
+          status: 'a_precificar',
           pending_pricing: true,
           detected_fault: formData.detectedFault,
+          work_performed: 'Reparado no local do cliente',
         });
-        toast.success('Visita concluída! Aguarda precificação.');
+        toast.success('Visita concluída! Aguarda precificação pelo Dono.');
       } else if (formData.decision === 'levantar_oficina') {
         await updateService.mutateAsync({
           id: service.id,
