@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Trash2,
 } from 'lucide-react';
+// Removed 'Eye' from main action cases - keeping only for dropdown menu
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -90,19 +91,10 @@ export function StateActionButtons({
             className: 'bg-green-600 hover:bg-green-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'em_execucao':
-        return {
-          label: 'Acompanhar',
-          icon: Eye,
-          onClick: onViewDetails,
-          className: 'bg-blue-600 hover:bg-blue-700 text-white',
-        };
+        return null;
 
       case 'na_oficina':
         if (isTecnico && onStartExecution) {
@@ -113,11 +105,7 @@ export function StateActionButtons({
             className: 'bg-green-600 hover:bg-green-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'para_pedir_peca':
         if (isDono && onMarkPartArrived) {
@@ -128,11 +116,7 @@ export function StateActionButtons({
             className: 'bg-yellow-600 hover:bg-yellow-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'em_espera_de_peca':
         if (isDono && onMarkPartArrived) {
@@ -143,11 +127,7 @@ export function StateActionButtons({
             className: 'bg-green-600 hover:bg-green-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'a_precificar':
         if ((isDono) && onSetPrice) {
@@ -158,11 +138,7 @@ export function StateActionButtons({
             className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'concluidos':
         if ((isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
@@ -173,11 +149,7 @@ export function StateActionButtons({
             className: 'bg-teal-600 hover:bg-teal-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'em_debito':
         if ((isDono || isSecretaria) && onRegisterPayment) {
@@ -188,25 +160,13 @@ export function StateActionButtons({
             className: 'bg-orange-600 hover:bg-orange-700 text-white',
           };
         }
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       case 'finalizado':
-        return {
-          label: 'Ver Histórico',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
 
       default:
-        return {
-          label: 'Ver Detalhes',
-          icon: Eye,
-          onClick: onViewDetails,
-        };
+        return null;
     }
   };
 

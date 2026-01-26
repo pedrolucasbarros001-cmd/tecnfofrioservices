@@ -206,7 +206,7 @@ export default function GeralPage() {
                   <TableHead className="w-[80px]">Tipo</TableHead>
                   <TableHead>Código</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Aparelho e Avaria</TableHead>
+                  <TableHead>Descrição</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Técnico</TableHead>
@@ -215,13 +215,32 @@ export default function GeralPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredServices.map(service => {
+              {filteredServices.map(service => {
               const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-              const isVisit = service.service_location === 'cliente';
+              
+              // Type config based on service_type and service_location
+              const getTypeConfig = () => {
+                if (service.service_type === 'instalacao') {
+                  return { label: 'INSTALAÇÃO', colorClass: 'bg-yellow-500 text-black', icon: null };
+                }
+                if (service.service_type === 'entrega') {
+                  return { label: 'ENTREGA', colorClass: 'bg-green-500 text-white', icon: null };
+                }
+                if (service.service_location === 'cliente') {
+                  return { label: null, colorClass: 'text-blue-500', icon: MapPin };
+                }
+                return { label: 'OFICINA', colorClass: 'bg-orange-500 text-white', icon: null };
+              };
+              const typeConfig = getTypeConfig();
+              
               return <TableRow key={service.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleServiceClick(service)}>
                       {/* Tipo */}
                       <TableCell>
-                        {isVisit ? <MapPin className="h-5 w-5 text-blue-500" /> : <Badge variant="secondary" className="text-xs">OFICINA</Badge>}
+                        {typeConfig.icon ? (
+                          <typeConfig.icon className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <Badge className={`text-xs ${typeConfig.colorClass}`}>{typeConfig.label}</Badge>
+                        )}
                       </TableCell>
                       
                       {/* Código */}
