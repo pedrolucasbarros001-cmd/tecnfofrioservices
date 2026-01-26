@@ -1,5 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, Snowflake } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { Service } from '@/types/database';
+import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 
 interface ServiceTagModalProps {
   service: Service | null;
@@ -39,9 +40,12 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           
           <div className="text-center space-y-4">
             {/* Logo/Brand */}
-            <div className="flex items-center justify-center gap-2">
-              <Snowflake className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">TECNOFRIO</span>
+            <div className="flex items-center justify-center">
+              <img 
+                src={tecnofrioLogoFull} 
+                alt="TECNOFRIO" 
+                className="h-12 object-contain"
+              />
             </div>
             
             {/* QR Code */}

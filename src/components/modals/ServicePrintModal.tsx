@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Printer, Snowflake, PenTool } from 'lucide-react';
+import { AlertTriangle, Printer, PenTool } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Dialog,
@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/types/database';
+import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -116,10 +117,11 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         <div className="print-content border rounded-lg p-4 bg-white print:border-0 print:p-0 print:shadow-none">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Snowflake className="h-6 w-6 text-primary print:text-black" />
-              <span className="text-xl font-bold">TECNOFRIO</span>
-            </div>
+            <img 
+              src={tecnofrioLogoFull} 
+              alt="TECNOFRIO" 
+              className="h-10 object-contain"
+            />
             <div className="text-right">
               <h1 className="text-lg font-bold">Ficha de Serviço</h1>
             </div>
