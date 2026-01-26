@@ -274,20 +274,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Tags */}
               <div className="flex gap-2 flex-wrap">
+                {/* Estado principal - sempre primeiro */}
                 <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                {service.is_urgent && (
-                  <Badge variant="destructive" className="animate-pulse">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Urgente
-                  </Badge>
-                )}
-                {service.is_warranty && (
-                  <Badge className="bg-purple-500 text-white">
-                    <Shield className="h-3 w-3 mr-1" />
-                    Garantia
-                  </Badge>
-                )}
-              {service.service_type === 'instalacao' && (
+                
+                {/* Tipo de serviço */}
+                {service.service_type === 'instalacao' && (
                   <Badge className="bg-yellow-500 text-black">
                     <Wrench className="h-3 w-3 mr-1" />
                     Instalação
@@ -311,9 +302,34 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     Visita
                   </Badge>
                 )}
-                {service.pending_pricing && (
+                
+                {/* Tags complementares - NÃO duplicar estado */}
+                {service.is_urgent && (
+                  <Badge variant="destructive" className="animate-pulse">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Urgente
+                  </Badge>
+                )}
+                {service.is_warranty && (
+                  <Badge className="bg-purple-500 text-white">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Garantia
+                  </Badge>
+                )}
+                
+                {/* A Precificar - só se estado não for a_precificar */}
+                {service.pending_pricing && service.status !== 'a_precificar' && (
                   <Badge className="bg-yellow-500 text-black">
                     A Precificar
+                  </Badge>
+                )}
+                
+                {/* Em Débito - indica débito coexistente */}
+                {service.status !== 'em_debito' && 
+                 (service.final_price || 0) > 0 && 
+                 (service.amount_paid || 0) < (service.final_price || 0) && (
+                  <Badge className="bg-red-500 text-white">
+                    Em Débito
                   </Badge>
                 )}
               </div>

@@ -286,12 +286,30 @@ export default function GeralPage() {
                         </Badge>
                       </TableCell>
                       
-                      {/* Tags */}
+                      {/* Tags - Informações complementares, não duplicar estado */}
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
-                          {service.pending_pricing && <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>}
-                          {service.is_urgent && <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>}
-                          {service.is_warranty && <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>}
+                          {/* Urgente - sempre mostra se true */}
+                          {service.is_urgent && (
+                            <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>
+                          )}
+                          
+                          {/* Garantia - sempre mostra se true */}
+                          {service.is_warranty && (
+                            <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>
+                          )}
+                          
+                          {/* A Precificar - só mostra se estado NÃO for a_precificar */}
+                          {service.pending_pricing && service.status !== 'a_precificar' && (
+                            <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>
+                          )}
+                          
+                          {/* Em Débito - indica débito quando estado principal é outro */}
+                          {service.status !== 'em_debito' && 
+                           (service.final_price || 0) > 0 && 
+                           (service.amount_paid || 0) < (service.final_price || 0) && (
+                            <Badge className="bg-red-500 text-white text-xs">Em Débito</Badge>
+                          )}
                         </div>
                       </TableCell>
                       
