@@ -138,3 +138,16 @@ export function useAuth() {
   }
   return context;
 }
+
+export function getDefaultRouteForRole(role: AppRole | null): string {
+  switch (role) {
+    case 'dono':
+      return '/dashboard';
+    case 'secretaria':
+      return '/geral';
+    case 'tecnico':
+      return '/servicos';
+    default:
+      return '/login';
+  }
+}

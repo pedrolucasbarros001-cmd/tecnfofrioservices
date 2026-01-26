@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Snowflake } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,7 +28,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, role } = useAuth();
+  const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,6 +39,19 @@ export default function LoginPage() {
       password: '',
     },
   });
+
+  // Redirect based on role when authenticated
+  useEffect(() => {
+    if (isAuthenticated && role && !loading) {
+      const from = location.state?.from?.pathname;
+      if (from && from !== '/login') {
+        navigate(from, { replace: true });
+      } else {
+        const redirectPath = getDefaultRouteForRole(role);
+        navigate(redirectPath, { replace: true });
+      }
+    }
+  }, [isAuthenticated, role, loading, navigate, location.state]);
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
@@ -55,18 +68,7 @@ export default function LoginPage() {
         setIsLoading(false);
         return;
       }
-
-      // Wait a moment for role to be fetched
-      setTimeout(() => {
-        // Redirect based on role
-        const from = location.state?.from?.pathname;
-        if (from && from !== '/login') {
-          navigate(from, { replace: true });
-        } else {
-          // Default redirects based on role will be handled by useEffect
-          navigate('/dashboard', { replace: true });
-        }
-      }, 500);
+      // Redirection is handled by useEffect when role is loaded
     } catch (error) {
       console.error('Login error:', error);
       toast({
