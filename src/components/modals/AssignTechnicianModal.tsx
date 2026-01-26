@@ -40,7 +40,9 @@ import { cn } from '@/lib/utils';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
 import { notifyServiceAssigned } from '@/utils/notificationUtils';
+import { logTechnicianAssignment } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Service } from '@/types/database';
 
 const formSchema = z.object({
@@ -66,6 +68,7 @@ export function AssignTechnicianModal({
   onOpenChange,
   onSuccess,
 }: AssignTechnicianModalProps) {
+  const { user, profile } = useAuth();
   const { data: technicians = [] } = useTechnicians();
   const updateService = useUpdateService();
 
@@ -95,17 +98,27 @@ export function AssignTechnicianModal({
       if (selectedTech?.profile_id) {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('user_id')
+          .select('user_id, full_name')
           .eq('id', selectedTech.profile_id)
           .maybeSingle();
 
         if (profileData?.user_id) {
+          // Send notification
           await notifyServiceAssigned(
             service.id,
             service.code || 'N/A',
             profileData.user_id,
             values.scheduled_date.toISOString().split('T')[0],
             values.scheduled_shift
+          );
+
+          // Log activity
+          await logTechnicianAssignment(
+            service.code || 'N/A',
+            service.id,
+            profileData.full_name || 'Técnico',
+            user?.id,
+            profile?.full_name || undefined
           );
         }
       }
