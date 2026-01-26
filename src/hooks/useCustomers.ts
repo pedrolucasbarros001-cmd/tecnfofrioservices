@@ -46,22 +46,44 @@ export function useCreateCustomer() {
 
   return useMutation({
     mutationFn: async (customerData: Partial<Customer>) => {
+      // Verificar sessão antes de tentar inserir
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Erro ao verificar sessão. Por favor, faça login novamente.');
+      }
+      
+      if (!session) {
+        console.error('No active session - user needs to re-authenticate');
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
+      console.log('Creating customer with user:', session.user.id);
+      
       const { data, error } = await supabase
         .from('customers')
         .insert(customerData as any)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
       return data as Customer;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast.success('Cliente criado com sucesso!');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error creating customer:', error);
-      toast.error('Erro ao criar cliente');
+      if (error.message.includes('Sessão expirada') || error.message.includes('login novamente')) {
+        toast.error(error.message);
+      } else {
+        toast.error('Erro ao criar cliente');
+      }
     },
   });
 }

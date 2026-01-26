@@ -49,22 +49,44 @@ export function useCreateService() {
 
   return useMutation({
     mutationFn: async (serviceData: Partial<Service>) => {
+      // Verificar sessão antes de tentar inserir
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Erro ao verificar sessão. Por favor, faça login novamente.');
+      }
+      
+      if (!session) {
+        console.error('No active session - user needs to re-authenticate');
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
+      console.log('Creating service with user:', session.user.id);
+      
       const { data, error } = await supabase
         .from('services')
         .insert(serviceData as any)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Serviço criado com sucesso!');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error creating service:', error);
-      toast.error('Erro ao criar serviço');
+      if (error.message.includes('Sessão expirada') || error.message.includes('login novamente')) {
+        toast.error(error.message);
+      } else {
+        toast.error('Erro ao criar serviço');
+      }
     },
   });
 }
