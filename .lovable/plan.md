@@ -1,426 +1,332 @@
 
-
-# Plano: Ajustar Fluxos de Tecnico e Sistema de Tags
+# Plano: Melhorias na Ficha de Servico, Impressao e Tipo na Tabela Geral
 
 ## Resumo das Alteracoes Solicitadas
 
-O utilizador especificou um fluxo preciso para a visita ao cliente e pediu ajustes no sistema de tags para evitar duplicacao de informacao.
+1. **ServiceDetailSheet (Ficha)**: Adicionar imagens do tecnico, assinaturas com descricao, e informacao financeira detalhada
+2. **ServicePrintModal (Impressao)**: Incluir imagens, assinaturas do cliente com descricao do motivo, e detalhes financeiros
+3. **GeralPage (Tabela Geral)**: Mostrar texto do tipo de servico em vez de apenas icones
 
 ---
 
-## 1. FLUXO DE VISITA - Alteracoes
+## 1. Alteracoes na Ficha do Servico (ServiceDetailSheet.tsx)
 
-### 1.1 Remover Opcao "Pedir Peca" na Decisao
+### 1.1 Adicionar Seccao de Fotos do Servico
 
-**Ficheiro:** `src/components/technician/VisitFlowModals.tsx`
-
-**Estado Actual (linha 36):**
+**Nova query para buscar fotos:**
 ```typescript
-type DecisionType = 'reparar_local' | 'levantar_oficina' | 'pedir_peca';
-```
-
-**Alteracao:**
-```typescript
-type DecisionType = 'reparar_local' | 'levantar_oficina';
-```
-
-**Remover:** O terceiro radio button "Pedir Peca" do modal de decisao (linhas 456-475)
-
-### 1.2 Novo Fluxo para "Reparar no Local"
-
-Apos seleccionar "Reparar no Local", o tecnico deve seguir estes passos:
-
-```text
-Decisao (Reparar no Local)
-    │
-    ▼
-┌─────────────────────────────┐
-│ Passo 6: Pecas Usadas       │
-│                             │
-│ "Usou pecas na reparacao?"  │
-│ ○ Nao                       │
-│ ○ Sim                       │
-│                             │
-│ Se Sim:                     │
-│ [Nome] [Referencia] [Qtd]   │
-│ + Adicionar Peca            │
-└─────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────┐
-│ Passo 7: Precisa Pedir Peca?│
-│                             │
-│ "Precisa pedir alguma peca?"│
-│ ○ Nao                       │
-│ ○ Sim                       │
-└─────────────────────────────┘
-    │
-    ├── Se Sim ──────────────────┐
-    │                            ▼
-    │            ┌─────────────────────────────┐
-    │            │ Modal: Detalhes da Peca     │
-    │            │ [Nome] [Referencia]         │
-    │            │                             │
-    │            │ + Assinatura do Cliente     │
-    │            │                             │
-    │            │ Status → para_pedir_peca    │
-    │            └─────────────────────────────┘
-    │
-    └── Se Nao ──────────────────┐
-                                 ▼
-                 ┌─────────────────────────────┐
-                 │ Modal: Assinatura Final     │
-                 │                             │
-                 │ "Confirme a conclusao do    │
-                 │  servico no local"          │
-                 │                             │
-                 │ Status → a_precificar/      │
-                 │          finalizado         │
-                 └─────────────────────────────┘
-```
-
-### 1.3 Novos Estados no FormData
-
-```typescript
-interface PartEntry {
-  name: string;
-  reference: string;
-  quantity: number;
-}
-
-interface FormData {
-  detectedFault: string;
-  photoFile: string | null;
-  decision: DecisionType;
-  // NOVOS CAMPOS:
-  usedParts: boolean;
-  usedPartsList: PartEntry[];
-  needsPartOrder: boolean;
-  partToOrder: {
-    name: string;
-    reference: string;
-  } | null;
-}
-```
-
-### 1.4 Novos Passos no Modal
-
-**Adicionar tipos de passo:**
-```typescript
-type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'diagnostico' | 'decisao' | 'pecas_usadas' | 'pedir_peca' | 'finalizacao';
-```
-
-**Novo Modal: Pecas Usadas (Passo 6)**
-- Pergunta: "Usou pecas na reparacao?"
-- RadioGroup: Nao / Sim
-- Se Sim: Lista dinamica de pecas (nome, referencia, quantidade)
-- Botao "+ Adicionar Peca"
-- Guardar em `service_parts` com `is_requested: false`
-
-**Novo Modal: Pedir Peca? (Passo 7)**
-- Pergunta: "Precisa pedir alguma peca?"
-- RadioGroup: Nao / Sim
-- Se Sim: Campos nome + referencia + abre assinatura
-- Apos assinatura (tipo `pedido_peca`): status → `para_pedir_peca`
-- Se Nao: Abre assinatura de conclusao → status → `a_precificar`
-
-### 1.5 Logica de Transicao de Status
-
-**Reparar no Local + Nao precisa pedir peca:**
-```typescript
-await updateService.mutateAsync({
-  id: service.id,
-  status: 'a_precificar',
-  pending_pricing: true,
-  detected_fault: formData.detectedFault,
-  work_performed: 'Reparado no local do cliente',
+const { data: servicePhotos = [] } = useQuery({
+  queryKey: ['service-photos', service?.id],
+  queryFn: async () => {
+    if (!service?.id) return [];
+    const { data, error } = await supabase
+      .from('service_photos')
+      .select('*')
+      .eq('service_id', service.id)
+      .order('uploaded_at', { ascending: false });
+    if (error) throw error;
+    return data as ServicePhoto[];
+  },
+  enabled: !!service?.id && open,
 });
 ```
 
-**Reparar no Local + Precisa pedir peca:**
+**Nova seccao visual:**
+- Exibir galeria de fotos com tipo (visita, oficina, antes, depois)
+- Miniaturas clicaveis para ampliar
+- Mostrar data de upload e descricao
+
+### 1.2 Adicionar Seccao de Assinaturas
+
+**Nova query para buscar assinaturas:**
 ```typescript
-// Guardar assinatura tipo 'pedido_peca'
-await supabase.from('service_signatures').insert({
-  service_id: service.id,
-  signature_type: 'pedido_peca',
-  file_url: signatureData,
-  signer_name: signerName,
+const { data: serviceSignatures = [] } = useQuery({
+  queryKey: ['service-signatures', service?.id],
+  queryFn: async () => {
+    if (!service?.id) return [];
+    const { data, error } = await supabase
+      .from('service_signatures')
+      .select('*')
+      .eq('service_id', service.id)
+      .order('signed_at', { ascending: true });
+    if (error) throw error;
+    return data as ServiceSignature[];
+  },
+  enabled: !!service?.id && open,
 });
+```
 
-// Guardar peca a pedir
-await supabase.from('service_parts').insert({
-  service_id: service.id,
-  part_name: formData.partToOrder.name,
-  part_code: formData.partToOrder.reference,
-  quantity: 1,
-  is_requested: true,
-  arrived: false,
-});
+**Descricao por tipo de assinatura:**
+| signature_type | Descricao a mostrar |
+|----------------|---------------------|
+| `recolha` | "Autorizacao de levantamento do aparelho para reparacao em oficina" |
+| `entrega` | "Confirmacao da entrega do aparelho" |
+| `visita` | "Confirmacao da execucao do servico no local" |
+| `pedido_peca` | "Autorizacao para encomenda de peca" |
 
-// Guardar status anterior e mudar para para_pedir_peca
-await updateService.mutateAsync({
-  id: service.id,
-  status: 'para_pedir_peca',
-  last_status_before_part_request: service.status,
-  detected_fault: formData.detectedFault,
-});
+**Nova seccao visual:**
+- Imagem da assinatura
+- Nome do signatario
+- Data
+- Descricao do motivo
+
+### 1.3 Melhorar Seccao Financeira
+
+A seccao actual ja mostra preco, pago, desconto e debito. Vamos melhorar para incluir:
+
+- **Preco Final**: Total a pagar
+- **Valor Pago**: Quanto ja foi pago
+- **Desconto**: Se aplicavel
+- **Em Debito**: Valor em divida
+- **Falta para Pagamento Completo**: Diferenca entre total e pago
+
+```typescript
+// Calculos
+const totalPaid = service.amount_paid || 0;
+const finalPrice = service.final_price || 0;
+const remainingBalance = Math.max(0, finalPrice - totalPaid);
 ```
 
 ---
 
-## 2. SISTEMA DE TAGS - Alteracoes
+## 2. Alteracoes na Impressao (ServicePrintModal.tsx)
 
-### 2.1 Problema Actual
+### 2.1 Adicionar Seccao de Fotos
 
-Na tabela de servicos (`GeralPage.tsx`) e no painel de detalhes (`ServiceDetailSheet.tsx`), o estado aparece duas vezes:
-1. Na coluna/badge "Estado" 
-2. Como tag (ex: "A Precificar" aparece como estado E como tag)
-
-### 2.2 Nova Logica de Tags
-
-**Tags devem ser informacoes COMPLEMENTARES, nao duplicar o estado.**
-
-**Tags a mostrar:**
-| Tag | Condicao | Cor |
-|-----|----------|-----|
-| Urgente | `service.is_urgent === true` | Vermelho (destructive) + pulsante |
-| Garantia | `service.is_warranty === true` | Roxo |
-| Em Debito | `service.status !== 'em_debito' && service.final_price > service.amount_paid && service.final_price > 0` | Vermelho |
-| A Precificar | `service.status !== 'a_precificar' && service.pending_pricing === true` | Amarelo |
-
-**Regra importante:** Tags "Em Debito" e "A Precificar" so aparecem se o estado PRINCIPAL for diferente (para evitar duplicacao).
-
-### 2.3 Alteracao em GeralPage.tsx (linhas 289-295)
-
-**Codigo Actual:**
+**Nova seccao no documento impresso:**
 ```tsx
-{/* Tags */}
-<TableCell>
-  <div className="flex gap-1 flex-wrap">
-    {service.pending_pricing && <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>}
-    {service.is_urgent && <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>}
-    {service.is_warranty && <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>}
-  </div>
-</TableCell>
-```
-
-**Novo Codigo:**
-```tsx
-{/* Tags - Informacoes complementares, nao duplicar estado */}
-<TableCell>
-  <div className="flex gap-1 flex-wrap">
-    {/* Urgente - sempre mostra se true */}
-    {service.is_urgent && (
-      <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>
-    )}
-    
-    {/* Garantia - sempre mostra se true */}
-    {service.is_warranty && (
-      <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>
-    )}
-    
-    {/* A Precificar - so mostra se estado NAO for a_precificar */}
-    {service.pending_pricing && service.status !== 'a_precificar' && (
-      <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>
-    )}
-    
-    {/* Em Debito - indica debito quando estado principal e outro */}
-    {service.status !== 'em_debito' && 
-     service.final_price > 0 && 
-     service.amount_paid < service.final_price && (
-      <Badge className="bg-red-500 text-white text-xs">Em Debito</Badge>
-    )}
-  </div>
-</TableCell>
-```
-
-### 2.4 Alteracao em ServiceDetailSheet.tsx (linhas 275-318)
-
-**Novo Codigo:**
-```tsx
-{/* Tags */}
-<div className="flex gap-2 flex-wrap">
-  {/* Estado principal - sempre primeiro */}
-  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-  
-  {/* Tipo de servico */}
-  {service.service_type === 'instalacao' && (
-    <Badge className="bg-yellow-500 text-black">
-      <Wrench className="h-3 w-3 mr-1" />
-      Instalacao
-    </Badge>
-  )}
-  {service.service_type === 'entrega' && (
-    <Badge className="bg-green-500 text-white">
-      <Truck className="h-3 w-3 mr-1" />
-      Entrega
-    </Badge>
-  )}
-  {service.service_type === 'reparacao' && service.service_location === 'oficina' && (
-    <Badge className="bg-orange-500 text-white">
-      <Wrench className="h-3 w-3 mr-1" />
-      Oficina
-    </Badge>
-  )}
-  {service.service_type === 'reparacao' && service.service_location === 'cliente' && (
-    <Badge className="bg-blue-500 text-white">
-      <MapPin className="h-3 w-3 mr-1" />
-      Visita
-    </Badge>
-  )}
-  
-  {/* Tags complementares - NAO duplicar estado */}
-  {service.is_urgent && (
-    <Badge variant="destructive" className="animate-pulse">
-      <AlertCircle className="h-3 w-3 mr-1" />
-      Urgente
-    </Badge>
-  )}
-  {service.is_warranty && (
-    <Badge className="bg-purple-500 text-white">
-      <Shield className="h-3 w-3 mr-1" />
-      Garantia
-    </Badge>
-  )}
-  
-  {/* A Precificar - so se estado nao for a_precificar */}
-  {service.pending_pricing && service.status !== 'a_precificar' && (
-    <Badge className="bg-yellow-500 text-black">
-      A Precificar
-    </Badge>
-  )}
-  
-  {/* Em Debito - indica debito coexistente */}
-  {service.status !== 'em_debito' && 
-   service.final_price > 0 && 
-   service.amount_paid < service.final_price && (
-    <Badge className="bg-red-500 text-white">
-      Em Debito
-    </Badge>
-  )}
-</div>
-```
-
----
-
-## 3. Ficheiros a Modificar
-
-| Ficheiro | Alteracoes |
-|----------|------------|
-| `src/components/technician/VisitFlowModals.tsx` | Remover opcao "Pedir Peca" da decisao; Adicionar passos "Pecas Usadas" e "Pedir Peca?"; Ajustar logica de transicao |
-| `src/pages/GeralPage.tsx` | Ajustar logica de tags para nao duplicar estado |
-| `src/components/services/ServiceDetailSheet.tsx` | Ajustar logica de tags para nao duplicar estado |
-
----
-
-## 4. Resumo do Novo Fluxo de Visita
-
-```text
-1. Resumo ──────────────► Dados do servico/cliente
-2. Deslocacao ──────────► Botao "Caminho para Cliente" + "Cheguei"
-3. Foto ────────────────► Tirar foto(s) do aparelho (obrigatorio)
-4. Diagnostico ─────────► Campo de texto para avaria detectada
-5. Decisao ─────────────► "Reparar no Local" OU "Levantar para Oficina"
-   │
-   ├─► Levantar Oficina → Assinatura de Recolha → na_oficina
-   │
-   └─► Reparar no Local
-       │
-       6. Pecas Usadas ─► "Usou pecas?" → Registar se sim
-       │
-       7. Pedir Peca? ──► "Precisa pedir peca?"
-          │
-          ├─► Sim → Nome + Ref + Assinatura → para_pedir_peca
-          │
-          └─► Nao → Assinatura Final → a_precificar
-```
-
----
-
-## 5. Seccao Tecnica
-
-### 5.1 Componente de Lista de Pecas
-
-```typescript
-// Componente reutilizavel para adicionar pecas
-interface PartEntryRowProps {
-  part: PartEntry;
-  index: number;
-  onChange: (index: number, field: keyof PartEntry, value: string | number) => void;
-  onRemove: (index: number) => void;
-}
-
-function PartEntryRow({ part, index, onChange, onRemove }: PartEntryRowProps) {
-  return (
-    <div className="grid grid-cols-12 gap-2 items-center">
-      <Input
-        className="col-span-5"
-        placeholder="Nome da peca"
-        value={part.name}
-        onChange={(e) => onChange(index, 'name', e.target.value)}
-      />
-      <Input
-        className="col-span-4"
-        placeholder="Referencia"
-        value={part.reference}
-        onChange={(e) => onChange(index, 'reference', e.target.value)}
-      />
-      <Input
-        className="col-span-2"
-        type="number"
-        min="1"
-        value={part.quantity}
-        onChange={(e) => onChange(index, 'quantity', parseInt(e.target.value) || 1)}
-      />
-      <Button
-        variant="ghost"
-        size="icon"
-        className="col-span-1"
-        onClick={() => onRemove(index)}
-      >
-        <X className="h-4 w-4" />
-      </Button>
+{/* Fotos do Serviço */}
+{photos.length > 0 && (
+  <section className="mb-6">
+    <h2 className="text-lg font-semibold mb-3 border-b pb-1">Evidências Fotográficas</h2>
+    <div className="grid grid-cols-3 gap-2">
+      {photos.map((photo) => (
+        <div key={photo.id} className="border rounded overflow-hidden">
+          <img 
+            src={photo.file_url} 
+            alt={photo.description || 'Foto do serviço'} 
+            className="w-full h-24 object-cover"
+          />
+          <p className="text-xs text-center p-1 bg-gray-50 capitalize">
+            {photo.photo_type}
+          </p>
+        </div>
+      ))}
     </div>
-  );
-}
+  </section>
+)}
 ```
 
-### 5.2 Guardar Pecas Usadas no Banco
+### 2.2 Adicionar Seccao de Assinaturas
 
+**Nova seccao no documento impresso:**
+```tsx
+{/* Assinaturas */}
+{signatures.length > 0 && (
+  <section className="mb-6">
+    <h2 className="text-lg font-semibold mb-3 border-b pb-1">Assinaturas</h2>
+    <div className="space-y-4">
+      {signatures.map((sig) => (
+        <div key={sig.id} className="flex items-start gap-4 p-3 border rounded">
+          <img 
+            src={sig.file_url} 
+            alt="Assinatura" 
+            className="w-32 h-16 object-contain border"
+          />
+          <div className="flex-1">
+            <p className="font-medium">{sig.signer_name || 'Cliente'}</p>
+            <p className="text-sm text-muted-foreground">
+              {getSignatureDescription(sig.signature_type)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {format(new Date(sig.signed_at), "dd/MM/yyyy HH:mm")}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+```
+
+**Funcao helper para descricao:**
 ```typescript
-// Ao confirmar pecas usadas
-const saveUsedParts = async () => {
-  for (const part of formData.usedPartsList) {
-    if (part.name.trim()) {
-      await supabase.from('service_parts').insert({
-        service_id: service.id,
-        part_name: part.name.trim(),
-        part_code: part.reference.trim() || null,
-        quantity: part.quantity,
-        is_requested: false, // Peca usada, nao pedida
-        arrived: true, // Ja foi usada
-        cost: 0, // Sera definido na precificacao
-      });
-    }
+const getSignatureDescription = (type: string): string => {
+  switch (type) {
+    case 'recolha':
+      return 'Autorizacao de levantamento do aparelho para reparacao em oficina';
+    case 'entrega':
+      return 'Confirmacao da entrega do aparelho';
+    case 'visita':
+      return 'Confirmacao da execucao do servico no local';
+    case 'pedido_peca':
+      return 'Autorizacao para encomenda de peca';
+    default:
+      return 'Assinatura do cliente';
   }
 };
 ```
 
-### 5.3 Validacoes
+### 2.3 Melhorar Resumo Financeiro na Impressao
 
-- Foto obrigatoria antes de avancar para diagnostico
-- Diagnostico obrigatorio (texto nao vazio)
-- Se "Usou pecas = Sim", pelo menos 1 peca com nome preenchido
-- Se "Pedir peca = Sim", nome da peca obrigatorio + assinatura obrigatoria
-- Assinatura final obrigatoria para conclusao
+A seccao actual ja existe (linhas 276-322), mas vamos garantir que mostra:
+- Mao de Obra
+- Pecas
+- Desconto (quando aplicavel)
+- **TOTAL**
+- Valor Pago (quando aplicavel)
+- **Em Debito** (quando aplicavel)
+- **Falta para pagamento completo** (quando aplicavel)
 
 ---
 
-## 6. Resultado Esperado
+## 3. Alteracoes na Tabela Geral (GeralPage.tsx)
 
-1. Fluxo de visita simplificado com apenas 2 opcoes na decisao
-2. Tecnico pode registar pecas usadas antes de concluir
-3. Tecnico pode indicar necessidade de pedir peca (com assinatura do cliente)
-4. Tags nao duplicam informacao do estado
-5. Tags "Em Debito" e "A Precificar" aparecem como informacao complementar quando coexistem com outros estados
+### 3.1 Mudar Tipo de Icone para Texto
 
+**Codigo Actual (linhas 238-259):**
+- Para `service_location === 'cliente'` mostra icone MapPin sem texto
+- Para outros casos mostra Badge com texto
+
+**Alteracao:**
+Remover icones e mostrar sempre texto:
+- "REPARACAO" para `service_type === 'reparacao'`
+- "INSTALACAO" para `service_type === 'instalacao'`
+- "ENTREGA" para `service_type === 'entrega'`
+
+**Novo codigo:**
+```tsx
+const getTypeConfig = () => {
+  if (service.service_type === 'instalacao') {
+    return { label: 'INSTALACAO', colorClass: 'bg-yellow-500 text-black' };
+  }
+  if (service.service_type === 'entrega') {
+    return { label: 'ENTREGA', colorClass: 'bg-green-500 text-white' };
+  }
+  // Reparacao - distinguir visita vs oficina
+  if (service.service_location === 'cliente') {
+    return { label: 'REPARACAO', colorClass: 'bg-blue-500 text-white' };
+  }
+  return { label: 'REPARACAO', colorClass: 'bg-orange-500 text-white' };
+};
+
+// Na celula:
+<TableCell>
+  <Badge className={`text-xs ${typeConfig.colorClass}`}>
+    {typeConfig.label}
+  </Badge>
+</TableCell>
+```
+
+---
+
+## 4. Ficheiros a Modificar
+
+| Ficheiro | Alteracoes |
+|----------|------------|
+| `src/components/services/ServiceDetailSheet.tsx` | Adicionar queries para fotos e assinaturas; Nova seccao de fotos; Nova seccao de assinaturas com descricao |
+| `src/components/modals/ServicePrintModal.tsx` | Adicionar queries para fotos e assinaturas; Seccoes de fotos e assinaturas no documento impresso |
+| `src/pages/GeralPage.tsx` | Simplificar coluna Tipo para mostrar texto em vez de icones |
+
+---
+
+## 5. Estrutura das Novas Seccoes
+
+### 5.1 ServiceDetailSheet - Nova Seccao de Fotos
+
+```text
+┌──────────────────────────────────────┐
+│ 📷 Fotos do Serviço                  │
+├──────────────────────────────────────┤
+│ ┌─────┐ ┌─────┐ ┌─────┐             │
+│ │ 📷  │ │ 📷  │ │ 📷  │             │
+│ │ANTES│ │DEPOIS│ │VISITA│            │
+│ └─────┘ └─────┘ └─────┘             │
+│                                      │
+│ Clique para ampliar                  │
+└──────────────────────────────────────┘
+```
+
+### 5.2 ServiceDetailSheet - Nova Seccao de Assinaturas
+
+```text
+┌──────────────────────────────────────┐
+│ ✍️ Assinaturas do Cliente            │
+├──────────────────────────────────────┤
+│ ┌──────────────────────────────────┐ │
+│ │ [Imagem Assinatura]   Cliente    │ │
+│ │ ──────────────────              │ │
+│ │ "Confirmacao da execucao do     │ │
+│ │  servico no local"              │ │
+│ │ 26/01/2026 15:30                │ │
+│ └──────────────────────────────────┘ │
+│                                      │
+│ ┌──────────────────────────────────┐ │
+│ │ [Imagem Assinatura]   Cliente    │ │
+│ │ ──────────────────              │ │
+│ │ "Autorizacao para encomenda     │ │
+│ │  de peca"                       │ │
+│ │ 26/01/2026 16:45                │ │
+│ └──────────────────────────────────┘ │
+└──────────────────────────────────────┘
+```
+
+### 5.3 ServiceDetailSheet - Seccao Financeira Melhorada
+
+```text
+┌──────────────────────────────────────┐
+│ 💰 Informacao Financeira             │
+├──────────────────────────────────────┤
+│ Mao de Obra:          50.00 €       │
+│ Pecas:                30.00 €       │
+│ Desconto:             -5.00 €       │
+│ ─────────────────────────────       │
+│ TOTAL:                75.00 €       │
+│                                      │
+│ Ja Pago:              25.00 €       │
+│ Em Debito:            50.00 €       │
+│ Falta para Pagamento: 50.00 €       │
+└──────────────────────────────────────┘
+```
+
+---
+
+## 6. Mapeamento de Tipos de Assinatura
+
+| Codigo | Descricao para o Cliente |
+|--------|--------------------------|
+| `recolha` | "Autorizacao de levantamento do aparelho para reparacao em oficina" |
+| `entrega` | "Confirmacao da entrega do aparelho" |
+| `visita` | "Confirmacao da execucao do servico no local" |
+| `pedido_peca` | "Autorizacao para encomenda de peca" |
+
+---
+
+## 7. Mapeamento de Tipos de Foto
+
+| Codigo | Label a Mostrar |
+|--------|-----------------|
+| `visita` | "Visita" |
+| `oficina` | "Oficina" |
+| `entrega` | "Entrega" |
+| `instalacao` | "Instalacao" |
+| `antes` | "Antes" |
+| `depois` | "Depois" |
+
+---
+
+## 8. Resultado Esperado
+
+1. **Ficha do Servico** mostra:
+   - Galeria de fotos tiradas pelo tecnico
+   - Assinaturas do cliente com descricao clara do motivo
+   - Informacao financeira completa (preco, pago, desconto, debito, falta pagar)
+
+2. **Impressao da Ficha** inclui:
+   - Todas as fotos do servico
+   - Assinaturas com descricao do proposito
+   - Resumo financeiro detalhado
+
+3. **Tabela Geral** mostra:
+   - Tipo como texto (REPARACAO, INSTALACAO, ENTREGA) em vez de icones
+   - Badges coloridos para diferenciar visualmente
