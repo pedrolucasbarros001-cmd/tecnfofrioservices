@@ -139,13 +139,29 @@ export default function GeralPage() {
       console.error('Error finalizing service:', error);
     }
   };
-  const handleMarkPartArrived = async (service: Service) => {
+  // Handler to confirm that the part order has been placed (para_pedir_peca → em_espera_de_peca)
+  const handleConfirmPartOrder = async (service: Service) => {
     try {
       await updateService.mutateAsync({
         id: service.id,
-        status: 'por_fazer'
+        status: 'em_espera_de_peca',
       });
-      toast.success('Peça marcada como chegada. Serviço pronto para retomar.');
+      toast.success('Pedido de peça registado. Aguardando chegada.');
+    } catch (error) {
+      console.error('Error confirming part order:', error);
+    }
+  };
+
+  // Handler for when the part arrives (em_espera_de_peca → restore previous status)
+  const handleMarkPartArrived = async (service: Service) => {
+    try {
+      // Restore to previous status or default to na_oficina
+      const previousStatus = service.last_status_before_part_request || 'na_oficina';
+      await updateService.mutateAsync({
+        id: service.id,
+        status: previousStatus as any,
+      });
+      toast.success('Peça chegou! Serviço pronto para retomar.');
     } catch (error) {
       console.error('Error marking part arrived:', error);
     }
@@ -308,7 +324,7 @@ export default function GeralPage() {
                       
                       {/* Ações */}
                       <TableCell className="text-right">
-                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} />
+                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} />
                       </TableCell>
                     </TableRow>;
             })}

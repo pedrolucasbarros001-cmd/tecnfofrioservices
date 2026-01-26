@@ -390,6 +390,7 @@ export type Database = {
           is_urgent: boolean | null
           is_warranty: boolean | null
           labor_cost: number | null
+          last_status_before_part_request: string | null
           model: string | null
           notes: string | null
           parts_cost: number | null
@@ -430,6 +431,7 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           labor_cost?: number | null
+          last_status_before_part_request?: string | null
           model?: string | null
           notes?: string | null
           parts_cost?: number | null
@@ -470,6 +472,7 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           labor_cost?: number | null
+          last_status_before_part_request?: string | null
           model?: string | null
           notes?: string | null
           parts_cost?: number | null

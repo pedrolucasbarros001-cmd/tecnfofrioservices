@@ -237,7 +237,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         scheduled_shift: values.scheduled_shift,
         notes: values.notes,
         service_type: 'reparacao',
-        status: 'por_fazer',
+        status: values.service_location === 'oficina' ? 'na_oficina' : 'por_fazer',
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,

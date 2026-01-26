@@ -109,6 +109,7 @@ export interface Service {
   service_postal_code: string | null;
   service_city: string | null;
   notes: string | null;
+  last_status_before_part_request: string | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;
