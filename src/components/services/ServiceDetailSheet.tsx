@@ -15,6 +15,7 @@ import {
   User,
   Package,
   CreditCard,
+  Truck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -269,14 +270,26 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     Garantia
                   </Badge>
                 )}
-                {service.service_location === 'oficina' && (
-                  <Badge variant="secondary">
+              {service.service_type === 'instalacao' && (
+                  <Badge className="bg-yellow-500 text-black">
+                    <Wrench className="h-3 w-3 mr-1" />
+                    Instalação
+                  </Badge>
+                )}
+                {service.service_type === 'entrega' && (
+                  <Badge className="bg-green-500 text-white">
+                    <Truck className="h-3 w-3 mr-1" />
+                    Entrega
+                  </Badge>
+                )}
+                {service.service_type === 'reparacao' && service.service_location === 'oficina' && (
+                  <Badge className="bg-orange-500 text-white">
                     <Wrench className="h-3 w-3 mr-1" />
                     Oficina
                   </Badge>
                 )}
-                {service.service_location === 'cliente' && (
-                  <Badge variant="secondary">
+                {service.service_type === 'reparacao' && service.service_location === 'cliente' && (
+                  <Badge className="bg-blue-500 text-white">
                     <MapPin className="h-3 w-3 mr-1" />
                     Visita
                   </Badge>
@@ -336,9 +349,15 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 borderColor="border-l-pink-500"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline">
-                    {service.service_location === 'cliente' ? 'VISITA' : 'OFICINA'}
-                  </Badge>
+                  {service.service_type === 'instalacao' ? (
+                    <Badge className="bg-yellow-500 text-black border-yellow-500">INSTALAÇÃO</Badge>
+                  ) : service.service_type === 'entrega' ? (
+                    <Badge className="bg-green-500 text-white border-green-500">ENTREGA</Badge>
+                  ) : service.service_location === 'cliente' ? (
+                    <Badge className="border-blue-500 text-blue-600 bg-blue-50">VISITA</Badge>
+                  ) : (
+                    <Badge className="bg-orange-500 text-white border-orange-500">OFICINA</Badge>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <p className="font-medium">
@@ -414,8 +433,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
-              {/* Pricing */}
-              {(service.labor_cost || service.parts_cost || service.final_price) && (
+              {/* Pricing - Only show if there's actual pricing data */}
+              {((service.labor_cost && service.labor_cost > 0) || (service.parts_cost && service.parts_cost > 0) || (service.final_price && service.final_price > 0)) && (
                 <Section 
                   title="Preços" 
                   bgColor="bg-emerald-50"
@@ -440,7 +459,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                         <span>-{service.discount.toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.final_price && (
+                    {service.final_price && service.final_price > 0 && (
                       <>
                         <Separator />
                         <div className="flex justify-between font-semibold text-lg">
