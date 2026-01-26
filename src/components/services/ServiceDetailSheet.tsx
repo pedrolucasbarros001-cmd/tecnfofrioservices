@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -16,6 +16,8 @@ import {
   Package,
   CreditCard,
   Truck,
+  Camera,
+  PenTool,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -43,9 +45,38 @@ import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment } from '@/types/database';
+import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment, type ServicePhoto, type ServiceSignature } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// Helper: descrição amigável para tipos de assinatura
+const getSignatureDescription = (type: string | null): string => {
+  switch (type) {
+    case 'recolha':
+      return 'Autorização de levantamento do aparelho para reparação em oficina';
+    case 'entrega':
+      return 'Confirmação da entrega do aparelho';
+    case 'visita':
+      return 'Confirmação da execução do serviço no local';
+    case 'pedido_peca':
+      return 'Autorização para encomenda de peça';
+    default:
+      return 'Assinatura do cliente';
+  }
+};
+
+// Helper: label amigável para tipos de foto
+const getPhotoTypeLabel = (type: string | null): string => {
+  switch (type) {
+    case 'visita': return 'Visita';
+    case 'oficina': return 'Oficina';
+    case 'entrega': return 'Entrega';
+    case 'instalacao': return 'Instalação';
+    case 'antes': return 'Antes';
+    case 'depois': return 'Depois';
+    default: return 'Foto';
+  }
+};
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,6 +156,38 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       return data as ServicePayment[];
     },
     enabled: !!service?.id && open && (role === 'dono' || role === 'secretaria'),
+  });
+
+  // Fetch service photos
+  const { data: servicePhotos = [] } = useQuery({
+    queryKey: ['service-photos', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_photos')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      return data as ServicePhoto[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch service signatures
+  const { data: serviceSignatures = [] } = useQuery({
+    queryKey: ['service-signatures', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_signatures')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('signed_at', { ascending: true });
+      if (error) throw error;
+      return data as ServiceSignature[];
+    },
+    enabled: !!service?.id && open,
   });
 
   if (!service) return null;
@@ -466,10 +529,10 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
-              {/* Pricing - Only show if there's actual pricing data */}
+              {/* Pricing - Enhanced financial section */}
               {((service.labor_cost && service.labor_cost > 0) || (service.parts_cost && service.parts_cost > 0) || (service.final_price && service.final_price > 0)) && (
                 <Section 
-                  title="Preços" 
+                  title="Informação Financeira" 
                   bgColor="bg-emerald-50"
                   borderColor="border-l-emerald-500"
                 >
@@ -487,7 +550,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       </div>
                     )}
                     {service.discount && service.discount > 0 && (
-                      <div className="flex justify-between text-sm text-destructive">
+                      <div className="flex justify-between text-sm text-green-600">
                         <span>Desconto</span>
                         <span>-{service.discount.toFixed(2)} €</span>
                       </div>
@@ -496,22 +559,30 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       <>
                         <Separator />
                         <div className="flex justify-between font-semibold text-lg">
-                          <span>Total</span>
+                          <span>TOTAL</span>
                           <span className="text-primary">{service.final_price.toFixed(2)} €</span>
                         </div>
                       </>
                     )}
-                    {service.amount_paid && service.amount_paid > 0 && (
+                    {/* Valor já pago */}
+                    {(service.amount_paid || 0) > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
-                        <span>Pago</span>
-                        <span>{service.amount_paid.toFixed(2)} €</span>
+                        <span>Já Pago</span>
+                        <span>{(service.amount_paid || 0).toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.final_price && service.final_price > (service.amount_paid || 0) && (
-                      <div className="flex justify-between text-sm text-red-600 font-medium">
-                        <span>Em Débito</span>
-                        <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
-                      </div>
+                    {/* Em débito e falta para pagamento */}
+                    {service.final_price && service.final_price > 0 && (service.amount_paid || 0) < service.final_price && (
+                      <>
+                        <div className="flex justify-between text-sm text-red-600 font-medium">
+                          <span>Em Débito</span>
+                          <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-amber-600 font-medium bg-amber-50 p-2 rounded">
+                          <span>Falta para Pagamento Completo</span>
+                          <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </Section>
@@ -616,6 +687,71 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                         {servicePayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} €
                       </span>
                     </div>
+                  </div>
+                </Section>
+              )}
+
+              {/* Service Photos */}
+              {servicePhotos.length > 0 && (
+                <Section 
+                  title="Fotos do Serviço" 
+                  bgColor="bg-indigo-50"
+                  borderColor="border-l-indigo-500"
+                >
+                  <div className="grid grid-cols-3 gap-2">
+                    {servicePhotos.map((photo) => (
+                      <div key={photo.id} className="relative">
+                        <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={photo.file_url} 
+                            alt={photo.description || 'Foto do serviço'} 
+                            className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
+                          {getPhotoTypeLabel(photo.photo_type)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                    <Camera className="h-3 w-3" />
+                    {servicePhotos.length} foto{servicePhotos.length !== 1 ? 's' : ''} • Clique para ampliar
+                  </p>
+                </Section>
+              )}
+
+              {/* Service Signatures */}
+              {serviceSignatures.length > 0 && (
+                <Section 
+                  title="Assinaturas do Cliente" 
+                  bgColor="bg-violet-50"
+                  borderColor="border-l-violet-500"
+                >
+                  <div className="space-y-3">
+                    {serviceSignatures.map((sig) => (
+                      <div key={sig.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border">
+                        <a href={sig.file_url} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={sig.file_url} 
+                            alt="Assinatura" 
+                            className="w-24 h-14 object-contain border rounded bg-gray-50 hover:opacity-80 transition-opacity cursor-pointer"
+                          />
+                        </a>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <PenTool className="h-4 w-4 text-violet-600" />
+                            <span className="font-medium text-sm">{sig.signer_name || 'Cliente'}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {getSignatureDescription(sig.signature_type)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </Section>
               )}

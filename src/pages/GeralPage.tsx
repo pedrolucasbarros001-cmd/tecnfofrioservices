@@ -237,26 +237,23 @@ export default function GeralPage() {
               // Type config based on service_type and service_location
               const getTypeConfig = () => {
                 if (service.service_type === 'instalacao') {
-                  return { label: 'INSTALAÇÃO', colorClass: 'bg-yellow-500 text-black', icon: null };
+                  return { label: 'INSTALAÇÃO', colorClass: 'bg-yellow-500 text-black' };
                 }
                 if (service.service_type === 'entrega') {
-                  return { label: 'ENTREGA', colorClass: 'bg-green-500 text-white', icon: null };
+                  return { label: 'ENTREGA', colorClass: 'bg-green-500 text-white' };
                 }
+                // Reparação - sempre mostra texto, diferenciando cor por visita vs oficina
                 if (service.service_location === 'cliente') {
-                  return { label: null, colorClass: 'text-blue-500', icon: MapPin };
+                  return { label: 'REPARAÇÃO', colorClass: 'bg-blue-500 text-white' };
                 }
-                return { label: 'OFICINA', colorClass: 'bg-orange-500 text-white', icon: null };
+                return { label: 'REPARAÇÃO', colorClass: 'bg-orange-500 text-white' };
               };
               const typeConfig = getTypeConfig();
               
               return <TableRow key={service.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleServiceClick(service)}>
-                      {/* Tipo */}
+                      {/* Tipo - sempre texto */}
                       <TableCell>
-                        {typeConfig.icon ? (
-                          <typeConfig.icon className="h-5 w-5 text-blue-500" />
-                        ) : (
-                          <Badge className={`text-xs ${typeConfig.colorClass}`}>{typeConfig.label}</Badge>
-                        )}
+                        <Badge className={`text-xs ${typeConfig.colorClass}`}>{typeConfig.label}</Badge>
                       </TableCell>
                       
                       {/* Código */}

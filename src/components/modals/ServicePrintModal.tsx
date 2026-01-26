@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Printer, Snowflake } from 'lucide-react';
+import { AlertTriangle, Printer, Snowflake, Camera, PenTool } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Dialog,
@@ -13,13 +13,42 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import type { Service, ServicePart, ServicePayment } from '@/types/database';
+import type { Service, ServicePart, ServicePayment, ServicePhoto, ServiceSignature } from '@/types/database';
 
 interface ServicePrintModalProps {
   service: Service | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Helper: descrição amigável para tipos de assinatura
+const getSignatureDescription = (type: string | null): string => {
+  switch (type) {
+    case 'recolha':
+      return 'Autorização de levantamento do aparelho para reparação em oficina';
+    case 'entrega':
+      return 'Confirmação da entrega do aparelho';
+    case 'visita':
+      return 'Confirmação da execução do serviço no local';
+    case 'pedido_peca':
+      return 'Autorização para encomenda de peça';
+    default:
+      return 'Assinatura do cliente';
+  }
+};
+
+// Helper: label amigável para tipos de foto
+const getPhotoTypeLabel = (type: string | null): string => {
+  switch (type) {
+    case 'visita': return 'Visita';
+    case 'oficina': return 'Oficina';
+    case 'entrega': return 'Entrega';
+    case 'instalacao': return 'Instalação';
+    case 'antes': return 'Antes';
+    case 'depois': return 'Depois';
+    default: return 'Foto';
+  }
+};
 
 export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintModalProps) {
   // Fetch parts used for this service
@@ -50,6 +79,38 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         .order('payment_date', { ascending: false });
       if (error) throw error;
       return data as ServicePayment[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch service photos
+  const { data: photos = [] } = useQuery({
+    queryKey: ['service-photos-print', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_photos')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      return data as ServicePhoto[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch service signatures
+  const { data: signatures = [] } = useQuery({
+    queryKey: ['service-signatures-print', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_signatures')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('signed_at', { ascending: true });
+      if (error) throw error;
+      return data as ServiceSignature[];
     },
     enabled: !!service?.id && open,
   });
@@ -273,7 +334,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             </>
           )}
 
-          {/* Pricing Summary */}
+          {/* Pricing Summary - Enhanced */}
           {(service.final_price && service.final_price > 0) && (
             <>
               <Separator className="my-4" />
@@ -303,17 +364,21 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                     <span>{service.final_price.toFixed(2)} €</span>
                   </div>
                   {totalPayments > 0 && (
+                    <div className="flex justify-between col-span-2 text-green-600">
+                      <span>Valor Pago:</span>
+                      <span>{totalPayments.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.final_price > totalPayments && (
                     <>
-                      <div className="flex justify-between col-span-2 text-green-600">
-                        <span>Pago:</span>
-                        <span>{totalPayments.toFixed(2)} €</span>
+                      <div className="flex justify-between col-span-2 text-red-600 font-medium">
+                        <span>Em Débito:</span>
+                        <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
                       </div>
-                      {service.final_price > totalPayments && (
-                        <div className="flex justify-between col-span-2 text-red-600 font-medium">
-                          <span>Em Débito:</span>
-                          <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between col-span-2 text-amber-600 font-medium bg-amber-50 p-1 rounded">
+                        <span>Falta para Pagamento:</span>
+                        <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -355,6 +420,66 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             </>
           )}
 
+          {/* Service Photos */}
+          {photos.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Evidências Fotográficas
+                </h2>
+                <div className="grid grid-cols-4 gap-2">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="border rounded overflow-hidden">
+                      <img 
+                        src={photo.file_url} 
+                        alt={photo.description || 'Foto do serviço'} 
+                        className="w-full h-20 object-cover"
+                      />
+                      <p className="text-xs text-center p-1 bg-gray-100 capitalize">
+                        {getPhotoTypeLabel(photo.photo_type)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Service Signatures */}
+          {signatures.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <section className="mb-6">
+                <h2 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <PenTool className="h-5 w-5" />
+                  Assinaturas Recolhidas
+                </h2>
+                <div className="space-y-3">
+                  {signatures.map((sig) => (
+                    <div key={sig.id} className="flex items-start gap-4 p-3 border rounded bg-gray-50">
+                      <img 
+                        src={sig.file_url} 
+                        alt="Assinatura" 
+                        className="w-28 h-14 object-contain border bg-white rounded"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getSignatureDescription(sig.signature_type)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
           <Separator className="my-4" />
 
           {/* Terms Section with QR */}
@@ -383,15 +508,17 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             </div>
           </section>
 
-          {/* Signature Area */}
-          <div className="grid grid-cols-2 gap-8 mt-8 pt-4">
-            <div className="border-t border-gray-400 pt-2">
-              <p className="text-xs text-muted-foreground text-center">Assinatura do Cliente</p>
+          {/* Signature Area - Only show if no digital signatures */}
+          {signatures.length === 0 && (
+            <div className="grid grid-cols-2 gap-8 mt-8 pt-4">
+              <div className="border-t border-gray-400 pt-2">
+                <p className="text-xs text-muted-foreground text-center">Assinatura do Cliente</p>
+              </div>
+              <div className="border-t border-gray-400 pt-2">
+                <p className="text-xs text-muted-foreground text-center">Assinatura do Funcionário</p>
+              </div>
             </div>
-            <div className="border-t border-gray-400 pt-2">
-              <p className="text-xs text-muted-foreground text-center">Assinatura do Funcionário</p>
-            </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
