@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, CalendarDays, Play, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { format, addDays, isSameDay, startOfWeek } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
+import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
+import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
 import type { Service } from '@/types/database';
 
 const WEEK_DAYS = [
@@ -27,14 +29,19 @@ const SHIFT_ICONS: Record<string, { icon: typeof Sun; color: string }> = {
   noite: { icon: Moon, color: 'text-indigo-500' },
 };
 
+type FlowType = 'visit' | 'installation' | 'delivery' | null;
+
 export default function ServicosPage() {
-  const navigate = useNavigate();
   const { profile } = useAuth();
   
   // Get Monday of current week
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
+
+  // Modal state
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [activeFlow, setActiveFlow] = useState<FlowType>(null);
 
   // Use React Query for proper caching and refetch
   const { data: services = [], isLoading: loading, refetch } = useQuery({
@@ -75,16 +82,28 @@ export default function ServicosPage() {
     refetchOnWindowFocus: true,
   });
 
-  const handleStartService = (service: Service) => {
+  const handleStartFlow = (service: Service, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedService(service);
+    
     if (service.service_type === 'entrega') {
-      navigate(`/technician/delivery/${service.id}`);
+      setActiveFlow('delivery');
     } else if (service.service_type === 'instalacao') {
-      navigate(`/technician/installation/${service.id}`);
-    } else if (service.service_location === 'oficina') {
-      navigate(`/technician/workshop/${service.id}`);
+      setActiveFlow('installation');
     } else {
-      navigate(`/technician/visit/${service.id}`);
+      setActiveFlow('visit');
     }
+  };
+
+  const handleCloseFlow = () => {
+    setSelectedService(null);
+    setActiveFlow(null);
+  };
+
+  const handleFlowComplete = () => {
+    setSelectedService(null);
+    setActiveFlow(null);
+    refetch();
   };
 
   const navigateWeek = (direction: -1 | 1) => {
@@ -130,35 +149,47 @@ export default function ServicosPage() {
     return dayOfWeek === 0 ? -1 : dayOfWeek - 1;
   }, []);
 
+  // Get button config based on service type
+  const getButtonConfig = (service: Service) => {
+    if (service.service_type === 'entrega') {
+      return { 
+        label: 'Começar Entrega', 
+        color: 'bg-green-500 hover:bg-green-600 text-white',
+        badgeColor: 'bg-green-100 text-green-700',
+        badgeLabel: 'Entrega',
+        cardColor: 'bg-green-50 border-l-green-500'
+      };
+    }
+    if (service.service_type === 'instalacao') {
+      return { 
+        label: 'Começar Instalação', 
+        color: 'bg-yellow-500 hover:bg-yellow-600 text-black',
+        badgeColor: 'bg-yellow-100 text-yellow-700',
+        badgeLabel: 'Instalação',
+        cardColor: 'bg-yellow-50 border-l-yellow-500'
+      };
+    }
+    // Default: Visita (blue)
+    return { 
+      label: 'Começar Visita', 
+      color: 'bg-blue-500 hover:bg-blue-600 text-white',
+      badgeColor: 'bg-blue-100 text-blue-700',
+      badgeLabel: 'Visita',
+      cardColor: 'bg-blue-50 border-l-blue-500'
+    };
+  };
+
   const ServiceCard = ({ service }: { service: Service }) => {
     const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
     const ShiftIcon = shiftInfo?.icon || Sun;
-    
-    // Determine card color based on service type
-    const isInstallation = service.service_type === 'instalacao';
-    const isDelivery = service.service_type === 'entrega';
-    
-    const cardColors = isInstallation 
-      ? 'bg-purple-50 border-l-purple-500' 
-      : isDelivery 
-        ? 'bg-teal-50 border-l-teal-500'
-        : 'bg-blue-50 border-l-blue-500';
-    
-    const badgeColors = isInstallation
-      ? 'bg-purple-100 text-purple-700'
-      : isDelivery
-        ? 'bg-teal-100 text-teal-700'
-        : 'bg-blue-100 text-blue-700';
-    
-    const badgeLabel = isInstallation ? 'Instalação' : isDelivery ? 'Entrega' : 'Visita';
+    const buttonConfig = getButtonConfig(service);
     
     return (
       <Card
         className={cn(
-          'cursor-pointer hover:shadow-md transition-all border-l-4',
-          cardColors
+          'border-l-4 transition-shadow hover:shadow-md',
+          buttonConfig.cardColor
         )}
-        onClick={() => handleStartService(service)}
       >
         <CardContent className="p-2 md:p-3">
           <div className="space-y-1.5 md:space-y-2">
@@ -169,9 +200,9 @@ export default function ServicosPage() {
               </span>
               <Badge 
                 variant="secondary" 
-                className={cn('text-[10px] md:text-xs shrink-0', badgeColors)}
+                className={cn('text-[10px] md:text-xs shrink-0', buttonConfig.badgeColor)}
               >
-                {badgeLabel}
+                {buttonConfig.badgeLabel}
               </Badge>
             </div>
 
@@ -206,6 +237,16 @@ export default function ServicosPage() {
                 )}
               </div>
             </div>
+
+            {/* Start Button */}
+            <Button
+              size="sm"
+              className={cn('w-full h-8 text-xs md:text-sm mt-2', buttonConfig.color)}
+              onClick={(e) => handleStartFlow(service, e)}
+            >
+              <Play className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+              {buttonConfig.label}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -302,6 +343,34 @@ export default function ServicosPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Flow Modals */}
+      {selectedService && activeFlow === 'visit' && (
+        <VisitFlowModals
+          service={selectedService}
+          isOpen={true}
+          onClose={handleCloseFlow}
+          onComplete={handleFlowComplete}
+        />
+      )}
+
+      {selectedService && activeFlow === 'installation' && (
+        <InstallationFlowModals
+          service={selectedService}
+          isOpen={true}
+          onClose={handleCloseFlow}
+          onComplete={handleFlowComplete}
+        />
+      )}
+
+      {selectedService && activeFlow === 'delivery' && (
+        <DeliveryFlowModals
+          service={selectedService}
+          isOpen={true}
+          onClose={handleCloseFlow}
+          onComplete={handleFlowComplete}
+        />
       )}
     </div>
   );
