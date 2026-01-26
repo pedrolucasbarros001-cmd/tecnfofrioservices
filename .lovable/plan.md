@@ -1,388 +1,426 @@
 
-# Plano: Alinhamento Completo do Sistema com o Documento Tecnico de Interaccoes e Fluxos
 
-## Resumo da Analise
+# Plano: Ajustar Fluxos de Tecnico e Sistema de Tags
 
-Apos analise detalhada do codigo actual vs. o documento tecnico de especificacoes fornecido, identifiquei as seguintes areas que necessitam de alinhamento ou correcao.
+## Resumo das Alteracoes Solicitadas
 
----
-
-## 1. Conformidades Verificadas (Implementacao Correcta)
-
-### 1.1 Botoes e Modais Implementados Correctamente
-
-| Funcionalidade | Estado |
-|----------------|--------|
-| "Adicionar Servico" (Dono/Secretaria) | CONFORME - Dropdown com opcoes Reparacao/Instalacao/Entrega |
-| "Atribuir/Reatribuir Tecnico" | CONFORME - AssignTechnicianModal com data/turno |
-| "Definir Preco" (Dono) | CONFORME - SetPriceModal com labor/parts/discount |
-| "Registrar Pagamento" (Dono/Secretaria) | CONFORME - RegisterPaymentModal com historico |
-| "Forcar Status" (Dono exclusivo) | CONFORME - ForceStateModal disponivel |
-| "Gerir Entrega" com bifurcacao | CONFORME - DeliveryManagementModal com opcoes |
-| "Dar Baixa" (Cliente Recolhe) | CONFORME - SecretaryConcluidosPage implementa |
-| Auto-deteccao de cliente | CONFORME - CreateServiceModal pesquisa por telefone/NIF |
-| Fluxo de Oficina (Tecnico) | CONFORME - WorkshopFlowModals com 5 passos |
-| Fluxos de Visita/Instalacao/Entrega | CONFORME - Modais sequenciais implementados |
-
-### 1.2 Permissoes por Role
-
-| Verificacao | Estado |
-|-------------|--------|
-| Dono pode definir preco | CONFORME |
-| Secretaria NAO pode definir preco | CONFORME |
-| Tecnico ve apenas servicos atribuidos | CONFORME |
-| Dono/Secretaria podem criar servicos | CONFORME |
+O utilizador especificou um fluxo preciso para a visita ao cliente e pediu ajustes no sistema de tags para evitar duplicacao de informacao.
 
 ---
 
-## 2. Discrepancias Identificadas
+## 1. FLUXO DE VISITA - Alteracoes
 
-### 2.1 CRITICO: Falta Campo `last_status_before_part_request`
+### 1.1 Remover Opcao "Pedir Peca" na Decisao
 
-**Documento:**
-> "Guarda Service.last_status_before_part_request [...] Peca Recebida → restaura last_status_before_part_request"
+**Ficheiro:** `src/components/technician/VisitFlowModals.tsx`
 
-**Implementacao Actual:**
-- O campo `last_status_before_part_request` NAO existe na tabela `services`
-- Na funcao `handleMarkPartArrived` (GeralPage.tsx, linha 143-151), o status e definido como `por_fazer` fixo em vez de restaurar o status anterior
-
-**Codigo Actual (Linha 143-151):**
+**Estado Actual (linha 36):**
 ```typescript
-const handleMarkPartArrived = async (service: Service) => {
-  try {
-    await updateService.mutateAsync({
-      id: service.id,
-      status: 'por_fazer'  // PROBLEMA: Deveria restaurar o status anterior
-    });
-    toast.success('Peça marcada como chegada. Serviço pronto para retomar.');
-  }
-};
+type DecisionType = 'reparar_local' | 'levantar_oficina' | 'pedir_peca';
 ```
 
-**Correcao Necessaria:**
-1. Adicionar coluna `last_status_before_part_request` na tabela `services`
-2. No `RequestPartModal`, guardar o status actual antes de mudar para `para_pedir_peca`
-3. No `handleMarkPartArrived`, restaurar o status guardado
-
----
-
-### 2.2 Falta Transicao `para_pedir_peca` → `em_espera_de_peca`
-
-**Documento:**
-> "para_pedir_peca: Confirmacao do pedido [...] → em_espera_de_peca"
-
-**Implementacao Actual:**
-- O `RequestPartModal` muda directamente para `para_pedir_peca`
-- NAO ha implementacao da transicao para `em_espera_de_peca` quando o Dono "Registra Pedido"
-- O botao "Registar Pedido" em `StateActionButtons` dispara `onMarkPartArrived`, mas esta funcao nao distingue entre os dois estados
-
-**Codigo Actual (StateActionButtons, linhas 110-119):**
+**Alteracao:**
 ```typescript
-case 'para_pedir_peca':
-  if (isDono && onMarkPartArrived) {
-    return {
-      label: 'Registar Pedido',
-      icon: Package,
-      onClick: onMarkPartArrived,  // PROBLEMA: Mesma funcao para ambos estados
-    };
-  }
+type DecisionType = 'reparar_local' | 'levantar_oficina';
 ```
 
-**Correcao Necessaria:**
-1. Criar handler separado `onConfirmPartOrder` para transitar `para_pedir_peca` → `em_espera_de_peca`
-2. Manter `onMarkPartArrived` para transitar `em_espera_de_peca` → status anterior
+**Remover:** O terceiro radio button "Pedir Peca" do modal de decisao (linhas 456-475)
 
----
+### 1.2 Novo Fluxo para "Reparar no Local"
 
-### 2.3 Falta Botao "Assumir Servico" para Tecnicos
+Apos seleccionar "Reparar no Local", o tecnico deve seguir estes passos:
 
-**Documento:**
-> "Botao 'Assumir Servico' [...] Servico Nao Atribuido (technician_id === null) [...] aparece na seccao 'Servicos Disponiveis para Assumir'"
-
-**Implementacao Actual:**
-- `TechnicianOfficePage.tsx` (linha 42-43) filtra apenas servicos JA atribuidos ao tecnico:
-```typescript
-.eq('technician_id', tech.id)  // PROBLEMA: Ignora servicos sem atribuicao
+```text
+Decisao (Reparar no Local)
+    │
+    ▼
+┌─────────────────────────────┐
+│ Passo 6: Pecas Usadas       │
+│                             │
+│ "Usou pecas na reparacao?"  │
+│ ○ Nao                       │
+│ ○ Sim                       │
+│                             │
+│ Se Sim:                     │
+│ [Nome] [Referencia] [Qtd]   │
+│ + Adicionar Peca            │
+└─────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────┐
+│ Passo 7: Precisa Pedir Peca?│
+│                             │
+│ "Precisa pedir alguma peca?"│
+│ ○ Nao                       │
+│ ○ Sim                       │
+└─────────────────────────────┘
+    │
+    ├── Se Sim ──────────────────┐
+    │                            ▼
+    │            ┌─────────────────────────────┐
+    │            │ Modal: Detalhes da Peca     │
+    │            │ [Nome] [Referencia]         │
+    │            │                             │
+    │            │ + Assinatura do Cliente     │
+    │            │                             │
+    │            │ Status → para_pedir_peca    │
+    │            └─────────────────────────────┘
+    │
+    └── Se Nao ──────────────────┐
+                                 ▼
+                 ┌─────────────────────────────┐
+                 │ Modal: Assinatura Final     │
+                 │                             │
+                 │ "Confirme a conclusao do    │
+                 │  servico no local"          │
+                 │                             │
+                 │ Status → a_precificar/      │
+                 │          finalizado         │
+                 └─────────────────────────────┘
 ```
-- NAO existe seccao "Servicos Disponiveis para Assumir"
-- NAO existe botao "Assumir Servico"
 
-**Correcao Necessaria:**
-1. Adicionar query separada para servicos com `technician_id = null`
-2. Criar seccao "Servicos Disponiveis para Assumir"
-3. Implementar botao "Assumir Servico" que atribui o tecnico logado
+### 1.3 Novos Estados no FormData
 
----
-
-### 2.4 QR Code na Ficha/Etiqueta
-
-**Documento:**
-> "O QR Code [...] codifica o Service.id [...] redireciona para [...] /technician/flow?serviceId=[ID]"
-
-**Implementacao Actual:**
-- O ficheiro `ServiceTagModal.tsx` usa `qrcode.react` (existe na lista de dependencias)
-- Precisa verificar se o URL codificado esta correcto
-
-**Verificar:** O modal ServiceTagModal.tsx precisa ser analisado para confirmar a implementacao do QR Code.
-
----
-
-### 2.5 CreateServiceModal: Status Inicial
-
-**Documento:**
-> "Service.status: Define-se como por_fazer (se service_location: 'cliente') ou na_oficina (se service_location: 'oficina')."
-
-**Implementacao Actual (CreateServiceModal.tsx, linha 240):**
 ```typescript
-status: 'por_fazer',  // PROBLEMA: Sempre 'por_fazer' independente da localizacao
+interface PartEntry {
+  name: string;
+  reference: string;
+  quantity: number;
+}
+
+interface FormData {
+  detectedFault: string;
+  photoFile: string | null;
+  decision: DecisionType;
+  // NOVOS CAMPOS:
+  usedParts: boolean;
+  usedPartsList: PartEntry[];
+  needsPartOrder: boolean;
+  partToOrder: {
+    name: string;
+    reference: string;
+  } | null;
+}
 ```
 
-**Correcao Necessaria:**
-Mudar para:
+### 1.4 Novos Passos no Modal
+
+**Adicionar tipos de passo:**
 ```typescript
-status: values.service_location === 'oficina' ? 'na_oficina' : 'por_fazer',
+type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'diagnostico' | 'decisao' | 'pecas_usadas' | 'pedir_peca' | 'finalizacao';
+```
+
+**Novo Modal: Pecas Usadas (Passo 6)**
+- Pergunta: "Usou pecas na reparacao?"
+- RadioGroup: Nao / Sim
+- Se Sim: Lista dinamica de pecas (nome, referencia, quantidade)
+- Botao "+ Adicionar Peca"
+- Guardar em `service_parts` com `is_requested: false`
+
+**Novo Modal: Pedir Peca? (Passo 7)**
+- Pergunta: "Precisa pedir alguma peca?"
+- RadioGroup: Nao / Sim
+- Se Sim: Campos nome + referencia + abre assinatura
+- Apos assinatura (tipo `pedido_peca`): status → `para_pedir_peca`
+- Se Nao: Abre assinatura de conclusao → status → `a_precificar`
+
+### 1.5 Logica de Transicao de Status
+
+**Reparar no Local + Nao precisa pedir peca:**
+```typescript
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'a_precificar',
+  pending_pricing: true,
+  detected_fault: formData.detectedFault,
+  work_performed: 'Reparado no local do cliente',
+});
+```
+
+**Reparar no Local + Precisa pedir peca:**
+```typescript
+// Guardar assinatura tipo 'pedido_peca'
+await supabase.from('service_signatures').insert({
+  service_id: service.id,
+  signature_type: 'pedido_peca',
+  file_url: signatureData,
+  signer_name: signerName,
+});
+
+// Guardar peca a pedir
+await supabase.from('service_parts').insert({
+  service_id: service.id,
+  part_name: formData.partToOrder.name,
+  part_code: formData.partToOrder.reference,
+  quantity: 1,
+  is_requested: true,
+  arrived: false,
+});
+
+// Guardar status anterior e mudar para para_pedir_peca
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'para_pedir_peca',
+  last_status_before_part_request: service.status,
+  detected_fault: formData.detectedFault,
+});
 ```
 
 ---
 
-### 2.6 Falta Botao "Caminho para o Cliente"
+## 2. SISTEMA DE TAGS - Alteracoes
 
-**Documento:**
-> "Botao 'Caminho para o Cliente' [...] Abre o navegador com o Google Maps"
+### 2.1 Problema Actual
 
-**Implementacao Actual:**
-- Os modais de fluxo (`VisitFlowModals`, etc.) NAO incluem botao de navegacao GPS
-- A morada esta disponivel em `service.service_address`
+Na tabela de servicos (`GeralPage.tsx`) e no painel de detalhes (`ServiceDetailSheet.tsx`), o estado aparece duas vezes:
+1. Na coluna/badge "Estado" 
+2. Como tag (ex: "A Precificar" aparece como estado E como tag)
 
-**Correcao Necessaria:**
-Adicionar botao nos fluxos de Visita, Instalacao e Entrega:
-```typescript
-<Button
-  variant="outline"
-  onClick={() => {
-    const address = encodeURIComponent(
-      `${service.service_address}, ${service.service_postal_code} ${service.service_city}`
-    );
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
-  }}
->
-  <MapPin className="h-4 w-4 mr-2" />
-  Caminho para o Cliente
-</Button>
+### 2.2 Nova Logica de Tags
+
+**Tags devem ser informacoes COMPLEMENTARES, nao duplicar o estado.**
+
+**Tags a mostrar:**
+| Tag | Condicao | Cor |
+|-----|----------|-----|
+| Urgente | `service.is_urgent === true` | Vermelho (destructive) + pulsante |
+| Garantia | `service.is_warranty === true` | Roxo |
+| Em Debito | `service.status !== 'em_debito' && service.final_price > service.amount_paid && service.final_price > 0` | Vermelho |
+| A Precificar | `service.status !== 'a_precificar' && service.pending_pricing === true` | Amarelo |
+
+**Regra importante:** Tags "Em Debito" e "A Precificar" so aparecem se o estado PRINCIPAL for diferente (para evitar duplicacao).
+
+### 2.3 Alteracao em GeralPage.tsx (linhas 289-295)
+
+**Codigo Actual:**
+```tsx
+{/* Tags */}
+<TableCell>
+  <div className="flex gap-1 flex-wrap">
+    {service.pending_pricing && <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>}
+    {service.is_urgent && <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>}
+    {service.is_warranty && <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>}
+  </div>
+</TableCell>
+```
+
+**Novo Codigo:**
+```tsx
+{/* Tags - Informacoes complementares, nao duplicar estado */}
+<TableCell>
+  <div className="flex gap-1 flex-wrap">
+    {/* Urgente - sempre mostra se true */}
+    {service.is_urgent && (
+      <Badge variant="destructive" className="text-xs animate-pulse">Urgente</Badge>
+    )}
+    
+    {/* Garantia - sempre mostra se true */}
+    {service.is_warranty && (
+      <Badge className="bg-purple-500 text-white text-xs">Garantia</Badge>
+    )}
+    
+    {/* A Precificar - so mostra se estado NAO for a_precificar */}
+    {service.pending_pricing && service.status !== 'a_precificar' && (
+      <Badge className="bg-yellow-500 text-black text-xs">A Precificar</Badge>
+    )}
+    
+    {/* Em Debito - indica debito quando estado principal e outro */}
+    {service.status !== 'em_debito' && 
+     service.final_price > 0 && 
+     service.amount_paid < service.final_price && (
+      <Badge className="bg-red-500 text-white text-xs">Em Debito</Badge>
+    )}
+  </div>
+</TableCell>
+```
+
+### 2.4 Alteracao em ServiceDetailSheet.tsx (linhas 275-318)
+
+**Novo Codigo:**
+```tsx
+{/* Tags */}
+<div className="flex gap-2 flex-wrap">
+  {/* Estado principal - sempre primeiro */}
+  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
+  
+  {/* Tipo de servico */}
+  {service.service_type === 'instalacao' && (
+    <Badge className="bg-yellow-500 text-black">
+      <Wrench className="h-3 w-3 mr-1" />
+      Instalacao
+    </Badge>
+  )}
+  {service.service_type === 'entrega' && (
+    <Badge className="bg-green-500 text-white">
+      <Truck className="h-3 w-3 mr-1" />
+      Entrega
+    </Badge>
+  )}
+  {service.service_type === 'reparacao' && service.service_location === 'oficina' && (
+    <Badge className="bg-orange-500 text-white">
+      <Wrench className="h-3 w-3 mr-1" />
+      Oficina
+    </Badge>
+  )}
+  {service.service_type === 'reparacao' && service.service_location === 'cliente' && (
+    <Badge className="bg-blue-500 text-white">
+      <MapPin className="h-3 w-3 mr-1" />
+      Visita
+    </Badge>
+  )}
+  
+  {/* Tags complementares - NAO duplicar estado */}
+  {service.is_urgent && (
+    <Badge variant="destructive" className="animate-pulse">
+      <AlertCircle className="h-3 w-3 mr-1" />
+      Urgente
+    </Badge>
+  )}
+  {service.is_warranty && (
+    <Badge className="bg-purple-500 text-white">
+      <Shield className="h-3 w-3 mr-1" />
+      Garantia
+    </Badge>
+  )}
+  
+  {/* A Precificar - so se estado nao for a_precificar */}
+  {service.pending_pricing && service.status !== 'a_precificar' && (
+    <Badge className="bg-yellow-500 text-black">
+      A Precificar
+    </Badge>
+  )}
+  
+  {/* Em Debito - indica debito coexistente */}
+  {service.status !== 'em_debito' && 
+   service.final_price > 0 && 
+   service.amount_paid < service.final_price && (
+    <Badge className="bg-red-500 text-white">
+      Em Debito
+    </Badge>
+  )}
+</div>
 ```
 
 ---
 
 ## 3. Ficheiros a Modificar
 
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `supabase/migrations/` | Adicionar coluna `last_status_before_part_request` |
-| `src/types/database.ts` | Adicionar tipo para novo campo |
-| `src/components/modals/RequestPartModal.tsx` | Guardar status anterior antes de mudar |
-| `src/pages/GeralPage.tsx` | Implementar logica de transicao de pecas correcta |
-| `src/components/services/StateActionButtons.tsx` | Adicionar handler separado para confirmar pedido |
-| `src/pages/technician/TechnicianOfficePage.tsx` | Adicionar seccao "Servicos Disponiveis" |
-| `src/components/modals/CreateServiceModal.tsx` | Corrigir status inicial baseado em localizacao |
-| `src/components/technician/VisitFlowModals.tsx` | Adicionar botao "Caminho para o Cliente" |
-| `src/components/technician/InstallationFlowModals.tsx` | Adicionar botao "Caminho para o Cliente" |
-| `src/components/technician/DeliveryFlowModals.tsx` | Adicionar botao "Caminho para o Cliente" |
+| Ficheiro | Alteracoes |
+|----------|------------|
+| `src/components/technician/VisitFlowModals.tsx` | Remover opcao "Pedir Peca" da decisao; Adicionar passos "Pecas Usadas" e "Pedir Peca?"; Ajustar logica de transicao |
+| `src/pages/GeralPage.tsx` | Ajustar logica de tags para nao duplicar estado |
+| `src/components/services/ServiceDetailSheet.tsx` | Ajustar logica de tags para nao duplicar estado |
 
 ---
 
-## 4. Diagrama: Fluxo de Pecas Corrigido
+## 4. Resumo do Novo Fluxo de Visita
 
 ```text
-                    Tecnico identifica necessidade
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │  RequestPartModal   │
-                    │                     │
-                    │ 1. Guardar status   │
-                    │    actual em        │
-                    │    last_status_...  │
-                    │                     │
-                    │ 2. status →         │
-                    │    para_pedir_peca  │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │  para_pedir_peca    │
-                    │                     │
-                    │ Botao: "Registar    │
-                    │ Pedido" (Dono)      │
-                    └─────────────────────┘
-                              │
-                              ▼ onConfirmPartOrder()
-                    ┌─────────────────────┐
-                    │ em_espera_de_peca   │
-                    │                     │
-                    │ Botao: "Peca        │
-                    │ Chegou" (Dono)      │
-                    └─────────────────────┘
-                              │
-                              ▼ onMarkPartArrived()
-                    ┌─────────────────────┐
-                    │ Restaurar:          │
-                    │ last_status_...     │
-                    │                     │
-                    │ Ex: na_oficina ou   │
-                    │     em_execucao     │
-                    └─────────────────────┘
+1. Resumo ──────────────► Dados do servico/cliente
+2. Deslocacao ──────────► Botao "Caminho para Cliente" + "Cheguei"
+3. Foto ────────────────► Tirar foto(s) do aparelho (obrigatorio)
+4. Diagnostico ─────────► Campo de texto para avaria detectada
+5. Decisao ─────────────► "Reparar no Local" OU "Levantar para Oficina"
+   │
+   ├─► Levantar Oficina → Assinatura de Recolha → na_oficina
+   │
+   └─► Reparar no Local
+       │
+       6. Pecas Usadas ─► "Usou pecas?" → Registar se sim
+       │
+       7. Pedir Peca? ──► "Precisa pedir peca?"
+          │
+          ├─► Sim → Nome + Ref + Assinatura → para_pedir_peca
+          │
+          └─► Nao → Assinatura Final → a_precificar
 ```
 
 ---
 
-## 5. Seccao Tecnica: Alteracoes Detalhadas
+## 5. Seccao Tecnica
 
-### 5.1 Migracao SQL para Campo de Status Anterior
-
-```sql
-ALTER TABLE public.services 
-ADD COLUMN last_status_before_part_request text;
-
-COMMENT ON COLUMN public.services.last_status_before_part_request IS 
-'Armazena o status anterior quando o servico entra em para_pedir_peca ou em_espera_de_peca';
-```
-
-### 5.2 RequestPartModal - Guardar Status Anterior
+### 5.1 Componente de Lista de Pecas
 
 ```typescript
-// Linha ~76, antes de updateService
-const currentStatus = service.status;
+// Componente reutilizavel para adicionar pecas
+interface PartEntryRowProps {
+  part: PartEntry;
+  index: number;
+  onChange: (index: number, field: keyof PartEntry, value: string | number) => void;
+  onRemove: (index: number) => void;
+}
 
-await updateService.mutateAsync({
-  id: service.id,
-  status: 'para_pedir_peca',
-  last_status_before_part_request: currentStatus, // NOVO
-});
+function PartEntryRow({ part, index, onChange, onRemove }: PartEntryRowProps) {
+  return (
+    <div className="grid grid-cols-12 gap-2 items-center">
+      <Input
+        className="col-span-5"
+        placeholder="Nome da peca"
+        value={part.name}
+        onChange={(e) => onChange(index, 'name', e.target.value)}
+      />
+      <Input
+        className="col-span-4"
+        placeholder="Referencia"
+        value={part.reference}
+        onChange={(e) => onChange(index, 'reference', e.target.value)}
+      />
+      <Input
+        className="col-span-2"
+        type="number"
+        min="1"
+        value={part.quantity}
+        onChange={(e) => onChange(index, 'quantity', parseInt(e.target.value) || 1)}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="col-span-1"
+        onClick={() => onRemove(index)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 ```
 
-### 5.3 GeralPage - Handlers Separados para Pecas
+### 5.2 Guardar Pecas Usadas no Banco
 
 ```typescript
-// Handler para confirmar que o pedido foi feito (para_pedir_peca → em_espera_de_peca)
-const handleConfirmPartOrder = async (service: Service) => {
-  try {
-    await updateService.mutateAsync({
-      id: service.id,
-      status: 'em_espera_de_peca',
-    });
-    toast.success('Pedido de peça registado. Aguardando chegada.');
-  } catch (error) {
-    console.error('Error confirming part order:', error);
+// Ao confirmar pecas usadas
+const saveUsedParts = async () => {
+  for (const part of formData.usedPartsList) {
+    if (part.name.trim()) {
+      await supabase.from('service_parts').insert({
+        service_id: service.id,
+        part_name: part.name.trim(),
+        part_code: part.reference.trim() || null,
+        quantity: part.quantity,
+        is_requested: false, // Peca usada, nao pedida
+        arrived: true, // Ja foi usada
+        cost: 0, // Sera definido na precificacao
+      });
+    }
   }
 };
-
-// Handler para quando a peca chega (em_espera_de_peca → status anterior)
-const handleMarkPartArrived = async (service: Service) => {
-  try {
-    const previousStatus = service.last_status_before_part_request || 'na_oficina';
-    await updateService.mutateAsync({
-      id: service.id,
-      status: previousStatus,
-      last_status_before_part_request: null, // Limpar
-    });
-    toast.success('Peça chegou! Serviço pronto para retomar.');
-  } catch (error) {
-    console.error('Error marking part arrived:', error);
-  }
-};
 ```
 
-### 5.4 StateActionButtons - Logica Separada
+### 5.3 Validacoes
 
-```typescript
-case 'para_pedir_peca':
-  if (isDono && onConfirmPartOrder) {
-    return {
-      label: 'Registar Pedido',
-      icon: Package,
-      onClick: onConfirmPartOrder,
-      className: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-    };
-  }
-  return null;
-
-case 'em_espera_de_peca':
-  if (isDono && onMarkPartArrived) {
-    return {
-      label: 'Peça Chegou',
-      icon: CheckCircle,
-      onClick: onMarkPartArrived,
-      className: 'bg-green-600 hover:bg-green-700 text-white',
-    };
-  }
-  return null;
-```
-
-### 5.5 TechnicianOfficePage - Servicos Disponiveis
-
-```typescript
-// Query adicional para servicos sem atribuicao
-const { data: availableServices = [] } = useQuery({
-  queryKey: ['available-workshop-services'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*, customer:customers(*)')
-      .is('technician_id', null)
-      .eq('service_location', 'oficina')
-      .in('status', ['por_fazer', 'na_oficina'])
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return (data as Service[]) || [];
-  },
-  staleTime: 30000,
-});
-
-// Funcao para assumir servico
-const handleAssumeService = async (service: Service) => {
-  if (!profile) return;
-  
-  const { data: tech } = await supabase
-    .from('technicians')
-    .select('id')
-    .eq('profile_id', profile.id)
-    .maybeSingle();
-  
-  if (!tech) return;
-  
-  await updateService.mutateAsync({
-    id: service.id,
-    technician_id: tech.id,
-    status: 'na_oficina',
-  });
-  
-  toast.success('Serviço assumido com sucesso!');
-  refetch();
-};
-```
+- Foto obrigatoria antes de avancar para diagnostico
+- Diagnostico obrigatorio (texto nao vazio)
+- Se "Usou pecas = Sim", pelo menos 1 peca com nome preenchido
+- Se "Pedir peca = Sim", nome da peca obrigatorio + assinatura obrigatoria
+- Assinatura final obrigatoria para conclusao
 
 ---
 
-## 6. Prioridade de Implementacao
+## 6. Resultado Esperado
 
-| Prioridade | Item | Justificacao |
-|------------|------|--------------|
-| 1 - ALTA | Campo `last_status_before_part_request` | Impacto critico no fluxo de pecas |
-| 1 - ALTA | Transicao `para_pedir_peca` → `em_espera_de_peca` | Fluxo incompleto |
-| 2 - MEDIA | Status inicial baseado em localizacao | Conformidade com documento |
-| 2 - MEDIA | Servicos Disponiveis para Tecnicos | Funcionalidade em falta |
-| 3 - BAIXA | Botao "Caminho para o Cliente" | Melhoria de UX |
-| 3 - BAIXA | Verificar QR Code | Funcionalidade secundaria |
+1. Fluxo de visita simplificado com apenas 2 opcoes na decisao
+2. Tecnico pode registar pecas usadas antes de concluir
+3. Tecnico pode indicar necessidade de pedir peca (com assinatura do cliente)
+4. Tags nao duplicam informacao do estado
+5. Tags "Em Debito" e "A Precificar" aparecem como informacao complementar quando coexistem com outros estados
 
----
-
-## 7. Conclusao
-
-O sistema actual tem uma base solida com a maioria das funcionalidades implementadas correctamente. As principais lacunas estao no:
-
-1. **Fluxo de gestao de pecas** - falta o campo de persistencia do status anterior e a separacao clara entre "registar pedido" e "peca chegou"
-2. **Autonomia do tecnico** - falta opcao de assumir servicos sem atribuicao
-3. **Status inicial de servicos de oficina** - sempre `por_fazer` em vez de `na_oficina`
-
-A implementacao destas correcoes alinhara completamente o sistema com o documento tecnico de especificacoes.
