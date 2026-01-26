@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
+import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -113,10 +114,25 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </Button>
         </DialogHeader>
 
-        {/* Printable Content - A4 optimized */}
-        <div className="print-content border rounded-lg p-4 bg-white print:border-0 print:p-0 print:shadow-none">
+        {/* Printable Content - A4 optimized with watermark */}
+        <div 
+          className="print-content relative border rounded-lg p-4 bg-white print:border-0 print:p-0 print:shadow-none"
+          style={{ '--watermark-url': `url(${tecnofrioLogoIcon})` } as React.CSSProperties}
+        >
+          {/* Watermark - visible only in print */}
+          <div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 print:opacity-[0.04]"
+            aria-hidden="true"
+          >
+            <img 
+              src={tecnofrioLogoIcon} 
+              alt="" 
+              className="w-[180mm] h-[180mm] object-contain"
+            />
+          </div>
+
           {/* Header */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 relative z-10">
             <img 
               src={tecnofrioLogoFull} 
               alt="TECNOFRIO" 

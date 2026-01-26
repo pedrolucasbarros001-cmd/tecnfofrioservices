@@ -169,6 +169,18 @@
     color: black !important;
   }
 
+  /* Watermark styling for print */
+  .print-content > div[aria-hidden="true"] {
+    opacity: 0.04 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-content > *:not([aria-hidden="true"]) {
+    position: relative;
+    z-index: 1;
+  }
+
   /* Typography adjustments */
   .print-content h1 {
     font-size: 14px !important;

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Snowflake, Wrench, Clock, User, AlertCircle, RefreshCw } from 'lucide-react';
+import { Wrench, Clock, User, AlertCircle, RefreshCw } from 'lucide-react';
+import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -64,11 +65,16 @@ export default function TVMonitorPage() {
       {/* Header */}
       <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-cyan-500">
-            <Snowflake className="h-10 w-10 lg:h-12 lg:w-12 text-white" />
-          </div>
+          <img 
+            src={tecnofrioLogoIcon} 
+            alt="TECNOFRIO" 
+            className="h-16 w-16 lg:h-20 lg:w-20 object-contain"
+          />
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">TECNOFRIO</h1>
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+              <span className="text-[#2B4F84]">TECNO</span>
+              <span className="text-slate-300">FRIO</span>
+            </h1>
             <p className="text-slate-400 text-lg">Monitor da Oficina</p>
           </div>
         </div>
@@ -208,7 +214,11 @@ export default function TVMonitorPage() {
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 bg-slate-800/90 backdrop-blur-sm py-3 px-6">
         <div className="flex items-center justify-between text-slate-400 text-sm">
-          <span>TECNOFRIO - Sistema de Gestão</span>
+          <span>
+            <span className="text-[#2B4F84]">TECNO</span>
+            <span className="text-slate-300">FRIO</span>
+            {' - Sistema de Gestão'}
+          </span>
           <span>{services.length} serviço{services.length !== 1 ? 's' : ''} na oficina</span>
         </div>
       </footer>
