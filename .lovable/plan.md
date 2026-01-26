@@ -1,292 +1,197 @@
 
-# Plano: Cores dos Cards da Agenda por Tipo de Servico + Header com Branding TECNOFRIO
 
-## Resumo das Alteracoes
+# Plano: Corrigir TV Monitor - Exibir Servicos da Oficina
 
-1. **Cores dos cards da agenda** - Aplicar cores baseadas no tipo de servico (reparacao/instalacao/entrega)
-2. **Codigos TF-** - Ja implementado na funcao `generate_service_code` (novos servicos usam TF-)
-3. **Header com branding TECNOFRIO** - Adicionar logo e nome no header principal, remover cargos do topo
+## Problema Identificado
 
----
-
-## 1. Cores dos Cards da Agenda por Tipo de Servico
-
-### 1.1 Ficheiros a Modificar
-
-| Ficheiro | Componente | Alteracao |
-|----------|------------|-----------|
-| `src/components/agenda/WeeklyAgenda.tsx` | `ServiceCard` | Aplicar cores por service_type |
-| `src/components/agenda/AgendaDrawer.tsx` | `ServiceDrawerCard` | Aplicar cores por service_type |
-
-### 1.2 Mapeamento de Cores por Tipo
-
-| Tipo de Servico | Cor de Fundo | Cor da Borda | Icone |
-|-----------------|--------------|--------------|-------|
-| `reparacao` (visita) | `bg-blue-50` | `border-blue-500` | MapPin azul |
-| `reparacao` (oficina) | `bg-orange-50` | `border-orange-500` | Package laranja |
-| `instalacao` | `bg-yellow-50` | `border-yellow-500` | Settings amarelo |
-| `entrega` | `bg-green-50` | `border-green-500` | Truck verde |
-
-### 1.3 Logica de Cores no ServiceCard
-
-```typescript
-const getServiceTypeColors = (service: Service) => {
-  if (service.service_type === 'instalacao') {
-    return {
-      bg: 'bg-yellow-50',
-      border: 'border-yellow-500',
-      iconColor: 'text-yellow-600',
-      hoverBg: 'hover:bg-yellow-100'
-    };
-  }
-  if (service.service_type === 'entrega') {
-    return {
-      bg: 'bg-green-50',
-      border: 'border-green-500',
-      iconColor: 'text-green-600',
-      hoverBg: 'hover:bg-green-100'
-    };
-  }
-  // Reparacao
-  if (service.service_location === 'cliente') {
-    return {
-      bg: 'bg-blue-50',
-      border: 'border-blue-500',
-      iconColor: 'text-blue-500',
-      hoverBg: 'hover:bg-blue-100'
-    };
-  }
-  return {
-    bg: 'bg-orange-50',
-    border: 'border-orange-500',
-    iconColor: 'text-orange-500',
-    hoverBg: 'hover:bg-orange-100'
-  };
-};
-```
-
-### 1.4 Icones por Tipo
-
-| Tipo | Icone Lucide |
-|------|--------------|
-| Reparacao (visita) | `MapPin` |
-| Reparacao (oficina) | `Wrench` |
-| Instalacao | `Settings` |
-| Entrega | `Truck` |
-
----
-
-## 2. Codigos TF- (Ja Implementado)
-
-A funcao de base de dados `generate_service_code` ja foi atualizada para usar prefixo "TF-":
+O TV Monitor (`/tv-monitor`) e uma rota **publica** (sem autenticacao), mas a tabela `services` tem politicas RLS que exigem autenticacao:
 
 ```sql
-NEW.code := 'TF-' || LPAD(next_num::TEXT, 5, '0');
+-- Politica atual:
+"Dono and secretaria see all services, tecnico sees assigned"
+USING (is_dono(auth.uid()) OR is_secretaria(auth.uid()) OR ...)
 ```
 
-Os novos servicos criados ja usam TF-. Codigos OS- existentes continuam validos.
+Quando um utilizador acede ao monitor sem estar autenticado, `auth.uid()` retorna `NULL`, e a query nao devolve resultados.
 
 ---
 
-## 3. Header com Branding TECNOFRIO
+## Solucao: Policy RLS Publica para Servicos na Oficina
 
-### 3.1 Estado Atual vs Pretendido
+Adicionar uma nova policy RLS que permita leitura publica APENAS de servicos que estao na oficina:
 
-**Atual (AppLayout.tsx):**
-- Header simples com menu hamburguer e botao de notificacoes
-- Sidebar mostra cargo ("Administracao", "Secretaria", "Tecnico") junto do logo
-
-**Pretendido:**
-- Header mostra logo TECNOFRIO + "Sistema de Gestao"
-- Card branco com branding
-- Remover cargo do header das sidebars
-- Manter cargo junto ao nome do utilizador no footer das sidebars
-
-### 3.2 Alteracoes no AppLayout.tsx
-
-Adicionar branding no header principal:
-
-```tsx
-<header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-white px-4">
-  <SidebarTrigger className="-ml-1">
-    <Menu className="h-5 w-5" />
-  </SidebarTrigger>
-  
-  {/* Branding TECNOFRIO */}
-  <div className="flex items-center gap-3">
-    <img 
-      src={tecnofrioLogoIcon} 
-      alt="TECNOFRIO" 
-      className="h-8 w-8 object-contain"
-    />
-    <div className="flex flex-col">
-      <span className="text-base font-bold leading-tight">
-        <span className="text-[#2B4F84]">TECNO</span>
-        <span className="text-slate-700">FRIO</span>
-      </span>
-      <span className="text-[10px] text-muted-foreground leading-tight">
-        Sistema de Gestao
-      </span>
-    </div>
-  </div>
-  
-  <div className="flex-1" />
-  
-  <Button variant="ghost" size="icon" ...>
-    <Bell className="h-5 w-5" />
-  </Button>
-</header>
+```sql
+CREATE POLICY "Public read for workshop services on TV monitor"
+  ON public.services FOR SELECT
+  TO anon, authenticated
+  USING (
+    service_location = 'oficina' 
+    AND status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
+  );
 ```
 
-### 3.3 Alteracoes nas Sidebars
+Esta policy e segura porque:
+- So permite leitura (SELECT), nao escrita
+- So expoe servicos na oficina (nao servicos no cliente)
+- So expoe servicos em estados operacionais (nao finalizados)
 
-**OwnerSidebar.tsx:**
-- Remover texto "Administracao" do header (linha 61)
-- Manter "Dono" junto ao nome no footer (linha 87)
+---
 
-**SecretarySidebar.tsx:**
-- Remover texto "Secretaria" do header (linha 58)
-- Manter "Secretaria" junto ao nome no footer (linha 108)
+## Alteracoes no TVMonitorPage.tsx
 
-**TechnicianSidebar.tsx:**
-- Remover texto "Tecnico" do header (linha 45)
-- Manter "Tecnico" junto ao nome no footer (linha 71)
+### 1. Manter Query Existente (ja correta)
 
-### 3.4 Estrutura Visual do Header
+A query ja filtra corretamente por `service_location = 'oficina'` e pelos status relevantes.
+
+### 2. Organizar por Seccoes (Status)
+
+Em vez de mostrar todos os cards misturados, organizar por seccoes:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│ [≡]  🐧 TECNOFRIO                                    [🔔]      │
-│           Sistema de Gestao                                    │
+│ TECNOFRIO        Monitor da Oficina              15:32:45      │
+├─────────────────────────────────────────────────────────────────┤
+│ [Em Exec: 2] [Na Oficina: 3] [Pedir Peca: 1] [Espera: 2] [Conc: 4]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ ━━━━━━━━━━━ EM EXECUCAO ━━━━━━━━━━━                              │
+│ ┌──────────────────┐ ┌──────────────────┐                       │
+│ │    TF-00045      │ │    TF-00048      │                       │
+│ │ Joao Silva       │ │ Ana Costa        │                       │
+│ └──────────────────┘ └──────────────────┘                       │
+│                                                                  │
+│ ━━━━━━━━━━━ NA OFICINA (Disponiveis) ━━━━━━━━━━━                 │
+│ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐  │
+│ │    TF-00046      │ │    TF-00049      │ │    TF-00050      │  │
+│ │ ⚡ DISPONIVEL    │ │ ⚡ DISPONIVEL    │ │ Pedro Costa      │  │
+│ └──────────────────┘ └──────────────────┘ └──────────────────┘  │
+│                                                                  │
+│ ━━━━━━━━━━━ PARA PEDIR PECA ━━━━━━━━━━━                          │
+│ ┌──────────────────┐                                             │
+│ │    TF-00047      │                                             │
+│ │ Maria Santos     │                                             │
+│ └──────────────────┘                                             │
+│                                                                  │
+│ ━━━━━━━━━━━ CONCLUIDOS (Prontos para Entrega) ━━━━━━━━━━━        │
+│ ┌──────────────────┐ ┌──────────────────┐                       │
+│ │    TF-00043      │ │    TF-00044      │                       │
+│ │ Antonio Pereira  │ │ Carlos Mendes    │                       │
+│ └──────────────────┘ └──────────────────┘                       │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ 📋 Atividades Recentes                                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Ficheiros a Modificar
+## Ficheiros a Modificar
 
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `src/components/agenda/WeeklyAgenda.tsx` | Aplicar cores por tipo no ServiceCard |
-| `src/components/agenda/AgendaDrawer.tsx` | Aplicar cores por tipo no ServiceDrawerCard |
-| `src/components/layouts/AppLayout.tsx` | Adicionar branding TECNOFRIO no header |
-| `src/components/layouts/OwnerSidebar.tsx` | Remover "Administracao" do header |
-| `src/components/layouts/SecretarySidebar.tsx` | Remover "Secretaria" do header |
-| `src/components/layouts/TechnicianSidebar.tsx` | Remover "Tecnico" do header |
+| Ficheiro | Acao | Descricao |
+|----------|------|-----------|
+| Migracao SQL | Criar | Policy RLS publica para servicos da oficina |
+| Migracao SQL | Criar | Policy RLS publica para activity_logs (is_public = true) |
+| `src/pages/TVMonitorPage.tsx` | Modificar | Organizar cards por seccoes de status |
 
 ---
 
-## 5. Seccao Tecnica
+## Seccao Tecnica
 
-### 5.1 WeeklyAgenda.tsx - ServiceCard Atualizado
+### 1. Migracao SQL - Policies Publicas
 
-```typescript
-import { MapPin, Wrench, Settings, Truck } from 'lucide-react';
+```sql
+-- Permitir leitura publica de servicos na oficina
+CREATE POLICY "Public read for workshop services on TV monitor"
+  ON public.services FOR SELECT
+  TO anon, authenticated
+  USING (
+    service_location = 'oficina' 
+    AND status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
+  );
 
-const getServiceTypeConfig = (service: Service) => {
-  if (service.service_type === 'instalacao') {
-    return {
-      bg: 'bg-yellow-50',
-      borderColor: '#EAB308', // yellow-500
-      iconColor: 'text-yellow-600',
-      Icon: Settings
-    };
-  }
-  if (service.service_type === 'entrega') {
-    return {
-      bg: 'bg-green-50',
-      borderColor: '#22C55E', // green-500
-      iconColor: 'text-green-600',
-      Icon: Truck
-    };
-  }
-  // Reparacao
-  if (service.service_location === 'cliente') {
-    return {
-      bg: 'bg-blue-50',
-      borderColor: '#3B82F6', // blue-500
-      iconColor: 'text-blue-500',
-      Icon: MapPin
-    };
-  }
-  return {
-    bg: 'bg-orange-50',
-    borderColor: '#F97316', // orange-500
-    iconColor: 'text-orange-500',
-    Icon: Wrench
-  };
-};
+-- Permitir leitura publica de activity_logs publicos
+-- (ja existe policy similar, mas garantir para anon)
+CREATE POLICY "Public activity logs viewable by anyone"
+  ON public.activity_logs FOR SELECT
+  TO anon, authenticated
+  USING (is_public = true);
 ```
 
-### 5.2 AppLayout.tsx - Header com Branding
+### 2. TVMonitorPage.tsx - Estrutura por Seccoes
 
 ```typescript
-import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
+// Definir ordem e labels das seccoes
+const MONITOR_SECTIONS = [
+  { status: 'em_execucao', label: 'Em Execucao', icon: Play },
+  { status: 'na_oficina', label: 'Na Oficina (Disponiveis)', icon: Building2 },
+  { status: 'para_pedir_peca', label: 'Para Pedir Peca', icon: Package },
+  { status: 'em_espera_de_peca', label: 'Em Espera de Peca', icon: Clock },
+  { status: 'concluidos', label: 'Concluidos (Prontos)', icon: CheckCircle },
+];
 
-// No header:
-<header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-white px-4">
-  <SidebarTrigger className="-ml-1">
-    <Menu className="h-5 w-5" />
-  </SidebarTrigger>
+// Renderizar seccoes
+{MONITOR_SECTIONS.map(section => {
+  const sectionServices = groupedServices[section.status] || [];
+  if (sectionServices.length === 0) return null;
   
-  <div className="flex items-center gap-3">
-    <img 
-      src={tecnofrioLogoIcon} 
-      alt="TECNOFRIO" 
-      className="h-8 w-8 object-contain"
-    />
-    <div className="flex flex-col">
-      <span className="text-base font-bold leading-tight">
-        <span className="text-[#2B4F84]">TECNO</span>
-        <span className="text-slate-700">FRIO</span>
-      </span>
-      <span className="text-[10px] text-muted-foreground leading-tight">
-        Sistema de Gestao
-      </span>
+  return (
+    <div key={section.status} className="mb-8">
+      {/* Section Header */}
+      <div className="flex items-center gap-3 mb-4 border-b border-slate-700 pb-2">
+        <section.icon className="h-6 w-6 text-slate-400" />
+        <h2 className="text-xl font-bold text-slate-300">
+          {section.label}
+        </h2>
+        <Badge>{sectionServices.length}</Badge>
+      </div>
+      
+      {/* Section Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {sectionServices.map(service => (
+          <ServiceCard key={service.id} service={service} />
+        ))}
+      </div>
     </div>
-  </div>
-  
-  <div className="flex-1" />
-  
-  {/* Notification button */}
-</header>
+  );
+})}
 ```
 
-### 5.3 Sidebar Headers - Remover Cargo
+### 3. Manter Compatibilidade com Codigos Existentes
 
-**OwnerSidebar.tsx (linha 61):**
-```typescript
-// Remover esta linha:
-// <span className="text-xs text-sidebar-foreground/60">Administracao</span>
-```
-
-**SecretarySidebar.tsx (linha 58):**
-```typescript
-// Remover esta linha:
-// <span className="text-xs text-sidebar-foreground/60">Secretaria</span>
-```
-
-**TechnicianSidebar.tsx (linha 45):**
-```typescript
-// Remover esta linha:
-// <span className="text-xs text-sidebar-foreground/60">Tecnico</span>
-```
+Os servicos existentes com codigo "OS-" continuam visiveis. A query nao filtra por prefixo de codigo.
 
 ---
 
-## 6. Resultado Esperado
+## Consideracoes de Seguranca
 
-1. **Cards da Agenda:**
-   - Reparacao (visita) = Azul com icone MapPin
-   - Reparacao (oficina) = Laranja com icone Wrench
-   - Instalacao = Amarelo com icone Settings
-   - Entrega = Verde com icone Truck
+1. **Dados Expostos**: Apenas servicos fisicamente na oficina sao visiveis
+2. **Campos Sensiveis**: O monitor mostra apenas:
+   - Codigo do servico (TF-XXXXX)
+   - Nome do cliente
+   - Tipo de equipamento
+   - Status
+   - Tecnico atribuido
+3. **Sem Dados Financeiros**: Precos, pagamentos e debitos NAO sao expostos
+4. **Sem Dados Pessoais**: Telefones, emails e enderecos NAO sao expostos
 
-2. **Header Principal:**
-   - Card branco com logo do pinguim
-   - "TECNOFRIO" (TECNO azul, FRIO cinza)
-   - "Sistema de Gestao" em texto menor
+---
 
-3. **Sidebars:**
-   - Header mostra apenas logo + TECNOFRIO (sem cargo)
-   - Footer mantem nome + cargo junto do botao Sair
+## Resultado Esperado
+
+1. **TV Monitor Publico**:
+   - Acesso sem login em `/tv-monitor`
+   - Exibe todos os servicos na oficina
+   - Organizado por seccoes de status
+   - Cards grandes e legiveis
+
+2. **Seccoes Visiveis**:
+   - Em Execucao (servicos sendo trabalhados)
+   - Na Oficina (disponiveis ou com tecnico)
+   - Para Pedir Peca
+   - Em Espera de Peca
+   - Concluidos (prontos para entrega)
+
+3. **Feed de Atividades**:
+   - Mostra apenas logs com `is_public = true`
+   - Atualiza a cada 10 segundos
+
