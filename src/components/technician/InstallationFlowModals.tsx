@@ -166,17 +166,17 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   );
 
   const ModalHeader = ({ title, step }: { title: string; step: string }) => (
-    <DialogHeader className="p-0 mb-4">
-      <div className="bg-yellow-500 text-black px-4 py-3 rounded-lg -mx-6 -mt-6 mb-4">
-        <DialogTitle className="text-lg font-bold text-black">Instalação</DialogTitle>
-        <DialogDescription className="text-yellow-800 text-sm mt-0.5">
+    <DialogHeader className="p-0 mb-3">
+      <div className="bg-yellow-500 text-black px-4 py-2 rounded-lg -mx-6 -mt-6 mb-3">
+        <DialogTitle className="text-base font-bold text-black">Instalação</DialogTitle>
+        <DialogDescription className="text-yellow-800 text-xs mt-0.5">
           {service.code} - {service.customer?.name || 'Cliente'}
         </DialogDescription>
       </div>
       {showProgress && <ProgressBar />}
       <div className="flex items-center gap-2">
-        <Badge className="bg-yellow-100 text-yellow-700 text-xs">{step}</Badge>
-        <span className="font-semibold text-base">{title}</span>
+        <Badge className="bg-yellow-100 text-yellow-700 text-[10px]">{step}</Badge>
+        <span className="font-semibold text-sm">{title}</span>
       </div>
     </DialogHeader>
   );

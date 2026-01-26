@@ -167,17 +167,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
   );
 
   const ModalHeader = ({ title, step }: { title: string; step: string }) => (
-    <DialogHeader className="p-0 mb-4">
-      <div className="bg-orange-500 text-white px-4 py-3 rounded-lg -mx-6 -mt-6 mb-4">
-        <DialogTitle className="text-lg font-bold text-white">Oficina</DialogTitle>
-        <DialogDescription className="text-orange-100 text-sm mt-0.5">
+    <DialogHeader className="p-0 mb-3">
+      <div className="bg-orange-500 text-white px-4 py-2 rounded-lg -mx-6 -mt-6 mb-3">
+        <DialogTitle className="text-base font-bold text-white">Oficina</DialogTitle>
+        <DialogDescription className="text-orange-100 text-xs mt-0.5">
           {service.code} - {service.customer?.name || 'Cliente'}
         </DialogDescription>
       </div>
       {showProgress && <ProgressBar />}
       <div className="flex items-center gap-2">
-        <Badge className="bg-orange-100 text-orange-700 text-xs">{step}</Badge>
-        <span className="font-semibold text-base">{title}</span>
+        <Badge className="bg-orange-100 text-orange-700 text-[10px]">{step}</Badge>
+        <span className="font-semibold text-sm">{title}</span>
       </div>
     </DialogHeader>
   );

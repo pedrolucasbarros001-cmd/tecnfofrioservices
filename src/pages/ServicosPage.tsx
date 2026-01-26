@@ -153,7 +153,7 @@ export default function ServicosPage() {
   const getButtonConfig = (service: Service) => {
     if (service.service_type === 'entrega') {
       return { 
-        label: 'Começar Entrega', 
+        label: 'Começar', 
         color: 'bg-green-500 hover:bg-green-600 text-white',
         badgeColor: 'bg-green-100 text-green-700',
         badgeLabel: 'Entrega',
@@ -162,7 +162,7 @@ export default function ServicosPage() {
     }
     if (service.service_type === 'instalacao') {
       return { 
-        label: 'Começar Instalação', 
+        label: 'Começar', 
         color: 'bg-yellow-500 hover:bg-yellow-600 text-black',
         badgeColor: 'bg-yellow-100 text-yellow-700',
         badgeLabel: 'Instalação',
@@ -171,7 +171,7 @@ export default function ServicosPage() {
     }
     // Default: Visita (blue)
     return { 
-      label: 'Começar Visita', 
+      label: 'Começar', 
       color: 'bg-blue-500 hover:bg-blue-600 text-white',
       badgeColor: 'bg-blue-100 text-blue-700',
       badgeLabel: 'Visita',
@@ -241,10 +241,10 @@ export default function ServicosPage() {
             {/* Start Button */}
             <Button
               size="sm"
-              className={cn('w-full h-8 text-xs md:text-sm mt-2', buttonConfig.color)}
+              className={cn('w-full h-7 text-[11px] md:h-8 md:text-xs mt-1.5', buttonConfig.color)}
               onClick={(e) => handleStartFlow(service, e)}
             >
-              <Play className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+              <Play className="h-3 w-3 mr-1" />
               {buttonConfig.label}
             </Button>
           </div>

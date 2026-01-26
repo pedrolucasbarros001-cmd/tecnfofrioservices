@@ -143,17 +143,17 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   );
 
   const ModalHeader = ({ title, step }: { title: string; step: string }) => (
-    <DialogHeader className="p-0 mb-4">
-      <div className="bg-green-500 text-white px-4 py-3 rounded-lg -mx-6 -mt-6 mb-4">
-        <DialogTitle className="text-lg font-bold text-white">Entrega</DialogTitle>
-        <DialogDescription className="text-green-100 text-sm mt-0.5">
+    <DialogHeader className="p-0 mb-3">
+      <div className="bg-green-500 text-white px-4 py-2 rounded-lg -mx-6 -mt-6 mb-3">
+        <DialogTitle className="text-base font-bold text-white">Entrega</DialogTitle>
+        <DialogDescription className="text-green-100 text-xs mt-0.5">
           {service.code} - {service.customer?.name || 'Cliente'}
         </DialogDescription>
       </div>
       {showProgress && <ProgressBar />}
       <div className="flex items-center gap-2">
-        <Badge className="bg-green-100 text-green-700 text-xs">{step}</Badge>
-        <span className="font-semibold text-base">{title}</span>
+        <Badge className="bg-green-100 text-green-700 text-[10px]">{step}</Badge>
+        <span className="font-semibold text-sm">{title}</span>
       </div>
     </DialogHeader>
   );
