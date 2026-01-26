@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, Building2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, CalendarDays } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,26 +30,18 @@ const SHIFT_ICONS: Record<string, { icon: typeof Sun; color: string }> = {
 export default function ServicosPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [technicianId, setTechnicianId] = useState<string | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
   
   // Get Monday of current week
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
 
-  useEffect(() => {
-    if (profile) {
-      fetchTechnicianAndServices();
-    }
-  }, [profile]);
+  // Use React Query for proper caching and refetch
+  const { data: services = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ['technician-services', profile?.id],
+    queryFn: async () => {
+      if (!profile) return [];
 
-  async function fetchTechnicianAndServices() {
-    if (!profile) return;
-    
-    setLoading(true);
-    try {
       // Get the technician record for this profile
       const { data: technicianData, error: techError } = await supabase
         .from('technicians')
@@ -58,33 +51,29 @@ export default function ServicosPage() {
 
       if (techError) {
         console.error('Error fetching technician:', techError);
-        setLoading(false);
-        return;
+        return [];
       }
 
       if (!technicianData) {
-        setLoading(false);
-        return;
+        return [];
       }
 
-      setTechnicianId(technicianData.id);
-
-      // Fetch all services assigned to this technician (active ones)
+      // Fetch all services assigned to this technician (active ones, NOT in oficina for this view)
       const { data, error } = await supabase
         .from('services')
-        .select(`*, customer:customers(*)`)
+        .select('*, customer:customers(*)')
         .eq('technician_id', technicianData.id)
-        .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca'])
+        .neq('service_location', 'oficina') // Workshop services go to the Oficina page
+        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca'])
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
-      setServices((data as Service[]) || []);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      return (data as Service[]) || [];
+    },
+    enabled: !!profile,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
 
   const handleStartService = (service: Service) => {
     if (service.service_type === 'entrega') {
@@ -142,78 +131,80 @@ export default function ServicosPage() {
   }, []);
 
   const ServiceCard = ({ service }: { service: Service }) => {
-    const isWorkshop = service.service_location === 'oficina';
     const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
     const ShiftIcon = shiftInfo?.icon || Sun;
+    
+    // Determine card color based on service type
+    const isInstallation = service.service_type === 'instalacao';
+    const isDelivery = service.service_type === 'entrega';
+    
+    const cardColors = isInstallation 
+      ? 'bg-purple-50 border-l-purple-500' 
+      : isDelivery 
+        ? 'bg-teal-50 border-l-teal-500'
+        : 'bg-blue-50 border-l-blue-500';
+    
+    const badgeColors = isInstallation
+      ? 'bg-purple-100 text-purple-700'
+      : isDelivery
+        ? 'bg-teal-100 text-teal-700'
+        : 'bg-blue-100 text-blue-700';
+    
+    const badgeLabel = isInstallation ? 'Instalação' : isDelivery ? 'Entrega' : 'Visita';
     
     return (
       <Card
         className={cn(
           'cursor-pointer hover:shadow-md transition-all border-l-4',
-          isWorkshop 
-            ? 'bg-orange-50 border-l-orange-500' 
-            : 'bg-blue-50 border-l-blue-500'
+          cardColors
         )}
         onClick={() => handleStartService(service)}
       >
-        <CardContent className="p-3">
-          <div className="space-y-2">
+        <CardContent className="p-2 md:p-3">
+          <div className="space-y-1.5 md:space-y-2">
             {/* Code + Badge */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono font-bold text-sm text-foreground">
+            <div className="flex items-center justify-between gap-1">
+              <span className="font-mono font-bold text-xs md:text-sm text-foreground truncate">
                 {service.code}
               </span>
               <Badge 
                 variant="secondary" 
-                className={cn(
-                  'text-xs',
-                  isWorkshop ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                )}
+                className={cn('text-[10px] md:text-xs shrink-0', badgeColors)}
               >
-                {isWorkshop ? 'Oficina' : 'Visita'}
+                {badgeLabel}
               </Badge>
             </div>
 
             {/* Client Name */}
-            <p className="font-medium text-sm truncate">
-              {service.customer?.name || 'Cliente não definido'}
+            <p className="font-medium text-xs md:text-sm truncate">
+              {service.customer?.name || 'Cliente'}
             </p>
 
             {/* Appliance + Fault */}
-            <p className="text-xs text-muted-foreground line-clamp-2">
+            <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2">
               {service.appliance_type || 'Aparelho'} - {service.fault_description || 'Sem descrição'}
             </p>
 
-            {/* Shift indicator */}
-            <div className="flex items-center gap-1.5 pt-1">
-              <ShiftIcon className={cn('h-4 w-4', shiftInfo?.color || 'text-muted-foreground')} />
-              <span className="text-xs text-muted-foreground capitalize">
-                {service.scheduled_shift || 'Sem turno'}
-              </span>
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-1 pt-1">
-              {service.is_urgent && (
-                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                  Urgente
-                </Badge>
-              )}
-              {service.is_warranty && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-500 text-green-700">
-                  Garantia
-                </Badge>
-              )}
-              {service.service_type === 'instalacao' && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-500 text-purple-700">
-                  Instalação
-                </Badge>
-              )}
-              {service.service_type === 'entrega' && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-teal-500 text-teal-700">
-                  Entrega
-                </Badge>
-              )}
+            {/* Shift + Tags */}
+            <div className="flex items-center justify-between gap-1 pt-0.5">
+              <div className="flex items-center gap-1">
+                <ShiftIcon className={cn('h-3 w-3 md:h-4 md:w-4', shiftInfo?.color || 'text-muted-foreground')} />
+                <span className="text-[10px] md:text-xs text-muted-foreground capitalize">
+                  {service.scheduled_shift || '-'}
+                </span>
+              </div>
+              <div className="flex gap-0.5">
+                {service.is_urgent && (
+                  <Badge variant="destructive" className="text-[8px] md:text-[10px] px-1 py-0 h-4">
+                    Urg
+                  </Badge>
+                )}
+                {service.is_warranty && (
+                  <Badge variant="outline" className="text-[8px] md:text-[10px] px-1 py-0 h-4 border-green-500 text-green-700">
+                    Gar
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -222,50 +213,52 @@ export default function ServicosPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 h-full flex flex-col overflow-hidden">
+      {/* Header - Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Building2 className="h-6 w-6 text-orange-500" />
-          <h1 className="text-2xl font-bold tracking-tight">Serviços</h1>
+          <CalendarDays className="h-5 w-5 md:h-6 md:w-6 text-blue-500" />
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Agenda Semanal</h1>
         </div>
         
         {/* Week Navigation */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <Button 
             variant="ghost" 
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => navigateWeek(-1)}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           
           <Button
             variant={isCurrentWeek ? "default" : "outline"}
             size="sm"
             onClick={goToCurrentWeek}
-            className="min-w-[200px]"
+            className="min-w-[140px] md:min-w-[200px] text-xs md:text-sm h-8 md:h-9"
           >
-            {format(currentWeekStart, "dd/MM", { locale: pt })} - {format(addDays(currentWeekStart, 5), "dd/MM/yyyy", { locale: pt })}
+            {format(currentWeekStart, "dd/MM", { locale: pt })} - {format(addDays(currentWeekStart, 5), "dd/MM/yy", { locale: pt })}
           </Button>
           
           <Button 
             variant="ghost" 
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => navigateWeek(1)}
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
         </div>
       </div>
 
-      {/* Weekly Grid */}
+      {/* Weekly Grid - Responsive */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           A carregar serviços...
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-6 gap-4 min-h-0">
+        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 min-h-0 overflow-y-auto">
           {WEEK_DAYS.map((day, idx) => {
             const dayDate = addDays(currentWeekStart, day.offset);
             const dayServices = servicesByDay[idx];
@@ -275,18 +268,18 @@ export default function ServicosPage() {
               <div 
                 key={day.key} 
                 className={cn(
-                  'flex flex-col rounded-lg border bg-card overflow-hidden',
+                  'flex flex-col rounded-lg border bg-card overflow-hidden min-h-[200px] md:min-h-0',
                   isToday && 'ring-2 ring-primary'
                 )}
               >
                 {/* Day Header */}
                 <div className={cn(
-                  'p-3 text-center border-b',
+                  'p-2 md:p-3 text-center border-b shrink-0',
                   isToday ? 'bg-primary text-primary-foreground' : 'bg-muted/50'
                 )}>
-                  <p className="font-semibold">{day.label}</p>
+                  <p className="font-semibold text-sm md:text-base">{day.label}</p>
                   <p className={cn(
-                    'text-sm',
+                    'text-xs md:text-sm',
                     isToday ? 'text-primary-foreground/80' : 'text-muted-foreground'
                   )}>
                     {format(dayDate, "dd/MM", { locale: pt })}
@@ -294,7 +287,7 @@ export default function ServicosPage() {
                 </div>
                 
                 {/* Services List */}
-                <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+                <div className="flex-1 p-1.5 md:p-2 space-y-1.5 md:space-y-2 overflow-y-auto">
                   {dayServices.length === 0 ? (
                     <p className="text-center text-xs text-muted-foreground py-4">
                       Sem serviços

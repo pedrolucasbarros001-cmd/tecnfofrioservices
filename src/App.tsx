@@ -19,7 +19,7 @@ import ColaboradoresPage from "@/pages/ColaboradoresPage";
 import PerformancePage from "@/pages/PerformancePage";
 import SecretaryConcluidosPage from "@/pages/secretary/SecretaryConcluidosPage";
 import SecretaryDebitoPage from "@/pages/secretary/SecretaryDebitoPage";
-import TechnicianWorkshopFlow from "@/pages/technician/TechnicianWorkshopFlow";
+import TechnicianOfficePage from "@/pages/technician/TechnicianOfficePage";
 import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
 import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
 import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
@@ -105,12 +105,12 @@ const App = () => (
                   <ServicosPage />
                 </ProtectedRoute>
               } />
-              <Route path="/perfil" element={<PlaceholderPage />} />
-              <Route path="/technician/workshop/:serviceId" element={
+              <Route path="/oficina-tecnico" element={
                 <ProtectedRoute allowedRoles={['tecnico']}>
-                  <TechnicianWorkshopFlow />
+                  <TechnicianOfficePage />
                 </ProtectedRoute>
               } />
+              <Route path="/perfil" element={<PlaceholderPage />} />
               <Route path="/technician/visit/:serviceId" element={
                 <ProtectedRoute allowedRoles={['tecnico']}>
                   <TechnicianVisitFlow />
