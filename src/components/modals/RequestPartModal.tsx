@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { notifyPartRequested } from '@/utils/notificationUtils';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
 
@@ -39,6 +41,7 @@ export function RequestPartModal({
   const [clientApproved, setClientApproved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { profile } = useAuth();
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
 
@@ -74,6 +77,15 @@ export function RequestPartModal({
         id: service.id,
         status: 'para_pedir_peca',
       });
+
+      // Notify owners and secretaries about the part request
+      const technicianName = profile?.full_name || 'Técnico';
+      await notifyPartRequested(
+        service.id,
+        service.code || 'N/A',
+        technicianName,
+        partName.trim()
+      );
 
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
       toast.success('Peça solicitada com sucesso!');
