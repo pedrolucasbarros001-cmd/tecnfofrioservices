@@ -313,9 +313,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
             </div>
           ) : (
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-                <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
-                  <div className="space-y-6 py-4 pr-4">
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex-1 overflow-y-auto px-6">
+                  <div className="space-y-6 py-4 pr-2">
                     {/* Customer Section */}
                     <div className="space-y-4">
                       <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -789,7 +789,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
 
                 <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>
