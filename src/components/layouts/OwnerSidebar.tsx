@@ -58,7 +58,6 @@ export function OwnerSidebar() {
                 <span className="text-[#2B4F84]">TECNO</span>
                 <span className="text-slate-700">FRIO</span>
               </span>
-              <span className="text-xs text-sidebar-foreground/60">Administração</span>
             </div>}
         </div>
       </SidebarHeader>

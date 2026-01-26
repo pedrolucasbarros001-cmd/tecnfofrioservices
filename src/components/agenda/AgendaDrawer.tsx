@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Calendar, MapPin, Package } from 'lucide-react';
+import { Calendar, MapPin, Wrench, Settings, Truck } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -121,25 +121,61 @@ interface ServiceDrawerCardProps {
   onClick: () => void;
 }
 
+// Get service type configuration for colors and icons
+function getServiceTypeConfig(service: Service) {
+  if (service.service_type === 'instalacao') {
+    return {
+      bg: 'bg-yellow-50',
+      hoverBg: 'hover:bg-yellow-100',
+      borderColor: '#EAB308',
+      iconColor: 'text-yellow-600',
+      Icon: Settings
+    };
+  }
+  if (service.service_type === 'entrega') {
+    return {
+      bg: 'bg-green-50',
+      hoverBg: 'hover:bg-green-100',
+      borderColor: '#22C55E',
+      iconColor: 'text-green-600',
+      Icon: Truck
+    };
+  }
+  // Reparação
+  if (service.service_location === 'cliente') {
+    return {
+      bg: 'bg-blue-50',
+      hoverBg: 'hover:bg-blue-100',
+      borderColor: '#3B82F6',
+      iconColor: 'text-blue-500',
+      Icon: MapPin
+    };
+  }
+  return {
+    bg: 'bg-orange-50',
+    hoverBg: 'hover:bg-orange-100',
+    borderColor: '#F97316',
+    iconColor: 'text-orange-500',
+    Icon: Wrench
+  };
+}
+
 function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
-  const isVisit = service.service_location === 'cliente';
-  const techColor = service.technician?.color || '#3B82F6';
+  const config = getServiceTypeConfig(service);
+  const techColor = service.technician?.color;
 
   return (
     <div
       onClick={onClick}
       className={cn(
         "p-3 rounded-lg cursor-pointer transition-all hover:shadow-md border-l-4",
-        isVisit ? "bg-blue-50 hover:bg-blue-100" : "bg-purple-50 hover:bg-purple-100"
+        config.bg,
+        config.hoverBg
       )}
-      style={{ borderLeftColor: techColor }}
+      style={{ borderLeftColor: techColor || config.borderColor }}
     >
       <div className="flex items-center gap-2 mb-1">
-        {isVisit ? (
-          <MapPin className="h-4 w-4 text-blue-500" />
-        ) : (
-          <Package className="h-4 w-4 text-purple-500" />
-        )}
+        <config.Icon className={cn("h-4 w-4", config.iconColor)} />
         <span className="font-mono font-semibold text-sm">{service.code}</span>
         {service.is_urgent && (
           <Badge variant="destructive" className="text-xs animate-pulse">
@@ -155,7 +191,7 @@ function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
         <div className="flex items-center gap-2 mt-2">
           <div
             className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-medium"
-            style={{ backgroundColor: techColor }}
+            style={{ backgroundColor: techColor || config.borderColor }}
           >
             {service.technician.profile.full_name?.charAt(0) || 'T'}
           </div>
