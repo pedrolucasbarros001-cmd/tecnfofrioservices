@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Snowflake } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,11 +85,18 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-primary/5 p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg">
-            <Snowflake className="h-9 w-9 text-primary-foreground" />
+          <div className="mx-auto">
+            <img 
+              src={tecnofrioLogoIcon} 
+              alt="TECNOFRIO" 
+              className="h-20 w-20 object-contain mx-auto"
+            />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold tracking-tight">TECNOFRIO</CardTitle>
+            <CardTitle className="text-3xl font-bold tracking-tight">
+              <span className="text-[#2B4F84]">TECNO</span>
+              <span className="text-slate-700">FRIO</span>
+            </CardTitle>
             <CardDescription className="text-base mt-2">
               Sistema de Gestão de Serviços
             </CardDescription>
