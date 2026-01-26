@@ -1,332 +1,293 @@
 
-# Plano: Melhorias na Ficha de Servico, Impressao e Tipo na Tabela Geral
 
-## Resumo das Alteracoes Solicitadas
+# Plano: Ajustar Ficha de Impressao para A4 sem Fotos
 
-1. **ServiceDetailSheet (Ficha)**: Adicionar imagens do tecnico, assinaturas com descricao, e informacao financeira detalhada
-2. **ServicePrintModal (Impressao)**: Incluir imagens, assinaturas do cliente com descricao do motivo, e detalhes financeiros
-3. **GeralPage (Tabela Geral)**: Mostrar texto do tipo de servico em vez de apenas icones
+## Resumo das Alteracoes
 
----
-
-## 1. Alteracoes na Ficha do Servico (ServiceDetailSheet.tsx)
-
-### 1.1 Adicionar Seccao de Fotos do Servico
-
-**Nova query para buscar fotos:**
-```typescript
-const { data: servicePhotos = [] } = useQuery({
-  queryKey: ['service-photos', service?.id],
-  queryFn: async () => {
-    if (!service?.id) return [];
-    const { data, error } = await supabase
-      .from('service_photos')
-      .select('*')
-      .eq('service_id', service.id)
-      .order('uploaded_at', { ascending: false });
-    if (error) throw error;
-    return data as ServicePhoto[];
-  },
-  enabled: !!service?.id && open,
-});
-```
-
-**Nova seccao visual:**
-- Exibir galeria de fotos com tipo (visita, oficina, antes, depois)
-- Miniaturas clicaveis para ampliar
-- Mostrar data de upload e descricao
-
-### 1.2 Adicionar Seccao de Assinaturas
-
-**Nova query para buscar assinaturas:**
-```typescript
-const { data: serviceSignatures = [] } = useQuery({
-  queryKey: ['service-signatures', service?.id],
-  queryFn: async () => {
-    if (!service?.id) return [];
-    const { data, error } = await supabase
-      .from('service_signatures')
-      .select('*')
-      .eq('service_id', service.id)
-      .order('signed_at', { ascending: true });
-    if (error) throw error;
-    return data as ServiceSignature[];
-  },
-  enabled: !!service?.id && open,
-});
-```
-
-**Descricao por tipo de assinatura:**
-| signature_type | Descricao a mostrar |
-|----------------|---------------------|
-| `recolha` | "Autorizacao de levantamento do aparelho para reparacao em oficina" |
-| `entrega` | "Confirmacao da entrega do aparelho" |
-| `visita` | "Confirmacao da execucao do servico no local" |
-| `pedido_peca` | "Autorizacao para encomenda de peca" |
-
-**Nova seccao visual:**
-- Imagem da assinatura
-- Nome do signatario
-- Data
-- Descricao do motivo
-
-### 1.3 Melhorar Seccao Financeira
-
-A seccao actual ja mostra preco, pago, desconto e debito. Vamos melhorar para incluir:
-
-- **Preco Final**: Total a pagar
-- **Valor Pago**: Quanto ja foi pago
-- **Desconto**: Se aplicavel
-- **Em Debito**: Valor em divida
-- **Falta para Pagamento Completo**: Diferenca entre total e pago
-
-```typescript
-// Calculos
-const totalPaid = service.amount_paid || 0;
-const finalPrice = service.final_price || 0;
-const remainingBalance = Math.max(0, finalPrice - totalPaid);
-```
+1. Remover a seccao de fotos da ficha de impressao
+2. Manter assinaturas com descricoes
+3. Formatar o documento para caber numa folha A4
+4. A etiqueta (ServiceTagModal) permanece inalterada
 
 ---
 
-## 2. Alteracoes na Impressao (ServicePrintModal.tsx)
+## 1. Remover Seccao de Fotos
 
-### 2.1 Adicionar Seccao de Fotos
+**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
 
-**Nova seccao no documento impresso:**
+**Remover linhas 423-448:**
 ```tsx
-{/* Fotos do Serviço */}
+{/* Service Photos */}
 {photos.length > 0 && (
-  <section className="mb-6">
-    <h2 className="text-lg font-semibold mb-3 border-b pb-1">Evidências Fotográficas</h2>
-    <div className="grid grid-cols-3 gap-2">
-      {photos.map((photo) => (
-        <div key={photo.id} className="border rounded overflow-hidden">
-          <img 
-            src={photo.file_url} 
-            alt={photo.description || 'Foto do serviço'} 
-            className="w-full h-24 object-cover"
-          />
-          <p className="text-xs text-center p-1 bg-gray-50 capitalize">
-            {photo.photo_type}
-          </p>
-        </div>
-      ))}
-    </div>
-  </section>
+  <>
+    <Separator className="my-4" />
+    <section className="mb-6">
+      <h2 className="...">Evidências Fotográficas</h2>
+      ...
+    </section>
+  </>
 )}
 ```
 
-### 2.2 Adicionar Seccao de Assinaturas
+**Tambem remover:**
+- Import do icone `Camera` (linha 4)
+- Query `service-photos-print` (linhas 87-100)
+- Helper `getPhotoTypeLabel` (linhas 40-51) - ja nao e necessario
 
-**Nova seccao no documento impresso:**
+---
+
+## 2. Adicionar Estilos CSS para Impressao A4
+
+**Ficheiro:** `src/index.css`
+
+Adicionar media query `@media print` com estilos optimizados para A4:
+
+```css
+@media print {
+  /* Configurar pagina A4 */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  /* Esconder elementos que nao devem ser impressos */
+  body * {
+    visibility: hidden;
+  }
+
+  .print-content,
+  .print-content * {
+    visibility: visible;
+  }
+
+  .print-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Ajustar tamanhos de fonte para caber em A4 */
+  .print-content {
+    font-size: 11px !important;
+  }
+
+  .print-content h1 {
+    font-size: 16px !important;
+  }
+
+  .print-content h2 {
+    font-size: 13px !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .print-content section {
+    margin-bottom: 8px !important;
+  }
+
+  .print-content .separator {
+    margin: 6px 0 !important;
+  }
+
+  /* Compactar espacamentos */
+  .print-content .grid {
+    gap: 4px 16px !important;
+  }
+
+  /* Evitar quebras de pagina indesejaveis */
+  .print-content section {
+    break-inside: avoid;
+  }
+
+  /* Esconder botoes e header do modal */
+  [role="dialog"] > div:first-child,
+  .no-print {
+    display: none !important;
+  }
+}
+```
+
+---
+
+## 3. Ajustar Estrutura do Modal para Impressao
+
+**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
+
+### 3.1 Adicionar classe `print-content` ao container principal
+
+**Alterar linha 143:**
 ```tsx
-{/* Assinaturas */}
-{signatures.length > 0 && (
-  <section className="mb-6">
-    <h2 className="text-lg font-semibold mb-3 border-b pb-1">Assinaturas</h2>
-    <div className="space-y-4">
-      {signatures.map((sig) => (
-        <div key={sig.id} className="flex items-start gap-4 p-3 border rounded">
-          <img 
-            src={sig.file_url} 
-            alt="Assinatura" 
-            className="w-32 h-16 object-contain border"
-          />
-          <div className="flex-1">
-            <p className="font-medium">{sig.signer_name || 'Cliente'}</p>
-            <p className="text-sm text-muted-foreground">
-              {getSignatureDescription(sig.signature_type)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {format(new Date(sig.signed_at), "dd/MM/yyyy HH:mm")}
-            </p>
-          </div>
-        </div>
-      ))}
+// De:
+<div className="border rounded-lg p-6 bg-white print:border-0 print:p-0">
+
+// Para:
+<div className="print-content border rounded-lg p-6 bg-white print:border-0 print:p-0">
+```
+
+### 3.2 Reduzir tamanhos para caber em A4
+
+**Ajustar espacamentos e margens:**
+- Reduzir `mb-6` para `mb-4` nas seccoes
+- Reduzir `my-4` para `my-2` nos separadores
+- Usar fonte menor para texto (`text-xs` em vez de `text-sm`)
+
+### 3.3 Compactar seccao de assinaturas
+
+**Alterar layout das assinaturas (linhas 459-477):**
+```tsx
+<div className="grid grid-cols-2 gap-2">
+  {signatures.map((sig) => (
+    <div key={sig.id} className="flex items-center gap-2 p-2 border rounded bg-gray-50">
+      <img 
+        src={sig.file_url} 
+        alt="Assinatura" 
+        className="w-20 h-10 object-contain border bg-white rounded"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-xs truncate">{sig.signer_name || 'Cliente'}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {getSignatureDescription(sig.signature_type)}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {format(new Date(sig.signed_at), "dd/MM/yy HH:mm")}
+        </p>
+      </div>
     </div>
-  </section>
-)}
+  ))}
+</div>
 ```
 
-**Funcao helper para descricao:**
-```typescript
-const getSignatureDescription = (type: string): string => {
-  switch (type) {
-    case 'recolha':
-      return 'Autorizacao de levantamento do aparelho para reparacao em oficina';
-    case 'entrega':
-      return 'Confirmacao da entrega do aparelho';
-    case 'visita':
-      return 'Confirmacao da execucao do servico no local';
-    case 'pedido_peca':
-      return 'Autorizacao para encomenda de peca';
-    default:
-      return 'Assinatura do cliente';
-  }
-};
-```
+### 3.4 Compactar termos de guarda
 
-### 2.3 Melhorar Resumo Financeiro na Impressao
-
-A seccao actual ja existe (linhas 276-322), mas vamos garantir que mostra:
-- Mao de Obra
-- Pecas
-- Desconto (quando aplicavel)
-- **TOTAL**
-- Valor Pago (quando aplicavel)
-- **Em Debito** (quando aplicavel)
-- **Falta para pagamento completo** (quando aplicavel)
-
----
-
-## 3. Alteracoes na Tabela Geral (GeralPage.tsx)
-
-### 3.1 Mudar Tipo de Icone para Texto
-
-**Codigo Actual (linhas 238-259):**
-- Para `service_location === 'cliente'` mostra icone MapPin sem texto
-- Para outros casos mostra Badge com texto
-
-**Alteracao:**
-Remover icones e mostrar sempre texto:
-- "REPARACAO" para `service_type === 'reparacao'`
-- "INSTALACAO" para `service_type === 'instalacao'`
-- "ENTREGA" para `service_type === 'entrega'`
-
-**Novo codigo:**
+**Reduzir padding e texto:**
 ```tsx
-const getTypeConfig = () => {
-  if (service.service_type === 'instalacao') {
-    return { label: 'INSTALACAO', colorClass: 'bg-yellow-500 text-black' };
-  }
-  if (service.service_type === 'entrega') {
-    return { label: 'ENTREGA', colorClass: 'bg-green-500 text-white' };
-  }
-  // Reparacao - distinguir visita vs oficina
-  if (service.service_location === 'cliente') {
-    return { label: 'REPARACAO', colorClass: 'bg-blue-500 text-white' };
-  }
-  return { label: 'REPARACAO', colorClass: 'bg-orange-500 text-white' };
-};
-
-// Na celula:
-<TableCell>
-  <Badge className={`text-xs ${typeConfig.colorClass}`}>
-    {typeConfig.label}
-  </Badge>
-</TableCell>
+<section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+  ...
+</section>
 ```
 
 ---
 
-## 4. Ficheiros a Modificar
+## 4. Estrutura Final da Ficha A4
 
-| Ficheiro | Alteracoes |
-|----------|------------|
-| `src/components/services/ServiceDetailSheet.tsx` | Adicionar queries para fotos e assinaturas; Nova seccao de fotos; Nova seccao de assinaturas com descricao |
-| `src/components/modals/ServicePrintModal.tsx` | Adicionar queries para fotos e assinaturas; Seccoes de fotos e assinaturas no documento impresso |
-| `src/pages/GeralPage.tsx` | Simplificar coluna Tipo para mostrar texto em vez de icones |
-
----
-
-## 5. Estrutura das Novas Seccoes
-
-### 5.1 ServiceDetailSheet - Nova Seccao de Fotos
+A ficha impressa tera as seguintes seccoes (todas compactadas):
 
 ```text
-┌──────────────────────────────────────┐
-│ 📷 Fotos do Serviço                  │
-├──────────────────────────────────────┤
-│ ┌─────┐ ┌─────┐ ┌─────┐             │
-│ │ 📷  │ │ 📷  │ │ 📷  │             │
-│ │ANTES│ │DEPOIS│ │VISITA│            │
-│ └─────┘ └─────┘ └─────┘             │
-│                                      │
-│ Clique para ampliar                  │
-└──────────────────────────────────────┘
-```
-
-### 5.2 ServiceDetailSheet - Nova Seccao de Assinaturas
-
-```text
-┌──────────────────────────────────────┐
-│ ✍️ Assinaturas do Cliente            │
-├──────────────────────────────────────┤
-│ ┌──────────────────────────────────┐ │
-│ │ [Imagem Assinatura]   Cliente    │ │
-│ │ ──────────────────              │ │
-│ │ "Confirmacao da execucao do     │ │
-│ │  servico no local"              │ │
-│ │ 26/01/2026 15:30                │ │
-│ └──────────────────────────────────┘ │
-│                                      │
-│ ┌──────────────────────────────────┐ │
-│ │ [Imagem Assinatura]   Cliente    │ │
-│ │ ──────────────────              │ │
-│ │ "Autorizacao para encomenda     │ │
-│ │  de peca"                       │ │
-│ │ 26/01/2026 16:45                │ │
-│ └──────────────────────────────────┘ │
-└──────────────────────────────────────┘
-```
-
-### 5.3 ServiceDetailSheet - Seccao Financeira Melhorada
-
-```text
-┌──────────────────────────────────────┐
-│ 💰 Informacao Financeira             │
-├──────────────────────────────────────┤
-│ Mao de Obra:          50.00 €       │
-│ Pecas:                30.00 €       │
-│ Desconto:             -5.00 €       │
-│ ─────────────────────────────       │
-│ TOTAL:                75.00 €       │
-│                                      │
-│ Ja Pago:              25.00 €       │
-│ Em Debito:            50.00 €       │
-│ Falta para Pagamento: 50.00 €       │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│ TECNOFRIO              Ficha de Servico            │
+│ Codigo: SV-2026-0001   QR [■■]                     │
+├─────────────────────────────────────────────────────┤
+│ DADOS DO CLIENTE                                    │
+│ Nome: ...  NIF: ...  Telefone: ...  Email: ...     │
+│ Morada: ...                                         │
+├─────────────────────────────────────────────────────┤
+│ DETALHES DO SERVICO                                 │
+│ Categoria: ...  Tipo: ...  Estado: ...  Prioridade │
+├─────────────────────────────────────────────────────┤
+│ DETALHES DO EQUIPAMENTO                             │
+│ Tipo: ...  Marca: ...  Modelo: ...  Serie: ...     │
+│ Avaria: ...                                         │
+├─────────────────────────────────────────────────────┤
+│ GARANTIA (se aplicavel)                             │
+├─────────────────────────────────────────────────────┤
+│ TRABALHO REALIZADO (se aplicavel)                   │
+├─────────────────────────────────────────────────────┤
+│ PECAS UTILIZADAS (tabela compacta)                  │
+├─────────────────────────────────────────────────────┤
+│ RESUMO FINANCEIRO                                   │
+│ Mao de Obra / Pecas / Desconto / TOTAL             │
+│ Valor Pago / Em Debito / Falta Pagar               │
+├─────────────────────────────────────────────────────┤
+│ HISTORICO DE PAGAMENTOS (tabela compacta)           │
+├─────────────────────────────────────────────────────┤
+│ ASSINATURAS (grid 2 colunas, compacto)              │
+│ ┌──────────────────┐ ┌──────────────────┐          │
+│ │ [Assin] Nome     │ │ [Assin] Nome     │          │
+│ │ Descricao breve  │ │ Descricao breve  │          │
+│ └──────────────────┘ └──────────────────┘          │
+├─────────────────────────────────────────────────────┤
+│ ⚠ IMPORTANTE - Termos de Guarda (30 dias)    [QR] │
+├─────────────────────────────────────────────────────┤
+│ _____________          _____________               │
+│ Assin. Cliente         Assin. Funcionario          │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 6. Mapeamento de Tipos de Assinatura
+## 5. Ficheiros a Modificar
 
-| Codigo | Descricao para o Cliente |
-|--------|--------------------------|
-| `recolha` | "Autorizacao de levantamento do aparelho para reparacao em oficina" |
-| `entrega` | "Confirmacao da entrega do aparelho" |
-| `visita` | "Confirmacao da execucao do servico no local" |
-| `pedido_peca` | "Autorizacao para encomenda de peca" |
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `src/components/modals/ServicePrintModal.tsx` | Remover seccao de fotos; Adicionar classe `print-content`; Compactar espacamentos |
+| `src/index.css` | Adicionar media query `@media print` com estilos A4 |
 
 ---
 
-## 7. Mapeamento de Tipos de Foto
+## 6. Seccao Tecnica
 
-| Codigo | Label a Mostrar |
-|--------|-----------------|
-| `visita` | "Visita" |
-| `oficina` | "Oficina" |
-| `entrega` | "Entrega" |
-| `instalacao` | "Instalacao" |
-| `antes` | "Antes" |
-| `depois` | "Depois" |
+### 6.1 Media Query para A4
+
+```css
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  /* Esconder tudo exceto conteudo de impressao */
+  body > *:not(.print-area) {
+    display: none !important;
+  }
+
+  /* Estilos compactos para A4 */
+  .print-content {
+    width: 190mm;
+    max-height: 277mm;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .print-content h2 {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .print-content section {
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+  }
+
+  .print-content table {
+    font-size: 9px;
+  }
+
+  .print-content table th,
+  .print-content table td {
+    padding: 2px 4px;
+  }
+}
+```
+
+### 6.2 Calculos de Espaco A4
+
+- Dimensoes A4: 210mm x 297mm
+- Margens: 10mm (deixa 190mm x 277mm utilizaveis)
+- Cabecalho + QR: ~25mm
+- Cada seccao: ~20-25mm
+- Assinaturas: ~30mm
+- Termos: ~25mm
+
+**Total estimado: ~200-250mm** - cabe numa folha A4
 
 ---
 
-## 8. Resultado Esperado
+## 7. Resultado Esperado
 
-1. **Ficha do Servico** mostra:
-   - Galeria de fotos tiradas pelo tecnico
-   - Assinaturas do cliente com descricao clara do motivo
-   - Informacao financeira completa (preco, pago, desconto, debito, falta pagar)
+1. Ficha de impressao SEM fotos (apenas assinaturas)
+2. Documento formatado para A4 que imprime correctamente numa unica pagina
+3. Assinaturas mantidas com descricao do proposito
+4. Etiqueta (ServiceTagModal) inalterada
+5. Espacamentos e fontes optimizados para impressao
 
-2. **Impressao da Ficha** inclui:
-   - Todas as fotos do servico
-   - Assinaturas com descricao do proposito
-   - Resumo financeiro detalhado
-
-3. **Tabela Geral** mostra:
-   - Tipo como texto (REPARACAO, INSTALACAO, ENTREGA) em vez de icones
-   - Badges coloridos para diferenciar visualmente
