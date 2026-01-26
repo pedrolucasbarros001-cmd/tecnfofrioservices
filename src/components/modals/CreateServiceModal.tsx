@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, MapPin, Package, UserPlus } from 'lucide-react';
+import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +49,6 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
@@ -72,7 +71,7 @@ const formSchema = z.object({
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
-  fault_description: z.string().min(1, 'Descrição da avaria é obrigatória'),
+  fault_description: z.string().min(1, 'Avaria é obrigatória'),
   
   // Options
   is_warranty: z.boolean().default(false),
@@ -273,7 +272,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">
-              {step === 'location' ? 'Tipo de Serviço' : 'Nova Reparação'}
+              {step === 'location' ? 'Tipo de Serviço' : 'Criar Novo Serviço'}
             </DialogTitle>
           </DialogHeader>
 
@@ -313,266 +312,97 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
             </div>
           ) : (
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto px-6">
-                  <div className="space-y-6 py-4 pr-2">
-                    {/* Customer Section */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
-                        Dados do Cliente
-                      </h3>
-                      
-                      {selectedCustomer ? (
-                        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Check className="h-5 w-5 text-green-600" />
-                            <span className="font-medium text-green-800">
-                              Cliente selecionado: {selectedCustomer.name}
-                            </span>
-                          </div>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedCustomer(null);
-                              form.reset({
-                                ...form.getValues(),
-                                customer_name: '',
-                                customer_nif: '',
-                                customer_phone: '',
-                                customer_email: '',
-                                customer_address: '',
-                                customer_postal_code: '',
-                                customer_city: '',
-                              });
-                            }}
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+                <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
+                  <div className="space-y-4 py-4 pr-4">
+                    {/* Customer Selected Box */}
+                    {selectedCustomer && (
+                      <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-800">
+                            Cliente selecionado: {selectedCustomer.name}
+                          </span>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCustomer(null);
+                            form.reset({
+                              ...form.getValues(),
+                              customer_name: '',
+                              customer_nif: '',
+                              customer_phone: '',
+                              customer_email: '',
+                              customer_address: '',
+                              customer_postal_code: '',
+                              customer_city: '',
+                            });
+                          }}
+                        >
+                          Alterar
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Found Customer Box */}
+                    {!selectedCustomer && showFoundCustomerBox && foundCustomer && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                        <p className="font-medium text-blue-900">
+                          Cliente existente encontrado!
+                        </p>
+                        <p className="text-sm text-blue-800">
+                          Encontrámos um perfil de cliente com estes dados:
+                        </p>
+                        <div className="text-sm text-blue-700 bg-white/50 p-3 rounded">
+                          <p><strong>Nome:</strong> {foundCustomer.name}</p>
+                          <p><strong>Telefone:</strong> {foundCustomer.phone}</p>
+                          {foundCustomer.nif && <p><strong>NIF:</strong> {foundCustomer.nif}</p>}
+                          {foundCustomer.address && <p><strong>Morada:</strong> {foundCustomer.address}</p>}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={handleSelectFoundCustomer}
                           >
-                            Alterar
+                            Associar e Preencher Dados
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleIgnoreFoundCustomer}
+                          >
+                            Criar Novo Cliente
                           </Button>
                         </div>
-                      ) : (
-                        <>
-                          {/* Found Customer Box */}
-                          {showFoundCustomerBox && foundCustomer && (
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                              <p className="font-medium text-blue-900">
-                                Cliente existente encontrado!
-                              </p>
-                              <p className="text-sm text-blue-800">
-                                Encontrámos um perfil de cliente com estes dados:
-                              </p>
-                              <div className="text-sm text-blue-700 bg-white/50 p-3 rounded">
-                                <p><strong>Nome:</strong> {foundCustomer.name}</p>
-                                <p><strong>Telefone:</strong> {foundCustomer.phone}</p>
-                                {foundCustomer.nif && <p><strong>NIF:</strong> {foundCustomer.nif}</p>}
-                                {foundCustomer.address && <p><strong>Morada:</strong> {foundCustomer.address}</p>}
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  onClick={handleSelectFoundCustomer}
-                                >
-                                  Associar e Preencher Dados
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleIgnoreFoundCustomer}
-                                >
-                                  Criar Novo Cliente
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="customer_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Nome do cliente" {...field} disabled={!!selectedCustomer} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="customer_nif"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Contribuinte</FormLabel>
-                              <FormControl>
-                                <Input placeholder="NIF" {...field} disabled={!!selectedCustomer} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
+                    )}
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="customer_phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Telefone *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Telefone" {...field} disabled={!!selectedCustomer} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="customer_email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Email" type="email" {...field} disabled={!!selectedCustomer} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {serviceLocation === 'cliente' && (
-                        <>
-                          <FormField
-                            control={form.control}
-                            name="customer_address"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Morada</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Morada completa" {...field} disabled={!!selectedCustomer} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="customer_postal_code"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Código Postal</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="0000-000" {...field} disabled={!!selectedCustomer} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="customer_city"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Cidade</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Cidade" {...field} disabled={!!selectedCustomer} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <Separator />
-
-                    {/* Equipment Section */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
-                        Dados do Equipamento
-                      </h3>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="appliance_type"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tipo de Aparelho *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Ex: Frigorífico" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="brand"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Marca</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Ex: Samsung" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="model"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Modelo</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Modelo" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="serial_number"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Número de Série</FormLabel>
-                              <FormControl>
-                                <Input placeholder="S/N" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
+                    {/* Row 1: Nome + Contribuinte */}
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="fault_description"
+                        name="customer_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Descrição da Avaria *</FormLabel>
+                            <FormLabel>Nome *</FormLabel>
                             <FormControl>
-                              <Textarea 
-                                placeholder="Descreva o problema reportado pelo cliente..." 
-                                className="min-h-[80px]"
-                                {...field} 
-                              />
+                              <Input placeholder="Nome do cliente" {...field} disabled={!!selectedCustomer} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="customer_nif"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contribuinte</FormLabel>
+                            <FormControl>
+                              <Input placeholder="NIF" {...field} disabled={!!selectedCustomer} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -580,216 +410,283 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
 
-                    <Separator />
+                    {/* Row 2: Telefone + Email */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="customer_phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Telefone" {...field} disabled={!!selectedCustomer} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="customer_email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Email" type="email" {...field} disabled={!!selectedCustomer} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                    {/* Options Section */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">3</span>
-                        Opções
-                      </h3>
-
-                      <div className="flex flex-wrap gap-6">
+                    {/* Row 3: Morada + Código Postal (only for visit) */}
+                    {serviceLocation === 'cliente' && (
+                      <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
-                          name="is_warranty"
+                          name="customer_address"
                           render={({ field }) => (
-                            <FormItem className="flex items-center gap-2">
+                            <FormItem>
+                              <FormLabel>Morada</FormLabel>
                               <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
+                                <Input placeholder="Morada completa" {...field} disabled={!!selectedCustomer} />
                               </FormControl>
-                              <Label>Garantia</Label>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
                         <FormField
                           control={form.control}
-                          name="is_urgent"
+                          name="customer_postal_code"
                           render={({ field }) => (
-                            <FormItem className="flex items-center gap-2">
+                            <FormItem>
+                              <FormLabel>Código Postal</FormLabel>
                               <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
+                                <Input placeholder="0000-000" {...field} disabled={!!selectedCustomer} />
                               </FormControl>
-                              <Label>Urgente</Label>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
+                    )}
 
-                      {isWarranty && (
-                        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                          <FormField
-                            control={form.control}
-                            name="warranty_brand"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Marca da Garantia</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Marca" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="warranty_process_number"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Nº do Processo</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Número" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      )}
+                    {/* Row 4: Tipo de Aparelho + Marca */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="appliance_type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Aparelho *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Frigorífico" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="brand"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Marca</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Samsung" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
-                    <Separator />
+                    {/* Row 5: Avaria (full width) */}
+                    <FormField
+                      control={form.control}
+                      name="fault_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Avaria *</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Descreva o problema reportado pelo cliente..." 
+                              className="min-h-[80px]"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                    {/* Schedule Section */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">4</span>
-                        Agendamento
-                      </h3>
+                    {/* Row 6: Checkboxes - Garantia? + Urgente? */}
+                    <div className="flex flex-wrap gap-6">
+                      <FormField
+                        control={form.control}
+                        name="is_warranty"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <Label className="cursor-pointer">Garantia?</Label>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="is_urgent"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <Label className="cursor-pointer">Urgente?</Label>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Warranty Fields (conditional) */}
+                    {isWarranty && (
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                        <FormField
+                          control={form.control}
+                          name="warranty_brand"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Marca da Garantia</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Marca" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="warranty_process_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nº do Processo</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Número" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
+
+                    {/* Row 7: Técnico Responsável */}
+                    <FormField
+                      control={form.control}
+                      name="technician_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Técnico Responsável</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar técnico" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {technicians.map((tech) => (
+                                <SelectItem key={tech.id} value={tech.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-3 h-3 rounded-full"
+                                      style={{ backgroundColor: tech.color || '#3B82F6' }}
+                                    />
+                                    {tech.profile?.full_name || 'Técnico'}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Row 8: Data + Turno */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="scheduled_date"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Data</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "d 'de' MMMM", { locale: pt })
+                                    ) : (
+                                      <span>Selecionar</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <FormField
                         control={form.control}
-                        name="technician_id"
+                        name="scheduled_shift"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Técnico</FormLabel>
+                            <FormLabel>Turno</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Selecionar técnico" />
+                                  <SelectValue placeholder="Selecionar" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {technicians.map((tech) => (
-                                  <SelectItem key={tech.id} value={tech.id}>
-                                    <div className="flex items-center gap-2">
-                                      <div 
-                                        className="w-3 h-3 rounded-full"
-                                        style={{ backgroundColor: tech.color || '#3B82F6' }}
-                                      />
-                                      {tech.profile?.full_name || 'Técnico'}
-                                    </div>
-                                  </SelectItem>
-                                ))}
+                                <SelectItem value="manha">Manhã</SelectItem>
+                                <SelectItem value="tarde">Tarde</SelectItem>
+                                <SelectItem value="noite">Noite</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="scheduled_date"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel>Data</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      className={cn(
-                                        "w-full pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                    >
-                                      {field.value ? (
-                                        format(field.value, "d 'de' MMMM", { locale: pt })
-                                      ) : (
-                                        <span>Selecionar</span>
-                                      )}
-                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                                    initialFocus
-                                    className="pointer-events-auto"
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="scheduled_shift"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Turno</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecionar" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="manha">Manhã</SelectItem>
-                                  <SelectItem value="tarde">Tarde</SelectItem>
-                                  <SelectItem value="noite">Noite</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Notes Section */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">5</span>
-                        Notas
-                      </h3>
-
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Observações</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Notas internas sobre o serviço..." 
-                                className="min-h-[60px]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
                   </div>
-                </div>
+                </ScrollArea>
 
                 <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>
@@ -798,8 +695,14 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                   <Button 
                     type="submit" 
                     disabled={createService.isPending || createCustomer.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    {createService.isPending ? 'A criar...' : 'Criar Serviço'}
+                    {createService.isPending ? 'A criar...' : (
+                      <>
+                        Criar Serviço
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </>
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
