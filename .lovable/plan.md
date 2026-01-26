@@ -1,197 +1,260 @@
 
 
-# Plano: Corrigir TV Monitor - Exibir Servicos da Oficina
+# Plano: Ajustar Modais de Definir Preco e Registar Pagamento
 
-## Problema Identificado
+## Resumo das Alteracoes
 
-O TV Monitor (`/tv-monitor`) e uma rota **publica** (sem autenticacao), mas a tabela `services` tem politicas RLS que exigem autenticacao:
+Ajustar ambos os modais para corresponder ao design exato das imagens de referencia, incluindo:
 
-```sql
--- Politica atual:
-"Dono and secretaria see all services, tecnico sees assigned"
-USING (is_dono(auth.uid()) OR is_secretaria(auth.uid()) OR ...)
-```
-
-Quando um utilizador acede ao monitor sem estar autenticado, `auth.uid()` retorna `NULL`, e a query nao devolve resultados.
+1. **SetPriceModal**: Titulo com codigo do servico, campos alinhados, box de resumo com subtotal/total
+2. **RegisterPaymentModal**: Titulo com codigo do servico, box de resumo financeiro, campos reorganizados
 
 ---
 
-## Solucao: Policy RLS Publica para Servicos na Oficina
+## 1. SetPriceModal - "Definir Preco - TF-XXXXX"
 
-Adicionar uma nova policy RLS que permita leitura publica APENAS de servicos que estao na oficina:
+### 1.1 Alteracoes no Design
 
-```sql
-CREATE POLICY "Public read for workshop services on TV monitor"
-  ON public.services FOR SELECT
-  TO anon, authenticated
-  USING (
-    service_location = 'oficina' 
-    AND status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
-  );
-```
+| Elemento Atual | Novo Design (conforme imagem) |
+|----------------|-------------------------------|
+| Titulo: "Precificar Servico" com icone | "Definir Preco - TF-XXXXX" (sem icone) |
+| Box de info do servico | Removido (codigo ja esta no titulo) |
+| Labels com "(€)" | Labels com "(€) *" para campos obrigatorios |
+| Resumo simples | Box azul claro com Subtotal + Total separados |
+| Botao verde "Guardar Preco" | Botao violeta "Confirmar Preco" |
 
-Esta policy e segura porque:
-- So permite leitura (SELECT), nao escrita
-- So expoe servicos na oficina (nao servicos no cliente)
-- So expoe servicos em estados operacionais (nao finalizados)
-
----
-
-## Alteracoes no TVMonitorPage.tsx
-
-### 1. Manter Query Existente (ja correta)
-
-A query ja filtra corretamente por `service_location = 'oficina'` e pelos status relevantes.
-
-### 2. Organizar por Seccoes (Status)
-
-Em vez de mostrar todos os cards misturados, organizar por seccoes:
+### 1.2 Layout do Modal
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ TECNOFRIO        Monitor da Oficina              15:32:45      │
-├─────────────────────────────────────────────────────────────────┤
-│ [Em Exec: 2] [Na Oficina: 3] [Pedir Peca: 1] [Espera: 2] [Conc: 4]│
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│ ━━━━━━━━━━━ EM EXECUCAO ━━━━━━━━━━━                              │
-│ ┌──────────────────┐ ┌──────────────────┐                       │
-│ │    TF-00045      │ │    TF-00048      │                       │
-│ │ Joao Silva       │ │ Ana Costa        │                       │
-│ └──────────────────┘ └──────────────────┘                       │
-│                                                                  │
-│ ━━━━━━━━━━━ NA OFICINA (Disponiveis) ━━━━━━━━━━━                 │
-│ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐  │
-│ │    TF-00046      │ │    TF-00049      │ │    TF-00050      │  │
-│ │ ⚡ DISPONIVEL    │ │ ⚡ DISPONIVEL    │ │ Pedro Costa      │  │
-│ └──────────────────┘ └──────────────────┘ └──────────────────┘  │
-│                                                                  │
-│ ━━━━━━━━━━━ PARA PEDIR PECA ━━━━━━━━━━━                          │
-│ ┌──────────────────┐                                             │
-│ │    TF-00047      │                                             │
-│ │ Maria Santos     │                                             │
-│ └──────────────────┘                                             │
-│                                                                  │
-│ ━━━━━━━━━━━ CONCLUIDOS (Prontos para Entrega) ━━━━━━━━━━━        │
-│ ┌──────────────────┐ ┌──────────────────┐                       │
-│ │    TF-00043      │ │    TF-00044      │                       │
-│ │ Antonio Pereira  │ │ Carlos Mendes    │                       │
-│ └──────────────────┘ └──────────────────┘                       │
-│                                                                  │
-├─────────────────────────────────────────────────────────────────┤
-│ 📋 Atividades Recentes                                          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ Definir Preco - TF-000001              [X]  │
+├─────────────────────────────────────────────┤
+│                                             │
+│ Mao de Obra (€) *                           │
+│ ┌─────────────────────────────────────┐     │
+│ │                                   ↕ │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Pecas (€) *                                 │
+│ ┌─────────────────────────────────────┐     │
+│ │                                   ↕ │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Desconto (€)                                │
+│ ┌─────────────────────────────────────┐     │
+│ │ 0                                 ↕ │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ ┌───────────────────────────────────────┐   │
+│ │ Subtotal:                     €0.00   │   │
+│ │ ─────────────────────────────────────│   │
+│ │ Total:                        €0.00   │   │
+│ └───────────────────────────────────────┘   │
+│                                             │
+│        [Cancelar]  [Confirmar Preco]        │
+└─────────────────────────────────────────────┘
 ```
+
+### 1.3 Estilos Especificos
+
+- Box de resumo: `bg-violet-50 border border-violet-100 rounded-lg`
+- Total: texto violeta bold (`text-violet-600 font-bold`)
+- Botao principal: violeta (`bg-violet-600 hover:bg-violet-700`)
 
 ---
 
-## Ficheiros a Modificar
+## 2. RegisterPaymentModal - "Registar Pagamento - TF-XXXXX"
 
-| Ficheiro | Acao | Descricao |
-|----------|------|-----------|
-| Migracao SQL | Criar | Policy RLS publica para servicos da oficina |
-| Migracao SQL | Criar | Policy RLS publica para activity_logs (is_public = true) |
-| `src/pages/TVMonitorPage.tsx` | Modificar | Organizar cards por seccoes de status |
+### 2.1 Alteracoes no Design
+
+| Elemento Atual | Novo Design (conforme imagem) |
+|----------------|-------------------------------|
+| Titulo com icone CreditCard | "Registar Pagamento - TF-XXXXX" (sem icone) |
+| Box info servico + grid 3 colunas | Box unico com layout vertical (Valor Total, Ja Pago, Em Falta) |
+| Label "Valor do Pagamento (€)" | "Valor a Pagar (€) *" com placeholder "Max: €XXX.XX" |
+| Label "Descricao (opcional)" | "Descricao (Opcional)" |
+| Ordem: Valor, Metodo, Data, Descricao | Ordem: Metodo, Valor, Descricao, Data |
+| Botao laranja | Botao verde "Confirmar Pagamento" |
+
+### 2.2 Layout do Modal
+
+```text
+┌─────────────────────────────────────────────┐
+│ Registar Pagamento - TF-000001         [X]  │
+├─────────────────────────────────────────────┤
+│                                             │
+│ ┌───────────────────────────────────────┐   │
+│ │ Valor Total:                  €150.00 │   │
+│ │ Ja Pago:                       €0.00  │   │ (verde)
+│ │ Em Falta:                    €150.00  │   │ (vermelho bold)
+│ └───────────────────────────────────────┘   │
+│                                             │
+│ Metodo de Pagamento *                       │
+│ ┌─────────────────────────────────────┐     │
+│ │ Dinheiro                          ▼ │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Valor a Pagar (€) *                         │
+│ ┌─────────────────────────────────────┐     │
+│ │ Max: €150.00                      ↕ │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Descricao (Opcional)                        │
+│ ┌─────────────────────────────────────┐     │
+│ │ Ex: Pagamento parcial               │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Data do Pagamento *                         │
+│ ┌─────────────────────────────────────┐     │
+│ │ 25/01/2026                          │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│      [Cancelar]  [Confirmar Pagamento]      │
+└─────────────────────────────────────────────┘
+```
+
+### 2.3 Estilos Especificos
+
+- Box resumo: `bg-green-50 border border-green-100 rounded-lg`
+- "Ja Pago": texto verde (`text-green-600`)
+- "Em Falta": texto vermelho bold (`text-red-600 font-bold`)
+- Botao principal: verde (`bg-green-600 hover:bg-green-700`)
 
 ---
 
-## Seccao Tecnica
+## 3. Funcionalidade de Calculos Multiplos
 
-### 1. Migracao SQL - Policies Publicas
+O sistema de pagamentos ja suporta multiplos registos (tabela `service_payments`). As alteracoes visuais vao:
 
-```sql
--- Permitir leitura publica de servicos na oficina
-CREATE POLICY "Public read for workshop services on TV monitor"
-  ON public.services FOR SELECT
-  TO anon, authenticated
-  USING (
-    service_location = 'oficina' 
-    AND status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
-  );
+1. Mostrar `Ja Pago` = soma de todos os pagamentos anteriores (`service.amount_paid`)
+2. Mostrar `Em Falta` = `final_price - amount_paid`
+3. Placeholder do campo valor: "Max: €XXX.XX" mostrando o saldo restante
+4. Apos cada pagamento:
+   - Atualiza `amount_paid` no servico
+   - Se `amount_paid >= final_price` → status muda para `concluidos`
+   - Senao → mantem `em_debito`
 
--- Permitir leitura publica de activity_logs publicos
--- (ja existe policy similar, mas garantir para anon)
-CREATE POLICY "Public activity logs viewable by anyone"
-  ON public.activity_logs FOR SELECT
-  TO anon, authenticated
-  USING (is_public = true);
-```
+---
 
-### 2. TVMonitorPage.tsx - Estrutura por Seccoes
+## 4. Ficheiros a Modificar
+
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `src/components/modals/SetPriceModal.tsx` | Redesign completo do layout |
+| `src/components/modals/RegisterPaymentModal.tsx` | Redesign completo do layout |
+
+---
+
+## 5. Seccao Tecnica
+
+### 5.1 SetPriceModal.tsx - Novo Layout
 
 ```typescript
-// Definir ordem e labels das seccoes
-const MONITOR_SECTIONS = [
-  { status: 'em_execucao', label: 'Em Execucao', icon: Play },
-  { status: 'na_oficina', label: 'Na Oficina (Disponiveis)', icon: Building2 },
-  { status: 'para_pedir_peca', label: 'Para Pedir Peca', icon: Package },
-  { status: 'em_espera_de_peca', label: 'Em Espera de Peca', icon: Clock },
-  { status: 'concluidos', label: 'Concluidos (Prontos)', icon: CheckCircle },
-];
+// Titulo dinamico com codigo do servico
+<DialogTitle className="text-xl font-semibold">
+  Definir Preco - {service?.code}
+</DialogTitle>
 
-// Renderizar seccoes
-{MONITOR_SECTIONS.map(section => {
-  const sectionServices = groupedServices[section.status] || [];
-  if (sectionServices.length === 0) return null;
-  
-  return (
-    <div key={section.status} className="mb-8">
-      {/* Section Header */}
-      <div className="flex items-center gap-3 mb-4 border-b border-slate-700 pb-2">
-        <section.icon className="h-6 w-6 text-slate-400" />
-        <h2 className="text-xl font-bold text-slate-300">
-          {section.label}
-        </h2>
-        <Badge>{sectionServices.length}</Badge>
-      </div>
-      
-      {/* Section Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sectionServices.map(service => (
-          <ServiceCard key={service.id} service={service} />
-        ))}
-      </div>
-    </div>
-  );
-})}
+// Box de resumo com estilo violeta
+<div className="p-4 bg-violet-50 border border-violet-100 rounded-lg space-y-2">
+  <div className="flex justify-between items-center text-sm">
+    <span className="text-muted-foreground">Subtotal:</span>
+    <span>€{(laborValue + partsValue).toFixed(2)}</span>
+  </div>
+  <div className="border-t border-violet-200" />
+  <div className="flex justify-between items-center">
+    <span className="font-semibold">Total:</span>
+    <span className="text-violet-600 font-bold text-lg">
+      €{finalPrice.toFixed(2)}
+    </span>
+  </div>
+</div>
+
+// Botao violeta
+<Button className="bg-violet-600 hover:bg-violet-700">
+  Confirmar Preco
+</Button>
 ```
 
-### 3. Manter Compatibilidade com Codigos Existentes
+### 5.2 RegisterPaymentModal.tsx - Novo Layout
 
-Os servicos existentes com codigo "OS-" continuam visiveis. A query nao filtra por prefixo de codigo.
+```typescript
+// Titulo dinamico com codigo do servico
+<DialogTitle className="text-xl font-semibold">
+  Registar Pagamento - {service?.code}
+</DialogTitle>
+
+// Box de resumo financeiro com layout vertical
+<div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
+  <div className="flex justify-between items-center">
+    <span className="text-muted-foreground">Valor Total:</span>
+    <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
+  </div>
+  <div className="flex justify-between items-center">
+    <span className="text-muted-foreground">Ja Pago:</span>
+    <span className="text-green-600 font-semibold">
+      €{amountPaid.toFixed(2)}
+    </span>
+  </div>
+  <div className="flex justify-between items-center">
+    <span className="text-red-600 font-semibold">Em Falta:</span>
+    <span className="text-red-600 font-bold">
+      €{remainingBalance.toFixed(2)}
+    </span>
+  </div>
+</div>
+
+// Campo de valor com placeholder dinamico
+<Input
+  placeholder={`Max: €${remainingBalance.toFixed(2)}`}
+  ...
+/>
+
+// Botao verde
+<Button className="bg-green-600 hover:bg-green-700">
+  Confirmar Pagamento
+</Button>
+```
+
+### 5.3 Ordem dos Campos no RegisterPaymentModal
+
+Nova ordem:
+1. Box de resumo financeiro
+2. Metodo de Pagamento
+3. Valor a Pagar
+4. Descricao (Opcional)
+5. Data do Pagamento
 
 ---
 
-## Consideracoes de Seguranca
+## 6. Validacoes
 
-1. **Dados Expostos**: Apenas servicos fisicamente na oficina sao visiveis
-2. **Campos Sensiveis**: O monitor mostra apenas:
-   - Codigo do servico (TF-XXXXX)
-   - Nome do cliente
-   - Tipo de equipamento
-   - Status
-   - Tecnico atribuido
-3. **Sem Dados Financeiros**: Precos, pagamentos e debitos NAO sao expostos
-4. **Sem Dados Pessoais**: Telefones, emails e enderecos NAO sao expostos
+### SetPriceModal
+- Mao de Obra: obrigatorio (minimo 0)
+- Pecas: obrigatorio (minimo 0)
+- Desconto: opcional (default 0)
+
+### RegisterPaymentModal
+- Metodo: obrigatorio
+- Valor: obrigatorio, max = saldo restante
+- Descricao: opcional
+- Data: obrigatoria (default = hoje)
 
 ---
 
-## Resultado Esperado
+## 7. Resultado Esperado
 
-1. **TV Monitor Publico**:
-   - Acesso sem login em `/tv-monitor`
-   - Exibe todos os servicos na oficina
-   - Organizado por seccoes de status
-   - Cards grandes e legiveis
+1. **SetPriceModal**:
+   - Titulo: "Definir Preco - TF-XXXXX"
+   - Campos limpos com labels corretos
+   - Box violeta com Subtotal e Total
+   - Botao violeta "Confirmar Preco"
 
-2. **Seccoes Visiveis**:
-   - Em Execucao (servicos sendo trabalhados)
-   - Na Oficina (disponiveis ou com tecnico)
-   - Para Pedir Peca
-   - Em Espera de Peca
-   - Concluidos (prontos para entrega)
-
-3. **Feed de Atividades**:
-   - Mostra apenas logs com `is_public = true`
-   - Atualiza a cada 10 segundos
+2. **RegisterPaymentModal**:
+   - Titulo: "Registar Pagamento - TF-XXXXX"
+   - Box verde com Valor Total, Ja Pago (verde), Em Falta (vermelho)
+   - Campos na ordem correta
+   - Placeholder com valor maximo
+   - Botao verde "Confirmar Pagamento"
+   - Suporta pagamentos parciais com calculo automatico
 
