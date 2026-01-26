@@ -158,13 +158,30 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
-  const handleMarkPartArrived = async () => {
+  // Handler to confirm that the part order has been placed (para_pedir_peca → em_espera_de_peca)
+  const handleConfirmPartOrder = async () => {
     try {
       await updateService.mutateAsync({
         id: service.id,
-        status: 'na_oficina', // Return to workshop status
+        status: 'em_espera_de_peca',
       });
-      toast.success('Peça marcada como chegada!');
+      toast.success('Pedido de peça registado. Aguardando chegada.');
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error confirming part order:', error);
+    }
+  };
+
+  // Handler for when the part arrives (em_espera_de_peca → restore previous status)
+  const handleMarkPartArrived = async () => {
+    try {
+      // Restore to previous status or default to na_oficina
+      const previousStatus = service.last_status_before_part_request || 'na_oficina';
+      await updateService.mutateAsync({
+        id: service.id,
+        status: previousStatus as any,
+      });
+      toast.success('Peça chegou! Serviço pronto para retomar.');
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error marking part arrived:', error);
@@ -612,6 +629,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onManageDelivery={(role === 'dono' || role === 'secretaria') ? () => setShowDeliveryModal(true) : undefined}
               onFinalize={(role === 'dono' || role === 'secretaria') ? handleFinalize : undefined}
               onRequestPart={(role === 'dono' || role === 'tecnico') ? () => setShowRequestPartModal(true) : undefined}
+              onConfirmPartOrder={role === 'dono' ? handleConfirmPartOrder : undefined}
               onMarkPartArrived={role === 'dono' ? handleMarkPartArrived : undefined}
               onForceState={role === 'dono' ? () => setShowForceStateModal(true) : undefined}
               onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}

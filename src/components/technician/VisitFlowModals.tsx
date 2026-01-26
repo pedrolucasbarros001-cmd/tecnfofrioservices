@@ -143,10 +143,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const handlePedirPeca = async () => {
     setIsSubmitting(true);
     try {
+      // Save current status before changing to para_pedir_peca
+      const currentStatus = service.status;
+      
       await updateService.mutateAsync({
         id: service.id,
         status: 'para_pedir_peca',
         detected_fault: formData.detectedFault,
+        last_status_before_part_request: currentStatus,
       });
       toast.success('Pedido de peça registado!');
       onComplete();

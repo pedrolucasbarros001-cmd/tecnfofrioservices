@@ -72,10 +72,14 @@ export function RequestPartModal({
 
       if (partError) throw partError;
 
+      // Save current status before changing to para_pedir_peca
+      const currentStatus = service.status;
+
       // Update service status to para_pedir_peca
       await updateService.mutateAsync({
         id: service.id,
         status: 'para_pedir_peca',
+        last_status_before_part_request: currentStatus,
       });
 
       // Notify owners and secretaries about the part request

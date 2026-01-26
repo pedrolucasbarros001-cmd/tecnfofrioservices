@@ -35,6 +35,7 @@ interface StateActionButtonsProps {
   onManageDelivery?: () => void;
   onFinalize?: () => void;
   onRequestPart?: () => void;
+  onConfirmPartOrder?: () => void;
   onMarkPartArrived?: () => void;
   onForceState?: () => void;
   onContactClient?: () => void;
@@ -58,6 +59,7 @@ export function StateActionButtons({
   onManageDelivery,
   onFinalize,
   onRequestPart,
+  onConfirmPartOrder,
   onMarkPartArrived,
   onForceState,
   onContactClient,
@@ -108,11 +110,11 @@ export function StateActionButtons({
         return null;
 
       case 'para_pedir_peca':
-        if (isDono && onMarkPartArrived) {
+        if (isDono && onConfirmPartOrder) {
           return {
             label: 'Registar Pedido',
             icon: Package,
-            onClick: onMarkPartArrived,
+            onClick: onConfirmPartOrder,
             className: 'bg-yellow-600 hover:bg-yellow-700 text-white',
           };
         }

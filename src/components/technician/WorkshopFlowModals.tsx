@@ -100,6 +100,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
     setIsSubmitting(true);
     try {
       if (formData.finalizationType === 'pedir_peca') {
+        // Save current status before changing to para_pedir_peca
+        const currentStatus = service.status;
+        
         await updateService.mutateAsync({
           id: service.id,
           status: 'para_pedir_peca',
@@ -107,6 +110,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
           brand: formData.brand,
           model: formData.model,
           serial_number: formData.serialNumber,
+          last_status_before_part_request: currentStatus,
         });
         toast.success('Pedido de peça registado!');
       } else {
