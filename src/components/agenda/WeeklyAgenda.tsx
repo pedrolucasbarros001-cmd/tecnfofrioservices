@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Wrench, Settings, Truck } from 'lucide-react';
 import { 
   format, 
   startOfWeek, 
@@ -307,9 +307,44 @@ interface ServiceCardProps {
   onClick: () => void;
 }
 
+// Get service type configuration for colors and icons
+function getServiceTypeConfig(service: Service) {
+  if (service.service_type === 'instalacao') {
+    return {
+      bg: 'bg-yellow-50',
+      borderColor: '#EAB308',
+      iconColor: 'text-yellow-600',
+      Icon: Settings
+    };
+  }
+  if (service.service_type === 'entrega') {
+    return {
+      bg: 'bg-green-50',
+      borderColor: '#22C55E',
+      iconColor: 'text-green-600',
+      Icon: Truck
+    };
+  }
+  // Reparação
+  if (service.service_location === 'cliente') {
+    return {
+      bg: 'bg-blue-50',
+      borderColor: '#3B82F6',
+      iconColor: 'text-blue-500',
+      Icon: MapPin
+    };
+  }
+  return {
+    bg: 'bg-orange-50',
+    borderColor: '#F97316',
+    iconColor: 'text-orange-500',
+    Icon: Wrench
+  };
+}
+
 function ServiceCard({ service, onClick }: ServiceCardProps) {
-  const isVisit = service.service_location === 'cliente';
-  const techColor = service.technician?.color || '#3B82F6';
+  const config = getServiceTypeConfig(service);
+  const techColor = service.technician?.color;
   
   return (
     <div
@@ -318,17 +353,13 @@ function ServiceCard({ service, onClick }: ServiceCardProps) {
         onClick();
       }}
       className={cn(
-        "p-1.5 rounded text-xs cursor-pointer transition-all hover:scale-[1.02] hover:shadow-sm",
-        isVisit ? "bg-blue-50 border-l-2 border-blue-500" : "bg-purple-50 border-l-2 border-purple-500"
+        "p-1.5 rounded text-xs cursor-pointer transition-all hover:scale-[1.02] hover:shadow-sm border-l-2",
+        config.bg
       )}
-      style={{ borderLeftColor: techColor }}
+      style={{ borderLeftColor: techColor || config.borderColor }}
     >
       <div className="flex items-center gap-1">
-        {isVisit ? (
-          <MapPin className="h-3 w-3 text-blue-500" />
-        ) : (
-          <Package className="h-3 w-3 text-purple-500" />
-        )}
+        <config.Icon className={cn("h-3 w-3", config.iconColor)} />
         <span className="font-medium truncate">{service.code}</span>
       </div>
       <p className="text-muted-foreground truncate">

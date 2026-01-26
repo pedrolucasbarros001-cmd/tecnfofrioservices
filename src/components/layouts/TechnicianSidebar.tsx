@@ -42,7 +42,6 @@ export function TechnicianSidebar() {
                 <span className="text-[#2B4F84]">TECNO</span>
                 <span className="text-slate-700">FRIO</span>
               </span>
-              <span className="text-xs text-sidebar-foreground/60">Técnico</span>
             </div>}
         </div>
       </SidebarHeader>
