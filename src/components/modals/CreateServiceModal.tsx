@@ -48,7 +48,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { cn } from '@/lib/utils';
 import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
@@ -313,7 +313,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-                <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
+                <div className="flex-1 overflow-y-auto px-6">
                   <div className="space-y-4 py-4 pr-4">
                     {/* Customer Selected Box */}
                     {selectedCustomer && (
@@ -686,7 +686,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
 
                 <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>
