@@ -1,154 +1,248 @@
 
-# Plano: Corrigir Visualização de Serviços no TV Monitor
+# Plano: Implementar Filosofia de Design TECNOFRIO
 
-## Diagnóstico
+## Resumo Executivo
 
-Após investigação profunda, confirmei que:
+Transformar o design do sistema de um "arco-íris de estados" para um sistema **monocromático azul institucional** com lógica **"aceso/apagado"**, onde a clareza e a hierarquia substituem cores saturadas e botões coloridos.
 
-1. **Os dados existem e estão correctos no banco**:
-   - OS-00002 tem `service_location = 'oficina'`, `status = 'na_oficina'`, `technician_id` preenchido
+---
 
-2. **As políticas RLS estão configuradas correctamente**:
-   - Policy "Public read for workshop services on TV monitor" permite acesso `anon`
-   - Condition: `service_location = 'oficina' AND status != 'finalizado'`
+## Diagnóstico do Estado Actual
 
-3. **A query da API retorna dados** (confirmado nos logs de rede):
-   - Requests autenticados retornam o serviço correctamente
+### Problemas Identificados
 
-4. **O problema identificado**:
-   - O TV Monitor é acedido sem autenticação (role `anon`)
-   - Os requests de rede mostram Bearer token preenchido, indicando que a página foi testada com sessão autenticada
-   - Quando acedido anonimamente, pode haver um problema no Supabase client que não está a fazer a query correctamente
+| Área | Problema Actual | Impacto |
+|------|-----------------|---------|
+| **Dashboard** | Cada card com cor diferente (cinza, azul, laranja, roxo, amarelo, teal, verde, vermelho, violeta) | Competição visual, arco-íris confuso |
+| **Botões de acção** | Cada estado tem botão de cor diferente (verde, amarelo, laranja, teal, emerald, roxo+rosa) | Sem hierarquia clara |
+| **Badges de estado** | Cores saturadas (blue-500, cyan-500, purple-500, yellow-500, etc.) | Gritam por atenção |
+| **Tags** | Cores fortes (red-500, purple-500, yellow-500) | Protagonismo excessivo |
 
-## Causa Raiz
+---
 
-O código do TVMonitorPage está a usar o client Supabase que pode ter uma sessão autenticada em cache do localStorage. Quando a página é acedida numa TV (sem login), deveria usar o role `anon`, mas se houver sessão expirada ou mal formada, a query pode falhar silenciosamente.
+## Solução: Sistema Monocromático Azul
 
-## Solução
+### 1. Paleta de Cores Unificada
 
-Modificar o TVMonitorPage para garantir que funciona em modo anónimo e adicionar tratamento de erro adequado.
-
-### A) Forçar Modo Anónimo no TV Monitor
-
-Criar um client Supabase anónimo dedicado ou limpar a sessão ao carregar o TV Monitor:
-
-**Ficheiro**: `src/pages/TVMonitorPage.tsx`
-
-Adicionar lógica para usar cliente sem autenticação:
-
-```typescript
-// No início do componente, antes da query
-useEffect(() => {
-  // Garantir que o TV Monitor funciona sem sessão
-  // Não fazer logout, apenas ignorar erros de sessão
-}, []);
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    PALETA INSTITUCIONAL                      │
+├─────────────────────────────────────────────────────────────┤
+│  AZUL PRINCIPAL                                              │
+│  ├── Aceso:    slate-800 (texto) + slate-100 (bg sutil)     │
+│  ├── Apagado:  slate-300 (texto) + slate-50 (bg)            │
+│  └── Hover:    ring-slate-300 + shadow suave                │
+├─────────────────────────────────────────────────────────────┤
+│  ACÇÕES (Sempre azul)                                        │
+│  ├── Primária:   bg-primary (azul escuro) text-white        │
+│  ├── Secundária: border-primary text-primary                │
+│  └── Ghost:      text-primary hover:bg-primary/5            │
+├─────────────────────────────────────────────────────────────┤
+│  TIPOS DE SERVIÇO (Discretos, mantidos)                     │
+│  ├── Visita:     blue-100/blue-700                          │
+│  ├── Oficina:    orange-100/orange-700                      │
+│  ├── Instalação: yellow-100/yellow-700                      │
+│  └── Entrega:    green-100/green-700                        │
+├─────────────────────────────────────────────────────────────┤
+│  EXCEPÇÕES (Únicas)                                          │
+│  ├── Destrutivo: red-600 (apenas eliminar/irreversível)     │
+│  └── Alerta:     amber-600 (apenas "forçar estado")         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### B) Adicionar Tratamento de Erro na Query
+### 2. Lógica "Aceso/Apagado" no Dashboard
 
-Modificar a query para ter logs de debug e tratamento de erro:
-
-```typescript
-const { data: services = [], refetch, error, isError } = useQuery({
-  queryKey: ['tv-monitor-services'],
-  queryFn: async () => {
-    console.log('[TV Monitor] Fetching services...');
-    const { data, error } = await supabase
-      .from('services')
-      .select(`
-        *,
-        customer:customers(*),
-        technician:technicians(*, profile:profiles(*))
-      `)
-      .eq('service_location', 'oficina')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[TV Monitor] Query error:', error);
-      throw error;
-    }
-    
-    console.log('[TV Monitor] Fetched services:', data?.length);
-    return (data as unknown as Service[]) || [];
-  },
-  refetchInterval: 30000,
-  retry: 3,
-});
+```text
+┌───────────────────────────────────────────────────────────┐
+│                    DASHBOARD CARDS                         │
+├───────────────────────────────────────────────────────────┤
+│  TODOS OS CARDS:                                           │
+│  ├── Mesmo fundo base: bg-slate-50/80                     │
+│  ├── Mesmo layout e tamanho                                │
+│  ├── Glass effect sutil: backdrop-blur-sm                 │
+│  ├── Borda: border-slate-200                              │
+│                                                            │
+│  ESTADO APAGADO (0 serviços):                             │
+│  ├── opacity-50                                            │
+│  ├── shadow-none                                           │
+│  ├── Número: text-slate-400                               │
+│  ├── Ícone: text-slate-400                                │
+│                                                            │
+│  ESTADO ACESO (≥1 serviço):                               │
+│  ├── opacity-100                                           │
+│  ├── shadow-sm + ring-1 ring-slate-200                    │
+│  ├── Número: text-slate-900 font-bold                     │
+│  ├── Ícone: text-slate-600                                │
+└───────────────────────────────────────────────────────────┘
 ```
 
-### C) Mostrar Estado de Loading e Erro
+### 3. Estados: Texto > Cor
 
-Adicionar feedback visual quando há erro na query:
+Todos os estados usam a mesma cor base com variações de intensidade:
 
-```typescript
-// Após o header, antes das seções
-{isError && (
-  <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-6 text-center">
-    <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-2" />
-    <p className="text-red-400">Erro ao carregar serviços. A tentar novamente...</p>
-  </div>
-)}
+| Estado | Actual | Novo |
+|--------|--------|------|
+| Por Fazer | bg-blue-500 | bg-slate-100 text-slate-700 |
+| Em Execução | bg-cyan-500 | bg-slate-200 text-slate-800 font-medium |
+| Na Oficina | bg-purple-500 | bg-slate-100 text-slate-700 |
+| Para Pedir Peça | bg-yellow-500 | bg-slate-100 text-slate-700 border-dashed |
+| Em Espera de Peça | bg-orange-500 | bg-slate-100 text-slate-700 |
+| A Precificar | bg-fuchsia-500 | bg-slate-100 text-slate-700 |
+| Concluídos | bg-green-500 | bg-slate-200 text-slate-800 |
+| Em Débito | bg-red-500 | bg-slate-100 text-slate-700 border-l-2 border-l-red-400 |
+| Finalizado | bg-teal-500 | bg-slate-50 text-slate-500 (mais apagado) |
 
-{isLoading && (
-  <div className="text-center py-8">
-    <RefreshCw className="h-8 w-8 animate-spin mx-auto text-slate-400" />
-    <p className="text-slate-400 mt-2">A carregar serviços...</p>
-  </div>
-)}
+### 4. Botões: Uma Cor para Governar Todas
+
+| Acção | Actual | Novo |
+|-------|--------|------|
+| Atribuir Técnico | gradient purple/pink | bg-primary text-primary-foreground |
+| Iniciar | bg-green-600 | bg-primary text-primary-foreground |
+| Registar Pedido | bg-yellow-600 | bg-primary text-primary-foreground |
+| Peça Chegou | bg-green-600 | bg-primary text-primary-foreground |
+| Definir Preço | bg-emerald-600 | bg-primary text-primary-foreground |
+| Gerir Entrega | bg-teal-600 | bg-primary text-primary-foreground |
+| Registar Pagamento | bg-orange-600 | bg-primary text-primary-foreground |
+| **Eliminar** | text-destructive | text-destructive (mantém - destrutivo) |
+| **Forçar Estado** | text-amber-600 | text-amber-600 (mantém - alerta) |
+
+### 5. Tags Discretas
+
+| Tag | Actual | Novo |
+|-----|--------|------|
+| Urgente | bg-red (animate-pulse) | border border-red-300 text-red-600 text-xs |
+| Garantia | bg-purple-500 | border border-purple-200 text-purple-600 text-xs |
+| A Precificar | bg-yellow-500 | border border-amber-200 text-amber-600 text-xs |
+| Em Débito | bg-red-500 | border border-red-200 text-red-600 text-xs |
+
+---
+
+## Ficheiros a Modificar
+
+| Ficheiro | Alterações |
+|----------|------------|
+| `src/index.css` | Adicionar classes utilitárias para estados monocromáticos e glass sutil |
+| `src/types/database.ts` | Actualizar SERVICE_STATUS_CONFIG com novas cores neutras |
+| `src/pages/DashboardPage.tsx` | Remover cores por card, implementar lógica aceso/apagado |
+| `src/components/services/StateActionButtons.tsx` | Unificar todos os botões para usar `bg-primary` |
+| `src/pages/GeralPage.tsx` | Actualizar badges de estado e tags para estilo neutro |
+| `src/components/ui/badge.tsx` | Adicionar variante `subtle` para tags discretas |
+
+---
+
+## Detalhes Técnicos
+
+### A) Actualizar index.css
+
+Adicionar novas classes utilitárias:
+
+```css
+/* Card states - aceso/apagado */
+.card-dim {
+  @apply opacity-50 shadow-none;
+}
+
+.card-lit {
+  @apply opacity-100 shadow-sm ring-1 ring-slate-200;
+}
+
+/* Status badge - monocromático */
+.status-badge {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 
+         rounded-full text-xs font-medium
+         bg-slate-100 text-slate-700;
+}
+
+.status-badge-active {
+  @apply bg-slate-200 text-slate-800 font-semibold;
+}
+
+/* Tag - discreto */
+.tag-subtle {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 
+         rounded text-xs font-medium
+         border bg-transparent;
+}
 ```
 
-### D) Fallback para Query Simplificada
-
-Se a query com joins falhar, usar uma query sem joins (fallback):
+### B) Actualizar SERVICE_STATUS_CONFIG
 
 ```typescript
-const { data: services = [] } = useQuery({
-  queryKey: ['tv-monitor-services'],
-  queryFn: async () => {
-    // Primeira tentativa: query completa
-    const { data, error } = await supabase
-      .from('services')
-      .select(`
-        *,
-        customer:customers(*),
-        technician:technicians(*, profile:profiles(*))
-      `)
-      .eq('service_location', 'oficina')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      return data as unknown as Service[];
-    }
-
-    // Fallback: query sem joins (para debug)
-    console.warn('[TV Monitor] Using fallback query');
-    const fallback = await supabase
-      .from('services')
-      .select('*')
-      .eq('service_location', 'oficina')
-      .order('created_at', { ascending: false });
-    
-    return (fallback.data || []) as unknown as Service[];
-  },
-});
+export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { 
+  label: string; 
+  color: string;
+  intensity: 'dim' | 'normal' | 'active';
+}> = {
+  por_fazer: { label: 'Por Fazer', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
+  em_execucao: { label: 'Em Execução', color: 'bg-slate-200 text-slate-800 font-medium', intensity: 'active' },
+  na_oficina: { label: 'Na Oficina', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
+  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-slate-100 text-slate-700 border border-dashed border-slate-300', intensity: 'normal' },
+  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
+  a_precificar: { label: 'A Precificar', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
+  concluidos: { label: 'Concluídos', color: 'bg-slate-200 text-slate-800', intensity: 'active' },
+  em_debito: { label: 'Em Débito', color: 'bg-slate-100 text-slate-700 border-l-2 border-l-red-400', intensity: 'normal' },
+  finalizado: { label: 'Finalizado', color: 'bg-slate-50 text-slate-500', intensity: 'dim' },
+};
 ```
 
-## Ficheiros a Alterar
+### C) Actualizar DashboardPage
 
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/pages/TVMonitorPage.tsx` | Adicionar logs de debug, tratamento de erro, e fallback |
+```typescript
+// Remover bgClass e iconClass individuais
+// Usar lógica aceso/apagado baseada em count
 
-## Validação
+const isLit = count > 0;
 
-1. Abrir TV Monitor numa janela anónima (sem login)
-2. Verificar console logs para debug
-3. Confirmar que o serviço OS-00002 aparece na secção "Na Oficina"
+<Card className={cn(
+  "cursor-pointer transition-all duration-200",
+  "bg-slate-50/80 backdrop-blur-sm border-slate-200",
+  isLit 
+    ? "opacity-100 shadow-sm ring-1 ring-slate-200 hover:shadow-md hover:-translate-y-0.5" 
+    : "opacity-50 hover:opacity-70"
+)}>
+```
 
-## Nota Importante
+### D) Actualizar StateActionButtons
 
-O utilizador mencionou estar na rota `/oficina`, mas o screenshot mostra o layout do TV Monitor. Confirmar qual página está realmente a ser visualizada:
-- `/oficina` → OficinaPage (layout com cards brancos, sidebar visível)
-- `/tv-monitor` → TVMonitorPage (layout escuro, sem sidebar, fullscreen)
+```typescript
+// Remover todas as classes de cor específicas
+// Usar apenas:
+className: 'bg-primary text-primary-foreground hover:bg-primary/90'
+```
 
-Se for a OficinaPage, essa página **usa o hook `useServices`** que já funciona correctamente (confirmado nos logs de rede). O problema seria apenas no TVMonitorPage.
+---
+
+## Resultado Esperado
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    ANTES vs DEPOIS                           │
+├─────────────────────────────────────────────────────────────┤
+│  ANTES:                                                      │
+│  • Dashboard = arco-íris de cores                           │
+│  • Olho não sabe onde focar                                 │
+│  • Cada botão uma cor diferente                             │
+│  • Tags berrantes                                            │
+│                                                              │
+│  DEPOIS:                                                     │
+│  • Dashboard = azul institucional uniforme                  │
+│  • Cards "acendem" apenas onde há trabalho                  │
+│  • Botões azuis, hierarquia por contexto                    │
+│  • Tags discretas, informativas                             │
+│  • Sensação premium, confiável, profissional               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Filosofia Preservada
+
+✅ **Tipos de serviço mantêm cores** (visita=azul, oficina=laranja, instalação=amarelo, entrega=verde) - como badges pequenos, não dominantes
+
+✅ **Vermelho apenas para destruição** (eliminar serviço)
+
+✅ **Amber apenas para alerta** (forçar estado)
+
+✅ **Glass sutil** - blur leve, transparência baixa
+
+✅ **Hierarquia clara** - Estado → Acção → Informação → Histórico
