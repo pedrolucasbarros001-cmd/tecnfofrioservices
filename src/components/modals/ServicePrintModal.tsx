@@ -16,6 +16,7 @@ import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
+import { printServiceSheet } from '@/utils/printUtils';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -93,7 +94,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
   if (!service) return null;
 
   const handlePrint = () => {
-    window.print();
+    printServiceSheet('print-service-sheet');
   };
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
@@ -116,8 +117,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
         {/* Printable Content - A4 optimized with watermark */}
         <div 
-          className="print-content relative border rounded-lg p-4 bg-white print:border-0 print:p-0 print:shadow-none"
-          style={{ '--watermark-url': `url(${tecnofrioLogoIcon})` } as React.CSSProperties}
+          id="print-service-sheet"
+          className="relative border rounded-lg p-4 bg-white"
         >
           {/* Watermark - visible only in print */}
           <div 

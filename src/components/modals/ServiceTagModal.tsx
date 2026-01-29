@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { Service } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
+import { printServiceTag } from '@/utils/printUtils';
 
 interface ServiceTagModalProps {
   service: Service | null;
@@ -22,7 +23,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
   if (!service) return null;
 
   const handlePrint = () => {
-    window.print();
+    printServiceTag('print-service-tag');
   };
 
   // Generate a full URL for QR code that redirects to the appropriate technician flow
@@ -35,9 +36,9 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
         </DialogHeader>
 
-        {/* Print-optimized tag content */}
-        <div className="print-tag border rounded-lg p-4 bg-card">
-          <Separator className="bg-primary h-1 mb-4 print:bg-black" />
+        {/* Tag content - this will be printed */}
+        <div id="print-service-tag" className="border rounded-lg p-4 bg-card">
+          <Separator className="bg-primary h-1 mb-4" />
           
           <div className="text-center space-y-3">
             {/* Logo/Brand */}
@@ -61,7 +62,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             </div>
             
             {/* Service Code */}
-            <p className="service-code text-2xl font-mono font-bold tracking-wider text-foreground">
+            <p className="text-2xl font-mono font-bold tracking-wider text-foreground">
               {service.code}
             </p>
             
