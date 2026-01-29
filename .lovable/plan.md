@@ -1,103 +1,315 @@
 
-Objetivo
-- Implementar a regra de coexistência/normalização de estados para SERVIÇOS DA OFICINA:
-  - “por_fazer” (na oficina) só pode existir quando NÃO há técnico atribuído (technician_id = null) → serviço “para assumir/atribuir”.
-  - Quando há técnico atribuído (technician_id != null) e o serviço está na oficina, ele deve ser “na_oficina” (aguarda início).
-  - Ao técnico clicar “Começar”, o status vira “em_execucao”, mas o serviço continua “na oficina” porque isso é definido por service_location = 'oficina'.
-  - Estados “para_pedir_peca” e “em_espera_de_peca” continuam coexistindo com “estar na oficina” via service_location (não mudamos location nesses estados).
+# Plano: Melhorias no Sistema de Feedback e Encadeamento de Ações
 
-Diagnóstico (por que está acontecendo hoje)
-- Existe um bug claro no fluxo de atribuição: `src/components/modals/AssignTechnicianModal.tsx` sempre faz update com `status: 'por_fazer'` (linha ~93 do arquivo).
-  - Isso “joga para trás” serviços da oficina para “por_fazer” mesmo após terem técnico atribuído.
-  - Resultado: em telas/cards que esperam “na_oficina” para “serviços na oficina”, o serviço “some” (porque está como por_fazer).
-- Além disso, os modais de criação de serviço na oficina hoje setam `status: 'na_oficina'` mesmo sem técnico (isso conflita com sua nova regra). Exemplos:
-  - `src/components/modals/CreateServiceModal.tsx`
-  - `src/components/shared/CustomerDetailSheet.tsx`
+## Resumo
 
-Estratégia de correção (garantir que não some nunca)
-Vou aplicar a correção em 2 camadas (defensivo):
-1) Banco de dados (garantia forte): normalizar status automaticamente para evitar inconsistências futuras, mesmo se algum ponto do frontend “errar”.
-2) Frontend (origem do erro): corrigir os pontos que estão gravando status errado (atribuição e criação), para que o app já gere dados consistentes.
+Este plano implementa um sistema de feedback inteligente que:
+1. Informa o utilizador sobre o novo estado do serviço após cada ação
+2. Fornece contexto adicional relevante (ex: "Serviço já se encontra na oficina")
+3. Sugere a próxima ação lógica no fluxo
+4. Usa mensagens diferenciadas e descritivas ao invés de mensagens genéricas
 
-A) Correção no Banco (migração SQL)
-A1. Backfill (corrigir registros já existentes)
-- Atualizar serviços inconsistentes já gravados:
-  - Se service_location='oficina' AND technician_id IS NOT NULL AND status='por_fazer' → status='na_oficina'
-  - Se service_location='oficina' AND technician_id IS NULL AND status='na_oficina' → status='por_fazer'
-Isso resolve imediatamente o caso do serviço “na oficina” que está “por_fazer” com técnico atribuído.
+## Situação Atual
 
-A2. Trigger de normalização (impede regressões)
-- Criar uma função trigger (plpgsql) que roda BEFORE INSERT/UPDATE em `public.services`:
-  - Se NEW.service_location = 'oficina':
-    - Se NEW.technician_id IS NULL e NEW.status = 'na_oficina' → NEW.status := 'por_fazer'
-    - Se NEW.technician_id IS NOT NULL e NEW.status = 'por_fazer' → NEW.status := 'na_oficina'
-  - Caso contrário, não mexe (não afeta serviços em “cliente”, nem mexe em “em_execucao/para_pedir_peca/em_espera_de_peca/concluidos/a_precificar/finalizado”).
-- Benefício: mesmo que alguém force status errado via UI (ou ForceStateModal), o banco garante o mínimo da regra para oficina.
+Atualmente, as mensagens de sucesso são genéricas e não fornecem contexto:
 
-B) Correção no Frontend (onde o status errado nasce)
-B1. AssignTechnicianModal (principal bug)
-Arquivo: `src/components/modals/AssignTechnicianModal.tsx`
-- Alterar a lógica de update para NÃO setar sempre `status: 'por_fazer'`.
-- Regra:
-  - Se `service.service_location === 'oficina'`:
-    - Se o serviço estiver em `por_fazer` (ou “estado inicial”) e está sendo atribuído a um técnico → setar `status: 'na_oficina'`.
-    - Se o serviço já estiver em `em_execucao/para_pedir_peca/em_espera_de_peca/concluidos/...` → NÃO alterar status (evita “voltar atrás”).
-  - Se `service.service_location !== 'oficina'`:
-    - Não alterar status (deixa como está), para não quebrar a lógica de visitas/instalações que podem estar `por_fazer` mesmo com técnico.
-- Resultado: atribuir/reatribuir deixa de “resetar” o serviço para por_fazer e, na oficina, ele passa a ficar como “na_oficina”.
+| Ação | Mensagem Atual | Problema |
+|------|---------------|----------|
+| Atribuir técnico | "Serviço atualizado!" | Não indica o novo estado nem o técnico |
+| Definir preço | "Preço definido: €X" | Não indica próximo passo |
+| Registar pagamento | "Pagamento registado!" | Não indica se há saldo em aberto |
+| Iniciar reparação | "Reparação iniciada!" | OK, mas pode ser melhor |
+| Concluir reparação | "Reparação concluída!" | Não menciona precificação |
 
-B2. CreateServiceModal e CreateServiceFromCustomerModal (criação coerente com sua regra)
-Arquivos:
-- `src/components/modals/CreateServiceModal.tsx`
-- `src/components/shared/CustomerDetailSheet.tsx` (modal de criar serviço a partir do cliente)
-- Ajustar status na criação:
-  - Se `service_location === 'oficina'`:
-    - Se `technician_id` foi escolhido → `status = 'na_oficina'`
-    - Se `technician_id` NÃO foi escolhido → `status = 'por_fazer'` (disponível/para assumir)
-  - Se `service_location === 'cliente'` → `status = 'por_fazer'` (como já é o padrão)
-- Isso impede que serviços “sem técnico” já nasçam como “na_oficina”.
+## Melhorias Propostas
 
-C) Camada de UX (opcional, mas recomendado para clareza e para “não sumir” visualmente)
-Mesmo com banco + frontend corrigidos, posso adicionar uma regra visual defensiva para telas de oficina:
-- Em páginas que exibem serviços da oficina, caso chegue algum dado “inconsistente” (ex.: status por_fazer + technician_id preenchido), renderizar o badge como “Na Oficina” e/ou agrupar como “Na Oficina” (fallback).
-Isso garante que, mesmo durante a transição/migração, o usuário não veja o serviço “sumindo”.
-Arquivos candidatos:
-- `src/pages/OficinaPage.tsx`
-- `src/pages/TVMonitorPage.tsx` (se quiser manter alinhado, mesmo você não focando nele agora)
-- `src/pages/technician/TechnicianOfficePage.tsx` (principalmente a label/badge)
+### A) Mensagens Contextuais com Estado e Próxima Ação
 
-D) Testes ponta-a-ponta (cenários que vamos validar)
-1. Criar serviço na oficina SEM técnico
-- Deve aparecer como “por_fazer” (para assumir) nas listas pertinentes.
-2. Atribuir técnico a um serviço da oficina que estava “por_fazer”
-- Deve virar “na_oficina” automaticamente (sem sumir).
-3. Reatribuir técnico em serviço da oficina que já estava “em_execucao” ou “para_pedir_peca”
-- Não pode voltar para “por_fazer”.
-4. Técnico clicar “Começar”
-- Status vira “em_execucao”, mas service_location continua “oficina” e o serviço continua aparecendo na página de oficina (coexistência por location).
-5. Fluxo de peça:
-- `em_execucao → para_pedir_peca → em_espera_de_peca → (volta ao anterior)` mantendo service_location='oficina' o tempo todo.
+Criar mensagens que informam:
+1. O que aconteceu
+2. O novo estado/localização do serviço
+3. A próxima ação (quando aplicável)
 
-Entregáveis (o que será alterado)
-- Migração SQL nova em `supabase/migrations/`:
-  - backfill + trigger de normalização
-- Frontend:
-  - `src/components/modals/AssignTechnicianModal.tsx` (não resetar status; normalizar oficina)
-  - `src/components/modals/CreateServiceModal.tsx` (status inicial depende de técnico na oficina)
-  - `src/components/shared/CustomerDetailSheet.tsx` (mesma regra de criação)
-- (Opcional) fallback visual para evitar “sumir” em telas de oficina/monitor.
+#### Exemplos de Novas Mensagens:
 
-Risco/Impacto
-- Impacto é localizado em serviços com `service_location='oficina'`.
-- Não altera a lógica financeira (`pending_pricing`, “em débito” calculado) nem mexe em serviços no cliente.
-- A trigger impede regressões e garante consistência mesmo se alguém alterar status manualmente.
+| Ação | Nova Mensagem |
+|------|--------------|
+| Atribuir técnico (oficina) | "Técnico Pedro atribuído! Serviço na oficina, aguarda início." |
+| Atribuir técnico (cliente) | "Técnico João agendado para 15/02, manhã." |
+| Definir preço | "Preço definido: €150. Serviço pronto para entrega." |
+| Pagamento parcial | "Pagamento de €50 registado. Em falta: €100." |
+| Pagamento total | "Pagamento completo! Serviço sem débito." |
+| Iniciar reparação | "Em execução! OS-00001 está a ser reparado." |
+| Concluir (oficina) | "Concluído! Aguarda precificação pelo dono." |
+| Pedir peça | "Peça 'Compressor' solicitada. Serviço em espera." |
 
-Sequência de implementação
-1) Criar e aplicar migração SQL (backfill + trigger)
-2) Ajustar AssignTechnicianModal
-3) Ajustar CreateServiceModal + CustomerDetailSheet
-4) (Opcional) Adicionar fallback visual em páginas de oficina
-5) Testar os 5 cenários ponta-a-ponta
+### B) Hook Utilitário para Mensagens de Feedback
 
-Observação importante
-- Não vou mexer em `src/integrations/supabase/types.ts` (esse arquivo não deve ser editado manualmente). A correção será feita via migrações + componentes/hooks do app.
+Criar um novo ficheiro com funções auxiliares para gerar mensagens contextuais:
+
+**Novo Ficheiro**: `src/utils/feedbackMessages.ts`
+
+```text
+Funções a implementar:
+- getAssignmentFeedback(service, techName, scheduledDate, shift)
+- getPricingFeedback(service, price, isWarranty)
+- getPaymentFeedback(amountPaid, remaining, total)
+- getStatusChangeFeedback(service, oldStatus, newStatus)
+- getPartRequestFeedback(partName, service)
+- getDeliveryFeedback(service, method)
+```
+
+### C) Integração nos Modais Existentes
+
+#### 1. AssignTechnicianModal.tsx
+**Linha ~143**: Após sucesso, usar mensagem contextual
+
+Antes:
+```typescript
+// (sem toast específico - usa o genérico do hook)
+```
+
+Depois:
+```typescript
+const techName = selectedTech?.profile?.full_name || 'Técnico';
+const dateStr = format(values.scheduled_date, "dd/MM");
+const shiftLabel = values.scheduled_shift === 'manha' ? 'manhã' : 
+                   values.scheduled_shift === 'tarde' ? 'tarde' : 'noite';
+
+if (service.service_location === 'oficina') {
+  toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
+} else {
+  toast.success(`${techName} agendado para ${dateStr}, ${shiftLabel}.`);
+}
+```
+
+#### 2. SetPriceModal.tsx
+**Linha ~97-100**: Melhorar mensagem com próximo passo
+
+Antes:
+```typescript
+toast.success(warrantyCoversAll 
+  ? 'Serviço de garantia registado - sem cobrança ao cliente!' 
+  : `Preço definido: €${finalPrice.toFixed(2)}`
+);
+```
+
+Depois:
+```typescript
+if (warrantyCoversAll) {
+  toast.success('Garantia aplicada! Serviço sem custo para o cliente.');
+} else {
+  const nextStep = service.service_location === 'oficina' 
+    ? 'Pronto para entrega.' 
+    : 'Serviço concluído.';
+  toast.success(`Preço definido: €${finalPrice.toFixed(2)}. ${nextStep}`);
+}
+```
+
+#### 3. RegisterPaymentModal.tsx
+**Linha ~106**: Indicar saldo restante ou confirmação de quitação
+
+Antes:
+```typescript
+toast.success('Pagamento registado com sucesso!');
+```
+
+Depois:
+```typescript
+if (newBalance > 0) {
+  toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);
+} else {
+  toast.success(`Pagamento completo! ${service.code} sem débito.`);
+}
+```
+
+#### 4. WorkshopFlowModals.tsx
+**Linha ~91, ~115, ~126**: Mensagens mais descritivas
+
+Antes:
+```typescript
+toast.success('Reparação iniciada!');
+toast.success('Pedido de peça registado!');
+toast.success('Reparação concluída! Aguarda precificação.');
+```
+
+Depois:
+```typescript
+toast.success(`Em execução! ${service.code} está a ser reparado.`);
+toast.success(`Peça solicitada! ${service.code} aguarda aprovação do dono.`);
+toast.success(`${service.code} concluído! Aguarda precificação pelo dono.`);
+```
+
+#### 5. RequestPartModal.tsx
+**Linha ~95**: Indicar que o serviço está em espera
+
+Antes:
+```typescript
+toast.success('Peça solicitada com sucesso!');
+```
+
+Depois:
+```typescript
+toast.success(`Peça "${partName}" solicitada! ${service.code} em espera de aprovação.`);
+```
+
+#### 6. DeliveryManagementModal.tsx
+**Linha ~37**: Confirmar opção escolhida
+
+Antes:
+```typescript
+toast.success('Serviço marcado para recolha pelo cliente');
+```
+
+Depois:
+```typescript
+toast.success(`Recolha pelo cliente definida! Notificar ${service.customer?.name || 'cliente'}.`);
+```
+
+#### 7. ForceStateModal.tsx
+**Linha ~40-42**: Mostrar transição de estado
+
+Antes:
+```typescript
+// (sem toast específico)
+```
+
+Depois:
+```typescript
+const oldLabel = SERVICE_STATUS_CONFIG[service.status]?.label;
+const newLabel = SERVICE_STATUS_CONFIG[selectedStatus]?.label;
+toast.warning(`Estado forçado: ${oldLabel} → ${newLabel}`);
+```
+
+### D) Hook useUpdateService com Mensagens Contextuais
+
+Modificar o hook para aceitar uma mensagem customizada (opcional):
+
+**Ficheiro**: `src/hooks/useServices.ts`
+
+Alterar `useUpdateService` para receber um parâmetro opcional de mensagem:
+
+```typescript
+export function useUpdateService() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, customMessage, ...updates }: 
+      Partial<Service> & { id: string; customMessage?: string }) => {
+      const { data, error } = await supabase
+        .from('services')
+        .update(updates as any)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, customMessage };
+    },
+    onSuccess: ({ customMessage }) => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      // Apenas mostrar toast genérico se não houver mensagem custom
+      if (!customMessage) {
+        toast.success('Serviço atualizado!');
+      }
+      // Mensagem custom é mostrada no local que chamou
+    },
+    onError: (error) => {
+      console.error('Error updating service:', error);
+      toast.error('Erro ao atualizar serviço');
+    },
+  });
+}
+```
+
+### E) Melhorar ServiceDetailSheet com Toasts Contextuais
+
+**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx`
+
+Melhorar os toasts nas ações internas (finalizar, confirmar peça, etc.):
+
+```typescript
+// Finalizar serviço
+toast.success(`${service.code} finalizado com sucesso!`);
+
+// Confirmar pedido de peça
+toast.success(`Pedido confirmado! ${service.code} em espera de peça.`);
+
+// Peça chegou
+toast.success(`Peça chegou! ${service.code} pronto para continuar.`);
+```
+
+## Ficheiros a Alterar
+
+| Ficheiro | Alteração | Prioridade |
+|----------|-----------|------------|
+| `src/utils/feedbackMessages.ts` | **NOVO** - Funções auxiliares de mensagens | ALTA |
+| `src/hooks/useServices.ts` | Suporte a customMessage no update | ALTA |
+| `src/components/modals/AssignTechnicianModal.tsx` | Mensagem contextual de atribuição | ALTA |
+| `src/components/modals/SetPriceModal.tsx` | Mensagem com próximo passo | ALTA |
+| `src/components/modals/RegisterPaymentModal.tsx` | Indicar saldo restante | ALTA |
+| `src/components/technician/WorkshopFlowModals.tsx` | Mensagens mais claras | MÉDIA |
+| `src/components/modals/RequestPartModal.tsx` | Indicar estado de espera | MÉDIA |
+| `src/components/modals/DeliveryManagementModal.tsx` | Confirmar método de entrega | MÉDIA |
+| `src/components/modals/ForceStateModal.tsx` | Mostrar transição (warning) | MÉDIA |
+| `src/components/services/ServiceDetailSheet.tsx` | Mensagens contextuais | MÉDIA |
+
+## Estrutura do Ficheiro feedbackMessages.ts
+
+```text
+src/utils/feedbackMessages.ts
+
+Exportações:
+├── getAssignmentMessage(service, techName, date, shift)
+│   └── Retorna: "Pedro atribuído! Serviço na oficina, aguarda início."
+│
+├── getPricingMessage(price, isWarranty, location)
+│   └── Retorna: "Preço €150 definido. Pronto para entrega."
+│
+├── getPaymentMessage(paid, remaining, serviceCode)
+│   └── Retorna: "€50 registado. Em falta: €100." ou "Pagamento completo!"
+│
+├── getPartRequestMessage(partName, serviceCode)
+│   └── Retorna: "Peça 'Compressor' solicitada! OS-001 aguarda aprovação."
+│
+├── getStatusTransitionMessage(from, to, serviceCode)
+│   └── Retorna: "OS-001: Por Fazer → Em Execução"
+│
+└── getDeliveryMessage(method, customerName)
+    └── Retorna: "Recolha definida! Notificar João Silva."
+```
+
+## Resultado Esperado
+
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Atribuir técnico oficina | "Serviço atualizado!" | "Pedro atribuído! Serviço na oficina." |
+| Atribuir técnico cliente | "Serviço atualizado!" | "Pedro agendado para 15/02, manhã." |
+| Definir preço €150 | "Preço definido: €150" | "Preço €150 definido. Pronto para entrega." |
+| Pagamento parcial €50 | "Pagamento registado!" | "€50 registado. Em falta: €100." |
+| Pagamento total | "Pagamento registado!" | "Pagamento completo! OS-001 sem débito." |
+| Iniciar reparação | "Reparação iniciada!" | "Em execução! OS-001 está a ser reparado." |
+| Pedir peça | "Peça solicitada!" | "Peça 'Compressor' solicitada! Aguarda aprovação." |
+| Forçar estado | (sem toast) | "Estado forçado: Por Fazer → Em Execução" |
+
+## Validação
+
+1. **Atribuição de técnico**:
+   - Na oficina: Mensagem indica "na oficina, aguarda início"
+   - No cliente: Mensagem indica data e turno agendado
+
+2. **Precificação**:
+   - Oficina: Indica "pronto para entrega"
+   - Cliente: Indica "serviço concluído"
+   - Garantia: Indica "sem custo para cliente"
+
+3. **Pagamentos**:
+   - Parcial: Mostra valor pago e em falta
+   - Total: Confirma "sem débito"
+
+4. **Fluxo de peças**:
+   - Solicitação: Indica nome da peça e espera de aprovação
+   - Chegada: Indica que pode continuar
+
+5. **Forçar estado**:
+   - Toast amarelo (warning) mostrando transição
