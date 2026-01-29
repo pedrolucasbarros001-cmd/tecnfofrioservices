@@ -53,6 +53,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activity_logs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       budgets: {
@@ -116,6 +123,13 @@ export type Database = {
             columns: ["converted_service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_converted_service_id_fkey"
+            columns: ["converted_service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
           {
@@ -211,6 +225,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notifications_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -294,6 +315,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "service_parts_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_payments: {
@@ -335,6 +363,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "service_payments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_photos: {
@@ -373,6 +408,13 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "service_photos_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_signatures: {
@@ -406,6 +448,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_signatures_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
         ]
@@ -550,11 +599,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "services_delivery_technician_id_fkey"
+            columns: ["delivery_technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+          {
             foreignKeyName: "services_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
           },
         ]
       }
@@ -616,7 +679,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      tv_monitor_services: {
+        Row: {
+          appliance_type: string | null
+          brand: string | null
+          code: string | null
+          created_at: string | null
+          customer_name: string | null
+          fault_description: string | null
+          id: string | null
+          is_urgent: boolean | null
+          model: string | null
+          service_location: string | null
+          status: string | null
+          tech_active: boolean | null
+          tech_color: string | null
+          tech_id: string | null
+          tech_name: string | null
+          technician_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_service: {
