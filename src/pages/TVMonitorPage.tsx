@@ -5,25 +5,67 @@ import { pt } from 'date-fns/locale';
 import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle, DollarSign } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
+import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { usePublicActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-// Section definitions for organized display - includes all workshop-relevant statuses
+// Section definitions with functional filters for composite logic
 const MONITOR_SECTIONS = [
-  { status: 'por_fazer' as ServiceStatus, label: 'Por Fazer', icon: Clock, color: 'text-blue-400' },
-  { status: 'em_execucao' as ServiceStatus, label: 'Em Execução', icon: Play, color: 'text-cyan-400' },
-  { status: 'na_oficina' as ServiceStatus, label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
-  { status: 'para_pedir_peca' as ServiceStatus, label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
-  { status: 'em_espera_de_peca' as ServiceStatus, label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
-  { status: 'a_precificar' as ServiceStatus, label: 'A Precificar', icon: DollarSign, color: 'text-lime-400' },
-  { status: 'concluidos' as ServiceStatus, label: 'Concluídos (Prontos para Entrega)', icon: CheckCircle, color: 'text-emerald-400' },
+  { 
+    key: 'para_assumir', 
+    label: 'Para Assumir', 
+    icon: User, 
+    color: 'text-blue-400',
+    filter: (s: Service) => !s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
+  },
+  { 
+    key: 'na_oficina', 
+    label: 'Na Oficina', 
+    icon: Building2, 
+    color: 'text-green-400',
+    filter: (s: Service) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
+  },
+  { 
+    key: 'em_execucao', 
+    label: 'Em Execução', 
+    icon: Play, 
+    color: 'text-cyan-400',
+    filter: (s: Service) => s.status === 'em_execucao'
+  },
+  { 
+    key: 'para_pedir_peca', 
+    label: 'Para Pedir Peça', 
+    icon: Package, 
+    color: 'text-yellow-400',
+    filter: (s: Service) => s.status === 'para_pedir_peca'
+  },
+  { 
+    key: 'em_espera_de_peca', 
+    label: 'Em Espera de Peça', 
+    icon: Clock, 
+    color: 'text-orange-400',
+    filter: (s: Service) => s.status === 'em_espera_de_peca'
+  },
+  { 
+    key: 'a_precificar', 
+    label: 'A Precificar', 
+    icon: DollarSign, 
+    color: 'text-lime-400',
+    filter: (s: Service) => s.status === 'a_precificar'
+  },
+  { 
+    key: 'concluidos', 
+    label: 'Concluídos', 
+    icon: CheckCircle, 
+    color: 'text-emerald-400',
+    filter: (s: Service) => s.status === 'concluidos'
+  },
 ];
 
 // Service Card Component
 function ServiceCard({ service }: { service: Service }) {
-  const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
+  const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG];
   const isUrgent = service.is_urgent;
   const hasTechnician = !!service.technician;
 
@@ -153,16 +195,11 @@ export default function TVMonitorPage() {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  // Group services by status
-  const groupedServices = services.reduce((acc, service) => {
-    const status = service.status as ServiceStatus;
-    if (!acc[status]) acc[status] = [];
-    acc[status].push(service);
+  // Group services by section using functional filters
+  const groupedServices = MONITOR_SECTIONS.reduce((acc, section) => {
+    acc[section.key] = services.filter(section.filter);
     return acc;
-  }, {} as Record<ServiceStatus, Service[]>);
-
-  // Status order for stats bar - includes a_precificar for financial visibility
-  const statusOrder: ServiceStatus[] = ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos'];
+  }, {} as Record<string, Service[]>);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6 pb-40">
@@ -199,19 +236,18 @@ export default function TVMonitorPage() {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-7 gap-3 mb-6">
-        {statusOrder.map((status) => {
-          const config = SERVICE_STATUS_CONFIG[status];
-          const count = groupedServices[status]?.length || 0;
+        {MONITOR_SECTIONS.map((section) => {
+          const count = groupedServices[section.key]?.length || 0;
           return (
             <div
-              key={status}
+              key={section.key}
               className={cn(
                 "rounded-lg p-3 text-center",
-                count > 0 ? config.color : "bg-slate-800"
+                count > 0 ? "bg-slate-700" : "bg-slate-800"
               )}
             >
               <p className="text-3xl lg:text-4xl font-bold">{count}</p>
-              <p className="text-xs lg:text-sm opacity-90">{config.label}</p>
+              <p className="text-xs lg:text-sm opacity-90">{section.label}</p>
             </div>
           );
         })}
@@ -220,12 +256,11 @@ export default function TVMonitorPage() {
       {/* Services by Section */}
       <div className="space-y-6 mb-6">
         {MONITOR_SECTIONS.map((section) => {
-          const sectionServices = groupedServices[section.status] || [];
+          const sectionServices = groupedServices[section.key] || [];
           
-          // Always show section header, even if empty (shows 0)
           return (
-            <div key={section.status}>
-              {/* Section Header with separator line */}
+            <div key={section.key}>
+              {/* Section Header */}
               <div className="flex items-center gap-3 mb-3 pb-2">
                 <section.icon className={cn("h-5 w-5", section.color)} />
                 <h2 className="text-lg font-bold text-slate-300">
