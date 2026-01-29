@@ -4,7 +4,7 @@ import type { Service, ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
 
 interface UseServicesOptions {
-  status?: ServiceStatus | 'all';
+  status?: ServiceStatus | 'all' | 'pending_pricing';
   location?: 'cliente' | 'oficina' | 'all';
   technicianId?: string;
 }
@@ -24,7 +24,10 @@ export function useServices(options: UseServicesOptions = {}) {
         `)
         .order('created_at', { ascending: false });
 
-      if (status !== 'all') {
+      if (status === 'pending_pricing') {
+        // Todos os serviços com pending_pricing=true (independente do status)
+        query = query.eq('pending_pricing', true);
+      } else if (status !== 'all') {
         query = query.eq('status', status);
       }
 

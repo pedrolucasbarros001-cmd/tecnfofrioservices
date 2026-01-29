@@ -80,6 +80,8 @@ const getPhotoTypeLabel = (type: string | null): string => {
     case 'oficina': return 'Oficina';
     case 'entrega': return 'Entrega';
     case 'instalacao': return 'Instalação';
+    case 'instalacao_antes': return 'Antes (Instalação)';
+    case 'instalacao_depois': return 'Depois (Instalação)';
     case 'antes': return 'Antes';
     case 'depois': return 'Depois';
     default: return 'Foto';
@@ -195,7 +197,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (error) throw error;
       return data as ServicePayment[];
     },
-    enabled: !!service?.id && open && (role === 'dono' || role === 'secretaria'),
+    enabled: !!service?.id && open, // Técnicos também veem pagamentos
   });
 
   // Fetch service photos

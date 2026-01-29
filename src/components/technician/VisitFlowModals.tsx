@@ -29,8 +29,11 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logWorkshopPickup, logPartRequest, logServiceCompletion } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import type { Service } from '@/types/database';
@@ -67,6 +70,8 @@ interface FormData {
 
 export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitFlowModalsProps) {
   const updateService = useUpdateService();
+  const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
   const [formData, setFormData] = useState<FormData>({
     detectedFault: '',
@@ -116,6 +121,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         file_url: imageData,
         description: 'Foto da visita',
       });
+      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
       setFormData(prev => ({ ...prev, photoFile: imageData }));
       setShowCamera(false);
       toast.success('Foto guardada!');
@@ -178,6 +184,17 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           detected_fault: formData.detectedFault,
         });
 
+        // Log activity - pedido de peça
+        await logPartRequest(
+          service.code || 'N/A',
+          service.id,
+          formData.partToOrder.name.trim(),
+          profile?.full_name || 'Técnico',
+          user?.id
+        );
+
+        queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+        queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
         toast.success('Pedido de peça registado com assinatura!');
       } else if (signatureType === 'recolha') {
         // Save signature for pickup
@@ -196,6 +213,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           detected_fault: formData.detectedFault,
         });
 
+        // Log activity - levantamento para oficina
+        await logWorkshopPickup(
+          service.code || 'N/A',
+          service.id,
+          profile?.full_name || 'Técnico',
+          user?.id
+        );
+
+        queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
         toast.success('Aparelho recolhido para oficina!');
       } else {
         // Save signature for conclusion
@@ -215,6 +241,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           work_performed: 'Reparado no local do cliente',
         });
 
+        // Log activity - conclusão
+        await logServiceCompletion(
+          service.code || 'N/A',
+          service.id,
+          profile?.full_name || 'Técnico',
+          user?.id
+        );
+
+        queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
         toast.success('Visita concluída! Aguarda precificação.');
       }
 

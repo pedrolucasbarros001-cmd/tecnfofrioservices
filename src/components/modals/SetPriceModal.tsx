@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Shield, AlertTriangle } from 'lucide-react';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logPricingSet } from '@/utils/activityLogUtils';
 import { toast } from 'sonner';
 import type { Service, ServiceStatus } from '@/types/database';
 
@@ -29,6 +31,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const [warrantyCoversAll, setWarrantyCoversAll] = useState(false);
   
   const updateService = useUpdateService();
+  const { user, profile } = useAuth();
 
   const isWarrantyService = service?.is_warranty || false;
 
@@ -76,6 +79,15 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       pending_pricing: false,
       status: newStatus,
     });
+
+    // Log activity
+    await logPricingSet(
+      service.code || 'N/A',
+      service.id,
+      finalPrice,
+      user?.id,
+      profile?.full_name || undefined
+    );
 
     toast.success(warrantyCoversAll 
       ? 'Serviço de garantia registado - sem cobrança ao cliente!' 
