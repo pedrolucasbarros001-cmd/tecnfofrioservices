@@ -321,7 +321,7 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
           <AlertDialogHeader>
             <AlertDialogTitle>Alterar Nível de Acesso</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja alterar o nível de acesso deste utilizador?
+              Tem a certeza que deseja alterar o nível de acesso deste utilizador?
               Esta ação pode afetar as permissões e funcionalidades disponíveis.
             </AlertDialogDescription>
           </AlertDialogHeader>

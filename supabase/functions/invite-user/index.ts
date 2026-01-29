@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     // Validate password
     if (!password || password.length < 8) {
       return new Response(
-        JSON.stringify({ error: 'Senha é obrigatória e deve ter pelo menos 8 caracteres' }),
+        JSON.stringify({ error: 'Palavra-passe é obrigatória e deve ter pelo menos 8 caracteres' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

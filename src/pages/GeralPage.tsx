@@ -385,7 +385,7 @@ export default function GeralPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Eliminação</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja eliminar o serviço {currentService?.code}? 
+              Tem a certeza que deseja eliminar o serviço {currentService?.code}? 
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

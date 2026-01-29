@@ -965,7 +965,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Serviço</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja eliminar o serviço {service.code}? 
+              Tem a certeza que deseja eliminar o serviço {service.code}? 
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

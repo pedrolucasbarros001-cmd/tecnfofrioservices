@@ -343,8 +343,8 @@ export default function ColaboradoresPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {userToDeactivate?.is_active
-                ? `Tem certeza que deseja desativar ${userToDeactivate?.full_name || 'este utilizador'}? Ele não poderá receber novos serviços.`
-                : `Tem certeza que deseja ativar ${userToDeactivate?.full_name || 'este utilizador'}?`}
+                ? `Tem a certeza que deseja desativar ${userToDeactivate?.full_name || 'este utilizador'}? Ele não poderá receber novos serviços.`
+                : `Tem a certeza que deseja ativar ${userToDeactivate?.full_name || 'este utilizador'}?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
