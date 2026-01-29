@@ -1,68 +1,141 @@
 
-# Plano: Progresso do Serviço Mostra Apenas Passos Relevantes
+# Plano: Ficha Completa com Histórico de Atividades
 
 ## Problema Identificado
-Na imagem, o serviço de **Instalação** mostra todos os 9 passos (Por Fazer, Em Execução, Na Oficina, Para Pedir, Em Espera, A Precificar, Concluídos, Em Débito, Finalizado), quando deveria mostrar apenas os 4 passos que fazem sentido para uma instalação:
-1. Por Fazer
-2. Instalação (Em Execução)
-3. Concluído
-4. Finalizado
 
-## Solução
-Reutilizar a lógica do componente `ServiceTimeline` que já existe e filtra corretamente os passos por tipo de serviço:
-- **Entrega**: Criado → Em Curso → Entregue → Finalizado (4 passos)
-- **Instalação**: Criado → Instalação → Concluído → Finalizado (4 passos)
-- **Oficina**: Criado → Na Oficina → Reparação → Concluído → Finalizado (5 passos)
-- **Visita**: Criado → Visita → Concluído → Finalizado (4 passos)
+A ficha de serviço (ServiceDetailSheet) atualmente mostra informações básicas como fotos, assinaturas e pagamentos **apenas quando existem dados**. Porém, falta uma **seção de Histórico de Atividades** que exiba:
 
-## Alterações
+- Quem atribuiu o serviço
+- Quem levantou o equipamento (se aplicável)
+- Pedidos de peça realizados
+- Quando a peça chegou
+- Pagamentos registados
+- Conclusões do técnico
+- Entregas realizadas
+
+Estas informações já estão sendo registadas na tabela `activity_logs` pelo sistema, mas **não estão sendo exibidas na ficha**.
+
+---
+
+## Solução Proposta
+
+### 1. Adicionar Nova Seção "Histórico de Atividades"
+
+Criar uma nova seção na ficha que consulta os `activity_logs` do serviço e exibe uma timeline cronológica de todas as ações realizadas.
+
+### 2. Estrutura Visual
+
+```text
++-------------------------------------------+
+| HISTÓRICO DE ATIVIDADES                   |
++-------------------------------------------+
+| 29/01/2026 14:30                          |
+| [icon] João atribuiu SRV-0001 ao técnico  |
+|        Carlos Silva                       |
++-------------------------------------------+
+| 29/01/2026 15:45                          |
+| [icon] Técnico Carlos começou execução    |
++-------------------------------------------+
+| 29/01/2026 16:00                          |
+| [icon] Equipamento levantado para oficina |
++-------------------------------------------+
+| 30/01/2026 09:00                          |
+| [icon] Técnico solicitou peça "Compressor"|
++-------------------------------------------+
+```
+
+### 3. Ícones por Tipo de Ação
+
+| Tipo de Ação | Ícone | Cor |
+|--------------|-------|-----|
+| atribuicao | UserPlus | Azul |
+| inicio_execucao | Play | Verde |
+| levantamento | Package | Laranja |
+| pedido_peca | ShoppingCart | Amarelo |
+| peca_chegou | CheckCircle | Verde |
+| conclusao | CheckCircle2 | Verde |
+| precificacao | DollarSign | Roxo |
+| pagamento | CreditCard | Teal |
+| entrega | Truck | Verde |
+
+---
+
+## Alterações Técnicas
 
 ### Arquivo: `src/components/services/ServiceDetailSheet.tsx`
 
-**1. Adicionar função `getServiceProgressSteps`** (inspirada na função `getTimelineSteps` de `ServiceTimeline.tsx`):
+#### 1. Importar hook useActivityLogs
 ```typescript
-const getServiceProgressSteps = (service: Service) => {
-  const isWorkshop = service.service_location === 'oficina';
-  const isDelivery = service.service_type === 'entrega';
-  const isInstallation = service.service_type === 'instalacao';
-
-  if (isDelivery) {
-    return [
-      { label: 'Criado', status: ['por_fazer', 'em_execucao', ...] },
-      { label: 'Em Curso', status: ['em_execucao', 'concluidos', ...] },
-      { label: 'Entregue', status: ['concluidos', 'em_debito', ...] },
-      { label: 'Finalizado', status: ['finalizado'] },
-    ];
-  }
-
-  if (isInstallation) {
-    return [
-      { label: 'Criado', status: [...] },
-      { label: 'Instalação', status: [...] },
-      { label: 'Concluído', status: [...] },
-      { label: 'Finalizado', status: ['finalizado'] },
-    ];
-  }
-
-  // ... etc para Oficina e Visita
-};
+import { useActivityLogs } from '@/hooks/useActivityLogs';
 ```
 
-**2. Substituir o uso de `STATUS_TIMELINE`** na seção "Progresso do Serviço" (linhas 296-337) para usar a nova função que retorna apenas os passos relevantes.
+#### 2. Adicionar query para buscar activity logs
+```typescript
+// Fetch activity logs for this service
+const { data: activityLogs = [] } = useQuery({
+  queryKey: ['activity-logs', service?.id],
+  queryFn: async () => {
+    if (!service?.id) return [];
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .eq('service_id', service.id)
+      .order('created_at', { ascending: true }); // Ordem cronológica
+    if (error) throw error;
+    return data;
+  },
+  enabled: !!service?.id && open,
+});
+```
 
-**3. Manter a visualização atual** com círculos numerados e linhas de conexão, mas renderizar apenas os passos filtrados.
+#### 3. Adicionar nova seção "Histórico de Atividades"
+
+Inserir após a seção "Histórico" existente (linha ~648) uma nova seção com timeline de atividades:
+
+```typescript
+{/* Activity History Timeline */}
+{activityLogs.length > 0 && (
+  <Section 
+    title="Histórico de Atividades" 
+    bgColor="bg-slate-50"
+    borderColor="border-l-slate-500"
+  >
+    <div className="space-y-3">
+      {activityLogs.map((log) => (
+        <ActivityLogItem key={log.id} log={log} />
+      ))}
+    </div>
+  </Section>
+)}
+```
+
+#### 4. Criar componente ActivityLogItem
+
+Componente interno que renderiza cada entrada do log com ícone apropriado, descrição e timestamp.
+
+---
 
 ## Resultado Esperado
 
-| Tipo de Serviço | Antes | Depois |
-|-----------------|-------|--------|
-| Instalação | 9 passos | 4 passos |
-| Entrega | 9 passos | 4 passos |
-| Oficina | 9 passos | 5 passos |
-| Visita | 9 passos | 4 passos |
+| Antes | Depois |
+|-------|--------|
+| Histórico só mostra criado/atualizado | Timeline completa de todas as ações |
+| Sem informação de quem fez o quê | Cada ação com actor, descrição e data |
+| Instalações sem detalhes | Todas as fichas com histórico completo |
+
+---
 
 ## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/services/ServiceDetailSheet.tsx` | Adicionar função de filtragem e atualizar renderização do progresso |
+| `src/components/services/ServiceDetailSheet.tsx` | Adicionar query de activity_logs e nova seção "Histórico de Atividades" com timeline visual |
+
+---
+
+## Benefícios
+
+1. **Rastreabilidade completa**: Quem fez o quê e quando
+2. **Transparência**: Cliente pode ver todo o histórico se necessário
+3. **Auditoria**: Dono pode verificar todas as ações no serviço
+4. **Consistência**: Todas as fichas (instalação, entrega, visita, oficina) terão o mesmo nível de detalhe
