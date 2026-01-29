@@ -151,11 +151,11 @@ export default function DashboardPage() {
             <Card
               key={card.key}
               className={cn(
-                "cursor-pointer transition-all duration-200 border",
-                "bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700",
+                "cursor-pointer transition-all duration-200",
+                "bg-primary/5 backdrop-blur-sm border-primary/10",
                 isLit 
-                  ? "opacity-100 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 hover:shadow-md hover:-translate-y-0.5" 
-                  : "opacity-50 hover:opacity-70"
+                  ? "opacity-100 shadow-md ring-1 ring-primary/20 hover:shadow-lg hover:-translate-y-0.5" 
+                  : "opacity-40 hover:opacity-60"
               )}
               onClick={() => navigate(card.route)}
             >
@@ -163,11 +163,11 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <Icon className={cn(
                     "h-6 w-6",
-                    isLit ? "text-slate-600 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"
+                    isLit ? "text-primary" : "text-primary/40"
                   )} />
                   <span className={cn(
                     "text-3xl font-bold",
-                    isLit ? "text-slate-900 dark:text-slate-100" : "text-slate-400 dark:text-slate-600"
+                    isLit ? "text-foreground" : "text-muted-foreground/50"
                   )}>
                     {loading ? '...' : count}
                   </span>
