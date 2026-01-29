@@ -1,315 +1,199 @@
 
-# Plano: Melhorias no Sistema de Feedback e Encadeamento de Ações
+# Plano: Corrigir TV Monitor para Mostrar Todos os Serviços da Oficina
 
-## Resumo
+## Diagnóstico
 
-Este plano implementa um sistema de feedback inteligente que:
-1. Informa o utilizador sobre o novo estado do serviço após cada ação
-2. Fornece contexto adicional relevante (ex: "Serviço já se encontra na oficina")
-3. Sugere a próxima ação lógica no fluxo
-4. Usa mensagens diferenciadas e descritivas ao invés de mensagens genéricas
+O TV Monitor tem dois problemas:
 
-## Situação Atual
+1. **Agrupamento por status simples**: A lógica atual agrupa por `service.status`, mas a nova regra de coexistência define que serviços na oficina devem ser agrupados por lógica composta (technician_id + status).
 
-Atualmente, as mensagens de sucesso são genéricas e não fornecem contexto:
+2. **Seções desalinhadas**: As seções atuais não refletem a lógica correta:
+   - "Por Fazer" deveria ser "Para Assumir" (sem técnico)
+   - "Na Oficina" deveria mostrar serviços COM técnico aguardando início
 
-| Ação | Mensagem Atual | Problema |
-|------|---------------|----------|
-| Atribuir técnico | "Serviço atualizado!" | Não indica o novo estado nem o técnico |
-| Definir preço | "Preço definido: €X" | Não indica próximo passo |
-| Registar pagamento | "Pagamento registado!" | Não indica se há saldo em aberto |
-| Iniciar reparação | "Reparação iniciada!" | OK, mas pode ser melhor |
-| Concluir reparação | "Reparação concluída!" | Não menciona precificação |
+## Dados Atuais
 
-## Melhorias Propostas
+O serviço OS-00002 está corretamente:
+- `service_location = 'oficina'`
+- `status = 'na_oficina'`
+- `technician_id` preenchido
 
-### A) Mensagens Contextuais com Estado e Próxima Ação
+A RLS policy permite acesso e os dados estão corretos. O problema é a lógica de exibição no frontend.
 
-Criar mensagens que informam:
-1. O que aconteceu
-2. O novo estado/localização do serviço
-3. A próxima ação (quando aplicável)
+## Solução
 
-#### Exemplos de Novas Mensagens:
+Atualizar o TVMonitorPage.tsx para usar **filtros funcionais** que consideram tanto o `status` quanto o `technician_id`:
 
-| Ação | Nova Mensagem |
-|------|--------------|
-| Atribuir técnico (oficina) | "Técnico Pedro atribuído! Serviço na oficina, aguarda início." |
-| Atribuir técnico (cliente) | "Técnico João agendado para 15/02, manhã." |
-| Definir preço | "Preço definido: €150. Serviço pronto para entrega." |
-| Pagamento parcial | "Pagamento de €50 registado. Em falta: €100." |
-| Pagamento total | "Pagamento completo! Serviço sem débito." |
-| Iniciar reparação | "Em execução! OS-00001 está a ser reparado." |
-| Concluir (oficina) | "Concluído! Aguarda precificação pelo dono." |
-| Pedir peça | "Peça 'Compressor' solicitada. Serviço em espera." |
+### Nova Definição de MONITOR_SECTIONS
 
-### B) Hook Utilitário para Mensagens de Feedback
+| Coluna | Condição de Filtro | Descrição |
+|--------|-------------------|-----------|
+| Para Assumir | `!technician_id && ['por_fazer', 'na_oficina'].includes(status)` | Serviços sem técnico |
+| Na Oficina | `technician_id && ['por_fazer', 'na_oficina'].includes(status)` | Com técnico, aguarda início |
+| Em Execução | `status === 'em_execucao'` | Trabalho em andamento |
+| Para Pedir Peça | `status === 'para_pedir_peca'` | Precisa encomendar |
+| Em Espera de Peça | `status === 'em_espera_de_peca'` | Aguarda chegada |
+| A Precificar | `status === 'a_precificar'` | Trabalho feito, sem preço |
+| Concluídos | `status === 'concluidos'` | Prontos para entrega |
 
-Criar um novo ficheiro com funções auxiliares para gerar mensagens contextuais:
+### Alterações no Ficheiro
 
-**Novo Ficheiro**: `src/utils/feedbackMessages.ts`
+**Ficheiro**: `src/pages/TVMonitorPage.tsx`
+
+#### A) Atualizar MONITOR_SECTIONS (linhas 14-22)
+
+Adicionar função `filter` a cada seção:
+
+```typescript
+const MONITOR_SECTIONS = [
+  { 
+    key: 'para_assumir', 
+    label: 'Para Assumir', 
+    icon: User, 
+    color: 'text-blue-400',
+    filter: (s: Service) => !s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status)
+  },
+  { 
+    key: 'na_oficina', 
+    label: 'Na Oficina', 
+    icon: Building2, 
+    color: 'text-green-400',
+    filter: (s: Service) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status)
+  },
+  { 
+    key: 'em_execucao', 
+    label: 'Em Execução', 
+    icon: Play, 
+    color: 'text-cyan-400',
+    filter: (s: Service) => s.status === 'em_execucao'
+  },
+  { 
+    key: 'para_pedir_peca', 
+    label: 'Para Pedir Peça', 
+    icon: Package, 
+    color: 'text-yellow-400',
+    filter: (s: Service) => s.status === 'para_pedir_peca'
+  },
+  { 
+    key: 'em_espera_de_peca', 
+    label: 'Em Espera de Peça', 
+    icon: Clock, 
+    color: 'text-orange-400',
+    filter: (s: Service) => s.status === 'em_espera_de_peca'
+  },
+  { 
+    key: 'a_precificar', 
+    label: 'A Precificar', 
+    icon: DollarSign, 
+    color: 'text-lime-400',
+    filter: (s: Service) => s.status === 'a_precificar'
+  },
+  { 
+    key: 'concluidos', 
+    label: 'Concluídos', 
+    icon: CheckCircle, 
+    color: 'text-emerald-400',
+    filter: (s: Service) => s.status === 'concluidos'
+  },
+];
+```
+
+#### B) Atualizar Lógica de Agrupamento (linhas 157-162)
+
+Substituir agrupamento por status por agrupamento por seção:
+
+```typescript
+// Agrupar serviços por seção usando os filtros
+const groupedServices = MONITOR_SECTIONS.reduce((acc, section) => {
+  acc[section.key] = services.filter(section.filter);
+  return acc;
+}, {} as Record<string, Service[]>);
+```
+
+#### C) Atualizar Stats Bar (linhas 201-217)
+
+Usar as seções ao invés do array de status:
+
+```typescript
+<div className="grid grid-cols-7 gap-3 mb-6">
+  {MONITOR_SECTIONS.map((section) => {
+    const count = groupedServices[section.key]?.length || 0;
+    return (
+      <div
+        key={section.key}
+        className={cn(
+          "rounded-lg p-3 text-center",
+          count > 0 ? "bg-slate-700" : "bg-slate-800"
+        )}
+      >
+        <p className="text-3xl lg:text-4xl font-bold">{count}</p>
+        <p className="text-xs lg:text-sm opacity-90">{section.label}</p>
+      </div>
+    );
+  })}
+</div>
+```
+
+#### D) Atualizar Renderização das Seções (linhas 222-259)
+
+Usar `section.key` para aceder aos serviços agrupados:
+
+```typescript
+{MONITOR_SECTIONS.map((section) => {
+  const sectionServices = groupedServices[section.key] || [];
+  // ... resto igual, mas usar section.key
+})}
+```
+
+## Diagrama da Nova Lógica
 
 ```text
-Funções a implementar:
-- getAssignmentFeedback(service, techName, scheduledDate, shift)
-- getPricingFeedback(service, price, isWarranty)
-- getPaymentFeedback(amountPaid, remaining, total)
-- getStatusChangeFeedback(service, oldStatus, newStatus)
-- getPartRequestFeedback(partName, service)
-- getDeliveryFeedback(service, method)
-```
-
-### C) Integração nos Modais Existentes
-
-#### 1. AssignTechnicianModal.tsx
-**Linha ~143**: Após sucesso, usar mensagem contextual
-
-Antes:
-```typescript
-// (sem toast específico - usa o genérico do hook)
-```
-
-Depois:
-```typescript
-const techName = selectedTech?.profile?.full_name || 'Técnico';
-const dateStr = format(values.scheduled_date, "dd/MM");
-const shiftLabel = values.scheduled_shift === 'manha' ? 'manhã' : 
-                   values.scheduled_shift === 'tarde' ? 'tarde' : 'noite';
-
-if (service.service_location === 'oficina') {
-  toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
-} else {
-  toast.success(`${techName} agendado para ${dateStr}, ${shiftLabel}.`);
-}
-```
-
-#### 2. SetPriceModal.tsx
-**Linha ~97-100**: Melhorar mensagem com próximo passo
-
-Antes:
-```typescript
-toast.success(warrantyCoversAll 
-  ? 'Serviço de garantia registado - sem cobrança ao cliente!' 
-  : `Preço definido: €${finalPrice.toFixed(2)}`
-);
-```
-
-Depois:
-```typescript
-if (warrantyCoversAll) {
-  toast.success('Garantia aplicada! Serviço sem custo para o cliente.');
-} else {
-  const nextStep = service.service_location === 'oficina' 
-    ? 'Pronto para entrega.' 
-    : 'Serviço concluído.';
-  toast.success(`Preço definido: €${finalPrice.toFixed(2)}. ${nextStep}`);
-}
-```
-
-#### 3. RegisterPaymentModal.tsx
-**Linha ~106**: Indicar saldo restante ou confirmação de quitação
-
-Antes:
-```typescript
-toast.success('Pagamento registado com sucesso!');
-```
-
-Depois:
-```typescript
-if (newBalance > 0) {
-  toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);
-} else {
-  toast.success(`Pagamento completo! ${service.code} sem débito.`);
-}
-```
-
-#### 4. WorkshopFlowModals.tsx
-**Linha ~91, ~115, ~126**: Mensagens mais descritivas
-
-Antes:
-```typescript
-toast.success('Reparação iniciada!');
-toast.success('Pedido de peça registado!');
-toast.success('Reparação concluída! Aguarda precificação.');
-```
-
-Depois:
-```typescript
-toast.success(`Em execução! ${service.code} está a ser reparado.`);
-toast.success(`Peça solicitada! ${service.code} aguarda aprovação do dono.`);
-toast.success(`${service.code} concluído! Aguarda precificação pelo dono.`);
-```
-
-#### 5. RequestPartModal.tsx
-**Linha ~95**: Indicar que o serviço está em espera
-
-Antes:
-```typescript
-toast.success('Peça solicitada com sucesso!');
-```
-
-Depois:
-```typescript
-toast.success(`Peça "${partName}" solicitada! ${service.code} em espera de aprovação.`);
-```
-
-#### 6. DeliveryManagementModal.tsx
-**Linha ~37**: Confirmar opção escolhida
-
-Antes:
-```typescript
-toast.success('Serviço marcado para recolha pelo cliente');
-```
-
-Depois:
-```typescript
-toast.success(`Recolha pelo cliente definida! Notificar ${service.customer?.name || 'cliente'}.`);
-```
-
-#### 7. ForceStateModal.tsx
-**Linha ~40-42**: Mostrar transição de estado
-
-Antes:
-```typescript
-// (sem toast específico)
-```
-
-Depois:
-```typescript
-const oldLabel = SERVICE_STATUS_CONFIG[service.status]?.label;
-const newLabel = SERVICE_STATUS_CONFIG[selectedStatus]?.label;
-toast.warning(`Estado forçado: ${oldLabel} → ${newLabel}`);
-```
-
-### D) Hook useUpdateService com Mensagens Contextuais
-
-Modificar o hook para aceitar uma mensagem customizada (opcional):
-
-**Ficheiro**: `src/hooks/useServices.ts`
-
-Alterar `useUpdateService` para receber um parâmetro opcional de mensagem:
-
-```typescript
-export function useUpdateService() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, customMessage, ...updates }: 
-      Partial<Service> & { id: string; customMessage?: string }) => {
-      const { data, error } = await supabase
-        .from('services')
-        .update(updates as any)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return { data, customMessage };
-    },
-    onSuccess: ({ customMessage }) => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      // Apenas mostrar toast genérico se não houver mensagem custom
-      if (!customMessage) {
-        toast.success('Serviço atualizado!');
-      }
-      // Mensagem custom é mostrada no local que chamou
-    },
-    onError: (error) => {
-      console.error('Error updating service:', error);
-      toast.error('Erro ao atualizar serviço');
-    },
-  });
-}
-```
-
-### E) Melhorar ServiceDetailSheet com Toasts Contextuais
-
-**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx`
-
-Melhorar os toasts nas ações internas (finalizar, confirmar peça, etc.):
-
-```typescript
-// Finalizar serviço
-toast.success(`${service.code} finalizado com sucesso!`);
-
-// Confirmar pedido de peça
-toast.success(`Pedido confirmado! ${service.code} em espera de peça.`);
-
-// Peça chegou
-toast.success(`Peça chegou! ${service.code} pronto para continuar.`);
-```
-
-## Ficheiros a Alterar
-
-| Ficheiro | Alteração | Prioridade |
-|----------|-----------|------------|
-| `src/utils/feedbackMessages.ts` | **NOVO** - Funções auxiliares de mensagens | ALTA |
-| `src/hooks/useServices.ts` | Suporte a customMessage no update | ALTA |
-| `src/components/modals/AssignTechnicianModal.tsx` | Mensagem contextual de atribuição | ALTA |
-| `src/components/modals/SetPriceModal.tsx` | Mensagem com próximo passo | ALTA |
-| `src/components/modals/RegisterPaymentModal.tsx` | Indicar saldo restante | ALTA |
-| `src/components/technician/WorkshopFlowModals.tsx` | Mensagens mais claras | MÉDIA |
-| `src/components/modals/RequestPartModal.tsx` | Indicar estado de espera | MÉDIA |
-| `src/components/modals/DeliveryManagementModal.tsx` | Confirmar método de entrega | MÉDIA |
-| `src/components/modals/ForceStateModal.tsx` | Mostrar transição (warning) | MÉDIA |
-| `src/components/services/ServiceDetailSheet.tsx` | Mensagens contextuais | MÉDIA |
-
-## Estrutura do Ficheiro feedbackMessages.ts
-
-```text
-src/utils/feedbackMessages.ts
-
-Exportações:
-├── getAssignmentMessage(service, techName, date, shift)
-│   └── Retorna: "Pedro atribuído! Serviço na oficina, aguarda início."
-│
-├── getPricingMessage(price, isWarranty, location)
-│   └── Retorna: "Preço €150 definido. Pronto para entrega."
-│
-├── getPaymentMessage(paid, remaining, serviceCode)
-│   └── Retorna: "€50 registado. Em falta: €100." ou "Pagamento completo!"
-│
-├── getPartRequestMessage(partName, serviceCode)
-│   └── Retorna: "Peça 'Compressor' solicitada! OS-001 aguarda aprovação."
-│
-├── getStatusTransitionMessage(from, to, serviceCode)
-│   └── Retorna: "OS-001: Por Fazer → Em Execução"
-│
-└── getDeliveryMessage(method, customerName)
-    └── Retorna: "Recolha definida! Notificar João Silva."
+┌──────────────────────────────────────────────────────────────────┐
+│                  TV MONITOR - FLUXO DE COLUNAS                   │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Serviço chega (service_location = 'oficina')                    │
+│       │                                                          │
+│       ▼                                                          │
+│  ┌────────────────┐    technician_id     ┌────────────────┐      │
+│  │ PARA ASSUMIR   │ ──────────────────►  │   NA OFICINA   │      │
+│  │ (sem técnico)  │    atribuído         │ (com técnico)  │      │
+│  └────────────────┘                      └───────┬────────┘      │
+│                                                  │               │
+│                                          "Começar" clicado       │
+│                                                  │               │
+│                                                  ▼               │
+│                                         ┌────────────────┐       │
+│                                         │  EM EXECUÇÃO   │       │
+│                                         └───────┬────────┘       │
+│                                                 │                │
+│                     ┌───────────────────────────┼────────┐       │
+│                     │                           │        │       │
+│                     ▼                           ▼        ▼       │
+│            ┌────────────────┐          ┌────────────────────┐    │
+│            │ PARA PEDIR PEÇA│          │   A PRECIFICAR     │    │
+│            └───────┬────────┘          │   ou CONCLUÍDOS    │    │
+│                    │                   └────────────────────┘    │
+│                    ▼                                             │
+│            ┌────────────────┐                                    │
+│            │ ESPERA DE PEÇA │                                    │
+│            └────────────────┘                                    │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Resultado Esperado
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Atribuir técnico oficina | "Serviço atualizado!" | "Pedro atribuído! Serviço na oficina." |
-| Atribuir técnico cliente | "Serviço atualizado!" | "Pedro agendado para 15/02, manhã." |
-| Definir preço €150 | "Preço definido: €150" | "Preço €150 definido. Pronto para entrega." |
-| Pagamento parcial €50 | "Pagamento registado!" | "€50 registado. Em falta: €100." |
-| Pagamento total | "Pagamento registado!" | "Pagamento completo! OS-001 sem débito." |
-| Iniciar reparação | "Reparação iniciada!" | "Em execução! OS-001 está a ser reparado." |
-| Pedir peça | "Peça solicitada!" | "Peça 'Compressor' solicitada! Aguarda aprovação." |
-| Forçar estado | (sem toast) | "Estado forçado: Por Fazer → Em Execução" |
+Com o serviço OS-00002:
+- `technician_id` = preenchido
+- `status` = 'na_oficina'
+
+**Antes**: Não aparece (bug no agrupamento)
+**Depois**: Aparece na coluna "Na Oficina"
 
 ## Validação
 
-1. **Atribuição de técnico**:
-   - Na oficina: Mensagem indica "na oficina, aguarda início"
-   - No cliente: Mensagem indica data e turno agendado
-
-2. **Precificação**:
-   - Oficina: Indica "pronto para entrega"
-   - Cliente: Indica "serviço concluído"
-   - Garantia: Indica "sem custo para cliente"
-
-3. **Pagamentos**:
-   - Parcial: Mostra valor pago e em falta
-   - Total: Confirma "sem débito"
-
-4. **Fluxo de peças**:
-   - Solicitação: Indica nome da peça e espera de aprovação
-   - Chegada: Indica que pode continuar
-
-5. **Forçar estado**:
-   - Toast amarelo (warning) mostrando transição
+1. Serviço na oficina SEM técnico → Coluna "Para Assumir"
+2. Serviço na oficina COM técnico → Coluna "Na Oficina"
+3. Serviço em execução → Coluna "Em Execução"
+4. Stats Bar reflete as contagens corretas das seções
