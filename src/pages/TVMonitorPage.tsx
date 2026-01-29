@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle } from 'lucide-react';
+import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle, DollarSign } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
@@ -10,13 +10,14 @@ import { usePublicActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-// Section definitions for organized display
+// Section definitions for organized display - includes all workshop-relevant statuses
 const MONITOR_SECTIONS = [
   { status: 'por_fazer' as ServiceStatus, label: 'Por Fazer', icon: Clock, color: 'text-blue-400' },
   { status: 'em_execucao' as ServiceStatus, label: 'Em Execução', icon: Play, color: 'text-cyan-400' },
   { status: 'na_oficina' as ServiceStatus, label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
   { status: 'para_pedir_peca' as ServiceStatus, label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
   { status: 'em_espera_de_peca' as ServiceStatus, label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
+  { status: 'a_precificar' as ServiceStatus, label: 'A Precificar', icon: DollarSign, color: 'text-lime-400' },
   { status: 'concluidos' as ServiceStatus, label: 'Concluídos (Prontos para Entrega)', icon: CheckCircle, color: 'text-emerald-400' },
 ];
 
@@ -160,8 +161,8 @@ export default function TVMonitorPage() {
     return acc;
   }, {} as Record<ServiceStatus, Service[]>);
 
-  // Status order for stats bar
-  const statusOrder: ServiceStatus[] = ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'];
+  // Status order for stats bar - includes a_precificar for financial visibility
+  const statusOrder: ServiceStatus[] = ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos'];
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6 pb-40">
@@ -197,7 +198,7 @@ export default function TVMonitorPage() {
       </header>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-7 gap-3 mb-6">
         {statusOrder.map((status) => {
           const config = SERVICE_STATUS_CONFIG[status];
           const count = groupedServices[status]?.length || 0;
