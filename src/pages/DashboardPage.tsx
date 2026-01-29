@@ -15,6 +15,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import type { ServiceStatus } from '@/types/database';
 
 interface DashboardStats {
@@ -31,86 +32,16 @@ interface DashboardStats {
 }
 
 const DASHBOARD_CARDS = [
-  { 
-    key: 'por_fazer' as const, 
-    label: 'Por Fazer', 
-    icon: ClipboardList,
-    bgClass: 'bg-gray-200/50',
-    iconClass: 'text-gray-600',
-    route: '/geral?status=por_fazer'
-  },
-  { 
-    key: 'em_execucao' as const, 
-    label: 'Em Execução', 
-    icon: Play,
-    bgClass: 'bg-blue-100',
-    iconClass: 'text-blue-600',
-    route: '/geral?status=em_execucao'
-  },
-  { 
-    key: 'na_oficina' as const, 
-    label: 'Na Oficina', 
-    icon: Building2,
-    bgClass: 'bg-orange-100',
-    iconClass: 'text-orange-600',
-    route: '/geral?status=na_oficina'
-  },
-  { 
-    key: 'para_pedir_peca' as const, 
-    label: 'Para Pedir Peça', 
-    icon: Package,
-    bgClass: 'bg-purple-100',
-    iconClass: 'text-purple-600',
-    route: '/geral?status=para_pedir_peca'
-  },
-  { 
-    key: 'em_espera_de_peca' as const, 
-    label: 'Em Espera de Peça', 
-    icon: Clock,
-    bgClass: 'bg-yellow-100',
-    iconClass: 'text-yellow-700',
-    route: '/geral?status=em_espera_de_peca'
-  },
-  { 
-    key: 'concluidos' as const, 
-    label: 'Concluídos', 
-    icon: Truck,
-    bgClass: 'bg-teal-100',
-    iconClass: 'text-teal-600',
-    route: '/geral?status=concluidos'
-  },
-  { 
-    key: 'a_precificar' as const, 
-    label: 'A Precificar', 
-    icon: DollarSign,
-    bgClass: 'bg-green-200',
-    iconClass: 'text-green-700',
-    route: '/geral?status=a_precificar'
-  },
-  { 
-    key: 'em_debito' as const, 
-    label: 'Em Débito', 
-    icon: AlertCircle,
-    bgClass: 'bg-red-100',
-    iconClass: 'text-red-600',
-    route: '/em-debito'
-  },
-  { 
-    key: 'finalizado' as const, 
-    label: 'Finalizados', 
-    icon: CheckSquare,
-    bgClass: 'bg-violet-100',
-    iconClass: 'text-violet-600',
-    route: '/geral?status=finalizado'
-  },
-  { 
-    key: 'orcamentos' as const, 
-    label: 'Orçamentos', 
-    icon: FileText,
-    bgClass: 'bg-purple-100',
-    iconClass: 'text-purple-600',
-    route: '/orcamentos'
-  },
+  { key: 'por_fazer' as const, label: 'Por Fazer', icon: ClipboardList, route: '/geral?status=por_fazer' },
+  { key: 'em_execucao' as const, label: 'Em Execução', icon: Play, route: '/geral?status=em_execucao' },
+  { key: 'na_oficina' as const, label: 'Na Oficina', icon: Building2, route: '/geral?status=na_oficina' },
+  { key: 'para_pedir_peca' as const, label: 'Para Pedir Peça', icon: Package, route: '/geral?status=para_pedir_peca' },
+  { key: 'em_espera_de_peca' as const, label: 'Em Espera de Peça', icon: Clock, route: '/geral?status=em_espera_de_peca' },
+  { key: 'concluidos' as const, label: 'Concluídos', icon: Truck, route: '/geral?status=concluidos' },
+  { key: 'a_precificar' as const, label: 'A Precificar', icon: DollarSign, route: '/geral?status=a_precificar' },
+  { key: 'em_debito' as const, label: 'Em Débito', icon: AlertCircle, route: '/em-debito' },
+  { key: 'finalizado' as const, label: 'Finalizados', icon: CheckSquare, route: '/geral?status=finalizado' },
+  { key: 'orcamentos' as const, label: 'Orçamentos', icon: FileText, route: '/orcamentos' },
 ];
 
 export default function DashboardPage() {
@@ -209,22 +140,35 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Status Cards Grid - 5 columns x 2 rows */}
+      {/* Status Cards Grid - 5 columns x 2 rows - Lit/Dim Logic */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {DASHBOARD_CARDS.map((card) => {
           const Icon = card.icon;
           const count = stats[card.key as keyof DashboardStats];
+          const isLit = count > 0;
           
           return (
             <Card
               key={card.key}
-              className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5 border border-border/50 ${card.bgClass}`}
+              className={cn(
+                "cursor-pointer transition-all duration-200 border",
+                "bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700",
+                isLit 
+                  ? "opacity-100 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 hover:shadow-md hover:-translate-y-0.5" 
+                  : "opacity-50 hover:opacity-70"
+              )}
               onClick={() => navigate(card.route)}
             >
               <CardContent className="p-4 h-[120px] flex flex-col justify-between">
                 <div className="flex items-start justify-between">
-                  <Icon className={`h-6 w-6 ${card.iconClass}`} />
-                  <span className="text-3xl font-bold text-foreground">
+                  <Icon className={cn(
+                    "h-6 w-6",
+                    isLit ? "text-slate-600 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"
+                  )} />
+                  <span className={cn(
+                    "text-3xl font-bold",
+                    isLit ? "text-slate-900 dark:text-slate-100" : "text-slate-400 dark:text-slate-600"
+                  )}>
                     {loading ? '...' : count}
                   </span>
                 </div>
