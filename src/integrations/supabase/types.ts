@@ -57,6 +57,13 @@ export type Database = {
             foreignKeyName: "activity_logs_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
             referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
@@ -123,6 +130,13 @@ export type Database = {
             columns: ["converted_service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_converted_service_id_fkey"
+            columns: ["converted_service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
             referencedColumns: ["id"]
           },
           {
@@ -229,6 +243,13 @@ export type Database = {
             foreignKeyName: "notifications_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
             referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
@@ -319,6 +340,13 @@ export type Database = {
             foreignKeyName: "service_parts_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_parts_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
             referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
@@ -361,6 +389,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_payments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
             referencedColumns: ["id"]
           },
           {
@@ -412,6 +447,13 @@ export type Database = {
             foreignKeyName: "service_photos_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_photos_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
             referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
@@ -448,6 +490,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_signatures_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
             referencedColumns: ["id"]
           },
           {
@@ -679,6 +728,153 @@ export type Database = {
       }
     }
     Views: {
+      technician_services: {
+        Row: {
+          appliance_type: string | null
+          brand: string | null
+          code: string | null
+          created_at: string | null
+          customer_id: string | null
+          delivery_date: string | null
+          delivery_method: string | null
+          delivery_technician_id: string | null
+          detected_fault: string | null
+          fault_description: string | null
+          id: string | null
+          is_installation: boolean | null
+          is_sale: boolean | null
+          is_urgent: boolean | null
+          is_warranty: boolean | null
+          last_status_before_part_request: string | null
+          model: string | null
+          notes: string | null
+          pending_pricing: boolean | null
+          pickup_date: string | null
+          scheduled_date: string | null
+          scheduled_shift: string | null
+          serial_number: string | null
+          service_address: string | null
+          service_city: string | null
+          service_location: string | null
+          service_postal_code: string | null
+          service_type: string | null
+          status: string | null
+          technician_id: string | null
+          updated_at: string | null
+          warranty_brand: string | null
+          warranty_process_number: string | null
+          work_performed: string | null
+        }
+        Insert: {
+          appliance_type?: string | null
+          brand?: string | null
+          code?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          delivery_date?: string | null
+          delivery_method?: string | null
+          delivery_technician_id?: string | null
+          detected_fault?: string | null
+          fault_description?: string | null
+          id?: string | null
+          is_installation?: boolean | null
+          is_sale?: boolean | null
+          is_urgent?: boolean | null
+          is_warranty?: boolean | null
+          last_status_before_part_request?: string | null
+          model?: string | null
+          notes?: string | null
+          pending_pricing?: boolean | null
+          pickup_date?: string | null
+          scheduled_date?: string | null
+          scheduled_shift?: string | null
+          serial_number?: string | null
+          service_address?: string | null
+          service_city?: string | null
+          service_location?: string | null
+          service_postal_code?: string | null
+          service_type?: string | null
+          status?: string | null
+          technician_id?: string | null
+          updated_at?: string | null
+          warranty_brand?: string | null
+          warranty_process_number?: string | null
+          work_performed?: string | null
+        }
+        Update: {
+          appliance_type?: string | null
+          brand?: string | null
+          code?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          delivery_date?: string | null
+          delivery_method?: string | null
+          delivery_technician_id?: string | null
+          detected_fault?: string | null
+          fault_description?: string | null
+          id?: string | null
+          is_installation?: boolean | null
+          is_sale?: boolean | null
+          is_urgent?: boolean | null
+          is_warranty?: boolean | null
+          last_status_before_part_request?: string | null
+          model?: string | null
+          notes?: string | null
+          pending_pricing?: boolean | null
+          pickup_date?: string | null
+          scheduled_date?: string | null
+          scheduled_shift?: string | null
+          serial_number?: string | null
+          service_address?: string | null
+          service_city?: string | null
+          service_location?: string | null
+          service_postal_code?: string | null
+          service_type?: string | null
+          status?: string | null
+          technician_id?: string | null
+          updated_at?: string | null
+          warranty_brand?: string | null
+          warranty_process_number?: string | null
+          work_performed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_delivery_technician_id_fkey"
+            columns: ["delivery_technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_delivery_technician_id_fkey"
+            columns: ["delivery_technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+          {
+            foreignKeyName: "services_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+        ]
+      }
       tv_monitor_services: {
         Row: {
           appliance_type: string | null
