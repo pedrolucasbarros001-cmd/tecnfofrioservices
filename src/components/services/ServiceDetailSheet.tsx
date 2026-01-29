@@ -96,17 +96,48 @@ interface ServiceDetailSheetProps {
   onServiceUpdated?: () => void;
 }
 
-const STATUS_TIMELINE: ServiceStatus[] = [
-  'por_fazer',
-  'em_execucao', 
-  'na_oficina',
-  'para_pedir_peca',
-  'em_espera_de_peca',
-  'a_precificar',
-  'concluidos',
-  'em_debito',
-  'finalizado',
-];
+// Helper function to get relevant progress steps based on service type
+const getServiceProgressSteps = (service: Service) => {
+  const isWorkshop = service.service_location === 'oficina';
+  const isDelivery = service.service_type === 'entrega';
+  const isInstallation = service.service_type === 'instalacao';
+
+  if (isDelivery) {
+    return [
+      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Em Curso', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Entregue', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Finalizado', statuses: ['finalizado'] },
+    ];
+  }
+
+  if (isInstallation) {
+    return [
+      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Instalação', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Finalizado', statuses: ['finalizado'] },
+    ];
+  }
+
+  if (isWorkshop) {
+    return [
+      { label: 'Criado', statuses: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Na Oficina', statuses: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Reparação', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Finalizado', statuses: ['finalizado'] },
+    ];
+  }
+
+  // Visit service (default)
+  return [
+    { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+    { label: 'Visita', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+    { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+    { label: 'Finalizado', statuses: ['finalizado'] },
+  ];
+};
 
 export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdated }: ServiceDetailSheetProps) {
   const navigate = useNavigate();
@@ -195,7 +226,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   if (!service) return null;
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-  const currentStatusIndex = STATUS_TIMELINE.indexOf(service.status as ServiceStatus);
 
   const handleStartExecution = () => {
     // Navigate to appropriate technician flow
@@ -293,48 +323,55 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             </SheetHeader>
 
             <div className="p-4 space-y-6">
-              {/* Status Timeline - Horizontal */}
+              {/* Status Timeline - Horizontal (filtered by service type) */}
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="font-medium mb-4 text-sm">Progresso do Serviço</h4>
-                <div className="flex items-center justify-between overflow-x-auto pb-2 gap-1">
-                  {STATUS_TIMELINE.map((status, index) => {
-                    const config = SERVICE_STATUS_CONFIG[status];
-                    const isActive = index <= currentStatusIndex;
-                    const isCurrent = status === service.status;
-                    
-                    return (
-                      <div key={status} className="flex flex-col items-center min-w-[50px] relative">
-                        {/* Connector line */}
-                        {index > 0 && (
-                          <div 
-                            className={cn(
-                              "absolute top-4 right-1/2 w-full h-0.5 -translate-y-1/2",
-                              isActive ? "bg-primary" : "bg-muted-foreground/20"
-                            )}
-                            style={{ width: 'calc(100% + 8px)', right: '50%' }}
-                          />
-                        )}
+                {(() => {
+                  const progressSteps = getServiceProgressSteps(service);
+                  const currentStatus = service.status as ServiceStatus;
+                  
+                  return (
+                    <div className="flex items-center justify-between overflow-x-auto pb-2 gap-1">
+                      {progressSteps.map((step, index) => {
+                        const isCompleted = step.statuses.includes(currentStatus);
+                        const isCurrent = step.statuses.includes(currentStatus) && 
+                          !progressSteps[index + 1]?.statuses.includes(currentStatus);
                         
-                        <div 
-                          className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all relative z-10",
-                            isCurrent ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/20" :
-                            isActive ? "bg-primary/80 text-primary-foreground" :
-                            "bg-muted-foreground/20 text-muted-foreground"
-                          )}
-                        >
-                          {index + 1}
-                        </div>
-                        <span className={cn(
-                          "text-[9px] mt-1 text-center leading-tight",
-                          isCurrent ? "text-primary font-medium" : "text-muted-foreground"
-                        )}>
-                          {config.label.split(' ').slice(0, 2).join(' ')}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                        return (
+                          <div key={step.label} className="flex flex-col items-center min-w-[60px] relative flex-1">
+                            {/* Connector line */}
+                            {index > 0 && (
+                              <div 
+                                className={cn(
+                                  "absolute top-4 right-1/2 w-full h-0.5 -translate-y-1/2",
+                                  isCompleted ? "bg-primary" : "bg-muted-foreground/20"
+                                )}
+                                style={{ width: 'calc(100% + 8px)', right: '50%' }}
+                              />
+                            )}
+                            
+                            <div 
+                              className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all relative z-10",
+                                isCurrent ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/20" :
+                                isCompleted ? "bg-primary/80 text-primary-foreground" :
+                                "bg-muted-foreground/20 text-muted-foreground"
+                              )}
+                            >
+                              {index + 1}
+                            </div>
+                            <span className={cn(
+                              "text-[10px] mt-1 text-center leading-tight",
+                              isCurrent ? "text-primary font-medium" : "text-muted-foreground"
+                            )}>
+                              {step.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Tags */}
