@@ -54,21 +54,26 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const handleSubmit = async () => {
     if (!service) return;
 
-    // Determinar status baseado na localização e débito
-    const isClientLocation = service.service_location === 'cliente';
-    const hasDebt = finalPrice > (service.amount_paid || 0);
-
-    let newStatus: ServiceStatus;
-    if (warrantyCoversAll) {
-      // Warranty covers everything - no debt possible
-      newStatus = isClientLocation ? 'finalizado' : 'concluidos';
-    } else if (hasDebt) {
-      newStatus = 'em_debito';
-    } else if (isClientLocation) {
-      newStatus = 'finalizado'; // Cliente: sem entrega necessária
-    } else {
-      newStatus = 'concluidos'; // Oficina: aguarda entrega
+    // Determinar novo status:
+    // - Se já está finalizado (instalação entregue), permanece finalizado
+    // - Se estava em a_precificar e location=cliente → finalizado
+    // - Se estava em a_precificar e location=oficina → concluidos
+    // - Qualquer outro caso: não muda status (mantém operacional)
+    const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
+    const currentStatus = service.status as ServiceStatus;
+    
+    let newStatus: ServiceStatus | undefined;
+    
+    // Apenas transita status se estiver em a_precificar (status operacional de precificação)
+    if (currentStatus === 'a_precificar') {
+      if (warrantyCoversAll || !isClientLocation) {
+        newStatus = 'concluidos'; // Oficina: aguarda entrega
+      } else {
+        newStatus = 'finalizado'; // Cliente: entrega já feita
+      }
     }
+    // Se está finalizado/concluidos, NÃO muda status (mantém operacional intacto)
+    // O débito é tratado como estado financeiro calculado, não como status
 
     await updateService.mutateAsync({
       id: service.id,
@@ -77,7 +82,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       discount: discountValue,
       final_price: finalPrice,
       pending_pricing: false,
-      status: newStatus,
+      ...(newStatus && { status: newStatus }),
     });
 
     // Log activity

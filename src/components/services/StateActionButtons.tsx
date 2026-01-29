@@ -145,6 +145,18 @@ export function StateActionButtons({
         }
         return null;
 
+      // Serviços finalizados que ainda precisam de precificação
+      case 'finalizado':
+        if (isDono && service.pending_pricing && onSetPrice) {
+          return {
+            label: 'Definir Preço',
+            icon: DollarSign,
+            onClick: onSetPrice,
+            className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+          };
+        }
+        return null;
+
       case 'concluidos':
         if ((isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
           return {
@@ -165,9 +177,6 @@ export function StateActionButtons({
             className: 'bg-orange-600 hover:bg-orange-700 text-white',
           };
         }
-        return null;
-
-      case 'finalizado':
         return null;
 
       default:
@@ -235,8 +244,8 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {/* Set Price - Only Dono */}
-          {(service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && isDono && onSetPrice && (
+          {/* Set Price - Only Dono - Shows when pending_pricing=true OR status is a_precificar/concluidos without price */}
+          {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && isDono && onSetPrice && (
             <DropdownMenuItem onClick={onSetPrice}>
               <DollarSign className="h-4 w-4 mr-2" />
               Definir Preço

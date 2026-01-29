@@ -83,11 +83,13 @@ export default function TechnicianInstallationFlow() {
         signer_name: service.customer?.name,
       });
 
-      // Update service to finalizado
+      // Update service to finalizado + mark pending_pricing if no price yet
+      const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
       await updateService.mutateAsync({
         id: service.id,
         status: 'finalizado',
         service_location: 'entregue',
+        pending_pricing: needsPricing,
       });
 
       setShowSignature(false);
