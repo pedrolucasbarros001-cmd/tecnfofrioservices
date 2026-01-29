@@ -132,7 +132,6 @@ export default function TVMonitorPage() {
           technician:technicians(*, profile:profiles(*))
         `)
         .eq('service_location', 'oficina')
-        .in('status', ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

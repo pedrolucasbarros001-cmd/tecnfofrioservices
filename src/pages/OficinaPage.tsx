@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Search, Wrench, Copy, Monitor, Send, UserPlus, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { Wrench, Copy, Monitor, Send, UserPlus, Clock, AlertCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -17,25 +16,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function OficinaPage() {
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
 
-  const { data: services = [], isLoading, refetch } = useServices({ location: 'oficina' });
+  const { data: services = [], isLoading } = useServices({ location: 'oficina' });
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
-
-  const filteredServices = services.filter((service) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      service.code?.toLowerCase().includes(search) ||
-      service.customer?.name?.toLowerCase().includes(search) ||
-      service.appliance_type?.toLowerCase().includes(search)
-    );
-  });
 
   const handleCopyTVLink = () => {
     const url = `${window.location.origin}/tv-monitor`;
@@ -88,39 +76,20 @@ export default function OficinaPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Pesquisar..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Badge variant="secondary" className="text-base px-3 py-1">
-          {filteredServices.length} na oficina
-        </Badge>
-        <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
-
       {/* Services Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {isLoading ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">
             A carregar serviços...
           </div>
-        ) : filteredServices.length === 0 ? (
+        ) : services.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="py-12 text-center text-muted-foreground">
               Nenhum serviço na oficina.
             </CardContent>
           </Card>
         ) : (
-          filteredServices.map((service) => {
+          services.map((service) => {
             const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG];
             const hasTechnician = !!service.technician;
 
@@ -283,7 +252,6 @@ export default function OficinaPage() {
         service={serviceToAssign}
         open={showAssignModal}
         onOpenChange={setShowAssignModal}
-        onSuccess={() => refetch()}
       />
 
       <SendTaskModal
