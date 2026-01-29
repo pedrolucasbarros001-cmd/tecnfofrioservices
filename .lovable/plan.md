@@ -1,485 +1,375 @@
 
+# Plano: Correcao do Display de Informacoes e Funcionalidade de Reagendamento
 
-# Plano: Redesign Sofisticado do Sistema TECNOFRIO
+## Resumo
 
-## Objetivo
-
-Melhorar o design do sistema com:
-- Toggle de tema claro/escuro em todos os acessos
-- Design responsivo sem sobreposicao de texto
-- Remocao de informacoes repetitivas visuais
-- Estetica "glass" sofisticada inspirada no Apple Vision Pro
-- Manter cores, logos e fontes da marca TECNOFRIO
+Este plano aborda tres objetivos principais:
+1. **Corrigir a exibicao de informacoes do servico** nos cards da pagina Oficina Tecnico
+2. **Criar modal de reagendamento** para secretarias com opcao de mudar tecnico e/ou data/turno
+3. **Sugestoes de melhorias** para tornar o sistema mais completo e intuitivo
 
 ---
 
-## 1. Problemas Identificados
+## 1. Problema Identificado: Informacoes do Servico
 
-### 1.1 Informacoes Repetitivas
-- **Header + Sidebar**: Logo TECNOFRIO aparece 2x (sidebar header + main header)
-- **Sidebar Footer**: SecretarySidebar tem card de branding extra desnecessario
+### Analise do Codigo Atual
 
-### 1.2 Tema Nao Funcional
-- `next-themes` esta instalado mas **ThemeProvider nao esta configurado** no App.tsx
-- Preferencias de tema nao persistem
+O componente `ServiceCard` em `TechnicianOfficePage.tsx` (linhas 141-221) exibe:
 
-### 1.3 Problemas de Responsividade
-- Header rigido com `bg-white` hardcoded (nao funciona em dark mode)
-- Tabelas podem transbordar em ecras pequenos
-- Sidebars com texto que pode sobrepor
-
-### 1.4 Falta de Sofisticacao Visual
-- Cards com sombras basicas
-- Falta de efeitos glass/blur
-- Sem transicoes suaves
-
----
-
-## 2. Alteracoes por Ficheiro
-
-### 2.1 App.tsx - Adicionar ThemeProvider
-
-```typescript
-import { ThemeProvider } from 'next-themes';
-
-const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-    <QueryClientProvider client={queryClient}>
-      ...
-    </QueryClientProvider>
-  </ThemeProvider>
-);
+```text
+┌──────────────────────────────────────┐
+│ OS-00002          [Na Oficina]       │
+│ Pedro                                │
+│                                      │
+│ Aparelho                             │
+│ geladeira                            │
+│                                      │
+│ Avaria                               │
+│ caiu                 (line-clamp-2)  │
+│                                      │
+│       [Urgente] [Gar]    ☀ Manha    │
+│                                      │
+│        [Comecar]                     │
+└──────────────────────────────────────┘
 ```
 
-### 2.2 index.css - Design System Glass
+### Problemas Visuais
 
-Adicionar novas variaveis e classes:
+1. Labels "Aparelho" e "Avaria" em cinza muito claro (`text-muted-foreground text-xs`)
+2. Valores podem ficar truncados pelo `line-clamp-2` ou por falta de espaco
+3. Espacamento excessivo entre seccoes
+4. Falta de indicacao visual clara dos dados
 
-```css
-:root {
-  /* Glass effects */
-  --glass-bg: 0 0% 100% / 0.7;
-  --glass-border: 0 0% 100% / 0.2;
-  --glass-blur: 12px;
-  
-  /* Enhanced shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  --shadow-glow: 0 0 20px rgb(43 79 132 / 0.15);
-}
+### Solucao Proposta
 
-.dark {
-  --glass-bg: 222 47% 8% / 0.7;
-  --glass-border: 0 0% 100% / 0.1;
-}
+Reformular o card para um layout mais compacto e legivel:
 
-/* Glass card utility */
-.glass-card {
-  background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid hsl(var(--glass-border));
-}
-
-/* Hover glow effect */
-.hover-glow {
-  transition: box-shadow 0.3s ease, transform 0.2s ease;
-}
-.hover-glow:hover {
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
-}
-```
-
-### 2.3 AppLayout.tsx - Header Unificado
-
-**Remover** duplicacao de branding e adicionar toggle de tema:
-
-```tsx
-// Novo header limpo
-<header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4">
-  <SidebarTrigger className="-ml-1">
-    <Menu className="h-5 w-5" />
-  </SidebarTrigger>
-  
-  <div className="flex-1" />
-  
-  {/* Theme Toggle */}
-  <ThemeToggle />
-  
-  {/* Notifications */}
-  <Button variant="ghost" size="icon" className="relative" ...>
-    <Bell className="h-5 w-5" />
-    ...
-  </Button>
-</header>
-```
-
-### 2.4 Novo Componente: ThemeToggle.tsx
-
-```tsx
-import { Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
-
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="relative"
-    >
-      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Alternar tema</span>
-    </Button>
-  );
-}
-```
-
-### 2.5 Sidebars - Remover Redundancias
-
-**OwnerSidebar.tsx, SecretarySidebar.tsx, TechnicianSidebar.tsx:**
-
-1. Remover logo e texto TECNOFRIO do header da sidebar (ja esta no main header)
-2. Remover card de branding extra no footer da SecretarySidebar
-3. Simplificar para mostrar apenas menu items
-
-```tsx
-// Sidebar Header - Simplificado
-<SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-  {!isCollapsed && (
-    <span className="text-sm font-medium text-sidebar-foreground/70">
-      Menu
-    </span>
-  )}
-</SidebarHeader>
-```
-
-### 2.6 Card.tsx - Glass Effect
-
-```tsx
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "rounded-xl border bg-card/80 text-card-foreground shadow-sm backdrop-blur-sm transition-all",
-        "hover:shadow-md hover:border-border/80",
-        className
-      )}
-      {...props}
-    />
-  )
-);
-```
-
-### 2.7 DashboardPage.tsx - Cards Sofisticados
-
-```tsx
-<Card
-  key={card.key}
-  className={cn(
-    "cursor-pointer transition-all duration-200",
-    "hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5",
-    "border border-border/50 backdrop-blur-sm",
-    card.bgClass
-  )}
-  onClick={() => navigate(card.route)}
->
-  <CardContent className="p-5 h-[120px] flex flex-col justify-between">
-    ...
-  </CardContent>
-</Card>
-```
-
-### 2.8 GeralPage.tsx - Tabela Responsiva
-
-```tsx
-// Wrapper para scroll horizontal em mobile
-<div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-  <Table className="min-w-[800px]">
-    ...
-  </Table>
-</div>
-```
-
-### 2.9 LoginPage.tsx - Glass Login
-
-```tsx
-<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-  <Card className="w-full max-w-md shadow-2xl border-0 bg-white/10 backdrop-blur-xl">
-    <CardHeader className="space-y-4 text-center pb-8">
-      <div className="mx-auto p-4 rounded-full bg-white/10 backdrop-blur-sm">
-        <img 
-          src={tecnofrioLogoIcon} 
-          alt="TECNOFRIO" 
-          className="h-20 w-20 object-contain"
-        />
-      </div>
-      <CardTitle className="text-3xl font-bold tracking-tight text-white">
-        <span className="text-blue-400">TECNO</span>
-        <span className="text-slate-200">FRIO</span>
-      </CardTitle>
-      ...
-    </CardHeader>
-  </Card>
-</div>
-```
-
-### 2.10 index.html - Titulo e Meta
-
-```html
-<title>TECNOFRIO - Sistema de Gestao</title>
-<meta name="description" content="Sistema de Gestao de Servicos TECNOFRIO" />
+```text
+┌──────────────────────────────────────┐
+│ OS-00002          [Na Oficina]       │
+│ Pedro                                │
+├──────────────────────────────────────┤
+│ 📦 geladeira • teka                  │  <-- Aparelho + Marca inline
+│ ⚠️ caiu                              │  <-- Avaria com icone
+├──────────────────────────────────────┤
+│ [Urgente] [Garantia]    ☀ Manha     │
+│           [Comecar]                  │
+└──────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Ficheiros a Modificar
+## 2. Nova Funcionalidade: Modal de Reagendamento
+
+### Requisitos
+
+- Acessivel por secretarias e donos
+- Opcao de **mudar tecnico** (opcional)
+- Se tecnico nao mudar, permite alterar **data e turno**
+- Logica: Se mudar tecnico, obrigatorio nova data/turno
+- Se manter tecnico, pode mudar apenas data/turno
+
+### Design do Modal
+
+```text
+┌─────────────────────────────────────────────┐
+│ Reagendar Servico - OS-00002           [X]  │
+├─────────────────────────────────────────────┤
+│                                             │
+│ ┌───────────────────────────────────────┐   │
+│ │ Atribuicao Atual                      │   │
+│ │ Tecnico: Pedro Lucas                  │   │
+│ │ Data: 26/01/2026 • Turno: Manha       │   │
+│ └───────────────────────────────────────┘   │
+│                                             │
+│ [✓] Alterar Tecnico                         │
+│ ┌─────────────────────────────────────┐     │
+│ │ Selecionar tecnico            ▼     │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Nova Data *                                 │
+│ ┌─────────────────────────────────────┐     │
+│ │ 28/01/2026                     📅   │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ Novo Turno *                                │
+│ ○ Manha   ○ Tarde   ○ Noite                 │
+│                                             │
+│      [Cancelar]  [Confirmar Reagendamento]  │
+└─────────────────────────────────────────────┘
+```
+
+### Fluxo de Logica
+
+1. Ao abrir modal, mostra dados atuais do servico
+2. Checkbox "Alterar Tecnico" - quando ativado, mostra dropdown
+3. Campos de data e turno sao sempre visiveis (pre-preenchidos com valores atuais)
+4. Ao confirmar:
+   - Atualiza `technician_id` (se alterado)
+   - Atualiza `scheduled_date` e `scheduled_shift`
+   - Envia notificacao ao tecnico (novo ou atual)
+   - Regista log de atividade
+
+---
+
+## 3. Ficheiros a Modificar/Criar
 
 | Ficheiro | Acao | Descricao |
 |----------|------|-----------|
-| `src/App.tsx` | Modificar | Adicionar ThemeProvider |
-| `index.html` | Modificar | Atualizar titulo e meta tags |
-| `src/index.css` | Modificar | Adicionar variaveis glass e utilitarios |
-| `src/components/ThemeToggle.tsx` | Criar | Componente de toggle de tema |
-| `src/components/layouts/AppLayout.tsx` | Modificar | Remover branding duplicado, adicionar ThemeToggle |
-| `src/components/layouts/OwnerSidebar.tsx` | Modificar | Simplificar header |
-| `src/components/layouts/SecretarySidebar.tsx` | Modificar | Remover branding card, simplificar header |
-| `src/components/layouts/TechnicianSidebar.tsx` | Modificar | Simplificar header |
-| `src/components/ui/card.tsx` | Modificar | Adicionar efeitos glass |
-| `src/pages/LoginPage.tsx` | Modificar | Design glass escuro |
-| `src/pages/DashboardPage.tsx` | Modificar | Cards com hover sofisticado |
-| `src/pages/GeralPage.tsx` | Modificar | Tabela responsiva |
-| `src/pages/PreferenciasPage.tsx` | Modificar | Garantir funcionamento do tema |
+| `src/pages/technician/TechnicianOfficePage.tsx` | Modificar | Melhorar layout do ServiceCard |
+| `src/components/modals/RescheduleServiceModal.tsx` | Criar | Novo modal de reagendamento |
+| `src/components/services/StateActionButtons.tsx` | Modificar | Adicionar botao de reagendar para secretaria |
+| `src/pages/GeralPage.tsx` | Modificar | Integrar modal de reagendamento |
+| `src/components/services/ServiceDetailSheet.tsx` | Modificar | Adicionar opcao de reagendar |
 
 ---
 
-## 4. Secao Tecnica
+## 4. Seccao Tecnica
 
-### 4.1 ThemeProvider Configuration
+### 4.1 TechnicianOfficePage.tsx - ServiceCard Melhorado
 
-```tsx
-// App.tsx
-import { ThemeProvider } from 'next-themes';
-
-const App = () => (
-  <ThemeProvider 
-    attribute="class" 
-    defaultTheme="system" 
-    enableSystem
-    disableTransitionOnChange={false}
-  >
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              ...
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </ThemeProvider>
-);
-```
-
-### 4.2 CSS Glass Variables
-
-```css
-@layer base {
-  :root {
-    /* Existing variables... */
-    
-    /* Glass morphism */
-    --glass-opacity: 0.7;
-    --blur-strength: 12px;
-  }
-  
-  .dark {
-    /* Existing dark variables... */
-    
-    --glass-opacity: 0.6;
-  }
-}
-
-@layer utilities {
-  .glass {
-    @apply bg-background/70 backdrop-blur-md border border-white/10;
-  }
-  
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm;
-    @apply hover:shadow-md hover:border-border/80 transition-all duration-200;
-  }
-  
-  .hover-lift {
-    @apply transition-all duration-200;
-    @apply hover:-translate-y-0.5 hover:shadow-lg;
-  }
-}
-```
-
-### 4.3 Sidebar Simplificado (exemplo OwnerSidebar)
-
-```tsx
-export function OwnerSidebar() {
-  // ... existing code ...
+```typescript
+const ServiceCard = ({ service, isAvailable = false }: { service: Service; isAvailable?: boolean }) => {
+  const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
+  const ShiftIcon = shiftInfo?.icon || Sun;
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/50">
-      {/* Header simplificado - sem logo duplicado */}
-      <SidebarHeader className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <img 
-            src={tecnofrioLogoIcon} 
-            alt="TECNOFRIO" 
-            className="h-9 w-9 shrink-0 rounded-lg object-contain"
-          />
-          {!isCollapsed && (
-            <span className="text-lg font-bold">
-              <span className="text-[#2B4F84]">TECNO</span>
-              <span className="text-sidebar-foreground/80">FRIO</span>
-            </span>
-          )}
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent className="px-2 py-4">
-        <SidebarMenu>
-          {menuItems.map(item => (
-            <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton 
-                asChild 
-                isActive={isActive(item.url)} 
-                tooltip={item.title}
-              >
-                <NavLink
-                  to={item.url}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200',
-                    isActive(item.url)
-                      ? 'bg-sidebar-primary/10 text-sidebar-primary font-medium'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {!isCollapsed && <span>{item.title}</span>}
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border/50 p-4">
-        {!isCollapsed && profile && (
-          <div className="mb-3 px-2">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {profile.full_name || profile.email}
-            </p>
-            <p className="text-xs text-sidebar-foreground/60">Dono</p>
+    <Card
+      className={cn(
+        'hover:shadow-md transition-shadow',
+        isAvailable 
+          ? 'bg-slate-50 border-l-4 border-l-slate-400' 
+          : 'bg-orange-50 border-l-4 border-l-orange-500'
+      )}
+    >
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="font-mono font-bold text-primary">{service.code}</span>
+              <p className="font-medium truncate">
+                {service.customer?.name || 'Cliente nao definido'}
+              </p>
+            </div>
+            {getStatusBadge(service.status || 'por_fazer')}
           </div>
-        )}
-        <Button 
-          variant="ghost" 
-          className={cn(
-            'w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-            isCollapsed && 'justify-center px-2'
-          )} 
-          onClick={signOut}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span className="ml-3">Sair</span>}
-        </Button>
-      </SidebarFooter>
-    </Sidebar>
+
+          {/* Separador */}
+          <div className="border-t border-border/50" />
+
+          {/* Equipamento - Layout inline compacto */}
+          <div className="flex items-center gap-2 text-sm">
+            <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="font-medium">
+              {[service.appliance_type, service.brand, service.model]
+                .filter(Boolean)
+                .join(' • ') || 'Nao especificado'}
+            </span>
+          </div>
+
+          {/* Avaria - Se existir */}
+          {service.fault_description && (
+            <div className="flex items-start gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-muted-foreground">{service.fault_description}</p>
+            </div>
+          )}
+
+          {/* Tags + Shift */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="flex flex-wrap gap-1">
+              {service.is_urgent && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  Urgente
+                </Badge>
+              )}
+              {service.is_warranty && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-500 text-green-700">
+                  Garantia
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ShiftIcon className={cn('h-3.5 w-3.5', shiftInfo?.color)} />
+              <span className="capitalize">{service.scheduled_shift || 'Sem turno'}</span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          {/* ... botoes existentes ... */}
+        </div>
+      </CardContent>
+    </Card>
   );
+};
+```
+
+### 4.2 RescheduleServiceModal.tsx - Novo Componente
+
+```typescript
+interface RescheduleServiceModalProps {
+  service: Service | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+const formSchema = z.object({
+  change_technician: z.boolean(),
+  technician_id: z.string().optional(),
+  scheduled_date: z.date({ required_error: 'Selecione uma data' }),
+  scheduled_shift: z.enum(['manha', 'tarde', 'noite'], {
+    required_error: 'Selecione um turno',
+  }),
+});
+
+export function RescheduleServiceModal({
+  service,
+  open,
+  onOpenChange,
+  onSuccess,
+}: RescheduleServiceModalProps) {
+  const { data: technicians = [] } = useTechnicians();
+  const updateService = useUpdateService();
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      change_technician: false,
+      technician_id: service?.technician_id || '',
+      scheduled_date: service?.scheduled_date 
+        ? new Date(service.scheduled_date) 
+        : undefined,
+      scheduled_shift: service?.scheduled_shift || undefined,
+    },
+  });
+
+  const changeTechnician = form.watch('change_technician');
+
+  // Reset form when service changes
+  useEffect(() => {
+    if (service && open) {
+      form.reset({
+        change_technician: false,
+        technician_id: service.technician_id || '',
+        scheduled_date: service.scheduled_date 
+          ? new Date(service.scheduled_date) 
+          : undefined,
+        scheduled_shift: service.scheduled_shift || undefined,
+      });
+    }
+  }, [service, open]);
+
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!service) return;
+
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        ...(values.change_technician && values.technician_id 
+          ? { technician_id: values.technician_id } 
+          : {}),
+        scheduled_date: values.scheduled_date.toISOString().split('T')[0],
+        scheduled_shift: values.scheduled_shift,
+      });
+
+      // Enviar notificacao ao tecnico
+      // Registar log de atividade
+
+      toast.success('Servico reagendado com sucesso!');
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      console.error('Error rescheduling service:', error);
+      toast.error('Erro ao reagendar servico');
+    }
+  };
+
+  // ... render do modal ...
 }
 ```
 
-### 4.4 Header Unificado - AppLayout
+### 4.3 StateActionButtons.tsx - Adicionar Reagendar
 
-```tsx
-export function AppLayout() {
-  // ... existing code ...
+```typescript
+// Adicionar prop
+onReschedule?: () => void;
 
-  return (
-    <SidebarProvider>
-      {getSidebar()}
-      <SidebarInset className="flex flex-col min-h-screen">
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-md px-4">
-          <SidebarTrigger className="-ml-1">
-            <Menu className="h-5 w-5" />
-          </SidebarTrigger>
-          
-          <div className="flex-1" />
-          
-          {/* Theme Toggle */}
-          <ThemeToggle />
-          
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            onClick={() => setShowNotifications(true)}
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Button>
-        </header>
-        <main className="flex-1 overflow-auto bg-background">
-          <Outlet />
-        </main>
-      </SidebarInset>
-      
-      <NotificationPanel
-        open={showNotifications}
-        onOpenChange={setShowNotifications}
-      />
-    </SidebarProvider>
-  );
-}
+// No dropdown menu, apos "Reatribuir Tecnico"
+{service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && onReschedule && (
+  <DropdownMenuItem onClick={onReschedule}>
+    <CalendarClock className="h-4 w-4 mr-2" />
+    Reagendar Servico
+  </DropdownMenuItem>
+)}
 ```
 
 ---
 
-## 5. Resultado Esperado
+## 5. Sugestoes para Sistema Mais Completo
 
-1. **Tema Funcional**
-   - Toggle no header principal
-   - Persiste preferencia
-   - Respeita tema do sistema
+### 5.1 Navegacao e Usabilidade
 
-2. **Sem Duplicacao**
-   - Logo apenas na sidebar (centralizado)
-   - Header principal limpo com apenas toggle e notificacoes
+| Melhoria | Beneficio | Prioridade |
+|----------|-----------|------------|
+| **Pesquisa Global** | Encontrar qualquer servico/cliente rapidamente | Alta |
+| **Atalhos de Teclado** | Navegar sem mouse (Ctrl+N = novo, Ctrl+S = pesquisar) | Media |
+| **Breadcrumbs** | Saber sempre onde esta no sistema | Alta |
+| **Dashboard Personalizavel** | Cada role ve metricas relevantes | Media |
 
-3. **Visual Sofisticado**
-   - Cards com efeito glass/blur
-   - Sombras suaves com hover
-   - Transicoes fluidas
-   - Gradientes sutis
+### 5.2 Economia de Tempo
 
-4. **Responsivo**
-   - Tabelas com scroll horizontal
-   - Sidebar responsiva
-   - Sem sobreposicao de texto
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| **Templates de Servico** | Criar reparacoes frequentes com 1 clique (ex: "Limpeza AC") |
+| **Duplicar Servico** | Copiar servico existente para novo cliente |
+| **Accoes em Lote** | Atribuir varios servicos ao mesmo tecnico de uma vez |
+| **Auto-preenchimento** | Ao selecionar cliente, preencher endereco automaticamente |
 
-5. **Marca Preservada**
-   - Cores TECNOFRIO (#2B4F84)
-   - Logo do pinguim
-   - Tipografia existente
+### 5.3 Visao e Controle
+
+| Recurso | Descricao |
+|---------|-----------|
+| **KPIs no Dashboard** | Servicos hoje, pendentes, tempo medio de resolucao |
+| **Alertas Proativos** | Notificar servicos ha muito tempo no mesmo estado |
+| **Relatorio de Performance** | Tempo por servico, por tecnico, por tipo |
+| **Mapa de Servicos** | Ver localizacao das visitas do dia |
+
+### 5.4 Interatividade e UX
+
+| Melhoria | Descricao |
+|----------|-----------|
+| **Drag & Drop na Agenda** | Arrastar servico para outra data/turno |
+| **Swipe em Mobile** | Deslizar card para acoes rapidas |
+| **Animacoes de Feedback** | Confirmar visualmente que acao foi executada |
+| **Modo Offline** | Tecnicos podem registar servicos sem internet |
+
+### 5.5 Gestao Financeira
+
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| **Relatorio de Faturacao** | Por periodo, cliente, tecnico |
+| **Lembretes de Debito** | Envio automatico de SMS/Email |
+| **Exportar para Excel/PDF** | Dados para contabilidade |
+| **Integracao com Faturacao** | Gerar faturas automaticamente |
+
+---
+
+## 6. Resultado Esperado
+
+### Correcao do Display
+- Cards com informacoes visiveis e bem formatadas
+- Icones para identificar tipo de informacao
+- Layout compacto sem perda de dados
+
+### Modal de Reagendamento
+- Secretarias podem mudar data/turno sem mudar tecnico
+- Opcao de alterar tecnico quando necessario
+- Notificacoes automaticas aos envolvidos
+
+### Sistema Mais Completo
+- Roadmap claro de melhorias futuras
+- Prioridades definidas por impacto no negocio
+- Foco em economia de tempo e visibilidade
 
