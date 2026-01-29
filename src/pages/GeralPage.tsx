@@ -22,6 +22,7 @@ import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementM
 import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ForceStateModal } from '@/components/modals/ForceStateModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
+import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { useServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
@@ -50,6 +51,7 @@ export default function GeralPage() {
   const [showForceStateModal, setShowForceStateModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -116,6 +118,10 @@ export default function GeralPage() {
   const handleDeleteService = (service: Service) => {
     setCurrentService(service);
     setShowDeleteDialog(true);
+  };
+  const handleReschedule = (service: Service) => {
+    setCurrentService(service);
+    setShowRescheduleModal(true);
   };
   const confirmDelete = async () => {
     if (!currentService) return;
@@ -340,7 +346,7 @@ export default function GeralPage() {
                       
                       {/* Ações */}
                       <TableCell className="text-right">
-                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} />
+                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} />
                       </TableCell>
                     </TableRow>;
             })}
@@ -368,6 +374,7 @@ export default function GeralPage() {
       <AssignDeliveryModal service={currentService} open={showAssignDeliveryModal} onOpenChange={setShowAssignDeliveryModal} />
       <ForceStateModal service={currentService} open={showForceStateModal} onOpenChange={setShowForceStateModal} />
       <ContactClientModal service={currentService} open={showContactModal} onOpenChange={setShowContactModal} />
+      <RescheduleServiceModal service={currentService} open={showRescheduleModal} onOpenChange={setShowRescheduleModal} />
 
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

@@ -12,8 +12,8 @@ import {
   Phone,
   AlertTriangle,
   Trash2,
+  CalendarClock,
 } from 'lucide-react';
-// Removed 'Eye' from main action cases - keeping only for dropdown menu
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -40,6 +40,7 @@ interface StateActionButtonsProps {
   onForceState?: () => void;
   onContactClient?: () => void;
   onDelete?: () => void;
+  onReschedule?: () => void;
 }
 
 interface ActionConfig {
@@ -64,6 +65,7 @@ export function StateActionButtons({
   onForceState,
   onContactClient,
   onDelete,
+  onReschedule,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
   const isDono = role === 'dono';
@@ -213,6 +215,14 @@ export function StateActionButtons({
             <DropdownMenuItem onClick={onAssignTechnician}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Reatribuir Técnico
+            </DropdownMenuItem>
+          )}
+
+          {/* Reschedule Service - Dono or Secretaria */}
+          {service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && onReschedule && (
+            <DropdownMenuItem onClick={onReschedule}>
+              <CalendarClock className="h-4 w-4 mr-2" />
+              Reagendar Serviço
             </DropdownMenuItem>
           )}
 
