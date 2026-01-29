@@ -93,7 +93,7 @@ const DASHBOARD_CARDS = [
     icon: AlertCircle,
     bgClass: 'bg-red-100',
     iconClass: 'text-red-600',
-    route: '/geral?status=em_debito'
+    route: '/em-debito'
   },
   { 
     key: 'finalizado' as const, 
@@ -142,10 +142,10 @@ export default function DashboardPage() {
 
   async function fetchStats() {
     try {
-      // Fetch services stats
+      // Fetch services stats (incluindo final_price e amount_paid para cálculo de débito)
       const { data: services, error: servicesError } = await supabase
         .from('services')
-        .select('status, pending_pricing');
+        .select('status, pending_pricing, final_price, amount_paid, is_warranty');
 
       if (servicesError) throw servicesError;
 
@@ -171,12 +171,23 @@ export default function DashboardPage() {
 
       services?.forEach((service) => {
         const status = service.status as ServiceStatus;
-        if (status in counts) {
-          counts[status as keyof Omit<DashboardStats, 'orcamentos'>]++;
+        
+        // Contagem de status operacionais (excluindo a_precificar e em_debito que são calculados)
+        if (status !== 'a_precificar' && status !== 'em_debito' && status in counts) {
+          counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito'>]++;
         }
-        // Count pending pricing separately
+        
+        // "A Precificar" = pending_pricing=true (estado financeiro, não operacional)
         if (service.pending_pricing) {
           counts.a_precificar++;
+        }
+        
+        // "Em Débito" = tem preço, não é garantia, e amount_paid < final_price (estado financeiro calculado)
+        const finalPrice = service.final_price || 0;
+        const amountPaid = service.amount_paid || 0;
+        const isWarranty = service.is_warranty || false;
+        if (!isWarranty && finalPrice > 0 && amountPaid < finalPrice) {
+          counts.em_debito++;
         }
       });
 

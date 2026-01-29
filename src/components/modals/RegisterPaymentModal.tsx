@@ -84,14 +84,13 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
       if (paymentError) throw paymentError;
 
-      // Update service amount_paid and status
+      // Update service amount_paid only (status is operational, debt is financial)
       const newAmountPaid = amountPaid + paymentValue;
-      const isPaidOff = newAmountPaid >= finalPrice;
 
       await updateService.mutateAsync({
         id: service.id,
         amount_paid: newAmountPaid,
-        status: isPaidOff ? 'concluidos' : 'em_debito',
+        // Não altera status - débito é estado financeiro calculado, não operacional
       });
 
       // Log activity
