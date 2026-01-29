@@ -1,161 +1,79 @@
 
-# Plano: Corrigir Sistema de Impressão (Especificidade CSS)
+# Plano: Ficha Ocupar Toda a Página A4
 
-## Problema Identificado
-A regra `* { visibility: hidden !important; }` está escondendo **TUDO**, incluindo o `.print-portal`, porque:
-1. O seletor `*` tem a mesma prioridade que `.print-portal` quando ambos usam `!important`
-2. A ordem das regras no CSS pode estar fazendo o `*` prevalecer
-3. O `.print-only { display: none !important; }` fora do `@media print` pode estar interferindo
-
-## Causa Técnica
-No CSS, quando dois seletores têm o mesmo nível de especificidade e ambos usam `!important`, a **última regra** vence. Como o portal tem `visibility: visible`, mas o `*` aplica `visibility: hidden` a todos os elementos (incluindo os filhos do portal novamente), há conflito.
+## Problema Atual
+A ficha está aparecendo corretamente, mas:
+1. Ocupa apenas uma parte da página no preview
+2. Elementos do ambiente Lovable (barra inferior) aparecem porque há "espaço" ao redor da ficha
 
 ## Solução
-Usar uma abordagem híbrida mais específica:
+Fazer a ficha (`print-content`) e a tag (`print-tag`) ocuparem **100% da área disponível**, forçando qualquer outro elemento a ficar fora da área de impressão visível.
 
-1. **Remover `display: none` do `.print-only`** quando em `@media print`
-2. **Usar seletores mais específicos** para garantir que o portal e seus filhos apareçam
-3. **Adicionar `display: block` explícito** no `@media print` para o portal
+---
 
+## Alterações em `src/index.css`
+
+### 1. Print Portal ocupa toda a área
 ```css
-/* Fora do @media print - esconder no screen */
-.print-only {
-  display: none !important;
-}
-
-@media print {
-  /* Mostrar elementos print-only */
-  .print-only {
-    display: block !important;
-  }
-
-  /* Esconder todo o resto */
-  body > *:not(.print-portal) {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Garantir que o portal apareça com alta especificidade */
-  body > .print-portal {
-    display: block !important;
-    visibility: visible !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    background: white !important;
-    z-index: 999999 !important;
-  }
-
-  /* Garantir visibilidade de todos os descendentes */
-  body > .print-portal * {
-    visibility: visible !important;
-  }
+body > .print-portal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;           /* ADICIONAR */
+  width: 100% !important;
+  height: 100% !important;        /* MUDAR de auto para 100% */
+  min-height: 100vh !important;   /* ADICIONAR */
+  background: white !important;
+  z-index: 999999 !important;
+  overflow: visible !important;
 }
 ```
 
-## Por que isso funciona?
-1. `body > *:not(.print-portal)` esconde tudo **exceto** o portal (usando negação)
-2. `body > .print-portal` tem especificidade maior que apenas `*`
-3. `.print-only { display: block }` dentro de `@media print` sobrescreve o `display: none` de fora
-4. Não usamos mais `* { visibility: hidden }` universal que causava conflitos
-
----
-
-## Alterações Detalhadas
-
-### Arquivo: `src/index.css`
-
-**Seção @media print (linhas ~294-460)**
-
-Substituir a lógica atual por:
-
+### 2. Print Content (ficha A4) ocupa toda a página
 ```css
-/* Screen: Hide print-only content */
-.print-only {
-  display: none !important;
-}
-
-@media print {
-  /* Default page setup - A4 */
-  @page {
-    size: A4 portrait;
-    margin: 10mm;
-  }
-
-  /* Reset html/body for print */
-  html, body {
-    background: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* CRITICAL: Show print-only elements in print */
-  .print-only {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  /* Hide everything EXCEPT the print portal */
-  body > *:not(.print-portal) {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Show the print portal with high specificity */
-  body > .print-portal {
-    display: block !important;
-    visibility: visible !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    background: white !important;
-    z-index: 999999 !important;
-    overflow: visible !important;
-  }
-
-  /* Ensure ALL descendants are visible */
-  body > .print-portal *,
-  body > .print-portal *::before,
-  body > .print-portal *::after {
-    visibility: visible !important;
-  }
-
-  /* ... resto das regras de .print-content e .print-tag ... */
+.print-content {
+  display: block !important;
+  visibility: visible !important;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 190mm !important;
+  min-height: 277mm !important;   /* ADICIONAR - altura A4 menos margens */
+  margin: 0 auto !important;
+  padding: 5mm !important;
+  background: white !important;
+  color: black !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  border: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;  /* ADICIONAR */
 }
 ```
 
----
-
-## Diferença Chave
-
-| Antes (problemático) | Depois (correto) |
-|---------------------|------------------|
-| `* { visibility: hidden }` esconde TUDO | `body > *:not(.print-portal)` esconde apenas o que não é portal |
-| `.print-only { display: none }` sempre ativo | `.print-only { display: block }` dentro de @media print |
-| Conflito de especificidade | Seletores específicos com `body >` |
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/index.css` | Reescrever seção `@media print` com seletores mais específicos |
+### 3. Print Tag (80mm) - formato específico
+A tag já está correta para ocupar 80mm de largura.
 
 ---
 
 ## Resultado Esperado
 
-- **Ficha A4**: Preview mostra documento A4 com todo o conteúdo
-- **Tag 80mm**: Preview mostra etiqueta no formato 80mm
-- **Sem elementos de UI**: Nenhuma barra do Lovable ou navegação aparece
-- **Cross-platform**: Funciona em iPhone, Android, MacBook, Windows
+| Antes | Depois |
+|-------|--------|
+| Ficha aparece pequena no centro | Ficha ocupa toda a página A4 |
+| Elementos do Lovable visíveis | Elementos cortados (fora da área) |
+
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/index.css` | Atualizar `.print-portal` e `.print-content` para ocupar 100% da área |
+
+---
+
+## Por que isso resolve?
+Quando a ficha ocupa **toda a área visível** (100vh/100%), qualquer elemento fora do portal fica:
+1. Atrás da ficha (z-index mais baixo)
+2. Fora da área de corte da impressão
+
+O navegador imprime apenas o que está visível na primeira "página" A4, cortando naturalmente qualquer barra de ferramentas ou elemento de navegação.
