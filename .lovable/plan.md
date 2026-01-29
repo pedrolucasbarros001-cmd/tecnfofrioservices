@@ -1,38 +1,42 @@
 
-# Plano: Corrigir Visibilidade de Serviços na Oficina e Coexistencia de Estados
 
-## Problema Identificado
+# Plano: Conectar e Garantir Funcionamento End-to-End com Supabase
 
-Existem **3 problemas distintos** que causam serviços a "sumir":
+## Situacao Atual
 
-### 1. RLS do TV Monitor exclui status `por_fazer`
-A politica atual apenas permite:
+Apos a analise detalhada do sistema, identifiquei **3 problemas criticos** que impedem o funcionamento correto:
+
+### Problema 1: Politica RLS do TV Monitor Desatualizada
+A politica atual no Supabase ainda usa a versao antiga:
 ```sql
 status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
 ```
-Logo, servicos como `OS-00002` (status=`por_fazer`, location=`oficina`) nao aparecem.
+Isso **exclui servicos com status `por_fazer` e `a_precificar`** da oficina, mesmo quando `service_location = 'oficina'`.
 
-### 2. Nao existe card separado para servicos na oficina aguardando trabalho
-O Dashboard mostra cards por status, mas um servico pode estar "na oficina" (`service_location='oficina'`) com qualquer status operacional. O card "Na Oficina" filtra por `status='na_oficina'`, o que e diferente de `service_location='oficina'`.
+### Problema 2: Config.toml Perdeu Configuracao do Edge Function
+O ficheiro `supabase/config.toml` foi simplificado e perdeu a configuracao:
+```toml
+[functions.invite-user]
+verify_jwt = false
+```
+Isso pode causar erros na criacao de utilizadores.
 
-### 3. Estados financeiros vs operacionais precisam coexistir visualmente
-Um servico pode estar simultaneamente:
-- **Operacional**: `finalizado` (trabalho concluido)
-- **Financeiro**: "A Precificar" (`pending_pricing=true`) E/OU "Em Debito" (`final_price > amount_paid`)
+### Problema 3: Warning de React no LoginPage
+Ha um warning de `Function components cannot be given refs` no FormField do LoginPage.
 
 ---
 
-## Solucao
+## Implementacao
 
 ### A) Corrigir RLS do TV Monitor
 
-Criar nova migracao para atualizar a politica:
+Criar migracao SQL para atualizar a politica:
 
 ```sql
--- Remover politica restritiva
+-- Remover politica antiga
 DROP POLICY IF EXISTS "Public read for workshop services on TV monitor" ON public.services;
 
--- Criar politica que inclui TODOS os servicos na oficina
+-- Criar politica corrigida (baseada em location, nao apenas status)
 CREATE POLICY "Public read for workshop services on TV monitor"
   ON public.services FOR SELECT
   TO anon, authenticated
@@ -42,14 +46,7 @@ CREATE POLICY "Public read for workshop services on TV monitor"
   );
 ```
 
-**Logica**: Mostrar todos os servicos com `service_location='oficina'` exceto os ja finalizados (que sairam da oficina).
-
-**Ficheiro**: `supabase/migrations/[timestamp]_fix_tv_monitor_rls.sql`
-
----
-
-### B) Corrigir politica de customers associados
-
+E atualizar a politica de customers associados:
 ```sql
 DROP POLICY IF EXISTS "Public read for customers with workshop services" ON public.customers;
 
@@ -66,37 +63,26 @@ CREATE POLICY "Public read for customers with workshop services"
   );
 ```
 
----
-
-### C) Garantir que TV Monitor mostra todos os status relevantes
-
-Atualizar `TVMonitorPage.tsx` para incluir `por_fazer` e `a_precificar` nas secoes:
-
-```typescript
-const MONITOR_SECTIONS = [
-  { status: 'por_fazer', label: 'Por Fazer', icon: Clock, color: 'text-blue-400' },
-  { status: 'em_execucao', label: 'Em Execução', icon: Play, color: 'text-cyan-400' },
-  { status: 'na_oficina', label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
-  { status: 'para_pedir_peca', label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
-  { status: 'em_espera_de_peca', label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
-  { status: 'a_precificar', label: 'A Precificar', icon: DollarSign, color: 'text-green-400' },
-  { status: 'concluidos', label: 'Concluídos (Prontos para Entrega)', icon: CheckCircle, color: 'text-emerald-400' },
-];
-```
-
-E atualizar a barra de estatisticas:
-```typescript
-const statusOrder: ServiceStatus[] = [
-  'por_fazer', 'em_execucao', 'na_oficina', 
-  'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos'
-];
-```
-
-**Ficheiro**: `src/pages/TVMonitorPage.tsx`
+**Ficheiro**: Nova migracao SQL via ferramenta de migracoes
 
 ---
 
-### D) Migracao para corrigir dados existentes
+### B) Restaurar Configuracao do Edge Function
+
+Atualizar `supabase/config.toml` para:
+
+```toml
+project_id = "flialeqlwrtfnonxtsnx"
+
+[functions.invite-user]
+verify_jwt = false
+```
+
+**Ficheiro**: `supabase/config.toml`
+
+---
+
+### C) Corrigir Dados Legados
 
 Marcar servicos finalizados sem preco como `pending_pricing=true`:
 
@@ -111,67 +97,46 @@ WHERE status = 'finalizado'
 
 ---
 
-## Ficheiros a Alterar
+### D) Corrigir Warning de React no LoginPage
 
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `supabase/migrations/[timestamp]_fix_workshop_visibility.sql` | Nova migracao com RLS corrigida + correcao de dados |
-| `src/pages/TVMonitorPage.tsx` | Adicionar `por_fazer` e `a_precificar` nas secoes |
+O warning ocorre porque o componente `Input` dentro de `FormField` nao esta a usar `forwardRef`. Isso e apenas um warning e nao afeta a funcionalidade, mas podemos corrigir para limpar a consola.
 
----
-
-## Resultado Esperado
-
-| Cenario | Antes | Depois |
-|---------|-------|--------|
-| `por_fazer` + oficina no TV Monitor | Nao aparece | Aparece |
-| `a_precificar` + oficina no TV Monitor | Nao aparece | Aparece |
-| `em_execucao` + oficina no TV Monitor | Aparece | Aparece |
-| Servico finalizado + oficina | Nao aplicavel | Nao aparece (saiu da oficina) |
-| Dashboard cards | Conta serviços | Conta serviços (sem mudanca) |
-| GeralPage filtros | Funciona | Funciona (sem mudanca) |
+**Ficheiro**: `src/pages/LoginPage.tsx` (verificar se o Input precisa de ref)
 
 ---
 
-## Diagrama de Visibilidade
+## Resumo de Alteracoes
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    REGRA DE VISIBILIDADE                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  TV MONITOR (publico/anon):                                │
-│    service_location = 'oficina'                            │
-│    AND status NOT IN ('finalizado')                        │
-│                                                             │
-│  DASHBOARD / GERAL (autenticado):                          │
-│    Todos os servicos (politica RLS ja permite)             │
-│    Contagem por status + pending_pricing + debito calc     │
-│                                                             │
-│  COEXISTENCIA:                                              │
-│    Servico pode aparecer em multiplos "estados":           │
-│    - Status operacional (por_fazer, em_execucao, etc.)     │
-│    - Flag financeira (pending_pricing=true → A Precificar) │
-│    - Calculo financeiro (final_price > amount_paid → Debito)│
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Componente | Acao | Prioridade |
+|------------|------|------------|
+| **RLS Policies** | Migracao para corrigir visibilidade TV Monitor | CRITICA |
+| **config.toml** | Restaurar config do edge function invite-user | ALTA |
+| **Dados legados** | Marcar pending_pricing em finalizados sem preco | ALTA |
+| **LoginPage** | Corrigir warning de ref (opcional) | BAIXA |
 
 ---
 
-## Validacao
+## Validacao Pos-Implementacao
 
-1. Criar servico na oficina com status `por_fazer`:
-   - Aparece no TV Monitor ✓
-   - Aparece no Dashboard card "Por Fazer" ✓
-   - Aparece na GeralPage com filtro "Por Fazer" ✓
+1. **TV Monitor**: Verificar que servicos `por_fazer` e `a_precificar` na oficina aparecem
+2. **Dashboard**: Confirmar que contagens de "A Precificar" e "Em Debito" estao corretas
+3. **Criacao de Utilizador**: Testar criacao de novo colaborador via edge function
+4. **Fluxo de Instalacao**: Finalizar instalacao e verificar que aparece em "A Precificar"
+5. **Pagamentos**: Registar pagamento e verificar que "Em Debito" atualiza corretamente
 
-2. Finalizar instalacao sem preco:
-   - `pending_pricing=true` automaticamente ✓
-   - Aparece no card "A Precificar" ✓
-   - Aparece na lista "A Precificar" ✓
-   - Acao "Definir Preco" disponivel ✓
+---
 
-3. Definir preco e registar pagamento parcial:
-   - Aparece em "Em Debito" (calculado) ✓
-   - Status operacional permanece ✓
+## Detalhes Tecnicos
+
+### Ficheiros a Criar/Modificar
+
+1. **Nova Migracao SQL** - Corrigir RLS policies para TV Monitor
+2. `supabase/config.toml` - Restaurar configuracao do edge function
+
+### Ordem de Execucao
+
+1. Aplicar migracao SQL (RLS + dados legados)
+2. Atualizar config.toml
+3. Redeployar edge function
+4. Validar end-to-end
+
