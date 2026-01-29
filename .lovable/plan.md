@@ -1,214 +1,132 @@
 
-# Plano: Lista "A Precificar" + Painel Lateral com Detalhes Completos
+# Plano: Correção de Idioma para Português de Portugal (pt-PT)
 
-## Resumo do Pedido
+## Resumo
 
-1. **Lista "A Precificar"**: Incluir todos os serviços com `pending_pricing=true`, independentemente do status atual
-2. **Painel Lateral (ServiceDetailSheet)**: Ao clicar numa ficha, abre um painel com todos os detalhes - incluindo fotos, assinaturas e histórico de atividades
-3. **Garantir que dados estejam sempre visíveis**: Fotos, assinaturas, peças, pagamentos e histórico devem aparecer em TODAS as fichas (quando existirem dados), sem bugs
-4. **Histórico completo de atividades**: Todas as ações realizadas no serviço devem ser rastreáveis
+Após análise do código, identifiquei várias inconsistências linguísticas que misturam Português do Brasil com Português de Portugal. Este plano corrige todos os textos para seguir as convenções do pt-PT, garantindo consistência em toda a aplicação.
 
 ---
 
-## Diagnóstico Atual
+## Problemas Identificados
 
-### O que já existe e funciona:
-- ServiceDetailSheet já busca `servicePhotos`, `serviceSignatures`, `servicePayments`, `serviceParts` e `activityLogs`
-- As seções condicionais renderizam quando há dados (`servicePhotos.length > 0`, etc.)
-- O histórico de atividades foi adicionado recentemente com timeline visual
+### 1. "Senha" → "Palavra-passe" (pt-BR → pt-PT)
 
-### Problemas identificados:
+| Arquivo | Linha | Texto Atual | Texto Correto |
+|---------|-------|-------------|---------------|
+| `src/components/modals/CreateUserModal.tsx` | 38 | "Senha deve ter pelo menos 8 caracteres" | "Palavra-passe deve ter pelo menos 8 caracteres" |
+| `src/components/modals/CreateUserModal.tsx` | 163 | label "Senha" | label "Palavra-passe" |
+| `src/components/modals/CreateUserModal.tsx` | 236 | FormLabel "Senha *" | FormLabel "Palavra-passe *" |
+| `supabase/functions/invite-user/index.ts` | 84 | "Senha é obrigatória..." | "Palavra-passe é obrigatória..." |
 
-| Problema | Causa | Solução |
-|----------|-------|---------|
-| Lista "A Precificar" no Dashboard só conta `pending_pricing` mas não filtra na lista | Lógica de contagem separada da listagem | Unificar a query para buscar todos com `pending_pricing=true` |
-| Página GeralPage não tem filtro específico para "A Precificar" | O filtro de status não considera `pending_pricing` | Adicionar lógica híbrida no useServices |
-| Técnicos não veem histórico de pagamentos | Query de payments é restrita a dono/secretaria | Remover restrição de role na query |
-| Histórico de atividades pode estar vazio | Activity logs não são criados em todos os fluxos | Adicionar chamadas de log nos modais/fluxos |
-| Fotos de instalação não mostram Antes/Depois | `photo_type` salvo como "instalacao_antes"/"instalacao_depois" mas helper só mostra "Instalação" | Corrigir função `getPhotoTypeLabel` |
+### 2. "Tem certeza" → "Tem a certeza" (pt-BR → pt-PT)
+
+| Arquivo | Linha | Contexto |
+|---------|-------|----------|
+| `src/pages/GeralPage.tsx` | 388 | "Tem certeza que deseja eliminar o serviço..." |
+| `src/pages/ClientesPage.tsx` | 54 | confirm('Tem certeza que deseja eliminar...') |
+| `src/pages/ColaboradoresPage.tsx` | 346-347 | "Tem certeza que deseja desativar/ativar..." |
+| `src/components/services/ServiceDetailSheet.tsx` | 968 | "Tem certeza que deseja eliminar o serviço..." |
+| `src/components/modals/EditUserModal.tsx` | 324 | "Tem certeza que deseja alterar o nível de acesso..." |
+
+### 3. Outras Correções Menores
+
+| Arquivo | Atual | Correto | Razão |
+|---------|-------|---------|-------|
+| `src/pages/PreferenciasPage.tsx` | "Preencha todos os campos" | "Preencha todos os campos" | OK - já correto |
+| Vários | "Por favor, faça login novamente" | "Inicie sessão novamente" | "fazer login" é anglicismo |
 
 ---
 
 ## Alterações por Arquivo
 
-### 1. `src/hooks/useServices.ts` - Adicionar Suporte a pending_pricing
-
-Modificar o hook para aceitar um parâmetro `pendingPricing` que filtra serviços com `pending_pricing = true`:
+### 1. `src/components/modals/CreateUserModal.tsx`
 
 ```typescript
-interface UseServicesOptions {
-  status?: ServiceStatus | 'all' | 'a_precificar_all'; // NOVO
-  location?: 'cliente' | 'oficina' | 'all';
-  technicianId?: string;
-}
+// Linha 38: Correção da validação
+.min(8, 'Palavra-passe deve ter pelo menos 8 caracteres')
 
-// Na query:
-if (status === 'a_precificar_all') {
-  query = query.eq('pending_pricing', true);
-} else if (status !== 'all') {
-  query = query.eq('status', status);
-}
+// Linha 163: Label de sucesso
+<span className="text-xs text-muted-foreground uppercase">Palavra-passe</span>
+
+// Linha 236: FormLabel
+<FormLabel>Palavra-passe *</FormLabel>
 ```
 
-### 2. `src/pages/GeralPage.tsx` - Usar Filtro Híbrido
-
-Quando o URL tiver `?status=a_precificar`, usar o novo filtro `a_precificar_all`:
+### 2. `supabase/functions/invite-user/index.ts`
 
 ```typescript
-const selectedStatus = searchParams.get('status') as ServiceStatus || 'all';
-const effectiveStatus = selectedStatus === 'a_precificar' 
-  ? 'a_precificar_all' 
-  : selectedStatus;
+// Linha 84
+JSON.stringify({ error: 'Palavra-passe é obrigatória e deve ter pelo menos 8 caracteres' })
 ```
 
-### 3. `src/components/services/ServiceDetailSheet.tsx` - Corrigir Visibilidade
-
-#### 3.1. Remover restrição de role para pagamentos
-Atualmente os pagamentos só são buscados para dono/secretaria. Conforme solicitado, técnicos também devem ver:
+### 3. `src/pages/GeralPage.tsx`
 
 ```typescript
-// ANTES:
-enabled: !!service?.id && open && (role === 'dono' || role === 'secretaria'),
-
-// DEPOIS:
-enabled: !!service?.id && open,
+// Linha 388
+Tem a certeza que deseja eliminar o serviço {currentService?.code}?
 ```
 
-#### 3.2. Corrigir labels de fotos de instalação
-Atualizar `getPhotoTypeLabel` para reconhecer os tipos "instalacao_antes" e "instalacao_depois":
+### 4. `src/pages/ClientesPage.tsx`
 
 ```typescript
-const getPhotoTypeLabel = (type: string | null): string => {
-  switch (type) {
-    case 'visita': return 'Visita';
-    case 'oficina': return 'Oficina';
-    case 'entrega': return 'Entrega';
-    case 'instalacao': return 'Instalação';
-    case 'instalacao_antes': return 'Antes (Instalação)';  // NOVO
-    case 'instalacao_depois': return 'Depois (Instalação)'; // NOVO
-    case 'antes': return 'Antes';
-    case 'depois': return 'Depois';
-    default: return 'Foto';
-  }
-};
+// Linha 54
+if (confirm('Tem a certeza que deseja eliminar este cliente?')) {
 ```
 
-### 4. Adicionar Logs de Atividade nos Fluxos Críticos
-
-Os seguintes arquivos precisam chamar as funções de `activityLogUtils.ts`:
-
-| Arquivo | Ação a Registar | Função a Chamar |
-|---------|-----------------|-----------------|
-| `InstallationFlowModals.tsx` | Conclusão da instalação | `logServiceCompletion` |
-| `DeliveryFlowModals.tsx` | Conclusão da entrega | `logDelivery` |
-| `VisitFlowModals.tsx` | Levantamento para oficina | `logWorkshopPickup` |
-| `VisitFlowModals.tsx` | Pedido de peça | `logPartRequest` |
-| `SetPriceModal.tsx` | Definição de preço | `logPricingSet` |
-| `RegisterPaymentModal.tsx` | Registo de pagamento | `logPayment` |
-
-#### Exemplo para `SetPriceModal.tsx`:
+### 5. `src/pages/ColaboradoresPage.tsx`
 
 ```typescript
-import { logPricingSet } from '@/utils/activityLogUtils';
-import { useAuth } from '@/contexts/AuthContext';
-
-// No handleSubmit, após updateService.mutateAsync:
-await logPricingSet(
-  service.code || 'N/A',
-  service.id,
-  finalPrice,
-  user?.id,
-  profile?.full_name
-);
+// Linhas 346-347
+? `Tem a certeza que deseja desativar ${userToDeactivate?.full_name || 'este utilizador'}?`
+: `Tem a certeza que deseja ativar ${userToDeactivate?.full_name || 'este utilizador'}?`
 ```
 
-### 5. Atualizar RLS para Activity Logs (técnico ver histórico completo)
+### 6. `src/components/services/ServiceDetailSheet.tsx`
 
-O técnico atribuído deve ver todos os logs do seu serviço, não apenas os públicos. Adicionar migration:
+```typescript
+// Linha 968
+Tem a certeza que deseja eliminar o serviço {service.code}?
+```
 
-```sql
--- Permitir que técnico atribuído veja todos os logs do seu serviço
-DROP POLICY IF EXISTS "Activity logs viewable by dono secretaria or public" ON public.activity_logs;
+### 7. `src/components/modals/EditUserModal.tsx`
 
-CREATE POLICY "Activity logs viewable by authorized users"
-  ON public.activity_logs FOR SELECT
-  TO authenticated
-  USING (
-    is_dono(auth.uid()) OR 
-    is_secretaria(auth.uid()) OR 
-    is_public = true OR
-    (service_id IS NOT NULL AND EXISTS (
-      SELECT 1 FROM public.services s
-      JOIN public.technicians t ON s.technician_id = t.id
-      WHERE s.id = activity_logs.service_id 
-        AND t.profile_id = get_technician_profile_id(auth.uid())
-    ))
-  );
+```typescript
+// Linha 324
+Tem a certeza que deseja alterar o nível de acesso deste utilizador?
 ```
 
 ---
 
-## Resumo de Arquivos a Modificar
+## Resumo de Alterações
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useServices.ts` | Adicionar filtro `a_precificar_all` para pending_pricing |
-| `src/pages/GeralPage.tsx` | Mapear status "a_precificar" para o novo filtro |
-| `src/pages/DashboardPage.tsx` | Manter contagem atual (já funciona) |
-| `src/components/services/ServiceDetailSheet.tsx` | Remover restrição de role em pagamentos + corrigir labels de fotos |
-| `src/components/modals/SetPriceModal.tsx` | Adicionar log de precificação |
-| `src/components/modals/RegisterPaymentModal.tsx` | Adicionar log de pagamento |
-| `src/components/technician/InstallationFlowModals.tsx` | Adicionar log de conclusão |
-| `src/components/technician/DeliveryFlowModals.tsx` | Adicionar log de entrega |
-| `src/components/technician/VisitFlowModals.tsx` | Adicionar logs de levantamento e pedido de peça |
-| `supabase/migrations/` | Nova migration para RLS de activity_logs |
+| Arquivo | Nº Alterações |
+|---------|---------------|
+| `CreateUserModal.tsx` | 3 |
+| `invite-user/index.ts` | 1 |
+| `GeralPage.tsx` | 1 |
+| `ClientesPage.tsx` | 1 |
+| `ColaboradoresPage.tsx` | 2 |
+| `ServiceDetailSheet.tsx` | 1 |
+| `EditUserModal.tsx` | 1 |
+| **Total** | **10** |
+
+---
+
+## Verificações Adicionais (Já Corretos)
+
+Os seguintes textos já estão em pt-PT correto:
+- "A carregar..." ✅
+- "Palavra-passe" em LoginPage e PreferenciasPage ✅
+- "Eliminar" (não "Apagar" ou "Deletar") ✅
+- "Utilizador" (não "Usuário") ✅
+- "Guardar" (não "Salvar") ✅
+- "Telemóvel" não usado, mas "Telefone" é aceitável ✅
 
 ---
 
 ## Resultado Esperado
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Lista "A Precificar" | Só serviços com status="a_precificar" | Todos com pending_pricing=true |
-| Ficha de Instalação | Sem fotos/assinaturas visíveis | Fotos "Antes/Depois" + Assinatura + Histórico |
-| Técnico abre ficha | Não vê pagamentos nem histórico completo | Vê tudo do seu serviço |
-| Histórico de atividades | Vazio em muitos serviços | Timeline com todas as ações |
-
----
-
-## Fluxo de Dados Visual
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│                      Dashboard                          │
-│  ┌─────────────┐                                        │
-│  │ A Precificar│ ← conta pending_pricing=true           │
-│  │     12      │                                        │
-│  └─────────────┘                                        │
-│         │ clique                                        │
-│         ▼                                               │
-│  ┌─────────────────────────────────────────────┐       │
-│  │ GeralPage (?status=a_precificar)            │       │
-│  │                                              │       │
-│  │  Lista com TODOS serviços pending_pricing   │       │
-│  │  (não só status='a_precificar')             │       │
-│  └─────────────────────────────────────────────┘       │
-│                    │ clique na linha                   │
-│                    ▼                                    │
-│  ┌─────────────────────────────────────────────┐       │
-│  │ ServiceDetailSheet (Painel Lateral)          │       │
-│  │                                              │       │
-│  │  ✅ Progresso do Serviço                    │       │
-│  │  ✅ Cliente                                  │       │
-│  │  ✅ Detalhes do Serviço                     │       │
-│  │  ✅ Agendamento                              │       │
-│  │  ✅ Informação Financeira                   │       │
-│  │  ✅ Peças Utilizadas                         │       │
-│  │  ✅ Histórico de Pagamentos ← agora técnico vê│      │
-│  │  ✅ Fotos (Antes/Depois para instalações)   │       │
-│  │  ✅ Assinaturas                              │       │
-│  │  ✅ Histórico de Atividades ← timeline      │       │
-│  │  ✅ Observações                              │       │
-│  └─────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────┘
-```
+Após as alterações:
+- Toda a interface usará "Palavra-passe" em vez de "Senha"
+- Todas as confirmações usarão "Tem a certeza" (com artigo "a")
+- Consistência linguística em pt-PT em toda a aplicação
