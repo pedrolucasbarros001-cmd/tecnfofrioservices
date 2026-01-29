@@ -312,46 +312,14 @@ export default function TVMonitorPage() {
         })}
       </div>
 
-      {/* Services by Section */}
-      <div className="space-y-6 mb-6">
-        {MONITOR_SECTIONS.map((section) => {
-          const sectionServices = groupedServices[section.key] || [];
-          
-          return (
-            <div key={section.key}>
-              {/* Section Header */}
-              <div className="flex items-center gap-3 mb-3 pb-2">
-                <section.icon className={cn("h-5 w-5", section.color)} />
-                <h2 className="text-lg font-bold text-slate-300">
-                  {section.label}
-                </h2>
-                <Badge 
-                  variant="secondary" 
-                  className={cn(
-                    "text-xs",
-                    sectionServices.length > 0 ? "bg-slate-700" : "bg-slate-800 text-slate-500"
-                  )}
-                >
-                  {sectionServices.length}
-                </Badge>
-              </div>
-              
-              {/* Section Cards */}
-              {sectionServices.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                  {sectionServices.map((service) => (
-                    <ServiceCard key={service.id} service={service} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-slate-600 text-sm italic pl-8">
-                  Nenhum serviço nesta secção
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* Unified Services Grid */}
+      {services.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
+          {services.map((service) => (
+            <ServiceCard key={service.id} service={service} />
+          ))}
+        </div>
+      )}
 
       {/* Empty State - Only if no services at all */}
       {services.length === 0 && (
