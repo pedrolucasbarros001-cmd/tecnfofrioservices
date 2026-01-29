@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Sun, Moon, Sunrise, Play, UserPlus } from 'lucide-react';
+import { Wrench, Sun, Moon, Sunrise, Play, UserPlus, Package, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -152,32 +152,41 @@ export default function TechnicianOfficePage() {
         )}
       >
         <CardContent className="p-4">
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <span className="font-mono font-bold text-sm">{service.code}</span>
-                <p className="font-medium text-sm truncate mt-0.5">
+                <span className="font-mono font-bold text-primary">{service.code}</span>
+                <p className="font-medium truncate">
                   {service.customer?.name || 'Cliente não definido'}
                 </p>
               </div>
               {getStatusBadge(service.status || 'por_fazer')}
             </div>
 
-            {/* Appliance */}
-            <div className="text-sm">
-              <p className="text-muted-foreground text-xs">Aparelho</p>
-              <p className="font-medium truncate">{service.appliance_type || 'Não especificado'}</p>
+            {/* Separator */}
+            <div className="border-t border-border/50" />
+
+            {/* Appliance - Compact inline layout */}
+            <div className="flex items-center gap-2 text-sm">
+              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-medium">
+                {[service.appliance_type, service.brand, service.model]
+                  .filter(Boolean)
+                  .join(' • ') || 'Não especificado'}
+              </span>
             </div>
 
-            {/* Fault */}
-            <div className="text-sm">
-              <p className="text-muted-foreground text-xs">Avaria</p>
-              <p className="line-clamp-2">{service.fault_description || 'Sem descrição'}</p>
-            </div>
+            {/* Fault - If exists */}
+            {service.fault_description && (
+              <div className="flex items-start gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-muted-foreground">{service.fault_description}</p>
+              </div>
+            )}
 
             {/* Tags + Shift */}
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 pt-1">
               <div className="flex flex-wrap gap-1">
                 {service.is_urgent && (
                   <Badge variant="destructive" className="text-[10px] px-1.5 py-0">

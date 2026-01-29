@@ -41,6 +41,7 @@ import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ForceStateModal } from '@/components/modals/ForceStateModal';
 import { RequestPartModal } from '@/components/modals/RequestPartModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
+import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
@@ -125,6 +126,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showRequestPartModal, setShowRequestPartModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -786,6 +788,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onForceState={role === 'dono' ? () => setShowForceStateModal(true) : undefined}
               onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}
               onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
+              onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
             />
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
@@ -866,6 +869,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         open={showAssignDeliveryModal}
         onOpenChange={(open) => {
           setShowAssignDeliveryModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <RescheduleServiceModal
+        open={showRescheduleModal}
+        onOpenChange={(open) => {
+          setShowRescheduleModal(open);
           if (!open) handleModalSuccess();
         }}
         service={service}
