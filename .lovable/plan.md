@@ -1,47 +1,66 @@
 
-# Plano: Corrigir Elementos do UI Aparecendo no Print Preview
+# Plano: Corrigir Sistema de Impressão (Especificidade CSS)
 
 ## Problema Identificado
-O conteúdo da impressão (ficha e tag) está aparecendo corretamente, mas **elementos da interface do Lovable** estão "vazando" para o preview de impressão (barra inferior com `/geral?status=finalizado`, botões "Chat", "Preview").
+A regra `* { visibility: hidden !important; }` está escondendo **TUDO**, incluindo o `.print-portal`, porque:
+1. O seletor `*` tem a mesma prioridade que `.print-portal` quando ambos usam `!important`
+2. A ordem das regras no CSS pode estar fazendo o `*` prevalecer
+3. O `.print-only { display: none !important; }` fora do `@media print` pode estar interferindo
 
-## Causa Raiz
-O CSS atual usa `body > *` que só afeta filhos **diretos** do body. No entanto:
-1. O app roda dentro de um iframe do Lovable
-2. Há elementos injetados pelo ambiente que não são filhos diretos do body
-3. O seletor `body > *` não consegue esconder esses elementos adicionais
+## Causa Técnica
+No CSS, quando dois seletores têm o mesmo nível de especificidade e ambos usam `!important`, a **última regra** vence. Como o portal tem `visibility: visible`, mas o `*` aplica `visibility: hidden` a todos os elementos (incluindo os filhos do portal novamente), há conflito.
 
-## Solução Proposta
-Usar uma abordagem mais robusta com `visibility: hidden` que afeta **todos** os elementos, não apenas filhos diretos:
+## Solução
+Usar uma abordagem híbrida mais específica:
+
+1. **Remover `display: none` do `.print-only`** quando em `@media print`
+2. **Usar seletores mais específicos** para garantir que o portal e seus filhos apareçam
+3. **Adicionar `display: block` explícito** no `@media print` para o portal
 
 ```css
+/* Fora do @media print - esconder no screen */
+.print-only {
+  display: none !important;
+}
+
 @media print {
-  /* Esconder TUDO - usando visibility que é herdado */
-  * {
+  /* Mostrar elementos print-only */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Esconder todo o resto */
+  body > *:not(.print-portal) {
+    display: none !important;
     visibility: hidden !important;
   }
-  
-  /* Mostrar APENAS o portal e seus filhos */
-  .print-portal,
-  .print-portal * {
+
+  /* Garantir que o portal apareça com alta especificidade */
+  body > .print-portal {
+    display: block !important;
     visibility: visible !important;
-  }
-  
-  /* Posicionar o portal no topo */
-  .print-portal {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
+    right: 0 !important;
     width: 100% !important;
+    height: auto !important;
     background: white !important;
     z-index: 999999 !important;
+  }
+
+  /* Garantir visibilidade de todos os descendentes */
+  body > .print-portal * {
+    visibility: visible !important;
   }
 }
 ```
 
-Esta abordagem:
-- `visibility: hidden` em `*` esconde **absolutamente tudo** na página
-- `visibility: visible` no `.print-portal` e seus filhos mostra apenas o conteúdo de impressão
-- Funciona independentemente da estrutura DOM do ambiente (iframe, elementos injetados, etc.)
+## Por que isso funciona?
+1. `body > *:not(.print-portal)` esconde tudo **exceto** o portal (usando negação)
+2. `body > .print-portal` tem especificidade maior que apenas `*`
+3. `.print-only { display: block }` dentro de `@media print` sobrescreve o `display: none` de fora
+4. Não usamos mais `* { visibility: hidden }` universal que causava conflitos
 
 ---
 
@@ -49,64 +68,80 @@ Esta abordagem:
 
 ### Arquivo: `src/index.css`
 
-**Localização**: Linhas 294-452 (seção `@media print`)
+**Seção @media print (linhas ~294-460)**
 
-**Mudanças**:
-
-1. Substituir `body > *` por `*` universal com visibility
-2. Remover `display: none` (visibility é mais confiável para print)
-3. Garantir que o portal esteja posicionado corretamente com `position: fixed`
-4. Adicionar `height: 100%` e `overflow: visible` para evitar cortes
+Substituir a lógica atual por:
 
 ```css
-/* ANTES (problemático) */
-body > * {
+/* Screen: Hide print-only content */
+.print-only {
   display: none !important;
-  visibility: hidden !important;
 }
 
-body > .print-portal {
-  display: block !important;
-  visibility: visible !important;
-  position: absolute !important;
-  ...
-}
+@media print {
+  /* Default page setup - A4 */
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
 
-/* DEPOIS (robusto) */
-* {
-  visibility: hidden !important;
-}
+  /* Reset html/body for print */
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
 
-.print-portal,
-.print-portal * {
-  visibility: visible !important;
-}
+  /* CRITICAL: Show print-only elements in print */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
 
-.print-portal {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
-  height: auto !important;
-  background: white !important;
-  z-index: 999999 !important;
+  /* Hide everything EXCEPT the print portal */
+  body > *:not(.print-portal) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Show the print portal with high specificity */
+  body > .print-portal {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: white !important;
+    z-index: 999999 !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure ALL descendants are visible */
+  body > .print-portal *,
+  body > .print-portal *::before,
+  body > .print-portal *::after {
+    visibility: visible !important;
+  }
+
+  /* ... resto das regras de .print-content e .print-tag ... */
 }
 ```
 
 ---
 
-## Resultado Esperado
+## Diferença Chave
 
-| Antes | Depois |
-|-------|--------|
-| Ficha aparece + barra inferior do Lovable | Apenas a ficha aparece |
-| Tag aparece + barra inferior do Lovable | Apenas a tag aparece |
-
-- **Ficha A4**: Preview mostra APENAS o documento da ficha, sem elementos de UI
-- **Tag 80mm**: Preview mostra APENAS a etiqueta no formato 80mm
-- **Cross-platform**: Funciona em iPhone, Android, MacBook, Windows
-- **Sem navegação**: Continua não navegando para nenhuma página
+| Antes (problemático) | Depois (correto) |
+|---------------------|------------------|
+| `* { visibility: hidden }` esconde TUDO | `body > *:not(.print-portal)` esconde apenas o que não é portal |
+| `.print-only { display: none }` sempre ativo | `.print-only { display: block }` dentro de @media print |
+| Conflito de especificidade | Seletores específicos com `body >` |
 
 ---
 
@@ -114,18 +149,13 @@ body > .print-portal {
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/index.css` | Atualizar regras `@media print` para usar `visibility` universal |
+| `src/index.css` | Reescrever seção `@media print` com seletores mais específicos |
 
 ---
 
-## Detalhes Técnicos
+## Resultado Esperado
 
-### Por que `visibility` em vez de `display`?
-- `display: none` remove o elemento do layout, mas não é consistente entre browsers para print
-- `visibility: hidden` mantém o espaço mas torna invisível - porém com `position: fixed` no portal, isso não é problema
-- `visibility` é mais confiável para esconder elementos injetados por frameworks/ambientes externos
-
-### Por que `*` universal?
-- O seletor `body > *` só afeta filhos diretos do body
-- Elementos injetados pelo Lovable (iframe tooling) podem estar em níveis diferentes
-- `*` garante que TUDO seja escondido, e depois seletivamente mostramos o portal
+- **Ficha A4**: Preview mostra documento A4 com todo o conteúdo
+- **Tag 80mm**: Preview mostra etiqueta no formato 80mm
+- **Sem elementos de UI**: Nenhuma barra do Lovable ou navegação aparece
+- **Cross-platform**: Funciona em iPhone, Android, MacBook, Windows
