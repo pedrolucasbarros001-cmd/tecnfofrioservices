@@ -1,79 +1,159 @@
 
-# Plano: Ficha Ocupar Toda a Página A4
+# Plano: Ficha Ocupar 100% da Viewport no Print
 
-## Problema Atual
-A ficha está aparecendo corretamente, mas:
-1. Ocupa apenas uma parte da página no preview
-2. Elementos do ambiente Lovable (barra inferior) aparecem porque há "espaço" ao redor da ficha
+## Problema Identificado
+A ficha de serviço está aparecendo pequena no preview de impressão do iOS porque:
 
-## Solução
-Fazer a ficha (`print-content`) e a tag (`print-tag`) ocuparem **100% da área disponível**, forçando qualquer outro elemento a ficar fora da área de impressão visível.
+1. O `.print-content` não está expandindo para ocupar toda a área disponível
+2. O portal não está forçando a página a ter apenas o conteúdo de impressão visível
+3. Os elementos do ambiente Lovable aparecem porque há "espaço livre" na página
 
----
+## Análise da Screenshot
+- A página A4 mostra a ficha pequena no centro
+- Elementos do Lovable ("/geral?status=finalizado", "Chat", "Preview") aparecem na parte inferior
+- "Página 1 de 1" confirma que é apenas 1 página
 
-## Alterações em `src/index.css`
+## Solução: Forçar Ocupação Total
 
-### 1. Print Portal ocupa toda a área
-```css
-body > .print-portal {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;           /* ADICIONAR */
-  width: 100% !important;
-  height: 100% !important;        /* MUDAR de auto para 100% */
-  min-height: 100vh !important;   /* ADICIONAR */
-  background: white !important;
-  z-index: 999999 !important;
-  overflow: visible !important;
-}
-```
+### Estratégia 1: Print-Content como Bloco de Página Inteira
+Fazer o `.print-content` usar `height: 100vh` para garantir que ocupe toda a altura visível:
 
-### 2. Print Content (ficha A4) ocupa toda a página
 ```css
 .print-content {
   display: block !important;
   visibility: visible !important;
-  position: relative !important;
+  position: absolute !important;    /* MUDAR de relative para absolute */
+  top: 0 !important;
+  left: 0 !important;
   width: 100% !important;
-  max-width: 190mm !important;
-  min-height: 277mm !important;   /* ADICIONAR - altura A4 menos margens */
-  margin: 0 auto !important;
-  padding: 5mm !important;
+  max-width: none !important;       /* REMOVER limite de 190mm */
+  height: 100vh !important;         /* OCUPAR TODA A ALTURA */
+  min-height: 297mm !important;     /* A4 completo */
+  margin: 0 !important;
+  padding: 10mm !important;         /* Padding interno para margens */
   background: white !important;
-  color: black !important;
-  font-size: 11px !important;
-  line-height: 1.4 !important;
-  border: none !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;  /* ADICIONAR */
+  ...
 }
 ```
 
-### 3. Print Tag (80mm) - formato específico
-A tag já está correta para ocupar 80mm de largura.
+### Estratégia 2: Portal como Única Coisa Visível
+Garantir que o portal cubra absolutamente tudo:
+
+```css
+body > .print-portal {
+  display: block !important;
+  visibility: visible !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;          /* VIEWPORT WIDTH */
+  height: 100vh !important;         /* VIEWPORT HEIGHT */
+  background: white !important;
+  z-index: 2147483647 !important;   /* MÁXIMO z-index possível */
+  overflow: hidden !important;      /* Esconder overflow */
+}
+```
+
+### Estratégia 3: Esconder Root do App
+Esconder o elemento root do React para garantir que nada apareça atrás:
+
+```css
+@media print {
+  #root {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+```
+
+---
+
+## Alterações Detalhadas
+
+### Arquivo: `src/index.css`
+
+Modificar a seção `@media print`:
+
+```css
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;  /* SEM MARGENS na página - padding no conteúdo */
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  /* Esconder #root explicitamente */
+  #root {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Portal cobre TUDO */
+  body > .print-portal {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: white !important;
+    z-index: 2147483647 !important;
+    overflow: visible !important;
+  }
+
+  /* Print content ocupa página inteira */
+  .print-content {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    background: white !important;
+    box-sizing: border-box !important;
+  }
+}
+```
 
 ---
 
 ## Resultado Esperado
 
-| Antes | Depois |
-|-------|--------|
-| Ficha aparece pequena no centro | Ficha ocupa toda a página A4 |
-| Elementos do Lovable visíveis | Elementos cortados (fora da área) |
+| Elemento | Antes | Depois |
+|----------|-------|--------|
+| .print-portal | Não cobre tudo | Cobre 100vw x 100vh |
+| .print-content | Pequeno no centro | Ocupa toda a página |
+| #root (app) | Visível atrás | Escondido explicitamente |
+| Elementos Lovable | Aparecem em baixo | Cortados/invisíveis |
+
+---
+
+## Por que isso resolve?
+
+1. **z-index máximo**: `2147483647` é o valor máximo de z-index, garantindo que o portal fique acima de QUALQUER elemento
+2. **inset: 0**: Atalho para `top: 0; right: 0; bottom: 0; left: 0;` - cobre toda a área
+3. **100vw/100vh**: Usa unidades de viewport para garantir cobertura total
+4. **#root escondido**: O React root é explicitamente escondido, removendo qualquer conteúdo da app
+5. **margin: 0 no @page**: Remove margens do navegador, deixando todo o controle de padding no conteúdo
+
+---
 
 ## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/index.css` | Atualizar `.print-portal` e `.print-content` para ocupar 100% da área |
-
----
-
-## Por que isso resolve?
-Quando a ficha ocupa **toda a área visível** (100vh/100%), qualquer elemento fora do portal fica:
-1. Atrás da ficha (z-index mais baixo)
-2. Fora da área de corte da impressão
-
-O navegador imprime apenas o que está visível na primeira "página" A4, cortando naturalmente qualquer barra de ferramentas ou elemento de navegação.
+| `src/index.css` | Reescrever @media print com estratégia de ocupação total |
