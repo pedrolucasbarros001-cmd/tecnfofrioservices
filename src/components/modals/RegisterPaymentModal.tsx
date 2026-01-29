@@ -90,7 +90,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       await updateService.mutateAsync({
         id: service.id,
         amount_paid: newAmountPaid,
-        // Não altera status - débito é estado financeiro calculado, não operacional
+        skipToast: true, // Contextual message below
       });
 
       // Log activity
@@ -103,7 +103,13 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-      toast.success('Pagamento registado com sucesso!');
+      
+      // Contextual feedback message
+      if (newBalance > 0) {
+        toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);
+      } else {
+        toast.success(`Pagamento completo! ${service.code} sem débito.`);
+      }
       onOpenChange(false);
       resetForm();
     } catch (error) {

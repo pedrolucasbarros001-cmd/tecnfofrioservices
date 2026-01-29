@@ -83,6 +83,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       final_price: finalPrice,
       pending_pricing: false,
       ...(newStatus && { status: newStatus }),
+      skipToast: true, // Contextual message below
     });
 
     // Log activity
@@ -94,10 +95,15 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       profile?.full_name || undefined
     );
 
-    toast.success(warrantyCoversAll 
-      ? 'Serviço de garantia registado - sem cobrança ao cliente!' 
-      : `Preço definido: €${finalPrice.toFixed(2)}`
-    );
+    // Contextual feedback message
+    if (warrantyCoversAll) {
+      toast.success('Garantia aplicada! Serviço sem custo para o cliente.');
+    } else {
+      const nextStep = service.service_location === 'oficina' 
+        ? 'Pronto para entrega.' 
+        : 'Serviço concluído.';
+      toast.success(`Preço definido: €${finalPrice.toFixed(2)}. ${nextStep}`);
+    }
 
     onOpenChange(false);
     resetForm();

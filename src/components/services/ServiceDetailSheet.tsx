@@ -270,8 +270,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await updateService.mutateAsync({
         id: service.id,
         status: 'finalizado',
+        skipToast: true,
       });
-      toast.success('Serviço finalizado!');
+      toast.success(`${service.code} finalizado com sucesso!`);
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error finalizing service:', error);
@@ -284,8 +285,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await updateService.mutateAsync({
         id: service.id,
         status: 'em_espera_de_peca',
+        skipToast: true,
       });
-      toast.success('Pedido de peça registado. Aguardando chegada.');
+      toast.success(`Pedido confirmado! ${service.code} em espera de peça.`);
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error confirming part order:', error);
@@ -300,13 +302,15 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await updateService.mutateAsync({
         id: service.id,
         status: previousStatus as any,
+        skipToast: true,
       });
-      toast.success('Peça chegou! Serviço pronto para retomar.');
+      toast.success(`Peça chegou! ${service.code} pronto para continuar.`);
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error marking part arrived:', error);
     }
   };
+
 
   const handleDelete = async () => {
     try {
