@@ -281,85 +281,56 @@
   }
 }
 
-/* Custom utility classes */
-@layer utilities {
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Glass morphism utilities */
-  .glass {
-    @apply bg-background/70 backdrop-blur-md border border-border/50;
-  }
-
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm;
-    @apply hover:shadow-md hover:border-border/80 transition-all duration-200;
-  }
-
-  .hover-lift {
-    @apply transition-all duration-200;
-    @apply hover:-translate-y-0.5 hover:shadow-lg;
-  }
-
-  .hover-glow {
-    @apply transition-all duration-300;
-  }
-
-  .hover-glow:hover {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
-  }
-}
-
 /* ======================================
    PRINT STYLES - Service Sheet (A4) & Tag (80mm)
+   Using portal-based approach for cross-platform reliability
    ====================================== */
 
-/* Screen-only: Print root is hidden on screen */
-.print-root {
+/* Screen: Hide print-only content */
+.print-only {
   display: none !important;
 }
 
 /* ========== PRINT MEDIA STYLES ========== */
 @media print {
-  /* Default page setup */
+  /* Default page setup - A4 */
   @page {
     size: A4 portrait;
     margin: 10mm;
   }
 
-  /* Reset html/body */
+  /* Reset html/body for print */
   html, body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Hide EVERYTHING except print-root */
-  body > *:not(.print-root) {
+  /* Hide EVERYTHING on screen */
+  body > * {
     display: none !important;
     visibility: hidden !important;
-    position: absolute !important;
-    left: -9999px !important;
   }
 
-  /* Show print root */
-  .print-root {
+  /* Show ONLY the print portal */
+  body > .print-portal {
     display: block !important;
     visibility: visible !important;
-    position: static !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
     width: 100% !important;
-    height: auto !important;
     background: white !important;
+    z-index: 999999 !important;
   }
 
+  .print-portal * {
+    visibility: visible !important;
+  }
 
   /* ========== SERVICE SHEET (A4) ========== */
   .print-content {
@@ -477,5 +448,15 @@
     font-size: 18px !important;
     font-weight: bold !important;
     letter-spacing: 2px !important;
+  }
+}
+
+/* Tag-specific @page - 80mm width */
+body.print-type-tag {
+  @media print {
+    @page {
+      size: 80mm auto;
+      margin: 2mm;
+    }
   }
 }
