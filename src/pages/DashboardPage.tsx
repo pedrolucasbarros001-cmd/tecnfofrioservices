@@ -152,10 +152,10 @@ export default function DashboardPage() {
               key={card.key}
               className={cn(
                 "cursor-pointer transition-all duration-200",
-                "bg-primary/5 backdrop-blur-sm border-primary/10",
+                "bg-[hsl(214,45%,97%)] border-[hsl(214,30%,88%)]",
                 isLit 
-                  ? "opacity-100 shadow-md ring-1 ring-primary/20 hover:shadow-lg hover:-translate-y-0.5" 
-                  : "opacity-40 hover:opacity-60"
+                  ? "opacity-100 bg-[hsl(214,45%,94%)] shadow-md ring-1 ring-primary/30 hover:shadow-lg hover:-translate-y-0.5" 
+                  : "opacity-50 hover:opacity-70"
               )}
               onClick={() => navigate(card.route)}
             >
@@ -163,16 +163,19 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <Icon className={cn(
                     "h-6 w-6",
-                    isLit ? "text-primary" : "text-primary/40"
+                    isLit ? "text-primary" : "text-[hsl(214,30%,70%)]"
                   )} />
                   <span className={cn(
                     "text-3xl font-bold",
-                    isLit ? "text-foreground" : "text-muted-foreground/50"
+                    isLit ? "text-primary" : "text-[hsl(214,20%,70%)]"
                   )}>
                     {loading ? '...' : count}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-muted-foreground mt-auto">
+                <p className={cn(
+                  "text-sm font-medium mt-auto",
+                  isLit ? "text-[hsl(214,30%,35%)]" : "text-[hsl(214,20%,60%)]"
+                )}>
                   {card.label}
                 </p>
               </CardContent>
