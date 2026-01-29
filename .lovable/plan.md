@@ -1,117 +1,93 @@
 
-# Plano: Corrigir Cores dos Cards do Dashboard para Azul Institucional
+# Plano: Simplificar Layout do Monitor TV
 
 ## Problema Actual
 
-Olhando para o screenshot, os cards estão a usar:
-- **Fundo**: `bg-primary/5` (apenas 5% do azul - aparece quase cinzento)
-- **Borda**: `bg-primary/10` (muito subtil)
-- **Ícone dim**: `text-primary/40` (40% do azul)
-- **Ícone lit**: `text-primary` (azul total)
+O layout actual está visualmente poluído com:
+- **7 headers de secção** ("Para Assumir", "Na Oficina", etc.)
+- **Mensagens "Nenhum serviço nesta secção"** para cada secção vazia
+- **Separação visual excessiva** entre categorias
 
-O resultado visual é que os cards parecem cinzentos em vez de azuis, perdendo coerência com a paleta da sidebar.
+## Solução: Grid Unificado
 
----
+Remover os separadores e mostrar todos os serviços num único grid fluido, onde cada card já contém o seu estado através do badge interno.
 
-## Solução: Intensificar o Azul Mantendo Lógica de Opacidade
-
-### Tabela de Mudanças
-
-| Elemento | Actual | Novo |
-|----------|--------|------|
-| **Card base (fundo)** | `bg-primary/5` | `bg-[hsl(214,45%,97%)]` (azul claro sólido) |
-| **Card borda** | `border-primary/10` | `border-[hsl(214,30%,88%)]` (azul suave) |
-| **Card lit ring** | `ring-primary/20` | `ring-primary/30` (mais visível) |
-| **Card lit fundo** | mesmo | `bg-[hsl(214,45%,94%)]` (azul mais intenso) |
-| **Ícone dim** | `text-primary/40` | `text-[hsl(214,30%,70%)]` (azul claro) |
-| **Ícone lit** | `text-primary` | `text-primary` (mantém) |
-| **Número dim** | `text-muted-foreground/50` | `text-[hsl(214,20%,70%)]` (azul claro) |
-| **Número lit** | `text-foreground` | `text-primary` (azul institucional) |
-| **Label** | `text-muted-foreground` | `text-[hsl(214,20%,50%)]` (azul médio) |
-
----
-
-## Código a Alterar
-
-### Ficheiro: `src/pages/DashboardPage.tsx`
-
-**Actualizar Card styling (linhas 151-159):**
-
-```typescript
-<Card
-  key={card.key}
-  className={cn(
-    "cursor-pointer transition-all duration-200",
-    // Base: fundo azul claro sólido, borda azul suave
-    "bg-[hsl(214,45%,97%)] border-[hsl(214,30%,88%)]",
-    isLit 
-      ? "opacity-100 bg-[hsl(214,45%,94%)] shadow-md ring-1 ring-primary/30 hover:shadow-lg hover:-translate-y-0.5" 
-      : "opacity-50 hover:opacity-70"
-  )}
-  onClick={() => navigate(card.route)}
->
-```
-
-**Actualizar Ícone styling (linhas 164-167):**
-
-```typescript
-<Icon className={cn(
-  "h-6 w-6",
-  isLit ? "text-primary" : "text-[hsl(214,30%,70%)]"
-)} />
-```
-
-**Actualizar Número styling (linhas 168-173):**
-
-```typescript
-<span className={cn(
-  "text-3xl font-bold",
-  isLit ? "text-primary" : "text-[hsl(214,20%,70%)]"
-)}>
-  {loading ? '...' : count}
-</span>
-```
-
-**Actualizar Label styling (linha 175):**
-
-```typescript
-<p className={cn(
-  "text-sm font-medium mt-auto",
-  isLit ? "text-[hsl(214,30%,35%)]" : "text-[hsl(214,20%,60%)]"
-)}>
-  {card.label}
-</p>
-```
-
----
-
-## Resultado Esperado
+### Antes vs Depois
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                     ANTES vs DEPOIS                          │
+│                        ANTES                                 │
 ├─────────────────────────────────────────────────────────────┤
-│  CARD APAGADO (count = 0):                                   │
-│  ├── Fundo: quase branco        → azul muito claro (97%)    │
-│  ├── Ícone: cinzento apagado    → azul claro (70%)          │
-│  ├── Número: cinzento           → azul claro (70%)          │
-│  ├── Label: cinzento            → azul médio (60%)          │
-│  └── Opacity: 40%               → 50% (um pouco mais visível)│
+│  [Cards de contagem: 7 números no topo] ✓                   │
 │                                                              │
-│  CARD ACESO (count > 0):                                     │
-│  ├── Fundo: quase branco        → azul claro (94%)          │
-│  ├── Ícone: azul                → azul institucional        │
-│  ├── Número: preto              → azul institucional        │
-│  ├── Label: cinzento            → azul escuro (35%)         │
-│  └── Ring: azul 20%             → azul 30% (mais visível)   │
+│  👤 Para Assumir (0)                                        │
+│     Nenhum serviço nesta secção                             │
+│                                                              │
+│  🏢 Na Oficina (1)                                          │
+│     [Card OS-00002]                                         │
+│                                                              │
+│  ▶ Em Execução (0)                                          │
+│     Nenhum serviço nesta secção                             │
+│                                                              │
+│  📦 Para Pedir Peça (0)                                     │
+│     Nenhum serviço nesta secção                             │
+│                                                              │
+│  ... (continua para cada secção)                            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                        DEPOIS                                │
+├─────────────────────────────────────────────────────────────┤
+│  [Cards de contagem: 7 números no topo] ✓ (mantém)          │
+│                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │ OS-00002 │  │ OS-00003 │  │ OS-00004 │  │ OS-00005 │    │
+│  │ Na Ofic. │  │ Em Exec. │  │ Concluído│  │ A Precif.│    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+│                                                              │
+│  (Grid único com todos os serviços, ordenados)              │
+│  (Cada card já mostra o seu estado via badge interno)       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Filosofia Mantida
+## Alterações Técnicas
 
-- **Lógica "aceso/apagado"** preservada através de opacidade e intensidade de cor
-- **Coerência com sidebar** usando a mesma família HSL (214°)
-- **Hierarquia visual** clara entre estados
-- **Sem cores cartoon** - todas as cores são azuis suaves
+### Ficheiro: `src/pages/TVMonitorPage.tsx`
+
+**Remover a secção de loop por categorias (linhas 316-354) e substituir por grid único:**
+
+```typescript
+// ANTES: Loop por MONITOR_SECTIONS com headers
+<div className="space-y-6 mb-6">
+  {MONITOR_SECTIONS.map((section) => {
+    // Header, badge, "Nenhum serviço nesta secção", etc.
+  })}
+</div>
+
+// DEPOIS: Grid único com todos os serviços
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
+  {services.map((service) => (
+    <ServiceCard key={service.id} service={service} />
+  ))}
+</div>
+```
+
+**Resultado:**
+- Cards de contagem no topo: **mantidos** (informação resumida útil)
+- Headers de secção: **removidos**
+- "Nenhum serviço nesta secção": **removido**
+- Grid de cards: **unificado**, todos os serviços visíveis de uma vez
+- Cada card já mostra o seu estado através do badge de status interno
+
+---
+
+## Benefícios
+
+| Aspecto | Antes | Depois |
+|---------|-------|--------|
+| **Legibilidade** | 7 separadores ocupam espaço | Layout limpo e fluido |
+| **Espaço** | Muito desperdício | Aproveitamento máximo |
+| **Contexto** | Estado visível no header de secção | Estado visível no badge do card |
+| **Manutenção** | Código complexo com loops aninhados | Código simples com grid único |
