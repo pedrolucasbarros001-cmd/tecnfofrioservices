@@ -1,119 +1,77 @@
 
-# Plano: Implementar Filosofia de Design TECNOFRIO
+# Plano: Corrigir Design para Padrão Institucional TECNOFRIO
 
-## Resumo Executivo
+## Diagnóstico
 
-Transformar o design do sistema de um "arco-íris de estados" para um sistema **monocromático azul institucional** com lógica **"aceso/apagado"**, onde a clareza e a hierarquia substituem cores saturadas e botões coloridos.
+O design actual tem problemas de legibilidade e coerência:
 
----
-
-## Diagnóstico do Estado Actual
-
-### Problemas Identificados
-
-| Área | Problema Actual | Impacto |
-|------|-----------------|---------|
-| **Dashboard** | Cada card com cor diferente (cinza, azul, laranja, roxo, amarelo, teal, verde, vermelho, violeta) | Competição visual, arco-íris confuso |
-| **Botões de acção** | Cada estado tem botão de cor diferente (verde, amarelo, laranja, teal, emerald, roxo+rosa) | Sem hierarquia clara |
-| **Badges de estado** | Cores saturadas (blue-500, cyan-500, purple-500, yellow-500, etc.) | Gritam por atenção |
-| **Tags** | Cores fortes (red-500, purple-500, yellow-500) | Protagonismo excessivo |
+| Problema | Actual | Impacto |
+|----------|--------|---------|
+| **Sombras cartoon** | `5px 5px 0px 0px #000` (borda dura) | Efeito "recortado", não profissional |
+| **Bordas pretas** | `--border: 0 0% 0%` | Linhas de contorno pesadas |
+| **Primary = preto** | `--primary: 0 0% 0%` | Botões pretos, não azuis |
+| **Sidebar ilegível** | foreground preto sobre fundo escuro | Texto invisível |
+| **Radius = 0** | `--radius: 0rem` | Cantos rectos, estilo cartoon |
+| **Cards slate** | `bg-slate-50/80` | Inconsistente com azul da marca |
 
 ---
 
-## Solução: Sistema Monocromático Azul
+## Solução: Paleta Azul Institucional #2B4F84
 
-### 1. Paleta de Cores Unificada
+### Paleta de Cores Coerente
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                    PALETA INSTITUCIONAL                      │
+│                 PALETA AZUL TECNOFRIO                        │
 ├─────────────────────────────────────────────────────────────┤
-│  AZUL PRINCIPAL                                              │
-│  ├── Aceso:    slate-800 (texto) + slate-100 (bg sutil)     │
-│  ├── Apagado:  slate-300 (texto) + slate-50 (bg)            │
-│  └── Hover:    ring-slate-300 + shadow suave                │
+│  COR PRINCIPAL: #2B4F84 (azul institucional)                │
+│  HSL: 214 50% 34%                                            │
 ├─────────────────────────────────────────────────────────────┤
-│  ACÇÕES (Sempre azul)                                        │
-│  ├── Primária:   bg-primary (azul escuro) text-white        │
-│  ├── Secundária: border-primary text-primary                │
-│  └── Ghost:      text-primary hover:bg-primary/5            │
+│  VARIAÇÕES LIGHT MODE:                                       │
+│  ├── Primary:      214 50% 34% (#2B4F84)                    │
+│  ├── Background:   214 30% 98% (quase branco azulado)       │
+│  ├── Card:         214 30% 100% (branco)                    │
+│  ├── Border:       214 20% 85% (azul muito claro)           │
+│  ├── Muted:        214 20% 96% (azul subtil)                │
 ├─────────────────────────────────────────────────────────────┤
-│  TIPOS DE SERVIÇO (Discretos, mantidos)                     │
-│  ├── Visita:     blue-100/blue-700                          │
-│  ├── Oficina:    orange-100/orange-700                      │
-│  ├── Instalação: yellow-100/yellow-700                      │
-│  └── Entrega:    green-100/green-700                        │
+│  VARIAÇÕES DARK MODE:                                        │
+│  ├── Primary:      214 50% 60% (azul mais claro)            │
+│  ├── Background:   214 30% 8% (quase preto azulado)         │
+│  ├── Card:         214 30% 12%                              │
+│  ├── Border:       214 20% 25%                              │
+│  ├── Muted:        214 20% 18%                              │
 ├─────────────────────────────────────────────────────────────┤
-│  EXCEPÇÕES (Únicas)                                          │
-│  ├── Destrutivo: red-600 (apenas eliminar/irreversível)     │
-│  └── Alerta:     amber-600 (apenas "forçar estado")         │
+│  SIDEBAR (sempre escura para contraste):                    │
+│  ├── Background:   214 45% 15% (azul escuro)                │
+│  ├── Foreground:   214 20% 95% (texto claro legível)        │
+│  ├── Accent:       214 40% 25% (hover)                      │
+│  ├── Border:       214 30% 25%                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Lógica "Aceso/Apagado" no Dashboard
+### Sombras Suaves (remover efeito cartoon)
 
-```text
-┌───────────────────────────────────────────────────────────┐
-│                    DASHBOARD CARDS                         │
-├───────────────────────────────────────────────────────────┤
-│  TODOS OS CARDS:                                           │
-│  ├── Mesmo fundo base: bg-slate-50/80                     │
-│  ├── Mesmo layout e tamanho                                │
-│  ├── Glass effect sutil: backdrop-blur-sm                 │
-│  ├── Borda: border-slate-200                              │
-│                                                            │
-│  ESTADO APAGADO (0 serviços):                             │
-│  ├── opacity-50                                            │
-│  ├── shadow-none                                           │
-│  ├── Número: text-slate-400                               │
-│  ├── Ícone: text-slate-400                                │
-│                                                            │
-│  ESTADO ACESO (≥1 serviço):                               │
-│  ├── opacity-100                                           │
-│  ├── shadow-sm + ring-1 ring-slate-200                    │
-│  ├── Número: text-slate-900 font-bold                     │
-│  ├── Ícone: text-slate-600                                │
-└───────────────────────────────────────────────────────────┘
+```css
+/* ANTES (cartoon) */
+--shadow-sm: 3px 3px 0px 0px #000000;
+
+/* DEPOIS (suave profissional) */
+--shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+--shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+--shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 ```
 
-### 3. Estados: Texto > Cor
+### Bordas Suaves (remover contornos pretos)
 
-Todos os estados usam a mesma cor base com variações de intensidade:
+```css
+/* ANTES */
+--border: 0 0% 0%;  /* preto */
+--radius: 0rem;     /* cantos rectos */
 
-| Estado | Actual | Novo |
-|--------|--------|------|
-| Por Fazer | bg-blue-500 | bg-slate-100 text-slate-700 |
-| Em Execução | bg-cyan-500 | bg-slate-200 text-slate-800 font-medium |
-| Na Oficina | bg-purple-500 | bg-slate-100 text-slate-700 |
-| Para Pedir Peça | bg-yellow-500 | bg-slate-100 text-slate-700 border-dashed |
-| Em Espera de Peça | bg-orange-500 | bg-slate-100 text-slate-700 |
-| A Precificar | bg-fuchsia-500 | bg-slate-100 text-slate-700 |
-| Concluídos | bg-green-500 | bg-slate-200 text-slate-800 |
-| Em Débito | bg-red-500 | bg-slate-100 text-slate-700 border-l-2 border-l-red-400 |
-| Finalizado | bg-teal-500 | bg-slate-50 text-slate-500 (mais apagado) |
-
-### 4. Botões: Uma Cor para Governar Todas
-
-| Acção | Actual | Novo |
-|-------|--------|------|
-| Atribuir Técnico | gradient purple/pink | bg-primary text-primary-foreground |
-| Iniciar | bg-green-600 | bg-primary text-primary-foreground |
-| Registar Pedido | bg-yellow-600 | bg-primary text-primary-foreground |
-| Peça Chegou | bg-green-600 | bg-primary text-primary-foreground |
-| Definir Preço | bg-emerald-600 | bg-primary text-primary-foreground |
-| Gerir Entrega | bg-teal-600 | bg-primary text-primary-foreground |
-| Registar Pagamento | bg-orange-600 | bg-primary text-primary-foreground |
-| **Eliminar** | text-destructive | text-destructive (mantém - destrutivo) |
-| **Forçar Estado** | text-amber-600 | text-amber-600 (mantém - alerta) |
-
-### 5. Tags Discretas
-
-| Tag | Actual | Novo |
-|-----|--------|------|
-| Urgente | bg-red (animate-pulse) | border border-red-300 text-red-600 text-xs |
-| Garantia | bg-purple-500 | border border-purple-200 text-purple-600 text-xs |
-| A Precificar | bg-yellow-500 | border border-amber-200 text-amber-600 text-xs |
-| Em Débito | bg-red-500 | border border-red-200 text-red-600 text-xs |
+/* DEPOIS */
+--border: 214 20% 85%;  /* azul muito claro */
+--radius: 0.5rem;       /* cantos suaves */
+```
 
 ---
 
@@ -121,93 +79,154 @@ Todos os estados usam a mesma cor base com variações de intensidade:
 
 | Ficheiro | Alterações |
 |----------|------------|
-| `src/index.css` | Adicionar classes utilitárias para estados monocromáticos e glass sutil |
-| `src/types/database.ts` | Actualizar SERVICE_STATUS_CONFIG com novas cores neutras |
-| `src/pages/DashboardPage.tsx` | Remover cores por card, implementar lógica aceso/apagado |
-| `src/components/services/StateActionButtons.tsx` | Unificar todos os botões para usar `bg-primary` |
-| `src/pages/GeralPage.tsx` | Actualizar badges de estado e tags para estilo neutro |
-| `src/components/ui/badge.tsx` | Adicionar variante `subtle` para tags discretas |
+| `src/index.css` | Actualizar todas as variáveis CSS para azul institucional + sombras suaves |
+| `src/pages/DashboardPage.tsx` | Mudar cards de slate para azul |
+| `src/types/database.ts` | Mudar estados de slate para azul |
+| `src/components/layouts/OwnerSidebar.tsx` | Remover bordas duras, usar cores legíveis |
+| `src/components/layouts/SecretarySidebar.tsx` | Mesmas correcções |
+| `src/components/layouts/TechnicianSidebar.tsx` | Mesmas correcções |
+| `src/components/ui/card.tsx` | Remover sombras cartoon |
 
 ---
 
 ## Detalhes Técnicos
 
-### A) Actualizar index.css
-
-Adicionar novas classes utilitárias:
+### A) Actualizar index.css - Variáveis CSS
 
 ```css
-/* Card states - aceso/apagado */
-.card-dim {
-  @apply opacity-50 shadow-none;
+:root {
+  /* Fundo levemente azulado para coerência */
+  --background: 214 30% 99%;
+  --foreground: 214 50% 15%;
+
+  /* Card branco puro com borda azul subtil */
+  --card: 0 0% 100%;
+  --card-foreground: 214 50% 15%;
+
+  /* Primary = Azul institucional TECNOFRIO #2B4F84 */
+  --primary: 214 50% 34%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary - azul muito claro */
+  --secondary: 214 20% 95%;
+  --secondary-foreground: 214 50% 25%;
+
+  /* Muted - para texto secundário */
+  --muted: 214 20% 96%;
+  --muted-foreground: 214 20% 45%;
+
+  /* Accent - hover states */
+  --accent: 214 30% 92%;
+  --accent-foreground: 214 50% 20%;
+
+  /* Bordas suaves, não pretas */
+  --border: 214 20% 88%;
+  --input: 214 20% 88%;
+  --ring: 214 50% 34%;
+
+  /* Cantos arredondados, não rectos */
+  --radius: 0.5rem;
+
+  /* Sidebar - escura mas legível */
+  --sidebar-background: 214 45% 15%;
+  --sidebar-foreground: 214 15% 92%;
+  --sidebar-primary: 214 50% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 214 40% 22%;
+  --sidebar-accent-foreground: 214 15% 95%;
+  --sidebar-border: 214 30% 25%;
+  --sidebar-ring: 214 50% 50%;
+
+  /* Sombras suaves (não cartoon) */
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
-.card-lit {
-  @apply opacity-100 shadow-sm ring-1 ring-slate-200;
-}
+.dark {
+  --background: 214 30% 7%;
+  --foreground: 214 15% 95%;
 
-/* Status badge - monocromático */
-.status-badge {
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 
-         rounded-full text-xs font-medium
-         bg-slate-100 text-slate-700;
-}
+  --card: 214 30% 10%;
+  --card-foreground: 214 15% 95%;
 
-.status-badge-active {
-  @apply bg-slate-200 text-slate-800 font-semibold;
-}
+  --primary: 214 50% 55%;
+  --primary-foreground: 214 50% 10%;
 
-/* Tag - discreto */
-.tag-subtle {
-  @apply inline-flex items-center gap-1 px-2 py-0.5 
-         rounded text-xs font-medium
-         border bg-transparent;
+  --secondary: 214 25% 18%;
+  --secondary-foreground: 214 15% 90%;
+
+  --muted: 214 25% 15%;
+  --muted-foreground: 214 15% 60%;
+
+  --accent: 214 30% 20%;
+  --accent-foreground: 214 15% 95%;
+
+  --border: 214 25% 22%;
+  --input: 214 25% 22%;
+  --ring: 214 50% 55%;
+
+  --sidebar-background: 214 45% 8%;
+  --sidebar-foreground: 214 15% 90%;
+  --sidebar-primary: 214 50% 60%;
+  --sidebar-primary-foreground: 214 50% 10%;
+  --sidebar-accent: 214 40% 15%;
+  --sidebar-accent-foreground: 214 15% 95%;
+  --sidebar-border: 214 30% 18%;
+  --sidebar-ring: 214 50% 50%;
+
+  /* Sombras suaves em dark mode */
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.45);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
 }
 ```
 
-### B) Actualizar SERVICE_STATUS_CONFIG
+### B) Actualizar DashboardPage - Cards Azuis
 
 ```typescript
-export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { 
-  label: string; 
-  color: string;
-  intensity: 'dim' | 'normal' | 'active';
-}> = {
-  por_fazer: { label: 'Por Fazer', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
-  em_execucao: { label: 'Em Execução', color: 'bg-slate-200 text-slate-800 font-medium', intensity: 'active' },
-  na_oficina: { label: 'Na Oficina', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
-  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-slate-100 text-slate-700 border border-dashed border-slate-300', intensity: 'normal' },
-  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
-  a_precificar: { label: 'A Precificar', color: 'bg-slate-100 text-slate-700', intensity: 'normal' },
-  concluidos: { label: 'Concluídos', color: 'bg-slate-200 text-slate-800', intensity: 'active' },
-  em_debito: { label: 'Em Débito', color: 'bg-slate-100 text-slate-700 border-l-2 border-l-red-400', intensity: 'normal' },
-  finalizado: { label: 'Finalizado', color: 'bg-slate-50 text-slate-500', intensity: 'dim' },
-};
-```
-
-### C) Actualizar DashboardPage
-
-```typescript
-// Remover bgClass e iconClass individuais
-// Usar lógica aceso/apagado baseada em count
-
-const isLit = count > 0;
-
+// Mudar de slate para azul coerente
 <Card className={cn(
   "cursor-pointer transition-all duration-200",
-  "bg-slate-50/80 backdrop-blur-sm border-slate-200",
+  "bg-primary/5 backdrop-blur-sm border-primary/10",
   isLit 
-    ? "opacity-100 shadow-sm ring-1 ring-slate-200 hover:shadow-md hover:-translate-y-0.5" 
-    : "opacity-50 hover:opacity-70"
+    ? "opacity-100 shadow-md hover:shadow-lg hover:-translate-y-0.5" 
+    : "opacity-40 hover:opacity-60"
 )}>
 ```
 
-### D) Actualizar StateActionButtons
+### C) Actualizar SERVICE_STATUS_CONFIG - Badges Azuis
 
 ```typescript
-// Remover todas as classes de cor específicas
-// Usar apenas:
-className: 'bg-primary text-primary-foreground hover:bg-primary/90'
+por_fazer: { 
+  label: 'Por Fazer', 
+  color: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary', 
+  intensity: 'normal' 
+},
+em_execucao: { 
+  label: 'Em Execução', 
+  color: 'bg-primary/20 text-primary font-medium dark:bg-primary/30', 
+  intensity: 'active' 
+},
+// ... restantes com variações de opacidade do primary
+```
+
+### D) Actualizar Sidebars - Remover Bordas Duras
+
+```typescript
+// Remover: border-sidebar-border/50
+// Usar simplesmente as cores do tema
+<Sidebar collapsible="icon">
+  {/* Bordas subtis, não linhas duras */}
+</Sidebar>
 ```
 
 ---
@@ -216,33 +235,33 @@ className: 'bg-primary text-primary-foreground hover:bg-primary/90'
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                    ANTES vs DEPOIS                           │
+│                     ANTES vs DEPOIS                          │
 ├─────────────────────────────────────────────────────────────┤
 │  ANTES:                                                      │
-│  • Dashboard = arco-íris de cores                           │
-│  • Olho não sabe onde focar                                 │
-│  • Cada botão uma cor diferente                             │
-│  • Tags berrantes                                            │
+│  • Sombras duras tipo cartoon (5px 5px 0px 0px #000)        │
+│  • Bordas pretas pesadas                                    │
+│  • Primary = preto (botões pretos)                          │
+│  • Sidebar ilegível (texto preto sobre fundo escuro)        │
+│  • Cards cinzento (slate) sem relação com marca             │
+│  • Cantos rectos (radius = 0)                               │
 │                                                              │
 │  DEPOIS:                                                     │
-│  • Dashboard = azul institucional uniforme                  │
-│  • Cards "acendem" apenas onde há trabalho                  │
-│  • Botões azuis, hierarquia por contexto                    │
-│  • Tags discretas, informativas                             │
-│  • Sensação premium, confiável, profissional               │
+│  • Sombras suaves profissionais (blur, opacity)             │
+│  • Bordas azul muito claro, discretas                       │
+│  • Primary = azul institucional #2B4F84                     │
+│  • Sidebar com texto claro legível                          │
+│  • Cards com tonalidade azul coerente com logo              │
+│  • Cantos suavemente arredondados (0.5rem)                  │
+│  • Sensação premium, coerente, profissional                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Filosofia Preservada
+## Filosofia Mantida
 
-✅ **Tipos de serviço mantêm cores** (visita=azul, oficina=laranja, instalação=amarelo, entrega=verde) - como badges pequenos, não dominantes
-
-✅ **Vermelho apenas para destruição** (eliminar serviço)
-
-✅ **Amber apenas para alerta** (forçar estado)
-
-✅ **Glass sutil** - blur leve, transparência baixa
-
-✅ **Hierarquia clara** - Estado → Acção → Informação → Histórico
+- **Lógica "aceso/apagado"** preservada nos cards (opacity)
+- **Tipos de serviço mantêm cores** (visita=azul, oficina=laranja, etc.)
+- **Vermelho apenas para destruição**
+- **Hierarquia clara** - Estado → Acção → Informação
+- **Glass sutil** - backdrop-blur leve, não exagerado
