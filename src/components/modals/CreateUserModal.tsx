@@ -35,7 +35,7 @@ const formSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   password: z.string()
-    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .min(8, 'Palavra-passe deve ter pelo menos 8 caracteres')
     .regex(/[A-Z]/, 'Deve conter pelo menos uma letra maiúscula')
     .regex(/[a-z]/, 'Deve conter pelo menos uma letra minúscula')
     .regex(/[0-9]/, 'Deve conter pelo menos um número'),
@@ -160,7 +160,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                   <p className="font-mono font-medium">{createdCredentials.email}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground uppercase">Senha</span>
+                  <span className="text-xs text-muted-foreground uppercase">Palavra-passe</span>
                   <p className="text-green-700 font-medium">Definida pelo administrador</p>
                 </div>
                 <div>
@@ -233,7 +233,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Senha *</FormLabel>
+                  <FormLabel>Palavra-passe *</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="Mínimo 8 caracteres" {...field} />
                   </FormControl>

@@ -51,7 +51,7 @@ export default function ClientesPage() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Tem certeza que deseja eliminar este cliente?')) {
+    if (confirm('Tem a certeza que deseja eliminar este cliente?')) {
       await deleteCustomer.mutateAsync(id);
     }
   };
