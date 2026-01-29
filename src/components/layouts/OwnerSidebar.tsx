@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, List, Wrench, Users, FileText, BarChart3, UserCog, Settings, LogOut, Tv } from 'lucide-react';
+import { LayoutDashboard, List, Wrench, Users, FileText, BarChart3, UserCog, Settings, LogOut } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,6 @@ const menuItems = [
   { title: 'Orçamentos', url: '/orcamentos', icon: FileText },
   { title: 'Performance', url: '/performance', icon: BarChart3 },
   { title: 'Colaboradores', url: '/colaboradores', icon: UserCog },
-  { title: 'Monitor TV', url: '/tv-monitor', icon: Tv },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
 ];
 

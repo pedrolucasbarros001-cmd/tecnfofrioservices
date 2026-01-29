@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 
 // Section definitions for organized display
 const MONITOR_SECTIONS = [
-  { status: 'em_execucao' as ServiceStatus, label: 'Em Execução', icon: Play, color: 'text-blue-400' },
+  { status: 'por_fazer' as ServiceStatus, label: 'Por Fazer', icon: Clock, color: 'text-blue-400' },
+  { status: 'em_execucao' as ServiceStatus, label: 'Em Execução', icon: Play, color: 'text-cyan-400' },
   { status: 'na_oficina' as ServiceStatus, label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
   { status: 'para_pedir_peca' as ServiceStatus, label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
   { status: 'em_espera_de_peca' as ServiceStatus, label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
@@ -131,7 +132,7 @@ export default function TVMonitorPage() {
           technician:technicians(*, profile:profiles(*))
         `)
         .eq('service_location', 'oficina')
-        .in('status', ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'])
+        .in('status', ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -161,7 +162,7 @@ export default function TVMonitorPage() {
   }, {} as Record<ServiceStatus, Service[]>);
 
   // Status order for stats bar
-  const statusOrder: ServiceStatus[] = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'];
+  const statusOrder: ServiceStatus[] = ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'];
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6 pb-40">
@@ -197,7 +198,7 @@ export default function TVMonitorPage() {
       </header>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-6 gap-3 mb-6">
         {statusOrder.map((status) => {
           const config = SERVICE_STATUS_CONFIG[status];
           const count = groupedServices[status]?.length || 0;
@@ -225,7 +226,7 @@ export default function TVMonitorPage() {
           return (
             <div key={section.status}>
               {/* Section Header with separator line */}
-              <div className="flex items-center gap-3 mb-3 pb-2 border-b border-slate-700">
+              <div className="flex items-center gap-3 mb-3 pb-2">
                 <section.icon className={cn("h-5 w-5", section.color)} />
                 <h2 className="text-lg font-bold text-slate-300">
                   {section.label}
