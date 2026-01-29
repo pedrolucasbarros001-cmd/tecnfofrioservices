@@ -5,10 +5,30 @@ import { pt } from 'date-fns/locale';
 import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle, DollarSign } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
+import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { usePublicActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+
+// TV Monitor Service type (sanitized view)
+interface TVMonitorService {
+  id: string;
+  code: string;
+  status: string;
+  appliance_type: string | null;
+  brand: string | null;
+  model: string | null;
+  fault_description: string | null;
+  is_urgent: boolean | null;
+  technician_id: string | null;
+  created_at: string;
+  service_location: string;
+  customer_name: string | null; // Sanitized - only first initial
+  tech_id: string | null;
+  tech_color: string | null;
+  tech_active: boolean | null;
+  tech_name: string | null;
+}
 
 // Section definitions with functional filters for composite logic
 const MONITOR_SECTIONS = [
@@ -17,57 +37,77 @@ const MONITOR_SECTIONS = [
     label: 'Para Assumir', 
     icon: User, 
     color: 'text-blue-400',
-    filter: (s: Service) => !s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
+    filter: (s: TVMonitorService) => !s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
   },
   { 
     key: 'na_oficina', 
     label: 'Na Oficina', 
     icon: Building2, 
     color: 'text-green-400',
-    filter: (s: Service) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
+    filter: (s: TVMonitorService) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
   },
   { 
     key: 'em_execucao', 
     label: 'Em Execução', 
     icon: Play, 
     color: 'text-cyan-400',
-    filter: (s: Service) => s.status === 'em_execucao'
+    filter: (s: TVMonitorService) => s.status === 'em_execucao'
   },
   { 
     key: 'para_pedir_peca', 
     label: 'Para Pedir Peça', 
     icon: Package, 
     color: 'text-yellow-400',
-    filter: (s: Service) => s.status === 'para_pedir_peca'
+    filter: (s: TVMonitorService) => s.status === 'para_pedir_peca'
   },
   { 
     key: 'em_espera_de_peca', 
     label: 'Em Espera de Peça', 
     icon: Clock, 
     color: 'text-orange-400',
-    filter: (s: Service) => s.status === 'em_espera_de_peca'
+    filter: (s: TVMonitorService) => s.status === 'em_espera_de_peca'
   },
   { 
     key: 'a_precificar', 
     label: 'A Precificar', 
     icon: DollarSign, 
     color: 'text-lime-400',
-    filter: (s: Service) => s.status === 'a_precificar'
+    filter: (s: TVMonitorService) => s.status === 'a_precificar'
   },
   { 
     key: 'concluidos', 
     label: 'Concluídos', 
     icon: CheckCircle, 
     color: 'text-emerald-400',
-    filter: (s: Service) => s.status === 'concluidos'
+    filter: (s: TVMonitorService) => s.status === 'concluidos'
   },
 ];
 
-// Service Card Component
-function ServiceCard({ service }: { service: Service }) {
+// TV Monitor Service type (sanitized view)
+interface TVMonitorService {
+  id: string;
+  code: string;
+  status: string;
+  appliance_type: string | null;
+  brand: string | null;
+  model: string | null;
+  fault_description: string | null;
+  is_urgent: boolean | null;
+  technician_id: string | null;
+  created_at: string;
+  service_location: string;
+  customer_name: string | null; // Sanitized - only first initial
+  tech_id: string | null;
+  tech_color: string | null;
+  tech_active: boolean | null;
+  tech_name: string | null;
+}
+
+// Service Card Component - using sanitized data
+function ServiceCard({ service }: { service: TVMonitorService }) {
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG];
   const isUrgent = service.is_urgent;
-  const hasTechnician = !!service.technician;
+  const hasTechnician = !!service.technician_id;
 
   return (
     <div
@@ -98,10 +138,10 @@ function ServiceCard({ service }: { service: Service }) {
         )}
       </div>
 
-      {/* Customer */}
+      {/* Customer - sanitized (only first initial shown) */}
       <div className="mb-3">
         <p className="text-lg font-semibold truncate">
-          {service.customer?.name || 'Sem cliente'}
+          {service.customer_name || 'Cliente'}
         </p>
         <p className="text-slate-400 text-sm truncate">
           {[service.appliance_type, service.brand, service.model]
@@ -123,12 +163,12 @@ function ServiceCard({ service }: { service: Service }) {
         <div className="flex items-center gap-2">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-            style={{ backgroundColor: service.technician?.color || '#3B82F6' }}
+            style={{ backgroundColor: service.tech_color || '#3B82F6' }}
           >
-            {service.technician?.profile?.full_name?.charAt(0) || 'T'}
+            {service.tech_name?.charAt(0) || 'T'}
           </div>
           <span className="text-sm text-slate-300">
-            {service.technician?.profile?.full_name}
+            {service.tech_name}
           </span>
         </div>
       ) : (
@@ -163,45 +203,25 @@ export default function TVMonitorPage() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  // Fetch services in workshop with fallback and debug logging
+  // Fetch services from sanitized view (security: no sensitive customer data exposed)
   const { data: services = [], refetch, isLoading, isError } = useQuery({
     queryKey: ['tv-monitor-services'],
     queryFn: async () => {
-      console.log('[TV Monitor] Fetching services...');
+      console.log('[TV Monitor] Fetching from sanitized view...');
       
-      // Primary query with joins
+      // Query the sanitized view - only exposes necessary data with masked customer names
       const { data, error } = await supabase
-        .from('services')
-        .select(`
-          *,
-          customer:customers(*),
-          technician:technicians(*, profile:profiles(*))
-        `)
-        .eq('service_location', 'oficina')
-        .neq('status', 'finalizado')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        console.log('[TV Monitor] Fetched services:', data.length, data);
-        return (data as unknown as Service[]) || [];
-      }
-
-      // Fallback: query without joins
-      console.warn('[TV Monitor] Primary query failed, using fallback:', error);
-      const fallback = await supabase
-        .from('services')
+        .from('tv_monitor_services')
         .select('*')
-        .eq('service_location', 'oficina')
-        .neq('status', 'finalizado')
         .order('created_at', { ascending: false });
-      
-      if (fallback.error) {
-        console.error('[TV Monitor] Fallback query also failed:', fallback.error);
-        throw fallback.error;
+
+      if (error) {
+        console.error('[TV Monitor] Query error:', error);
+        throw error;
       }
       
-      console.log('[TV Monitor] Fallback fetched:', fallback.data?.length);
-      return (fallback.data || []) as unknown as Service[];
+      console.log('[TV Monitor] Fetched services:', data?.length);
+      return (data || []) as TVMonitorService[];
     },
     refetchInterval: 30000,
     retry: 3,
@@ -223,7 +243,7 @@ export default function TVMonitorPage() {
   const groupedServices = MONITOR_SECTIONS.reduce((acc, section) => {
     acc[section.key] = services.filter(section.filter);
     return acc;
-  }, {} as Record<string, Service[]>);
+  }, {} as Record<string, TVMonitorService[]>);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6 pb-40">
