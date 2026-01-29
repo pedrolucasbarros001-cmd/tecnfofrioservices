@@ -80,7 +80,12 @@ export default function OrcamentosPage() {
         .eq('id', budgetId);
 
       if (error) throw error;
-      toast.success(`Orçamento ${newStatus === 'aprovado' ? 'aprovado' : 'recusado'}`);
+      
+      const statusMessages: Record<string, string> = {
+        aprovado: 'Orçamento aprovado com sucesso!',
+        recusado: 'Orçamento recusado.',
+      };
+      toast.success(statusMessages[newStatus] || 'Estado atualizado');
       refetch();
     } catch (error) {
       console.error('Error updating budget:', error);
@@ -88,7 +93,16 @@ export default function OrcamentosPage() {
     }
   };
 
-  const handleConvertToService = async (budget: any) => {
+  const handleConvertToService = async (budget: any, skipConfirm = false) => {
+    if (!skipConfirm) {
+      const confirmed = window.confirm('Deseja converter este orçamento em serviço?');
+      if (!confirmed) {
+        // Just mark as approved without converting
+        await handleUpdateStatus(budget.id, 'aprovado');
+        return;
+      }
+    }
+
     try {
       // Create service from budget
       const { data: service, error: serviceError } = await supabase
