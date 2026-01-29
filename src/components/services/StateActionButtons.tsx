@@ -77,6 +77,9 @@ export function StateActionButtons({
   const isServiceInDebit = !isWarrantyService && isServicePriced && (service.amount_paid || 0) < (service.final_price || 0);
   const canBeFinalized = (isServicePriced || isWarrantyService) && !isServiceInDebit && service.status === 'concluidos';
 
+  // Unified button style - all actions are primary blue
+  const primaryButtonClass = 'bg-primary text-primary-foreground hover:bg-primary/90';
+  
   const getMainAction = (): ActionConfig | null => {
     switch (service.status as ServiceStatus) {
       case 'por_fazer':
@@ -85,7 +88,7 @@ export function StateActionButtons({
             label: 'Atribuir Técnico',
             icon: UserPlus,
             onClick: onAssignTechnician,
-            className: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white',
+            className: primaryButtonClass,
           };
         }
         if (isTecnico && onStartExecution) {
@@ -93,7 +96,7 @@ export function StateActionButtons({
             label: 'Iniciar',
             icon: Play,
             onClick: onStartExecution,
-            className: 'bg-green-600 hover:bg-green-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -107,7 +110,7 @@ export function StateActionButtons({
             label: 'Iniciar',
             icon: Play,
             onClick: onStartExecution,
-            className: 'bg-green-600 hover:bg-green-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -118,7 +121,7 @@ export function StateActionButtons({
             label: 'Registar Pedido',
             icon: Package,
             onClick: onConfirmPartOrder,
-            className: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -129,7 +132,7 @@ export function StateActionButtons({
             label: 'Peça Chegou',
             icon: CheckCircle,
             onClick: onMarkPartArrived,
-            className: 'bg-green-600 hover:bg-green-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -140,7 +143,7 @@ export function StateActionButtons({
             label: 'Definir Preço',
             icon: DollarSign,
             onClick: onSetPrice,
-            className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -152,7 +155,7 @@ export function StateActionButtons({
             label: 'Definir Preço',
             icon: DollarSign,
             onClick: onSetPrice,
-            className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -163,7 +166,7 @@ export function StateActionButtons({
             label: 'Gerir Entrega',
             icon: Truck,
             onClick: onManageDelivery,
-            className: 'bg-teal-600 hover:bg-teal-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;
@@ -174,7 +177,7 @@ export function StateActionButtons({
             label: 'Registar Pagamento',
             icon: CreditCard,
             onClick: onRegisterPayment,
-            className: 'bg-orange-600 hover:bg-orange-700 text-white',
+            className: primaryButtonClass,
           };
         }
         return null;

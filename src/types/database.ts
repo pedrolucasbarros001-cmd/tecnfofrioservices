@@ -191,17 +191,21 @@ export interface Notification {
   created_at: string;
 }
 
-// Status labels and colors mapping
-export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { label: string; color: string }> = {
-  por_fazer: { label: 'Por Fazer', color: 'bg-blue-500' },
-  em_execucao: { label: 'Em Execução', color: 'bg-cyan-500' },
-  na_oficina: { label: 'Na Oficina', color: 'bg-purple-500' },
-  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-yellow-500' },
-  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-orange-500' },
-  a_precificar: { label: 'A Precificar', color: 'bg-fuchsia-500' },
-  concluidos: { label: 'Concluídos', color: 'bg-green-500' },
-  em_debito: { label: 'Em Débito', color: 'bg-red-500' },
-  finalizado: { label: 'Finalizado', color: 'bg-teal-500' },
+// Status labels and colors mapping - Monochromatic design (text > color)
+export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { 
+  label: string; 
+  color: string;
+  intensity: 'dim' | 'normal' | 'active';
+}> = {
+  por_fazer: { label: 'Por Fazer', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
+  em_execucao: { label: 'Em Execução', color: 'bg-slate-200 text-slate-800 font-medium dark:bg-slate-700 dark:text-slate-200', intensity: 'active' },
+  na_oficina: { label: 'Na Oficina', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
+  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-slate-100 text-slate-700 border border-dashed border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600', intensity: 'normal' },
+  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
+  a_precificar: { label: 'A Precificar', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
+  concluidos: { label: 'Concluídos', color: 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200', intensity: 'active' },
+  em_debito: { label: 'Em Débito', color: 'bg-slate-100 text-slate-700 border-l-2 border-l-red-400 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
+  finalizado: { label: 'Finalizado', color: 'bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400', intensity: 'dim' },
 };
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; icon: string }> = {
