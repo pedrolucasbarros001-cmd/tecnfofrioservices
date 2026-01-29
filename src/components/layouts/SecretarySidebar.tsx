@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   List,
   Wrench,
@@ -34,11 +34,20 @@ const menuItems = [
 
 export function SecretarySidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, profile } = useAuth();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Handle navigation with mobile sidebar close
+  const handleNavClick = (url: string) => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+    navigate(url);
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/50">
@@ -50,10 +59,13 @@ export function SecretarySidebar() {
             className="h-9 w-9 shrink-0 rounded-lg object-contain"
           />
           {!isCollapsed && (
-            <span className="text-lg font-bold">
-              <span className="text-[#2B4F84]">TECNO</span>
-              <span className="text-sidebar-foreground/80">FRIO</span>
-            </span>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold leading-tight">
+                <span className="text-[#2B4F84]">TECNO</span>
+                <span className="text-sidebar-foreground/80">FRIO</span>
+              </span>
+              <span className="text-[10px] text-sidebar-foreground/50 -mt-0.5">Sistema de Gestão</span>
+            </div>
           )}
         </div>
       </SidebarHeader>
@@ -63,22 +75,18 @@ export function SecretarySidebar() {
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.url}>
               <SidebarMenuButton
-                asChild
                 isActive={isActive(item.url)}
                 tooltip={item.title}
+                onClick={() => handleNavClick(item.url)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 cursor-pointer',
+                  isActive(item.url)
+                    ? 'bg-sidebar-primary/10 text-sidebar-primary font-medium'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                )}
               >
-                <NavLink
-                  to={item.url}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200',
-                    isActive(item.url)
-                      ? 'bg-sidebar-primary/10 text-sidebar-primary font-medium'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {!isCollapsed && <span>{item.title}</span>}
-                </NavLink>
+                <item.icon className="h-5 w-5 shrink-0" />
+                {!isCollapsed && <span>{item.title}</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
