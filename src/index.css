@@ -293,20 +293,28 @@
 
 /* ========== PRINT MEDIA STYLES ========== */
 @media print {
-  /* Default page setup - A4 */
+  /* Default page setup - A4 SEM MARGENS */
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
   }
 
-  /* Reset html/body for print */
+  /* Reset html/body for print - OCUPAÇÃO TOTAL */
   html, body {
-    background: white !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  /* ESCONDER #root EXPLICITAMENTE */
+  #root {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
   }
 
   /* CRITICAL: Show print-only elements in print */
@@ -321,20 +329,16 @@
     visibility: hidden !important;
   }
 
-  /* Show the print portal with high specificity - FULL PAGE */
+  /* PORTAL COBRE TODA A VIEWPORT */
   body > .print-portal {
     display: block !important;
     visibility: visible !important;
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 100vh !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
     background: white !important;
-    z-index: 999999 !important;
+    z-index: 2147483647 !important;
     overflow: visible !important;
   }
 
@@ -345,16 +349,18 @@
     visibility: visible !important;
   }
 
-  /* ========== SERVICE SHEET (A4) - FULL PAGE ========== */
+  /* ========== SERVICE SHEET (A4) - OCUPA PÁGINA INTEIRA ========== */
   .print-content {
     display: block !important;
     visibility: visible !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
-    max-width: 190mm !important;
-    min-height: 277mm !important;
-    margin: 0 auto !important;
-    padding: 5mm !important;
+    height: 100% !important;
+    min-height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 10mm !important;
     background: white !important;
     color: black !important;
     font-size: 11px !important;
