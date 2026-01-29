@@ -43,7 +43,7 @@ import { notifyServiceAssigned } from '@/utils/notificationUtils';
 import { logTechnicianAssignment } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Service } from '@/types/database';
+import type { Service, ServiceStatus } from '@/types/database';
 
 const formSchema = z.object({
   technician_id: z.string().min(1, 'Selecione um técnico'),
@@ -85,12 +85,29 @@ export function AssignTechnicianModal({
     if (!service) return;
 
     try {
+      // Determinar o status correto com base nas regras:
+      // - Oficina + técnico atribuído: 'na_oficina' (se estiver em estado inicial)
+      // - Estados avançados não devem ser revertidos (em_execucao, para_pedir_peca, etc.)
+      // - Cliente: não alterar status (manter como está)
+      const advancedStates = ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'];
+      const isAdvancedState = advancedStates.includes(service.status);
+      
+      let newStatus: ServiceStatus | undefined;
+      if (!isAdvancedState) {
+        if (service.service_location === 'oficina') {
+          // Na oficina: atribuir técnico = 'na_oficina'
+          newStatus = 'na_oficina';
+        }
+        // Para cliente: não definir status (deixar o trigger do banco normalizar se necessário)
+      }
+      // Se já está em estado avançado, não incluir status no update
+
       await updateService.mutateAsync({
         id: service.id,
         technician_id: values.technician_id,
         scheduled_date: values.scheduled_date.toISOString().split('T')[0],
         scheduled_shift: values.scheduled_shift,
-        status: 'por_fazer',
+        ...(newStatus && { status: newStatus }),
       });
 
       // Get the technician's user_id to send notification
