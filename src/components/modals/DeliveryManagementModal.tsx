@@ -32,9 +32,12 @@ export function DeliveryManagementModal({
       await updateService.mutateAsync({
         id: service.id,
         delivery_method: 'client_pickup',
+        skipToast: true,
       });
 
-      toast.success('Serviço marcado para recolha pelo cliente');
+      // Contextual feedback
+      const customerName = service.customer?.name || 'cliente';
+      toast.success(`Recolha pelo cliente definida! Notificar ${customerName}.`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error setting client pickup:', error);

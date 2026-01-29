@@ -98,7 +98,7 @@ export function useUpdateService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Service> & { id: string }) => {
+    mutationFn: async ({ id, skipToast, ...updates }: Partial<Service> & { id: string; skipToast?: boolean }) => {
       const { data, error } = await supabase
         .from('services')
         .update(updates as any)
@@ -107,11 +107,15 @@ export function useUpdateService() {
         .single();
 
       if (error) throw error;
-      return data;
+      return { data, skipToast };
     },
-    onSuccess: () => {
+    onSuccess: ({ skipToast }) => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      toast.success('Serviço atualizado!');
+      // Only show generic toast if skipToast is not true
+      // Components that provide contextual messages should set skipToast: true
+      if (!skipToast) {
+        toast.success('Serviço atualizado!');
+      }
     },
     onError: (error) => {
       console.error('Error updating service:', error);

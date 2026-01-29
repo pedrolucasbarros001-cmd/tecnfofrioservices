@@ -87,8 +87,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       await updateService.mutateAsync({
         id: service.id,
         status: 'em_execucao',
+        skipToast: true,
       });
-      toast.success('Reparação iniciada!');
+      toast.success(`Em execução! ${service.code} está a ser reparado.`);
       setCurrentStep('contexto');
     } catch (error) {
       console.error('Error starting repair:', error);
@@ -111,8 +112,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
           model: formData.model,
           serial_number: formData.serialNumber,
           last_status_before_part_request: currentStatus,
+          skipToast: true,
         });
-        toast.success('Pedido de peça registado!');
+        toast.success(`Peça solicitada! ${service.code} aguarda aprovação do dono.`);
       } else {
         await updateService.mutateAsync({
           id: service.id,
@@ -122,8 +124,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
           brand: formData.brand,
           model: formData.model,
           serial_number: formData.serialNumber,
+          skipToast: true,
         });
-        toast.success('Reparação concluída! Aguarda precificação.');
+        toast.success(`${service.code} concluído! Aguarda precificação pelo dono.`);
       }
       onComplete();
     } catch (error) {

@@ -80,6 +80,7 @@ export function RequestPartModal({
         id: service.id,
         status: 'para_pedir_peca',
         last_status_before_part_request: currentStatus,
+        skipToast: true, // Contextual message below
       });
 
       // Notify owners and secretaries about the part request
@@ -92,7 +93,9 @@ export function RequestPartModal({
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      toast.success('Peça solicitada com sucesso!');
+      
+      // Contextual feedback message
+      toast.success(`Peça "${partName.trim()}" solicitada! ${service.code} aguarda aprovação.`);
       onOpenChange(false);
       resetForm();
     } catch (error) {

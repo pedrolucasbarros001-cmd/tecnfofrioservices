@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -108,9 +109,10 @@ export function AssignTechnicianModal({
         scheduled_date: values.scheduled_date.toISOString().split('T')[0],
         scheduled_shift: values.scheduled_shift,
         ...(newStatus && { status: newStatus }),
+        skipToast: true, // We'll show contextual message below
       });
 
-      // Get the technician's user_id to send notification
+      // Get the technician's user_id to send notification and show contextual feedback
       const selectedTech = technicians.find(t => t.id === values.technician_id);
       if (selectedTech?.profile_id) {
         const { data: profileData } = await supabase
@@ -138,6 +140,17 @@ export function AssignTechnicianModal({
             profile?.full_name || undefined
           );
         }
+      }
+
+      // Show contextual feedback message
+      const techName = selectedTech?.profile?.full_name || 'Técnico';
+      if (service.service_location === 'oficina') {
+        toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
+      } else {
+        const dateStr = format(values.scheduled_date, "dd/MM", { locale: pt });
+        const shiftLabel = values.scheduled_shift === 'manha' ? 'manhã' : 
+                           values.scheduled_shift === 'tarde' ? 'tarde' : 'noite';
+        toast.success(`${techName} agendado para ${dateStr}, ${shiftLabel}.`);
       }
 
       onOpenChange(false);

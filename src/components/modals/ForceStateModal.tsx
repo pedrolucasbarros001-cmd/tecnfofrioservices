@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -33,11 +34,19 @@ export function ForceStateModal({ service, open, onOpenChange }: ForceStateModal
   const handleSubmit = async () => {
     if (!service || !selectedStatus) return;
 
+    const oldStatus = service.status as ServiceStatus;
+
     try {
       await updateService.mutateAsync({
         id: service.id,
         status: selectedStatus,
+        skipToast: true,
       });
+
+      // Show warning toast with transition details
+      const oldLabel = SERVICE_STATUS_CONFIG[oldStatus]?.label || oldStatus;
+      const newLabel = SERVICE_STATUS_CONFIG[selectedStatus]?.label || selectedStatus;
+      toast.warning(`Estado forçado: ${oldLabel} → ${newLabel}`);
 
       onOpenChange(false);
       setSelectedStatus('');
