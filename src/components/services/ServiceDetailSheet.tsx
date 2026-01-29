@@ -18,6 +18,13 @@ import {
   Truck,
   Camera,
   PenTool,
+  UserPlus,
+  Play,
+  ShoppingCart,
+  CheckCircle,
+  CheckCircle2,
+  DollarSign,
+  ClipboardList,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -219,6 +226,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         .order('signed_at', { ascending: true });
       if (error) throw error;
       return data as ServiceSignature[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch activity logs for this service
+  const { data: activityLogs = [] } = useQuery({
+    queryKey: ['activity-logs', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data as { id: string; action_type: string; description: string; created_at: string; is_public: boolean }[];
     },
     enabled: !!service?.id && open,
   });
@@ -795,6 +818,21 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
+              {/* Activity History Timeline */}
+              {activityLogs.length > 0 && (
+                <Section 
+                  title="Histórico de Atividades" 
+                  bgColor="bg-slate-50"
+                  borderColor="border-l-slate-500"
+                >
+                  <div className="space-y-3">
+                    {activityLogs.map((log, index) => (
+                      <ActivityLogItem key={log.id} log={log} isLast={index === activityLogs.length - 1} />
+                    ))}
+                  </div>
+                </Section>
+              )}
+
               {/* Notes */}
               {service.notes && (
                 <Section 
@@ -962,6 +1000,60 @@ function Section({ title, bgColor, borderColor, children }: SectionProps) {
         {title}
       </h4>
       {children}
+    </div>
+  );
+}
+
+// Activity log action type icons and colors
+const ACTION_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; bgColor: string; iconColor: string }> = {
+  atribuicao: { icon: UserPlus, bgColor: 'bg-blue-100', iconColor: 'text-blue-600' },
+  inicio_execucao: { icon: Play, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
+  levantamento: { icon: Package, bgColor: 'bg-orange-100', iconColor: 'text-orange-600' },
+  pedido_peca: { icon: ShoppingCart, bgColor: 'bg-yellow-100', iconColor: 'text-yellow-600' },
+  peca_chegou: { icon: CheckCircle, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
+  conclusao: { icon: CheckCircle2, bgColor: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+  precificacao: { icon: DollarSign, bgColor: 'bg-purple-100', iconColor: 'text-purple-600' },
+  pagamento: { icon: CreditCard, bgColor: 'bg-teal-100', iconColor: 'text-teal-600' },
+  entrega: { icon: Truck, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
+  tarefa: { icon: ClipboardList, bgColor: 'bg-gray-100', iconColor: 'text-gray-600' },
+};
+
+interface ActivityLogItemProps {
+  log: {
+    id: string;
+    action_type: string;
+    description: string;
+    created_at: string;
+    is_public: boolean;
+  };
+  isLast: boolean;
+}
+
+function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
+  const config = ACTION_TYPE_CONFIG[log.action_type] || { 
+    icon: Clock, 
+    bgColor: 'bg-gray-100', 
+    iconColor: 'text-gray-600' 
+  };
+  const Icon = config.icon;
+
+  return (
+    <div className="flex gap-3">
+      {/* Icon with vertical line */}
+      <div className="flex flex-col items-center">
+        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", config.bgColor)}>
+          <Icon className={cn("h-4 w-4", config.iconColor)} />
+        </div>
+        {!isLast && <div className="w-0.5 flex-1 bg-muted-foreground/20 mt-1" />}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 pb-3">
+        <p className="text-sm">{log.description}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+        </p>
+      </div>
     </div>
   );
 }
