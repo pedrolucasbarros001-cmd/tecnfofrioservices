@@ -57,6 +57,26 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Status colors
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        // Service type colors (identifiers)
+        type: {
+          visita: "hsl(var(--type-visita))",
+          oficina: "hsl(var(--type-oficina))",
+          instalacao: "hsl(var(--type-instalacao))",
+          entrega: "hsl(var(--type-entrega))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

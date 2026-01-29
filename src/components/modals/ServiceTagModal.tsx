@@ -35,60 +35,59 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
         </DialogHeader>
 
-        <div className="print:block">
-          <Separator className="bg-primary h-1 my-4" />
+        {/* Print-optimized tag content */}
+        <div className="print-tag border rounded-lg p-4 bg-card">
+          <Separator className="bg-primary h-1 mb-4 print:bg-black" />
           
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-3">
             {/* Logo/Brand */}
             <div className="flex items-center justify-center">
               <img 
                 src={tecnofrioLogoFull} 
                 alt="TECNOFRIO" 
-                className="h-12 object-contain"
+                className="h-10 object-contain"
               />
             </div>
             
             {/* QR Code */}
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-2">
               <QRCodeSVG
                 value={qrData}
-                size={180}
+                size={140}
                 level="H"
-                includeMargin
-                className="border p-2 rounded-lg"
+                includeMargin={false}
+                className="border p-2 rounded-lg bg-white"
               />
             </div>
             
             {/* Service Code */}
-            <p className="text-3xl font-mono font-bold tracking-wider">
+            <p className="service-code text-2xl font-mono font-bold tracking-wider text-foreground">
               {service.code}
             </p>
             
             {/* Service Details */}
-            <div className="text-left space-y-1 px-4">
-              <p className="text-sm">
+            <div className="text-left space-y-1 px-2 text-sm">
+              <p>
                 <span className="text-muted-foreground">Cliente:</span>{' '}
-                <span className="font-medium">{service.customer?.name || 'N/A'}</span>
+                <span className="font-medium text-foreground">{service.customer?.name || 'N/A'}</span>
               </p>
-              <p className="text-sm">
+              <p>
                 <span className="text-muted-foreground">Equipamento:</span>{' '}
-                <span className="font-medium">
+                <span className="font-medium text-foreground">
                   {[service.appliance_type, service.brand].filter(Boolean).join(' ') || 'N/A'}
                 </span>
               </p>
-              <p className="text-sm">
+              <p>
                 <span className="text-muted-foreground">Telefone:</span>{' '}
-                <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
+                <span className="font-medium text-foreground">{service.customer?.phone || 'N/A'}</span>
               </p>
             </div>
             
             {/* Footer Note */}
-            <p className="text-xs text-muted-foreground px-4 pt-2">
+            <p className="text-xs text-muted-foreground px-2 pt-1 border-t">
               Leia o QR Code para ver detalhes e histórico online
             </p>
           </div>
-          
-          <Separator className="my-4" />
         </div>
 
         <DialogFooter className="gap-2">
