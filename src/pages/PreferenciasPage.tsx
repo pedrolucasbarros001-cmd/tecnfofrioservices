@@ -45,6 +45,23 @@ export default function PreferenciasPage() {
     urgentAlerts: true,
   });
 
+  // Password validation matching server-side requirements
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'A palavra-passe deve ter pelo menos 8 caracteres';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'A palavra-passe deve conter pelo menos uma letra maiúscula';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'A palavra-passe deve conter pelo menos uma letra minúscula';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'A palavra-passe deve conter pelo menos um número';
+    }
+    return null;
+  };
+
   const handlePasswordChange = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
       toast.error('Preencha todos os campos');
@@ -56,32 +73,47 @@ export default function PreferenciasPage() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 8) {
-      toast.error('A nova palavra-passe deve ter pelo menos 8 caracteres');
+    // Client-side validation (matches server-side)
+    const validationError = validatePassword(passwordForm.newPassword);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
     setIsChangingPassword(true);
 
     try {
-      // Re-authenticate with current password first
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: passwordForm.currentPassword,
-      });
-
-      if (signInError) {
-        toast.error('Palavra-passe atual incorreta');
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
         setIsChangingPassword(false);
         return;
       }
 
-      // Update password
-      const { error } = await supabase.auth.updateUser({
-        password: passwordForm.newPassword,
-      });
+      // Call edge function for server-side password validation
+      const response = await fetch(
+        'https://flialeqlwrtfnonxtsnx.supabase.co/functions/v1/change-password',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            currentPassword: passwordForm.currentPassword,
+            newPassword: passwordForm.newPassword,
+          }),
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result.error || 'Erro ao alterar palavra-passe');
+        return;
+      }
 
       toast.success('Palavra-passe alterada com sucesso');
       setShowPasswordModal(false);
@@ -310,7 +342,7 @@ export default function PreferenciasPage() {
                 placeholder="••••••••"
               />
               <p className="text-xs text-muted-foreground">
-                Mínimo de 8 caracteres
+                Mínimo 8 caracteres, com letra maiúscula, minúscula e número
               </p>
             </div>
 
