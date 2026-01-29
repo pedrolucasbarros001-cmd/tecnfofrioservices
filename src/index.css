@@ -320,50 +320,46 @@
    PRINT STYLES - Service Sheet (A4) & Tag (80mm)
    ====================================== */
 
-/* Screen-only elements - hidden in print */
+/* Screen-only: Print root is hidden on screen */
+.print-root {
+  display: none !important;
+}
+
+/* ========== PRINT MEDIA STYLES ========== */
 @media print {
-  /* Page setup for A4 */
+  /* Default page setup */
   @page {
     size: A4 portrait;
     margin: 10mm;
   }
 
-  /* Hide EVERYTHING by default */
+  /* Reset html/body */
   html, body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
   }
 
-  /* Force hide all elements */
-  body > *:not(.print-root),
-  header,
-  nav,
-  aside,
-  footer,
-  .no-print,
-  [data-sidebar],
-  [data-radix-dialog-overlay],
-  [role="dialog"] > button:first-child,
-  button[aria-label="Close"],
-  .DialogHeader button {
+  /* Hide EVERYTHING except print-root */
+  body > *:not(.print-root) {
     display: none !important;
     visibility: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
   }
 
-  /* Print root container */
+  /* Show print root */
   .print-root {
     display: block !important;
     visibility: visible !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
+    position: static !important;
     width: 100% !important;
     height: auto !important;
     background: white !important;
-    z-index: 999999 !important;
   }
+
 
   /* ========== SERVICE SHEET (A4) ========== */
   .print-content {
