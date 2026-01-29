@@ -31,17 +31,17 @@ export function TechnicianSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/50">
-      <SidebarHeader className="border-b border-sidebar-border/50 px-4 py-3">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+          <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-9 w-9 shrink-0 rounded-lg object-contain bg-white p-0.5" />
           {!isCollapsed && (
             <div className="flex flex-col">
               <span className="text-lg font-bold leading-tight">
-                <span className="text-[#2B4F84]">TECNO</span>
-                <span className="text-sidebar-foreground/80">FRIO</span>
+                <span className="text-sidebar-primary">TECNO</span>
+                <span className="text-sidebar-foreground">FRIO</span>
               </span>
-              <span className="text-[10px] text-sidebar-foreground/50 -mt-0.5">Sistema de Gestão</span>
+              <span className="text-[10px] text-sidebar-foreground/60 -mt-0.5">Sistema de Gestão</span>
             </div>
           )}
         </div>
@@ -70,13 +70,13 @@ export function TechnicianSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border/50 p-4">
+      <SidebarFooter className="border-t border-sidebar-border p-4">
         {!isCollapsed && profile && (
           <div className="mb-3 px-2">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {profile.full_name || profile.email}
             </p>
-            <p className="text-xs text-sidebar-foreground/60">Técnico</p>
+            <p className="text-xs text-sidebar-foreground/70">Técnico</p>
           </div>
         )}
         <Button 

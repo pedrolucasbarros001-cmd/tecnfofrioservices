@@ -191,21 +191,21 @@ export interface Notification {
   created_at: string;
 }
 
-// Status labels and colors mapping - Monochromatic design (text > color)
+// Status labels and colors mapping - Institutional Blue design (text > color)
 export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { 
   label: string; 
   color: string;
   intensity: 'dim' | 'normal' | 'active';
 }> = {
-  por_fazer: { label: 'Por Fazer', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
-  em_execucao: { label: 'Em Execução', color: 'bg-slate-200 text-slate-800 font-medium dark:bg-slate-700 dark:text-slate-200', intensity: 'active' },
-  na_oficina: { label: 'Na Oficina', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
-  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-slate-100 text-slate-700 border border-dashed border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600', intensity: 'normal' },
-  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
-  a_precificar: { label: 'A Precificar', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
-  concluidos: { label: 'Concluídos', color: 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200', intensity: 'active' },
-  em_debito: { label: 'Em Débito', color: 'bg-slate-100 text-slate-700 border-l-2 border-l-red-400 dark:bg-slate-800 dark:text-slate-300', intensity: 'normal' },
-  finalizado: { label: 'Finalizado', color: 'bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400', intensity: 'dim' },
+  por_fazer: { label: 'Por Fazer', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  em_execucao: { label: 'Em Execução', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
+  na_oficina: { label: 'Na Oficina', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-primary/10 text-primary border border-dashed border-primary/30', intensity: 'normal' },
+  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  a_precificar: { label: 'A Precificar', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  concluidos: { label: 'Concluídos', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
+  em_debito: { label: 'Em Débito', color: 'bg-primary/10 text-primary border-l-2 border-l-destructive', intensity: 'normal' },
+  finalizado: { label: 'Finalizado', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
 };
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; icon: string }> = {

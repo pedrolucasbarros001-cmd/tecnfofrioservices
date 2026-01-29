@@ -17,64 +17,68 @@
 
 @layer base {
   :root {
-    /* Background & Foreground - Clean, professional */
-    --background: 209 40% 96%;
-    --foreground: 222 47% 11%;
+    /* =============================================
+       TECNOFRIO Institutional Blue Palette
+       Primary: #2B4F84 (HSL: 214 50% 34%)
+       ============================================= */
+    
+    /* Background - Subtle blue tint for cohesion */
+    --background: 214 30% 98%;
+    --foreground: 214 50% 15%;
 
-    /* Card - White with subtle depth */
-    --card: 210 40% 98%;
-    --card-foreground: 222 47% 11%;
+    /* Card - Pure white with blue-tinted border */
+    --card: 0 0% 100%;
+    --card-foreground: 214 50% 15%;
 
     /* Popover */
-    --popover: 214 31% 91%;
-    --popover-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 50% 15%;
 
-    /* TECNOFRIO Blue - Primary brand color (ALL actions are blue) */
-    --primary: 200 98% 39%;
-    --primary-foreground: 204 100% 97%;
+    /* Primary = TECNOFRIO Institutional Blue #2B4F84 */
+    --primary: 214 50% 34%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Subtle, neutral */
-    --secondary: 215 24% 26%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary - Very light blue */
+    --secondary: 214 20% 95%;
+    --secondary-foreground: 214 50% 25%;
 
-    /* Muted - For meta information */
-    --muted: 215 20% 65%;
-    --muted-foreground: 222 47% 11%;
+    /* Muted - For secondary text */
+    --muted: 214 20% 96%;
+    --muted-foreground: 214 20% 45%;
 
-    /* Accent - Subtle highlight */
-    --accent: 210 40% 98%;
-    --accent-foreground: 215 19% 34%;
+    /* Accent - Hover states */
+    --accent: 214 30% 92%;
+    --accent-foreground: 214 50% 20%;
 
     /* Destructive - Only for true destructive actions */
     --destructive: 0 72% 50%;
-    --destructive-foreground: 0 85% 97%;
+    --destructive-foreground: 0 0% 100%;
 
-    /* Status colors - Blue variations for states */
+    /* Status semantic colors */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-
-    --info: 199 89% 48%;
+    --info: 214 50% 50%;
     --info-foreground: 0 0% 100%;
 
-    /* Borders & Inputs */
-    --border: 212 26% 83%;
-    --input: 212 26% 83%;
-    --ring: 200 98% 39%;
+    /* Borders - Soft blue, not black */
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 214 50% 34%;
 
+    /* Rounded corners, not square */
     --radius: 0.5rem;
 
-    /* Sidebar - Dark blue theme */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 200 98% 39%;
-    --sidebar-primary-foreground: 204 100% 97%;
-    --sidebar-accent: 215 24% 26%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 212 26% 83%;
-    --sidebar-ring: 200 98% 39%;
+    /* Sidebar - Dark blue, legible text */
+    --sidebar-background: 214 45% 15%;
+    --sidebar-foreground: 214 15% 92%;
+    --sidebar-primary: 214 50% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 40% 22%;
+    --sidebar-accent-foreground: 214 15% 95%;
+    --sidebar-border: 214 30% 25%;
+    --sidebar-ring: 214 50% 50%;
 
     /* Service Type Colors (identifier only, not dominant) */
     --type-visita: 210 100% 50%;
@@ -82,98 +86,97 @@
     --type-instalacao: 45 93% 47%;
     --type-entrega: 142 76% 36%;
 
-    /* Service status colors - Using blue variations */
-    --status-por-fazer: 210 100% 45%;
-    --status-em-execucao: 199 89% 48%;
-    --status-na-oficina: 262 83% 58%;
-    --status-para-pedir-peca: 38 92% 50%;
-    --status-em-espera-peca: 25 95% 53%;
-    --status-a-precificar: 291 64% 42%;
-    --status-concluidos: 142 76% 36%;
-    --status-em-debito: 0 84% 60%;
-    --status-finalizado: 160 60% 45%;
-    --chart-1: 198 93% 59%;
-    --chart-2: 213 93% 67%;
-    --chart-3: 215 20% 65%;
-    --chart-4: 215 16% 46%;
-    --chart-5: 215 19% 34%;
-    --sidebar: 210 40% 98%;
+    /* Chart colors - Blue variations */
+    --chart-1: 214 50% 34%;
+    --chart-2: 214 50% 45%;
+    --chart-3: 214 50% 55%;
+    --chart-4: 214 50% 65%;
+    --chart-5: 214 50% 75%;
+    --sidebar: 0 0% 100%;
+
+    /* Fonts */
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
     --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+    /* Soft shadows - Professional, not cartoon */
+    --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.2);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* Dark mode - Blue-tinted dark */
+    --background: 214 30% 7%;
+    --foreground: 214 15% 95%;
 
-    --card: 217 32% 17%;
-    --card-foreground: 210 40% 98%;
+    --card: 214 30% 10%;
+    --card-foreground: 214 15% 95%;
 
-    --popover: 215 24% 26%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 214 30% 12%;
+    --popover-foreground: 214 15% 95%;
 
-    --primary: 198 93% 59%;
-    --primary-foreground: 204 80% 15%;
+    --primary: 214 50% 55%;
+    --primary-foreground: 214 50% 10%;
 
-    --secondary: 212 26% 83%;
-    --secondary-foreground: 228 84% 4%;
+    --secondary: 214 25% 18%;
+    --secondary-foreground: 214 15% 90%;
 
-    --muted: 215 16% 46%;
-    --muted-foreground: 210 40% 98%;
+    --muted: 214 25% 15%;
+    --muted-foreground: 214 15% 60%;
 
-    --accent: 228 84% 4%;
-    --accent-foreground: 215 20% 65%;
+    --accent: 214 30% 20%;
+    --accent-foreground: 214 15% 95%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 85% 97%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 142 76% 40%;
     --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
+    --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
-
-    --info: 199 89% 48%;
+    --info: 214 50% 60%;
     --info-foreground: 0 0% 100%;
 
-    --border: 215 19% 34%;
-    --input: 215 19% 34%;
-    --ring: 198 93% 59%;
+    --border: 214 25% 22%;
+    --input: 214 25% 22%;
+    --ring: 214 50% 55%;
 
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 198 93% 59%;
-    --sidebar-primary-foreground: 204 80% 15%;
-    --sidebar-accent: 215 20% 65%;
-    --sidebar-accent-foreground: 228 84% 4%;
-    --sidebar-border: 215 19% 34%;
-    --sidebar-ring: 198 93% 59%;
-    --chart-1: 199 95% 73%;
-    --chart-2: 211 96% 78%;
-    --chart-3: 215 20% 65%;
-    --chart-4: 215 16% 46%;
-    --chart-5: 215 19% 34%;
-    --sidebar: 217 32% 17%;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
-    --radius: 0rem;
+    /* Sidebar - Darker blue in dark mode */
+    --sidebar-background: 214 45% 8%;
+    --sidebar-foreground: 214 15% 90%;
+    --sidebar-primary: 214 50% 60%;
+    --sidebar-primary-foreground: 214 50% 10%;
+    --sidebar-accent: 214 40% 15%;
+    --sidebar-accent-foreground: 214 15% 95%;
+    --sidebar-border: 214 30% 18%;
+    --sidebar-ring: 214 50% 50%;
+
+    /* Chart colors */
+    --chart-1: 214 50% 55%;
+    --chart-2: 214 50% 65%;
+    --chart-3: 214 50% 45%;
+    --chart-4: 214 50% 35%;
+    --chart-5: 214 50% 75%;
+    --sidebar: 214 30% 10%;
+
+    /* Soft shadows for dark mode */
+    --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.15);
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.25), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.35);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+    --radius: 0.5rem;
   }
 }
 
