@@ -1,184 +1,140 @@
 /**
- * Print utilities for generating clean print output
- * Opens a new window with only the print content for proper formatting
+ * In-place printing utilities
+ * Prints content without opening new windows - works reliably on mobile/desktop
  */
+
+type PrintType = 'sheet' | 'tag';
 
 interface PrintOptions {
-  title: string;
-  pageSize?: 'A4' | 'label';  // A4 for service sheet, label for tag
+  type: PrintType;
+  onBeforePrint?: () => void;
+  onAfterPrint?: () => void;
 }
 
 /**
- * Opens a new window with the content to print, then triggers print dialog
+ * Creates a hidden print container, clones content, and prints in-place
  */
-export function printContent(elementId: string, options: PrintOptions) {
-  const element = document.getElementById(elementId);
-  if (!element) {
-    console.error('Print element not found:', elementId);
-    return;
-  }
+export function printInPlace(element: HTMLElement, options: PrintOptions): void {
+  const { type, onBeforePrint, onAfterPrint } = options;
 
-  // Clone the content to avoid modifying the original
-  const content = element.cloneNode(true) as HTMLElement;
+  // Remove any existing print root
+  const existingRoot = document.getElementById('print-root-container');
+  if (existingRoot) existingRoot.remove();
   
-  // Get computed styles from the main document
-  const styles = Array.from(document.styleSheets)
-    .map(styleSheet => {
-      try {
-        return Array.from(styleSheet.cssRules)
-          .map(rule => rule.cssText)
-          .join('\n');
-      } catch (e) {
-        // Cross-origin stylesheets will throw
-        return '';
-      }
-    })
-    .join('\n');
+  const existingStyle = document.getElementById('print-page-style');
+  if (existingStyle) existingStyle.remove();
 
-  // Page size styles
-  const pageStyles = options.pageSize === 'label' 
-    ? `
-      @page {
-        size: 80mm auto;
-        margin: 2mm;
-      }
-      body {
-        width: 80mm;
-        margin: 0 auto;
-      }
-      .print-container {
-        width: 76mm;
-        padding: 2mm;
-        border: 1px solid #000;
-        margin: 0 auto;
-      }
-    `
-    : `
-      @page {
-        size: A4 portrait;
-        margin: 10mm;
-      }
-      body {
-        width: 100%;
-        max-width: 190mm;
-        margin: 0 auto;
-      }
-      .print-container {
-        width: 100%;
-        padding: 5mm;
+  // Create print root container
+  const printRoot = document.createElement('div');
+  printRoot.className = 'print-root';
+  printRoot.id = 'print-root-container';
+
+  // Clone the content
+  const clone = element.cloneNode(true) as HTMLElement;
+  
+  // Add appropriate class based on type
+  clone.classList.add(type === 'tag' ? 'print-tag' : 'print-content');
+  
+  // Remove any interactive elements from clone
+  clone.querySelectorAll('button, [role="button"]').forEach(el => el.remove());
+  
+  printRoot.appendChild(clone);
+
+  // Create dynamic style for page size
+  const styleTag = document.createElement('style');
+  styleTag.id = 'print-page-style';
+  
+  if (type === 'tag') {
+    styleTag.textContent = `
+      @media print {
+        @page {
+          size: 80mm auto;
+          margin: 2mm;
+        }
       }
     `;
+  } else {
+    styleTag.textContent = `
+      @media print {
+        @page {
+          size: A4 portrait;
+          margin: 10mm;
+        }
+      }
+    `;
+  }
 
-  // Build the print document
-  const printDocument = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>${options.title}</title>
-        <style>
-          ${styles}
-          
-          /* Print-specific overrides */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          
-          html, body {
-            background: white !important;
-            color: black !important;
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 11px;
-            line-height: 1.4;
-            margin: 0;
-            padding: 0;
-          }
-          
-          ${pageStyles}
-          
-          /* Ensure images and SVGs print */
-          img, svg {
-            max-width: 100%;
-            height: auto;
-          }
-          
-          /* Remove interactive elements styling */
-          button, .no-print {
-            display: none !important;
-          }
-          
-          /* Color adjustments for print */
-          .text-muted-foreground {
-            color: #666 !important;
-          }
-          
-          .bg-amber-50 {
-            background-color: #fffbeb !important;
-          }
-          
-          .bg-purple-50 {
-            background-color: #faf5ff !important;
-          }
-          
-          .border {
-            border-color: #e5e7eb !important;
-          }
-          
-          [role="separator"] {
-            background-color: #e5e7eb !important;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="print-container">
-          ${content.innerHTML}
-        </div>
-        <script>
-          // Auto-print when loaded
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              // Close after print dialog (with small delay for Safari)
-              setTimeout(function() {
-                window.close();
-              }, 100);
-            }, 250);
-          };
-        </script>
-      </body>
-    </html>
+  // Hide on screen (only visible during print)
+  printRoot.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    z-index: 999999;
+    overflow: auto;
+    display: none;
   `;
 
-  // Open print window
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  if (printWindow) {
-    printWindow.document.write(printDocument);
-    printWindow.document.close();
-  } else {
-    // Fallback if popup blocked
-    console.error('Could not open print window. Please allow popups for this site.');
-    alert('Não foi possível abrir a janela de impressão. Por favor, permita popups para este site.');
+  // Add to DOM
+  document.head.appendChild(styleTag);
+  document.body.appendChild(printRoot);
+
+  // Show for printing
+  printRoot.style.display = 'block';
+
+  // Trigger callbacks
+  onBeforePrint?.();
+
+  // Small delay to ensure DOM is ready
+  requestAnimationFrame(() => {
+    window.print();
+    
+    // Cleanup after print dialog closes
+    const cleanup = () => {
+      const rootEl = document.getElementById('print-root-container');
+      const styleEl = document.getElementById('print-page-style');
+      if (rootEl) rootEl.remove();
+      if (styleEl) styleEl.remove();
+      onAfterPrint?.();
+      window.removeEventListener('afterprint', cleanup);
+    };
+
+    // Listen for afterprint event
+    window.addEventListener('afterprint', cleanup);
+
+    // Fallback cleanup for browsers that don't fire afterprint
+    setTimeout(() => {
+      if (document.getElementById('print-root-container')) {
+        cleanup();
+      }
+    }, 1000);
+  });
+}
+
+/**
+ * Print a service sheet (A4 format)
+ */
+export function printServiceSheet(elementId: string = 'print-service-sheet'): void {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id "${elementId}" not found`);
+    return;
   }
+  
+  printInPlace(element, { type: 'sheet' });
 }
 
 /**
- * Print service sheet (A4 format)
+ * Print a service tag (80mm format)
  */
-export function printServiceSheet(elementId: string = 'print-service-sheet') {
-  printContent(elementId, {
-    title: 'Ficha de Serviço - TECNOFRIO',
-    pageSize: 'A4',
-  });
-}
-
-/**
- * Print service tag (80mm label format)
- */
-export function printServiceTag(elementId: string = 'print-service-tag') {
-  printContent(elementId, {
-    title: 'Etiqueta de Serviço - TECNOFRIO',
-    pageSize: 'label',
-  });
+export function printServiceTag(elementId: string = 'print-service-tag'): void {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id "${elementId}" not found`);
+    return;
+  }
+  
+  printInPlace(element, { type: 'tag' });
 }
