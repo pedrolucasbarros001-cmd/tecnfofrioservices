@@ -437,13 +437,15 @@
     print-color-adjust: exact;
   }
 
-  /* ========== SERVICE TAG (80mm) ========== */
+  /* ========== SERVICE TAG (80mm x 170mm) ========== */
   .print-tag {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
     width: 80mm !important;
     max-width: 80mm !important;
+    min-height: 170mm !important;
+    height: auto !important;
     margin: 0 auto !important;
     padding: 4mm !important;
     background: white !important;
@@ -472,11 +474,11 @@
   }
 }
 
-/* Tag-specific @page - 80mm width */
+/* Tag-specific @page - 80mm x 170mm */
 body.print-type-tag {
   @media print {
     @page {
-      size: 80mm auto;
+      size: 80mm 170mm;
       margin: 2mm;
     }
   }
