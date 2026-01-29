@@ -309,19 +309,22 @@
     overflow: visible !important;
   }
 
-  /* Hide EVERYTHING using universal selector */
-  * {
-    visibility: hidden !important;
-  }
-
-  /* Show ONLY the print portal and its children */
-  .print-portal,
-  .print-portal * {
+  /* CRITICAL: Show print-only elements in print */
+  .print-only {
+    display: block !important;
     visibility: visible !important;
   }
 
-  /* Position the portal at top */
-  .print-portal {
+  /* Hide everything EXCEPT the print portal */
+  body > *:not(.print-portal) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Show the print portal with high specificity */
+  body > .print-portal {
+    display: block !important;
+    visibility: visible !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -331,6 +334,13 @@
     background: white !important;
     z-index: 999999 !important;
     overflow: visible !important;
+  }
+
+  /* Ensure ALL descendants are visible */
+  body > .print-portal *,
+  body > .print-portal *::before,
+  body > .print-portal *::after {
+    visibility: visible !important;
   }
 
   /* ========== SERVICE SHEET (A4) ========== */
