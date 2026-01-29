@@ -1,199 +1,154 @@
 
-# Plano: Corrigir TV Monitor para Mostrar Todos os Serviços da Oficina
+# Plano: Corrigir Visualização de Serviços no TV Monitor
 
 ## Diagnóstico
 
-O TV Monitor tem dois problemas:
+Após investigação profunda, confirmei que:
 
-1. **Agrupamento por status simples**: A lógica atual agrupa por `service.status`, mas a nova regra de coexistência define que serviços na oficina devem ser agrupados por lógica composta (technician_id + status).
+1. **Os dados existem e estão correctos no banco**:
+   - OS-00002 tem `service_location = 'oficina'`, `status = 'na_oficina'`, `technician_id` preenchido
 
-2. **Seções desalinhadas**: As seções atuais não refletem a lógica correta:
-   - "Por Fazer" deveria ser "Para Assumir" (sem técnico)
-   - "Na Oficina" deveria mostrar serviços COM técnico aguardando início
+2. **As políticas RLS estão configuradas correctamente**:
+   - Policy "Public read for workshop services on TV monitor" permite acesso `anon`
+   - Condition: `service_location = 'oficina' AND status != 'finalizado'`
 
-## Dados Atuais
+3. **A query da API retorna dados** (confirmado nos logs de rede):
+   - Requests autenticados retornam o serviço correctamente
 
-O serviço OS-00002 está corretamente:
-- `service_location = 'oficina'`
-- `status = 'na_oficina'`
-- `technician_id` preenchido
+4. **O problema identificado**:
+   - O TV Monitor é acedido sem autenticação (role `anon`)
+   - Os requests de rede mostram Bearer token preenchido, indicando que a página foi testada com sessão autenticada
+   - Quando acedido anonimamente, pode haver um problema no Supabase client que não está a fazer a query correctamente
 
-A RLS policy permite acesso e os dados estão corretos. O problema é a lógica de exibição no frontend.
+## Causa Raiz
+
+O código do TVMonitorPage está a usar o client Supabase que pode ter uma sessão autenticada em cache do localStorage. Quando a página é acedida numa TV (sem login), deveria usar o role `anon`, mas se houver sessão expirada ou mal formada, a query pode falhar silenciosamente.
 
 ## Solução
 
-Atualizar o TVMonitorPage.tsx para usar **filtros funcionais** que consideram tanto o `status` quanto o `technician_id`:
+Modificar o TVMonitorPage para garantir que funciona em modo anónimo e adicionar tratamento de erro adequado.
 
-### Nova Definição de MONITOR_SECTIONS
+### A) Forçar Modo Anónimo no TV Monitor
 
-| Coluna | Condição de Filtro | Descrição |
-|--------|-------------------|-----------|
-| Para Assumir | `!technician_id && ['por_fazer', 'na_oficina'].includes(status)` | Serviços sem técnico |
-| Na Oficina | `technician_id && ['por_fazer', 'na_oficina'].includes(status)` | Com técnico, aguarda início |
-| Em Execução | `status === 'em_execucao'` | Trabalho em andamento |
-| Para Pedir Peça | `status === 'para_pedir_peca'` | Precisa encomendar |
-| Em Espera de Peça | `status === 'em_espera_de_peca'` | Aguarda chegada |
-| A Precificar | `status === 'a_precificar'` | Trabalho feito, sem preço |
-| Concluídos | `status === 'concluidos'` | Prontos para entrega |
-
-### Alterações no Ficheiro
+Criar um client Supabase anónimo dedicado ou limpar a sessão ao carregar o TV Monitor:
 
 **Ficheiro**: `src/pages/TVMonitorPage.tsx`
 
-#### A) Atualizar MONITOR_SECTIONS (linhas 14-22)
-
-Adicionar função `filter` a cada seção:
+Adicionar lógica para usar cliente sem autenticação:
 
 ```typescript
-const MONITOR_SECTIONS = [
-  { 
-    key: 'para_assumir', 
-    label: 'Para Assumir', 
-    icon: User, 
-    color: 'text-blue-400',
-    filter: (s: Service) => !s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status)
-  },
-  { 
-    key: 'na_oficina', 
-    label: 'Na Oficina', 
-    icon: Building2, 
-    color: 'text-green-400',
-    filter: (s: Service) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status)
-  },
-  { 
-    key: 'em_execucao', 
-    label: 'Em Execução', 
-    icon: Play, 
-    color: 'text-cyan-400',
-    filter: (s: Service) => s.status === 'em_execucao'
-  },
-  { 
-    key: 'para_pedir_peca', 
-    label: 'Para Pedir Peça', 
-    icon: Package, 
-    color: 'text-yellow-400',
-    filter: (s: Service) => s.status === 'para_pedir_peca'
-  },
-  { 
-    key: 'em_espera_de_peca', 
-    label: 'Em Espera de Peça', 
-    icon: Clock, 
-    color: 'text-orange-400',
-    filter: (s: Service) => s.status === 'em_espera_de_peca'
-  },
-  { 
-    key: 'a_precificar', 
-    label: 'A Precificar', 
-    icon: DollarSign, 
-    color: 'text-lime-400',
-    filter: (s: Service) => s.status === 'a_precificar'
-  },
-  { 
-    key: 'concluidos', 
-    label: 'Concluídos', 
-    icon: CheckCircle, 
-    color: 'text-emerald-400',
-    filter: (s: Service) => s.status === 'concluidos'
-  },
-];
+// No início do componente, antes da query
+useEffect(() => {
+  // Garantir que o TV Monitor funciona sem sessão
+  // Não fazer logout, apenas ignorar erros de sessão
+}, []);
 ```
 
-#### B) Atualizar Lógica de Agrupamento (linhas 157-162)
+### B) Adicionar Tratamento de Erro na Query
 
-Substituir agrupamento por status por agrupamento por seção:
+Modificar a query para ter logs de debug e tratamento de erro:
 
 ```typescript
-// Agrupar serviços por seção usando os filtros
-const groupedServices = MONITOR_SECTIONS.reduce((acc, section) => {
-  acc[section.key] = services.filter(section.filter);
-  return acc;
-}, {} as Record<string, Service[]>);
+const { data: services = [], refetch, error, isError } = useQuery({
+  queryKey: ['tv-monitor-services'],
+  queryFn: async () => {
+    console.log('[TV Monitor] Fetching services...');
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        customer:customers(*),
+        technician:technicians(*, profile:profiles(*))
+      `)
+      .eq('service_location', 'oficina')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[TV Monitor] Query error:', error);
+      throw error;
+    }
+    
+    console.log('[TV Monitor] Fetched services:', data?.length);
+    return (data as unknown as Service[]) || [];
+  },
+  refetchInterval: 30000,
+  retry: 3,
+});
 ```
 
-#### C) Atualizar Stats Bar (linhas 201-217)
+### C) Mostrar Estado de Loading e Erro
 
-Usar as seções ao invés do array de status:
+Adicionar feedback visual quando há erro na query:
 
 ```typescript
-<div className="grid grid-cols-7 gap-3 mb-6">
-  {MONITOR_SECTIONS.map((section) => {
-    const count = groupedServices[section.key]?.length || 0;
-    return (
-      <div
-        key={section.key}
-        className={cn(
-          "rounded-lg p-3 text-center",
-          count > 0 ? "bg-slate-700" : "bg-slate-800"
-        )}
-      >
-        <p className="text-3xl lg:text-4xl font-bold">{count}</p>
-        <p className="text-xs lg:text-sm opacity-90">{section.label}</p>
-      </div>
-    );
-  })}
-</div>
+// Após o header, antes das seções
+{isError && (
+  <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-6 text-center">
+    <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-2" />
+    <p className="text-red-400">Erro ao carregar serviços. A tentar novamente...</p>
+  </div>
+)}
+
+{isLoading && (
+  <div className="text-center py-8">
+    <RefreshCw className="h-8 w-8 animate-spin mx-auto text-slate-400" />
+    <p className="text-slate-400 mt-2">A carregar serviços...</p>
+  </div>
+)}
 ```
 
-#### D) Atualizar Renderização das Seções (linhas 222-259)
+### D) Fallback para Query Simplificada
 
-Usar `section.key` para aceder aos serviços agrupados:
+Se a query com joins falhar, usar uma query sem joins (fallback):
 
 ```typescript
-{MONITOR_SECTIONS.map((section) => {
-  const sectionServices = groupedServices[section.key] || [];
-  // ... resto igual, mas usar section.key
-})}
+const { data: services = [] } = useQuery({
+  queryKey: ['tv-monitor-services'],
+  queryFn: async () => {
+    // Primeira tentativa: query completa
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        customer:customers(*),
+        technician:technicians(*, profile:profiles(*))
+      `)
+      .eq('service_location', 'oficina')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      return data as unknown as Service[];
+    }
+
+    // Fallback: query sem joins (para debug)
+    console.warn('[TV Monitor] Using fallback query');
+    const fallback = await supabase
+      .from('services')
+      .select('*')
+      .eq('service_location', 'oficina')
+      .order('created_at', { ascending: false });
+    
+    return (fallback.data || []) as unknown as Service[];
+  },
+});
 ```
 
-## Diagrama da Nova Lógica
+## Ficheiros a Alterar
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│                  TV MONITOR - FLUXO DE COLUNAS                   │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Serviço chega (service_location = 'oficina')                    │
-│       │                                                          │
-│       ▼                                                          │
-│  ┌────────────────┐    technician_id     ┌────────────────┐      │
-│  │ PARA ASSUMIR   │ ──────────────────►  │   NA OFICINA   │      │
-│  │ (sem técnico)  │    atribuído         │ (com técnico)  │      │
-│  └────────────────┘                      └───────┬────────┘      │
-│                                                  │               │
-│                                          "Começar" clicado       │
-│                                                  │               │
-│                                                  ▼               │
-│                                         ┌────────────────┐       │
-│                                         │  EM EXECUÇÃO   │       │
-│                                         └───────┬────────┘       │
-│                                                 │                │
-│                     ┌───────────────────────────┼────────┐       │
-│                     │                           │        │       │
-│                     ▼                           ▼        ▼       │
-│            ┌────────────────┐          ┌────────────────────┐    │
-│            │ PARA PEDIR PEÇA│          │   A PRECIFICAR     │    │
-│            └───────┬────────┘          │   ou CONCLUÍDOS    │    │
-│                    │                   └────────────────────┘    │
-│                    ▼                                             │
-│            ┌────────────────┐                                    │
-│            │ ESPERA DE PEÇA │                                    │
-│            └────────────────┘                                    │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-## Resultado Esperado
-
-Com o serviço OS-00002:
-- `technician_id` = preenchido
-- `status` = 'na_oficina'
-
-**Antes**: Não aparece (bug no agrupamento)
-**Depois**: Aparece na coluna "Na Oficina"
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/pages/TVMonitorPage.tsx` | Adicionar logs de debug, tratamento de erro, e fallback |
 
 ## Validação
 
-1. Serviço na oficina SEM técnico → Coluna "Para Assumir"
-2. Serviço na oficina COM técnico → Coluna "Na Oficina"
-3. Serviço em execução → Coluna "Em Execução"
-4. Stats Bar reflete as contagens corretas das seções
+1. Abrir TV Monitor numa janela anónima (sem login)
+2. Verificar console logs para debug
+3. Confirmar que o serviço OS-00002 aparece na secção "Na Oficina"
+
+## Nota Importante
+
+O utilizador mencionou estar na rota `/oficina`, mas o screenshot mostra o layout do TV Monitor. Confirmar qual página está realmente a ser visualizada:
+- `/oficina` → OficinaPage (layout com cards brancos, sidebar visível)
+- `/tv-monitor` → TVMonitorPage (layout escuro, sem sidebar, fullscreen)
+
+Se for a OficinaPage, essa página **usa o hook `useServices`** que já funciona correctamente (confirmado nos logs de rede). O problema seria apenas no TVMonitorPage.
