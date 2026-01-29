@@ -56,11 +56,14 @@ export default function GeralPage() {
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
+  // Mapear "a_precificar" do URL para "pending_pricing" (todos com pending_pricing=true)
+  const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
+  
   const {
     data: services = [],
     isLoading
   } = useServices({
-    status: selectedStatus
+    status: effectiveStatus as any
   });
   const updateService = useUpdateService();
   const deleteService = useDeleteService();

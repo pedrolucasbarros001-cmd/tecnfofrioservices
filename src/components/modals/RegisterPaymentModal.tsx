@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logPayment } from '@/utils/activityLogUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Service, PaymentMethod } from '@/types/database';
@@ -45,6 +47,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
 
   const amountPaid = service?.amount_paid || 0;
   const finalPrice = service?.final_price || 0;
@@ -90,6 +93,15 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         amount_paid: newAmountPaid,
         status: isPaidOff ? 'concluidos' : 'em_debito',
       });
+
+      // Log activity
+      await logPayment(
+        service.code || 'N/A',
+        service.id,
+        paymentValue,
+        user?.id,
+        profile?.full_name || undefined
+      );
 
       queryClient.invalidateQueries({ queryKey: ['service-payments'] });
       toast.success('Pagamento registado com sucesso!');

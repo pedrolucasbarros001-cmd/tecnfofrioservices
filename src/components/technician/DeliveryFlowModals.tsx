@@ -20,8 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logDelivery } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import type { Service } from '@/types/database';
@@ -41,6 +44,8 @@ interface FormData {
 
 export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: DeliveryFlowModalsProps) {
   const updateService = useUpdateService();
+  const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
   const [formData, setFormData] = useState<FormData>({
     photoFile: null,
@@ -77,6 +82,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         file_url: imageData,
         description: 'Foto da entrega',
       });
+      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
       setFormData(prev => ({ ...prev, photoFile: imageData }));
       setShowCamera(false);
       toast.success('Foto guardada!');
@@ -105,6 +111,15 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         delivery_date: new Date().toISOString(),
       });
 
+      // Log activity
+      await logDelivery(
+        service.code || 'N/A',
+        service.id,
+        service.customer?.name || 'Cliente',
+        user?.id
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
       setShowSignature(false);
       toast.success('Entrega concluída com sucesso!');
       onComplete();

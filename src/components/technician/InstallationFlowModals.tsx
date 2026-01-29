@@ -19,8 +19,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logServiceCompletion } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import type { Service } from '@/types/database';
@@ -41,6 +44,8 @@ interface FormData {
 
 export function InstallationFlowModals({ service, isOpen, onClose, onComplete }: InstallationFlowModalsProps) {
   const updateService = useUpdateService();
+  const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
   const [formData, setFormData] = useState<FormData>({
     photoAntes: null,
@@ -81,6 +86,8 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         description: cameraMode === 'antes' ? 'Foto antes da instalação' : 'Foto após instalação',
       });
       
+      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      
       if (cameraMode === 'antes') {
         setFormData(prev => ({ ...prev, photoAntes: imageData }));
       } else {
@@ -101,7 +108,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       // Save signature
       await supabase.from('service_signatures').insert({
         service_id: service.id,
-        signature_type: 'instalacao',
+        signature_type: 'visita', // usando tipo compatível com RLS
         file_url: signatureData,
         signer_name: signerName || service.customer?.name,
       });
@@ -111,8 +118,18 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         id: service.id,
         status: 'finalizado',
         service_location: 'entregue',
+        pending_pricing: true, // instalações também precisam de precificação
       });
 
+      // Log activity
+      await logServiceCompletion(
+        service.code || 'N/A',
+        service.id,
+        profile?.full_name || 'Técnico',
+        user?.id
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
       setShowSignature(false);
       toast.success('Instalação concluída com sucesso!');
       onComplete();
