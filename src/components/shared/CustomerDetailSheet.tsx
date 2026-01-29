@@ -463,6 +463,14 @@ function CreateServiceFromCustomerModal({
 
   const handleSubmit = async (values: ServiceFormValues) => {
     try {
+      // Regra de status para oficina:
+      // - Com técnico: 'na_oficina' (aguarda início)
+      // - Sem técnico: 'por_fazer' (para assumir)
+      // Para cliente: sempre 'por_fazer'
+      const initialStatus = values.service_location === 'oficina'
+        ? (values.technician_id ? 'na_oficina' : 'por_fazer')
+        : 'por_fazer';
+
       await createService.mutateAsync({
         customer_id: customer.id,
         appliance_type: values.appliance_type,
@@ -480,7 +488,7 @@ function CreateServiceFromCustomerModal({
         scheduled_shift: values.scheduled_shift,
         notes: values.notes,
         service_type: 'reparacao',
-        status: values.service_location === 'oficina' ? 'na_oficina' : 'por_fazer',
+        status: initialStatus,
         service_address: customer.address,
         service_postal_code: customer.postal_code,
         service_city: customer.city,

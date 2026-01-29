@@ -220,6 +220,14 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       }
 
       // Create service
+      // Regra de status para oficina:
+      // - Com técnico: 'na_oficina' (aguarda início)
+      // - Sem técnico: 'por_fazer' (para assumir)
+      // Para cliente: sempre 'por_fazer'
+      const initialStatus = values.service_location === 'oficina'
+        ? (values.technician_id ? 'na_oficina' : 'por_fazer')
+        : 'por_fazer';
+
       await createService.mutateAsync({
         customer_id: finalCustomerId,
         appliance_type: values.appliance_type,
@@ -237,7 +245,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         scheduled_shift: values.scheduled_shift,
         notes: values.notes,
         service_type: 'reparacao',
-        status: values.service_location === 'oficina' ? 'na_oficina' : 'por_fazer',
+        status: initialStatus,
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
