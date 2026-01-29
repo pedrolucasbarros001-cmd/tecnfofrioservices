@@ -72,9 +72,10 @@ export function StateActionButtons({
   const isSecretaria = role === 'secretaria';
   const isTecnico = role === 'tecnico';
 
-  const isServicePriced = (service.final_price || 0) > 0;
-  const isServiceInDebit = isServicePriced && (service.amount_paid || 0) < (service.final_price || 0);
-  const canBeFinalized = isServicePriced && !isServiceInDebit && service.status === 'concluidos';
+  const isWarrantyService = service.is_warranty || false;
+  const isServicePriced = (service.final_price || 0) > 0 || isWarrantyService;
+  const isServiceInDebit = !isWarrantyService && isServicePriced && (service.amount_paid || 0) < (service.final_price || 0);
+  const canBeFinalized = (isServicePriced || isWarrantyService) && !isServiceInDebit && service.status === 'concluidos';
 
   const getMainAction = (): ActionConfig | null => {
     switch (service.status as ServiceStatus) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateCustomerModal } from '@/components/modals/CreateCustomerModal';
+import { CustomerDetailSheet } from '@/components/shared/CustomerDetailSheet';
 import { useCustomers, useDeleteCustomer } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/database';
 
@@ -25,6 +26,8 @@ export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
   
   const { data: customers = [], isLoading } = useCustomers();
   const deleteCustomer = useDeleteCustomer();
@@ -40,15 +43,22 @@ export default function ClientesPage() {
     );
   });
 
-  const handleEdit = (customer: Customer) => {
+  const handleEdit = (customer: Customer, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingCustomer(customer);
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (confirm('Tem certeza que deseja eliminar este cliente?')) {
       await deleteCustomer.mutateAsync(id);
     }
+  };
+
+  const handleRowClick = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowDetailSheet(true);
   };
 
   const handleModalClose = (open: boolean) => {
@@ -117,7 +127,11 @@ export default function ClientesPage() {
               </TableRow>
             ) : (
               filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow 
+                  key={customer.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleRowClick(customer)}
+                >
                   <TableCell className="font-medium">{customer.name}</TableCell>
                   <TableCell>{customer.phone || '-'}</TableCell>
                   <TableCell>{customer.email || '-'}</TableCell>
@@ -132,18 +146,22 @@ export default function ClientesPage() {
                   <TableCell>{customer.postal_code || '-'}</TableCell>
                   <TableCell>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRowClick(customer); }}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Perfil
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => handleEdit(customer, e)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDelete(customer.id)}
+                          onClick={(e) => handleDelete(customer.id, e)}
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -163,6 +181,13 @@ export default function ClientesPage() {
         open={showModal}
         onOpenChange={handleModalClose}
         customer={editingCustomer}
+      />
+
+      <CustomerDetailSheet
+        open={showDetailSheet}
+        onOpenChange={setShowDetailSheet}
+        customer={selectedCustomer}
+        onUpdate={() => deleteCustomer.reset()}
       />
     </div>
   );
