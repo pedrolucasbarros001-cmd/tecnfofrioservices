@@ -1,83 +1,68 @@
 
-# Plano: Corrigir Tamanhos de Ficha (A4) e Tag (~17cm)
+# Plano: Progresso do Serviço Mostra Apenas Passos Relevantes
 
-## Resumo do Problema
-1. **Ficha A4**: Deve ocupar a página inteira A4 (210mm x 297mm)
-2. **Tag**: Estava com 80mm, mas deve ter aproximadamente **17cm (170mm)** de altura
+## Problema Identificado
+Na imagem, o serviço de **Instalação** mostra todos os 9 passos (Por Fazer, Em Execução, Na Oficina, Para Pedir, Em Espera, A Precificar, Concluídos, Em Débito, Finalizado), quando deveria mostrar apenas os 4 passos que fazem sentido para uma instalação:
+1. Por Fazer
+2. Instalação (Em Execução)
+3. Concluído
+4. Finalizado
 
-## Alterações a Realizar
+## Solução
+Reutilizar a lógica do componente `ServiceTimeline` que já existe e filtra corretamente os passos por tipo de serviço:
+- **Entrega**: Criado → Em Curso → Entregue → Finalizado (4 passos)
+- **Instalação**: Criado → Instalação → Concluído → Finalizado (4 passos)
+- **Oficina**: Criado → Na Oficina → Reparação → Concluído → Finalizado (5 passos)
+- **Visita**: Criado → Visita → Concluído → Finalizado (4 passos)
 
-### Arquivo: `src/index.css`
+## Alterações
 
-#### 1. Ajustar a Tag para 170mm de altura
+### Arquivo: `src/components/services/ServiceDetailSheet.tsx`
 
-Atualmente a tag tem `width: 80mm` (largura para impressora térmica). O usuário quer uma tag de aproximadamente **17cm de altura** - isso sugere uma etiqueta para ser impressa em papel comum, não térmica.
+**1. Adicionar função `getServiceProgressSteps`** (inspirada na função `getTimelineSteps` de `ServiceTimeline.tsx`):
+```typescript
+const getServiceProgressSteps = (service: Service) => {
+  const isWorkshop = service.service_location === 'oficina';
+  const isDelivery = service.service_type === 'entrega';
+  const isInstallation = service.service_type === 'instalacao';
 
-**Antes:**
-```css
-.print-tag {
-  width: 80mm !important;
-  max-width: 80mm !important;
-  ...
-}
-```
-
-**Depois:**
-```css
-.print-tag {
-  width: 80mm !important;        /* Largura mantida */
-  max-width: 80mm !important;
-  min-height: 170mm !important;  /* ADICIONAR - altura ~17cm */
-  height: auto !important;       /* ADICIONAR */
-  ...
-}
-```
-
-#### 2. Ajustar @page para Tag
-
-**Antes:**
-```css
-body.print-type-tag {
-  @media print {
-    @page {
-      size: 80mm auto;
-      margin: 2mm;
-    }
+  if (isDelivery) {
+    return [
+      { label: 'Criado', status: ['por_fazer', 'em_execucao', ...] },
+      { label: 'Em Curso', status: ['em_execucao', 'concluidos', ...] },
+      { label: 'Entregue', status: ['concluidos', 'em_debito', ...] },
+      { label: 'Finalizado', status: ['finalizado'] },
+    ];
   }
-}
-```
 
-**Depois:**
-```css
-body.print-type-tag {
-  @media print {
-    @page {
-      size: 80mm 170mm;  /* Largura x Altura específica */
-      margin: 2mm;
-    }
+  if (isInstallation) {
+    return [
+      { label: 'Criado', status: [...] },
+      { label: 'Instalação', status: [...] },
+      { label: 'Concluído', status: [...] },
+      { label: 'Finalizado', status: ['finalizado'] },
+    ];
   }
-}
+
+  // ... etc para Oficina e Visita
+};
 ```
 
-#### 3. Garantir que a Ficha A4 ocupe toda a página
+**2. Substituir o uso de `STATUS_TIMELINE`** na seção "Progresso do Serviço" (linhas 296-337) para usar a nova função que retorna apenas os passos relevantes.
 
-O CSS atual para `.print-content` já está configurado para ocupar toda a página. Vou verificar se precisa de ajustes adicionais para garantir que funcione corretamente.
+**3. Manter a visualização atual** com círculos numerados e linhas de conexão, mas renderizar apenas os passos filtrados.
 
----
+## Resultado Esperado
 
-## Resumo das Alterações
-
-| Elemento | Antes | Depois |
-|----------|-------|--------|
-| `.print-tag` width | 80mm | 80mm (mantido) |
-| `.print-tag` height | auto | min-height: 170mm |
-| `@page` para tag | 80mm auto | 80mm 170mm |
-| `.print-content` (ficha) | A4 inteiro | Sem alteração (já correto) |
-
----
+| Tipo de Serviço | Antes | Depois |
+|-----------------|-------|--------|
+| Instalação | 9 passos | 4 passos |
+| Entrega | 9 passos | 4 passos |
+| Oficina | 9 passos | 5 passos |
+| Visita | 9 passos | 4 passos |
 
 ## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/index.css` | Adicionar min-height na `.print-tag` e ajustar @page |
+| `src/components/services/ServiceDetailSheet.tsx` | Adicionar função de filtragem e atualizar renderização do progresso |
