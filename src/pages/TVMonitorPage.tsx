@@ -163,10 +163,13 @@ export default function TVMonitorPage() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  // Fetch services in workshop
-  const { data: services = [], refetch } = useQuery({
+  // Fetch services in workshop with fallback and debug logging
+  const { data: services = [], refetch, isLoading, isError } = useQuery({
     queryKey: ['tv-monitor-services'],
     queryFn: async () => {
+      console.log('[TV Monitor] Fetching services...');
+      
+      // Primary query with joins
       const { data, error } = await supabase
         .from('services')
         .select(`
@@ -175,12 +178,33 @@ export default function TVMonitorPage() {
           technician:technicians(*, profile:profiles(*))
         `)
         .eq('service_location', 'oficina')
+        .neq('status', 'finalizado')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return (data as unknown as Service[]) || [];
+      if (!error && data) {
+        console.log('[TV Monitor] Fetched services:', data.length, data);
+        return (data as unknown as Service[]) || [];
+      }
+
+      // Fallback: query without joins
+      console.warn('[TV Monitor] Primary query failed, using fallback:', error);
+      const fallback = await supabase
+        .from('services')
+        .select('*')
+        .eq('service_location', 'oficina')
+        .neq('status', 'finalizado')
+        .order('created_at', { ascending: false });
+      
+      if (fallback.error) {
+        console.error('[TV Monitor] Fallback query also failed:', fallback.error);
+        throw fallback.error;
+      }
+      
+      console.log('[TV Monitor] Fallback fetched:', fallback.data?.length);
+      return (fallback.data || []) as unknown as Service[];
     },
     refetchInterval: 30000,
+    retry: 3,
   });
 
   // Fetch public activity logs
@@ -234,7 +258,22 @@ export default function TVMonitorPage() {
         </div>
       </header>
 
-      {/* Stats Bar */}
+      {/* Loading State */}
+      {isLoading && (
+        <div className="text-center py-8">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-slate-400" />
+          <p className="text-slate-400 mt-2">A carregar serviços...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {isError && (
+        <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-6 text-center">
+          <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Erro ao carregar serviços. A tentar novamente...</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-7 gap-3 mb-6">
         {MONITOR_SECTIONS.map((section) => {
           const count = groupedServices[section.key]?.length || 0;
