@@ -1,153 +1,177 @@
 
-## Objetivo (bug reportado)
-Garantir que **um serviço pode estar “Finalizado” (trabalho concluído) e, ao mesmo tempo, “A Precificar” (sem preço definido)**, aparecendo sempre na lista “A Precificar” até a precificação ser feita — e depois **passar a “Em Débito” apenas no sentido financeiro** (com base em `final_price` vs `amount_paid`), sem perder o estado “Finalizado”.
+# Plano: Corrigir Visibilidade de Serviços na Oficina e Coexistencia de Estados
+
+## Problema Identificado
+
+Existem **3 problemas distintos** que causam serviços a "sumir":
+
+### 1. RLS do TV Monitor exclui status `por_fazer`
+A politica atual apenas permite:
+```sql
+status IN ('na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos')
+```
+Logo, servicos como `OS-00002` (status=`por_fazer`, location=`oficina`) nao aparecem.
+
+### 2. Nao existe card separado para servicos na oficina aguardando trabalho
+O Dashboard mostra cards por status, mas um servico pode estar "na oficina" (`service_location='oficina'`) com qualquer status operacional. O card "Na Oficina" filtra por `status='na_oficina'`, o que e diferente de `service_location='oficina'`.
+
+### 3. Estados financeiros vs operacionais precisam coexistir visualmente
+Um servico pode estar simultaneamente:
+- **Operacional**: `finalizado` (trabalho concluido)
+- **Financeiro**: "A Precificar" (`pending_pricing=true`) E/OU "Em Debito" (`final_price > amount_paid`)
 
 ---
 
-## Diagnóstico (por que isto acontece)
-Hoje o sistema tenta usar `status` para representar coisas diferentes (estado operacional e estado financeiro). Isso causa conflitos:
+## Solucao
 
-1. **O filtro “A Precificar” deveria ser sempre `pending_pricing = true`**, independentemente do `status`.
-2. Existem pontos do código onde um serviço (ex.: instalação) pode ir para **`status: 'finalizado'` sem garantir `pending_pricing: true`** quando ainda não tem preço.
-3. A precificação (`SetPriceModal`) e o registo de pagamentos (`RegisterPaymentModal`) **alteram o `status` para `em_debito`/`concluidos`**, o que entra em conflito com a tua regra:  
-   - instalação pode estar “Finalizado” e ainda assim “A Precificar” / “Em Débito” (financeiro)
-4. O botão/ação “Definir Preço” **não aparece** para `status='finalizado'` mesmo que `pending_pricing=true`, então o serviço pode “sumir” da ação necessária.
+### A) Corrigir RLS do TV Monitor
 
----
+Criar nova migracao para atualizar a politica:
 
-## Regras de negócio (como vamos alinhar)
-1. **Estado operacional** continua no `status`:
-   - Fora da oficina (`service_location != 'oficina'`): não usa “Concluídos” como etapa final operacional (instalação fica “Finalizado”).
-   - Dentro da oficina: usa “Concluídos” como etapa operacional antes da entrega.
-2. **Precificação pendente** é exclusivamente `pending_pricing`.
-3. **Débito** passa a ser **estado financeiro calculado**:
-   - “Em débito” se `final_price > amount_paid`
-   - “Sai do débito” quando `amount_paid >= final_price`
-4. Serviço pode estar **Finalizado e Em Débito ao mesmo tempo** (financeiro), sem mudar `status`.
+```sql
+-- Remover politica restritiva
+DROP POLICY IF EXISTS "Public read for workshop services on TV monitor" ON public.services;
 
----
+-- Criar politica que inclui TODOS os servicos na oficina
+CREATE POLICY "Public read for workshop services on TV monitor"
+  ON public.services FOR SELECT
+  TO anon, authenticated
+  USING (
+    service_location = 'oficina' 
+    AND status NOT IN ('finalizado')
+  );
+```
 
-## Implementação (o que será alterado)
+**Logica**: Mostrar todos os servicos com `service_location='oficina'` exceto os ja finalizados (que sairam da oficina).
 
-### A) Garantir que “A Precificar” mostra todos os pendentes (inclusive finalizados)
-1. **GeralPage**: manter/fortalecer o comportamento de “A Precificar” como filtro por `pending_pricing`.
-   - Tornar o filtro robusto aceitando:
-     - `status=a_precificar` (compatibilidade com o que o Dashboard já usa)
-     - e opcionalmente `status=pending_pricing` (mais explícito)
-   - Internamente, ambos viram `useServices({ status: 'pending_pricing' })`.
-
-**Ficheiro:** `src/pages/GeralPage.tsx`  
-**Resultado:** qualquer serviço com `pending_pricing=true` aparece na lista, mesmo se `status='finalizado'`.
+**Ficheiro**: `supabase/migrations/[timestamp]_fix_tv_monitor_rls.sql`
 
 ---
 
-### B) Corrigir o fluxo de Instalação para não “perder” o pending_pricing
-Hoje existe pelo menos um fluxo de instalação (página) que finaliza sem marcar `pending_pricing`.
+### B) Corrigir politica de customers associados
 
-1. Atualizar o “finish” da instalação para incluir:
-   - `pending_pricing: true` (quando ainda não foi precificado)
+```sql
+DROP POLICY IF EXISTS "Public read for customers with workshop services" ON public.customers;
 
-**Ficheiro:** `src/pages/technician/TechnicianInstallationFlow.tsx`  
-**Onde:** `handleSignatureComplete` → `updateService.mutateAsync({ ... })`  
-**Resultado:** instalação finalizada sem preço aparece no “A Precificar”.
-
----
-
-### C) Permitir “Definir Preço” mesmo quando o serviço está Finalizado
-Hoje a lógica do `StateActionButtons` só permite “Definir Preço” em poucos casos.
-
-1. Atualizar regras do menu (e opcionalmente ação principal) para:
-   - Se `service.pending_pricing === true` e o utilizador é `dono` → mostrar “Definir Preço” independentemente do `status` (incluindo `finalizado`).
-
-**Ficheiro:** `src/components/services/StateActionButtons.tsx`  
-**Resultado:** o serviço não “some” sem ação possível — mesmo finalizado.
+CREATE POLICY "Public read for customers with workshop services"
+  ON public.customers FOR SELECT
+  TO anon
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.services s
+      WHERE s.customer_id = customers.id
+        AND s.service_location = 'oficina'
+        AND s.status NOT IN ('finalizado')
+    )
+  );
+```
 
 ---
 
-### D) Ajustar a precificação: não mudar status para “em_debito”
-Hoje `SetPriceModal` faz:
-- `pending_pricing: false`
-- e muda `status` para `em_debito` se houver dívida
+### C) Garantir que TV Monitor mostra todos os status relevantes
 
-Vamos mudar para:
-1. **Nunca usar `status='em_debito'` como resultado automático da precificação.**
-2. `pending_pricing` passa a `false` quando o preço é definido.
-3. `status`:
-   - Se o serviço estava em `a_precificar`, aí sim pode “fechar” o operacional:
-     - fora da oficina → `finalizado`
-     - na oficina → `concluidos`
-   - Se o serviço já estava `finalizado` (instalação), **permanece `finalizado`**.
+Atualizar `TVMonitorPage.tsx` para incluir `por_fazer` e `a_precificar` nas secoes:
 
-**Ficheiro:** `src/components/modals/SetPriceModal.tsx`  
-**Resultado:** após precificar, o serviço continua “Finalizado”, e aparece em “Em Débito” (página /em-debito) apenas por cálculo financeiro.
+```typescript
+const MONITOR_SECTIONS = [
+  { status: 'por_fazer', label: 'Por Fazer', icon: Clock, color: 'text-blue-400' },
+  { status: 'em_execucao', label: 'Em Execução', icon: Play, color: 'text-cyan-400' },
+  { status: 'na_oficina', label: 'Na Oficina (Disponíveis)', icon: Building2, color: 'text-green-400' },
+  { status: 'para_pedir_peca', label: 'Para Pedir Peça', icon: Package, color: 'text-yellow-400' },
+  { status: 'em_espera_de_peca', label: 'Em Espera de Peça', icon: Clock, color: 'text-orange-400' },
+  { status: 'a_precificar', label: 'A Precificar', icon: DollarSign, color: 'text-green-400' },
+  { status: 'concluidos', label: 'Concluídos (Prontos para Entrega)', icon: CheckCircle, color: 'text-emerald-400' },
+];
+```
 
----
+E atualizar a barra de estatisticas:
+```typescript
+const statusOrder: ServiceStatus[] = [
+  'por_fazer', 'em_execucao', 'na_oficina', 
+  'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos'
+];
+```
 
-### E) Ajustar registo de pagamento: não mudar status
-Hoje `RegisterPaymentModal` altera `status` para `em_debito`/`concluidos`. Isso quebra o teu modelo.
-
-Vamos mudar para:
-1. Atualizar apenas:
-   - `amount_paid`
-2. Não mexer em `status`.
-
-**Ficheiro:** `src/components/modals/RegisterPaymentModal.tsx`  
-**Resultado:** o serviço continua “Finalizado” (instalação), e “sai do débito” automaticamente quando `amount_paid >= final_price` (porque a página de débito já filtra por cálculo).
+**Ficheiro**: `src/pages/TVMonitorPage.tsx`
 
 ---
 
-### F) Dashboard: contagens alinhadas com a realidade (para não haver “card diz X e lista mostra Y”)
-1. “A Precificar” no Dashboard deve contar apenas:
-   - `pending_pricing === true`
-2. “Em Débito” no Dashboard deve contar por cálculo:
-   - `final_price > 0 && amount_paid < final_price`
-3. O card “Em Débito” deve navegar para `/em-debito` (onde já existe a lista correta).
+### D) Migracao para corrigir dados existentes
 
-**Ficheiro:** `src/pages/DashboardPage.tsx`  
-**Resultado:** o número do card bate sempre certo com a lista.
+Marcar servicos finalizados sem preco como `pending_pricing=true`:
 
----
-
-## Migração / Correção de dados existentes (para resolver o caso que já aconteceu)
-Para serviços já criados e que ficaram “Finalizado” sem preço, vamos incluir uma migração SQL (ou script de correção) para marcar `pending_pricing=true` quando fizer sentido.
-
-Sugestão segura (focada em instalações):
-- `is_installation = true`
-- `status = 'finalizado'`
-- `pending_pricing = false`
-- `final_price = 0`
-- `is_warranty = false`
-
-E opcionalmente (se existir legado):
-- Converter `status='em_debito'` para:
-  - `concluidos` se `service_location='oficina'`
-  - `finalizado` caso contrário  
-  (para alinhar com o modelo novo, onde débito é financeiro e não “estado operacional”)
-
-**Ficheiro:** nova migração em `supabase/migrations/*_fix_pricing_coexistence.sql`
+```sql
+UPDATE public.services
+SET pending_pricing = true
+WHERE status = 'finalizado'
+  AND pending_pricing = false
+  AND (final_price IS NULL OR final_price = 0)
+  AND is_warranty = false;
+```
 
 ---
 
-## Checklist de validação (end-to-end)
-1. Criar uma instalação, concluir como técnico:
-   - serviço fica `finalizado`
-   - `pending_pricing=true`
-   - aparece no Dashboard “A Precificar”
-   - aparece na lista “A Precificar”
-2. Abrir esse serviço e conseguir clicar “Definir Preço” mesmo estando finalizado.
-3. Definir preço:
-   - `pending_pricing=false`
-   - continua `finalizado`
-   - se `amount_paid < final_price`, aparece em `/em-debito`
-4. Registar pagamento parcial:
-   - continua em `/em-debito`
-   - continua `finalizado`
-5. Registar pagamento total:
-   - desaparece de `/em-debito`
-   - continua `finalizado`
+## Ficheiros a Alterar
+
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `supabase/migrations/[timestamp]_fix_workshop_visibility.sql` | Nova migracao com RLS corrigida + correcao de dados |
+| `src/pages/TVMonitorPage.tsx` | Adicionar `por_fazer` e `a_precificar` nas secoes |
 
 ---
 
-## Risco / Observações
-- Esta alteração consolida o modelo correto: **status = operacional; débito = financeiro; precificar = flag**.
-- Mantém compatibilidade com o que já existe (incluindo serviços “na oficina” que usam “concluídos”).
+## Resultado Esperado
+
+| Cenario | Antes | Depois |
+|---------|-------|--------|
+| `por_fazer` + oficina no TV Monitor | Nao aparece | Aparece |
+| `a_precificar` + oficina no TV Monitor | Nao aparece | Aparece |
+| `em_execucao` + oficina no TV Monitor | Aparece | Aparece |
+| Servico finalizado + oficina | Nao aplicavel | Nao aparece (saiu da oficina) |
+| Dashboard cards | Conta serviços | Conta serviços (sem mudanca) |
+| GeralPage filtros | Funciona | Funciona (sem mudanca) |
+
+---
+
+## Diagrama de Visibilidade
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    REGRA DE VISIBILIDADE                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  TV MONITOR (publico/anon):                                │
+│    service_location = 'oficina'                            │
+│    AND status NOT IN ('finalizado')                        │
+│                                                             │
+│  DASHBOARD / GERAL (autenticado):                          │
+│    Todos os servicos (politica RLS ja permite)             │
+│    Contagem por status + pending_pricing + debito calc     │
+│                                                             │
+│  COEXISTENCIA:                                              │
+│    Servico pode aparecer em multiplos "estados":           │
+│    - Status operacional (por_fazer, em_execucao, etc.)     │
+│    - Flag financeira (pending_pricing=true → A Precificar) │
+│    - Calculo financeiro (final_price > amount_paid → Debito)│
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Validacao
+
+1. Criar servico na oficina com status `por_fazer`:
+   - Aparece no TV Monitor ✓
+   - Aparece no Dashboard card "Por Fazer" ✓
+   - Aparece na GeralPage com filtro "Por Fazer" ✓
+
+2. Finalizar instalacao sem preco:
+   - `pending_pricing=true` automaticamente ✓
+   - Aparece no card "A Precificar" ✓
+   - Aparece na lista "A Precificar" ✓
+   - Acao "Definir Preco" disponivel ✓
+
+3. Definir preco e registar pagamento parcial:
+   - Aparece em "Em Debito" (calculado) ✓
+   - Status operacional permanece ✓
