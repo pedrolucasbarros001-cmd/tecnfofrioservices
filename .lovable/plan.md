@@ -1,187 +1,206 @@
 
-# Plano: Melhorar Fluxo de Gestão de Peças
 
-## Problema Actual
+# Plano: Modal A4 para Impressão de Ficha de Serviço
 
-Quando o administrador gere pedidos de peças, o fluxo é muito simplista:
-1. "Registar Pedido" → apenas muda status, sem definir previsão de chegada
-2. "Peça Chegou" → apenas restaura status anterior, sem atribuir técnico ou agendar
+## Problema Identificado
 
-O serviço "desaparece" porque não há continuidade no fluxo.
+O modal actual (`sm:max-w-[700px]`) não corresponde às proporções A4. Quando se imprime:
+- O browser tenta ajustar o conteúdo às dimensões da página
+- O CSS `@media print` com Portal pode não funcionar consistentemente
+- O preview no ecrã não corresponde ao resultado impresso
 
 ## Solução Proposta
 
-### Novo Fluxo Completo
+Criar um modal com **dimensões exactas de A4** (210mm × 297mm), de forma que:
+1. O utilizador vê exactamente o que vai ser impresso
+2. O browser imprime o conteúdo 1:1
+3. Não há surpresas no preview de impressão
+
+## Alterações Necessárias
+
+### 1. Modificar ServicePrintModal.tsx
+
+**Alteração no DialogContent (linha ~455):**
+
+De:
+```typescript
+<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+```
+
+Para:
+```typescript
+<DialogContent className="print-modal-a4 w-[210mm] h-[297mm] max-w-[210mm] max-h-[297mm] overflow-hidden p-0">
+```
+
+O conteúdo interno ficará com scroll se necessário, mas ao imprimir ocupará a página A4 completa.
+
+### 2. Actualizar index.css
+
+Adicionar estilos específicos para o modal de impressão A4:
+
+```css
+/* Modal A4 para impressão */
+.print-modal-a4 {
+  width: 210mm !important;
+  max-width: 210mm !important;
+  height: 297mm !important;
+  max-height: 297mm !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Conteúdo com scroll no ecrã, mas completo na impressão */
+.print-modal-a4 .print-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10mm;
+  background: white;
+  overflow-y: auto;
+  max-height: 297mm;
+}
+
+@media print {
+  /* Esconder tudo excepto o modal A4 */
+  body > *:not([role="dialog"]) {
+    display: none !important;
+  }
+  
+  /* Modal ocupa toda a página */
+  .print-modal-a4 {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    left: 0 !important;
+    top: 0 !important;
+  }
+  
+  /* Esconder overlay e botões do dialog */
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+  
+  .print-modal-a4 .no-print {
+    display: none !important;
+  }
+  
+  /* Conteúdo sem scroll na impressão */
+  .print-modal-a4 .print-sheet {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+}
+```
+
+### 3. Estrutura do Modal Actualizada
+
+```tsx
+<Dialog open={open} onOpenChange={onOpenChange}>
+  <DialogContent className="print-modal-a4">
+    {/* Header com botões - escondido na impressão */}
+    <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
+      <h2 className="font-semibold">Pré-visualização da Ficha</h2>
+      <div className="flex gap-2">
+        <Button onClick={handlePrint} size="sm">
+          <Printer className="h-4 w-4 mr-2" />
+          Imprimir
+        </Button>
+        <DialogClose asChild>
+          <Button variant="ghost" size="icon">
+            <X className="h-4 w-4" />
+          </Button>
+        </DialogClose>
+      </div>
+    </div>
+    
+    {/* Conteúdo A4 - isto é o que será impresso */}
+    <div className="print-sheet">
+      {/* Watermark, Header, Dados do Cliente, etc... */}
+      {/* Todo o conteúdo existente */}
+    </div>
+  </DialogContent>
+</Dialog>
+```
+
+### 4. Remover Portal
+
+O `createPortal` no final do componente já não será necessário:
+
+```tsx
+// REMOVER esta linha (808):
+{open && createPortal(<PrintContent />, document.body)}
+```
+
+## Fluxo Visual
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    FLUXO DE GESTÃO DE PEÇAS                             │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  1. TÉCNICO SOLICITA PEÇA                                               │
-│     └─ RequestPartModal (já existe) → status: 'para_pedir_peca'         │
-│                                                                         │
-│  2. ADMIN REGISTA PEDIDO (NOVO MODAL)                                   │
-│     ├─ Previsão de chegada: "3 dias" / "1 semana" / data específica     │
-│     ├─ Fornecedor (opcional)                                            │
-│     ├─ Custo da peça (opcional)                                         │
-│     └─ status: 'em_espera_de_peca'                                      │
-│                                                                         │
-│  3. VISUALIZAÇÃO COM TERMÓMETRO                                         │
-│     ├─ Verde: faltam mais de 2 dias                                     │
-│     ├─ Amarelo: falta 1-2 dias                                          │
-│     ├─ Vermelho: atrasada / hoje                                        │
-│     └─ Tooltip com data prevista                                        │
-│                                                                         │
-│  4. ADMIN MARCA PEÇA CHEGOU (NOVO MODAL)                                │
-│     ├─ Confirma chegada da peça                                         │
-│     ├─ Marca peça como 'arrived: true' na tabela service_parts          │
-│     ├─ Atribui técnico (selector de técnicos)                           │
-│     ├─ Define data de agendamento                                       │
-│     ├─ Define turno (Manhã/Tarde/Noite)                                 │
-│     └─ status: restaura 'last_status_before_part_request' ou 'na_oficina'│
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    MODAL A4 (210mm × 297mm)                 │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ Pré-visualização da Ficha              [Imprimir] [X]  │ │ ← Escondido na impressão
+│ └─────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │                                                         │ │
+│ │  TECNOFRIO Logo              FICHA DE SERVIÇO           │ │
+│ │                                                         │ │
+│ │  Código: TF-00001                        [QR]           │ │
+│ │  Data: 30/01/2026                                       │ │
+│ │                                                         │ │
+│ │  ─────────────────────────────────────────────────────  │ │
+│ │  DADOS DO CLIENTE                                       │ │
+│ │  Nome: João Silva         NIF: 123456789                │ │
+│ │  ...                                                    │ │
+│ │                                                         │ │
+│ │  ─────────────────────────────────────────────────────  │ │
+│ │  DETALHES DO SERVIÇO                                    │ │
+│ │  ...                                                    │ │
+│ │                                                         │ │
+│ │  ─────────────────────────────────────────────────────  │ │
+│ │  TERMOS DE GUARDA                                       │ │
+│ │  Os equipamentos só podem permanecer...                 │ │
+│ │                                                         │ │
+│ └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                        Ctrl+P / Imprimir
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     IMPRESSÃO A4                            │
+│                                                             │
+│  O conteúdo é impresso exactamente como mostrado no modal   │
+│  sem header de botões, ocupando a página inteira            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-## Componentes a Criar
-
-### 1. ConfirmPartOrderModal.tsx (Novo)
-Modal para quando o admin regista que a peça foi encomendada:
-
-```typescript
-interface ConfirmPartOrderModalProps {
-  service: Service | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-// Campos do formulário:
-// - Tempo estimado de chegada (select: "3 dias", "1 semana", "2 semanas", ou data específica)
-// - Fornecedor (texto opcional)
-// - Custo da peça (número opcional) - actualiza service_parts.cost
-// - Notas (opcional)
-
-// Acções:
-// 1. Actualiza service_parts com estimated_arrival e cost
-// 2. Muda status do serviço para 'em_espera_de_peca'
-```
-
-### 2. PartArrivedModal.tsx (Novo)
-Modal para quando a peça chega, encadeando atribuição:
-
-```typescript
-interface PartArrivedModalProps {
-  service: Service | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-// Campos do formulário:
-// - Confirmação de chegada (checkbox ou automático)
-// - Técnico (selector - pode ser o mesmo ou outro)
-// - Data de agendamento (obrigatória)
-// - Turno (obrigatório)
-// - Notas (opcional)
-
-// Acções:
-// 1. Actualiza service_parts.arrived = true
-// 2. Actualiza serviço com technician_id, scheduled_date, scheduled_shift
-// 3. Restaura status anterior (last_status_before_part_request ou 'na_oficina')
-```
-
-### 3. Indicador Visual (Termómetro)
-Componente para mostrar urgência baseada na previsão:
-
-```typescript
-// PartArrivalIndicator.tsx
-const getIndicatorColor = (estimatedArrival: string | null) => {
-  if (!estimatedArrival) return 'bg-gray-400'; // Sem previsão
-  
-  const today = new Date();
-  const arrival = new Date(estimatedArrival);
-  const daysRemaining = differenceInDays(arrival, today);
-  
-  if (daysRemaining < 0) return 'bg-red-500';      // Atrasada
-  if (daysRemaining === 0) return 'bg-red-500';    // Hoje
-  if (daysRemaining <= 2) return 'bg-yellow-500';  // Próxima
-  return 'bg-green-500';                            // OK
-};
-
-// Exibição na tabela: badge colorido com tooltip mostrando a data
-```
-
-## Ficheiros a Criar
-
-| Ficheiro | Descrição |
-|----------|-----------|
-| `src/components/modals/ConfirmPartOrderModal.tsx` | Modal para registar pedido com previsão |
-| `src/components/modals/PartArrivedModal.tsx` | Modal para confirmar chegada + atribuição |
-| `src/components/shared/PartArrivalIndicator.tsx` | Indicador visual de urgência |
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/pages/GeralPage.tsx` | Adicionar modals e handlers |
-| `src/components/services/StateActionButtons.tsx` | Manter botões, mas chamar novos modals |
-| `src/components/services/ServiceDetailSheet.tsx` | Adicionar modals e indicador |
-
-## Fluxo Visual na Lista de Serviços
-
-Na coluna de estado, para serviços `em_espera_de_peca`:
-
-```text
-┌──────────────────────────────────────┐
-│ TF-00005 │ ... │ Em Espera de Peça  │
-│          │     │ 🟢 Chega em 3 dias │
-└──────────────────────────────────────┘
-
-┌──────────────────────────────────────┐
-│ TF-00006 │ ... │ Em Espera de Peça  │
-│          │     │ 🟡 Chega amanhã    │
-└──────────────────────────────────────┘
-
-┌──────────────────────────────────────┐
-│ TF-00007 │ ... │ Em Espera de Peça  │
-│          │     │ 🔴 Atrasada 2 dias │
-└──────────────────────────────────────┘
-```
-
-## Detalhes Técnicos
-
-### Tabela service_parts (existente)
-Campos relevantes:
-- `estimated_arrival`: date - previsão de chegada
-- `arrived`: boolean - se a peça já chegou
-- `cost`: numeric - custo da peça
-
-### Tabela services (existente)
-Campos relevantes:
-- `last_status_before_part_request`: text - status antes do pedido de peça
-- `technician_id`: uuid - técnico atribuído
-- `scheduled_date`: date - data agendada
-- `scheduled_shift`: text - turno agendado
-
-### Query para buscar peças pendentes
-```sql
-SELECT sp.*, s.code, s.status
-FROM service_parts sp
-JOIN services s ON sp.service_id = s.id
-WHERE sp.is_requested = true AND sp.arrived = false
-ORDER BY sp.estimated_arrival ASC NULLS LAST
-```
-
-## Resumo das Alterações
-
-1. **ConfirmPartOrderModal**: Admin define previsão de chegada ao registar pedido
-2. **PartArrivedModal**: Quando peça chega, modal força atribuição de técnico + data
-3. **PartArrivalIndicator**: Badge colorido mostra urgência (verde/amarelo/vermelho)
-4. **Integração**: Botões existentes passam a abrir estes modals em vez de acções directas
+| `src/components/modals/ServicePrintModal.tsx` | Reestruturar com classes A4, remover Portal |
+| `src/index.css` | Adicionar estilos `.print-modal-a4` |
 
 ## Benefícios
 
-- Previsibilidade: admin vê quando cada peça deve chegar
-- Urgência visual: termómetro indica peças atrasadas
-- Continuidade: quando peça chega, serviço já fica agendado
-- Rastreabilidade: histórico de custos e fornecedores das peças
+1. **WYSIWYG**: O utilizador vê exactamente o que vai ser impresso
+2. **Simplicidade**: Sem Portal, sem duplicação de conteúdo
+3. **Fiabilidade**: Funciona em todos os browsers
+4. **Manutenção**: Um único lugar para o conteúdo da ficha
+
+## Considerações
+
+- O modal será bastante grande no ecrã (A4), mas isso é intencional para mostrar exactamente o resultado
+- Em ecrãs pequenos, o modal pode precisar de scroll horizontal (mas isso é aceitável dado o caso de uso)
+- O botão X do Radix Dialog será escondido na impressão junto com o header
+
