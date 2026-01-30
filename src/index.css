@@ -326,8 +326,8 @@
 }
 
 /* ======================================
-   PRINT STYLES - Service Sheet (A4) & Tag (80mm)
-   Using portal-based approach for cross-platform reliability
+   PRINT STYLES - Unified System
+   Supports: A4 Sheet (via modal) & 80mm Tag (via portal)
    ====================================== */
 
 /* Screen: Hide print-only content */
@@ -335,46 +335,112 @@
   display: none !important;
 }
 
+/* Modal A4 - Screen styles */
+.print-modal-a4 {
+  width: 210mm !important;
+  max-width: 210mm !important;
+  height: 297mm !important;
+  max-height: 90vh !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.print-modal-a4 .print-sheet {
+  flex: 1;
+  width: 100%;
+  padding: 10mm;
+  background: white;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
 /* ========== PRINT MEDIA STYLES ========== */
 @media print {
-  /* Default page setup - A4 SEM MARGENS */
+  /* Page setup - A4 default */
   @page {
     size: A4 portrait;
     margin: 0;
   }
 
-  /* Reset html/body for print - OCUPAÇÃO TOTAL */
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    overflow: hidden !important;
-    background: white !important;
-  }
-
-  /* ESCONDER #root EXPLICITAMENTE */
+  /* Hide the main app */
   #root {
     display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    overflow: hidden !important;
   }
 
-  /* CRITICAL: Show print-only elements in print */
+  /* Hide Radix overlay */
+  [data-radix-dialog-overlay] {
+    display: none !important;
+    background: transparent !important;
+  }
+
+  /* Show print-only elements */
   .print-only {
     display: block !important;
     visibility: visible !important;
   }
 
-  /* Hide everything EXCEPT the print portal */
-  body > *:not(.print-portal) {
+  /* Hide action headers in print */
+  .no-print {
     display: none !important;
-    visibility: hidden !important;
   }
 
-  /* PORTAL COBRE TODA A VIEWPORT */
-  body > .print-portal {
+  /* ========== A4 SHEET (modal) ========== */
+  .print-modal-a4 {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    background: white !important;
+    z-index: 2147483647 !important;
+  }
+
+  .print-modal-a4 .print-sheet {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 10mm !important;
+  }
+
+  .print-modal-a4 .print-sheet * {
+    visibility: visible !important;
+  }
+
+  /* Colored backgrounds in print */
+  .print-modal-a4 .bg-amber-50 {
+    background-color: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-modal-a4 .bg-purple-50 {
+    background-color: #faf5ff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-modal-a4 .bg-gray-50 {
+    background-color: #f9fafb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-modal-a4 svg {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ========== TAG (80mm x 170mm via portal) ========== */
+  .print-portal {
     display: block !important;
     visibility: visible !important;
     position: fixed !important;
@@ -386,102 +452,10 @@
     overflow: visible !important;
   }
 
-  /* Ensure ALL descendants are visible */
-  body > .print-portal *,
-  body > .print-portal *::before,
-  body > .print-portal *::after {
+  .print-portal * {
     visibility: visible !important;
   }
 
-  /* ========== SERVICE SHEET (A4) - OCUPA PÁGINA INTEIRA ========== */
-  .print-content {
-    display: block !important;
-    visibility: visible !important;
-    position: absolute !important;
-    inset: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 297mm !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 10mm !important;
-    background: white !important;
-    color: black !important;
-    font-size: 11px !important;
-    line-height: 1.4 !important;
-    border: none !important;
-    box-shadow: none !important;
-    box-sizing: border-box !important;
-  }
-
-  .print-content * {
-    visibility: visible !important;
-    color: black !important;
-    background: transparent !important;
-  }
-
-  /* Watermark for sheet */
-  .print-content > div[aria-hidden="true"] {
-    opacity: 0.04 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background: transparent !important;
-  }
-
-  .print-content > *:not([aria-hidden="true"]) {
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Typography */
-  .print-content h1 { font-size: 16px !important; margin-bottom: 4px !important; }
-  .print-content h2 { font-size: 12px !important; margin-bottom: 6px !important; padding-bottom: 3px !important; }
-  .print-content h3 { font-size: 11px !important; }
-
-  .print-content section {
-    margin-bottom: 8px !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .print-content .grid { gap: 4px 16px !important; }
-
-  .print-content table { font-size: 10px !important; }
-  .print-content table th,
-  .print-content table td { padding: 3px 6px !important; }
-
-  .print-content hr,
-  .print-content [role="separator"] {
-    margin: 6px 0 !important;
-    border-color: #e5e7eb !important;
-    background-color: #e5e7eb !important;
-  }
-
-  /* Colored backgrounds in print */
-  .print-content .bg-amber-50 {
-    background-color: #fffbeb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-content .bg-purple-50 {
-    background-color: #faf5ff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-content .bg-gray-50 {
-    background-color: #f9fafb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-content svg {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* ========== SERVICE TAG (80mm x 170mm) ========== */
   .print-tag {
     display: block !important;
     visibility: visible !important;
@@ -501,7 +475,6 @@
   }
 
   .print-tag * {
-    visibility: visible !important;
     color: black !important;
   }
 
@@ -518,116 +491,11 @@
   }
 }
 
-/* Tag-specific @page - 80mm x 170mm */
-body.print-type-tag {
-  @media print {
-    @page {
-      size: 80mm 170mm;
-      margin: 2mm;
-    }
-  }
-}
-
-/* ======================================
-   MODAL A4 PARA IMPRESSÃO
-   WYSIWYG - O utilizador vê exactamente o que vai ser impresso
-   ====================================== */
-
-/* Modal com dimensões A4 exactas */
-.print-modal-a4 {
-  width: 210mm !important;
-  max-width: 210mm !important;
-  height: 297mm !important;
-  max-height: 90vh !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border-radius: 8px !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* Conteúdo da ficha com scroll no ecrã */
-.print-modal-a4 .print-sheet {
-  flex: 1;
-  width: 100%;
-  padding: 10mm;
-  background: white;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-
-/* Print styles para modal A4 */
+/* Tag @page size - must be at top level for some browsers */
 @media print {
-  /* Esconder tudo excepto o dialog */
-  body > *:not([data-radix-dialog-overlay]):not([role="dialog"]) {
-    display: none !important;
-    visibility: hidden !important;
-  }
-  
-  /* Esconder overlay do Radix */
-  [data-radix-dialog-overlay] {
-    display: none !important;
-    background: transparent !important;
-  }
-  
-  /* Modal ocupa toda a página sem bordas */
-  .print-modal-a4 {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    transform: none !important;
-    left: 0 !important;
-    top: 0 !important;
-    background: white !important;
-  }
-  
-  /* Esconder header com botões na impressão */
-  .print-modal-a4 .no-print {
-    display: none !important;
-  }
-  
-  /* Conteúdo sem scroll na impressão */
-  .print-modal-a4 .print-sheet {
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-    padding: 10mm !important;
-  }
-  
-  /* Garantir visibilidade de todo o conteúdo */
-  .print-modal-a4 .print-sheet * {
-    visibility: visible !important;
-  }
-  
-  /* Cores exactas na impressão */
-  .print-modal-a4 .print-sheet .bg-amber-50 {
-    background-color: #fffbeb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  .print-modal-a4 .print-sheet .bg-purple-50 {
-    background-color: #faf5ff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  .print-modal-a4 .print-sheet .bg-gray-50 {
-    background-color: #f9fafb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  /* QR codes e SVGs com cores exactas */
-  .print-modal-a4 .print-sheet svg {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  body.print-type-tag {
+    /* This class is added via JS before print */
   }
 }
+
+/* Separate @page rule for tag (injected dynamically if needed) */
