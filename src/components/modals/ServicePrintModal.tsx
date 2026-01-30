@@ -1,14 +1,12 @@
-import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Printer, PenTool } from 'lucide-react';
+import { AlertTriangle, Printer, PenTool, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
+  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +15,6 @@ import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
-import { printServiceSheet } from '@/utils/printUtils';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -90,10 +87,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
     enabled: !!service?.id && open,
   });
 
-  if (!service) return null;
-
   const handlePrint = () => {
-    printServiceSheet();
+    window.print();
   };
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
@@ -450,30 +445,37 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
   );
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>Pré-visualização da Ficha</DialogTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="print-modal-a4">
+        {/* Header com botões - escondido na impressão */}
+        <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
+          <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
+          <div className="flex gap-2">
             <Button onClick={handlePrint} size="sm">
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
-          </DialogHeader>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
+          </div>
+        </div>
 
-          {/* Preview Content - visible on screen */}
-          <div className="relative border rounded-lg p-4 bg-white">
-            {/* Watermark - visible only in print */}
-            <div 
-              className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 print:opacity-[0.04]"
-              aria-hidden="true"
-            >
-              <img 
-                src={tecnofrioLogoIcon} 
-                alt="" 
-                className="w-[180mm] h-[180mm] object-contain"
-              />
-            </div>
+        {/* Conteúdo A4 - isto é o que será impresso */}
+        <div className="print-sheet relative bg-white">
+          {/* Watermark */}
+          <div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
+            aria-hidden="true"
+          >
+            <img 
+              src={tecnofrioLogoIcon} 
+              alt="" 
+              className="w-[180mm] h-[180mm] object-contain"
+            />
+          </div>
 
             {/* Header */}
             <div className="flex items-center justify-between mb-3 relative z-10">
@@ -800,12 +802,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </div>
             </section>
 
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Print Portal - rendered directly in body, hidden on screen */}
-      {open && createPortal(<PrintContent />, document.body)}
-    </>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
