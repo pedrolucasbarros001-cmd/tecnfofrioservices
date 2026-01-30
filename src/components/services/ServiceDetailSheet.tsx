@@ -47,8 +47,11 @@ import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementM
 import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ForceStateModal } from '@/components/modals/ForceStateModal';
 import { RequestPartModal } from '@/components/modals/RequestPartModal';
+import { ConfirmPartOrderModal } from '@/components/modals/ConfirmPartOrderModal';
+import { PartArrivedModal } from '@/components/modals/PartArrivedModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
+import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
@@ -167,6 +170,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
+  const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -279,36 +284,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
-  // Handler to confirm that the part order has been placed (para_pedir_peca → em_espera_de_peca)
-  const handleConfirmPartOrder = async () => {
-    try {
-      await updateService.mutateAsync({
-        id: service.id,
-        status: 'em_espera_de_peca',
-        skipToast: true,
-      });
-      toast.success(`Pedido confirmado! ${service.code} em espera de peça.`);
-      onServiceUpdated?.();
-    } catch (error) {
-      console.error('Error confirming part order:', error);
-    }
+  // Handler to open the confirm part order modal
+  const handleConfirmPartOrder = () => {
+    setShowConfirmPartOrderModal(true);
   };
 
-  // Handler for when the part arrives (em_espera_de_peca → restore previous status)
-  const handleMarkPartArrived = async () => {
-    try {
-      // Restore to previous status or default to na_oficina
-      const previousStatus = service.last_status_before_part_request || 'na_oficina';
-      await updateService.mutateAsync({
-        id: service.id,
-        status: previousStatus as any,
-        skipToast: true,
-      });
-      toast.success(`Peça chegou! ${service.code} pronto para continuar.`);
-      onServiceUpdated?.();
-    } catch (error) {
-      console.error('Error marking part arrived:', error);
-    }
+  // Handler to open the part arrived modal
+  const handleMarkPartArrived = () => {
+    setShowPartArrivedModal(true);
   };
 
 
@@ -958,6 +941,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         open={showRescheduleModal}
         onOpenChange={(open) => {
           setShowRescheduleModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <ConfirmPartOrderModal
+        open={showConfirmPartOrderModal}
+        onOpenChange={(open) => {
+          setShowConfirmPartOrderModal(open);
+          if (!open) handleModalSuccess();
+        }}
+        service={service}
+      />
+      <PartArrivedModal
+        open={showPartArrivedModal}
+        onOpenChange={(open) => {
+          setShowPartArrivedModal(open);
           if (!open) handleModalSuccess();
         }}
         service={service}
