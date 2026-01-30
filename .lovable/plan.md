@@ -1,74 +1,131 @@
 
-# Plano: Corrigir Servico Existente com Status Incorrecto
+# Plano: Corrigir Lógica de pending_pricing na Criação de Serviços
 
-## Diagnostico
+## Lógica de Negócio Correcta
 
-Analisei a base de dados e encontrei o problema:
+| Cenário | Na Criação | Após Conclusão Técnica |
+|---------|------------|------------------------|
+| **SEM preço definido** | `pending_pricing: false` | `pending_pricing: true` (técnico marca ao concluir) |
+| **COM preço definido** | `pending_pricing: false` | `pending_pricing: false` (já tem preço) |
 
-O servico **TF-00004** foi criado **antes** da correcao de codigo e tem:
-- `status: 'em_debito'` (incorrecto)
-- `service_location: 'cliente'`
-- `service_type: 'instalacao'`
-- `scheduled_date: 2026-01-30` (hoje)
+O serviço só vai para "A Precificar" **após o trabalho ser concluído**, permitindo que o dono veja o que foi feito (diagnóstico, peças usadas, fotos) antes de definir o preço.
 
-A query do tecnico filtra por:
-```sql
-status IN ('por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca')
+## Problema Actual
+
+Os modais `CreateDeliveryModal.tsx` e `CreateInstallationModal.tsx` foram alterados para marcar `pending_pricing: true` na criação quando não há preço definido. Isto está **incorrecto**.
+
+**Código actual (errado):**
+```typescript
+const needsPricing = !values.final_price || values.final_price <= 0;
+pending_pricing: needsPricing,  // ← Marca logo na criação
 ```
 
-Como `em_debito` nao esta nesta lista, o servico nao aparece!
+## Correcção Necessária
 
-## Servicos do Tecnico Pedro Lucas
+Remover a lógica de `pending_pricing` da criação - deve ser sempre `false` ou `null`:
 
-| Codigo | Status | Localizacao | Motivo de nao aparecer |
-|--------|--------|-------------|------------------------|
-| TF-00004 | `em_debito` | cliente | Status incorrecto (criado antes da correcao) |
-| OS-00001 | `a_precificar` | cliente | Ja concluido operacionalmente |
-| OS-00002 | `na_oficina` | oficina | Vai para pagina Oficina |
-| OS-00003 | `finalizado` | entregue | Ja concluido |
+**CreateDeliveryModal.tsx e CreateInstallationModal.tsx:**
+```typescript
+// REMOVER estas linhas:
+// const needsPricing = !values.final_price || values.final_price <= 0;
+// pending_pricing: needsPricing,
 
-## Solucao
-
-O codigo ja foi corrigido na mensagem anterior. Apenas precisamos de corrigir o servico existente na base de dados.
-
-### Correcao de Dados (SQL)
-
-Executar este SQL para corrigir o servico afectado:
-
-```sql
-UPDATE public.services
-SET status = 'por_fazer'
-WHERE id = 'fd39531d-3bdc-4820-a612-98c00f648e74';
+// Criar serviço SEM pending_pricing (deixar como default false/null)
+await createService.mutateAsync({
+  // ... outros campos ...
+  status: 'por_fazer',
+  // pending_pricing NÃO é definido aqui - será definido na conclusão
+});
 ```
 
-Ou de forma mais generica para todos os servicos afectados:
+## Fluxos de Conclusão (Já Correctos)
 
-```sql
-UPDATE public.services
-SET status = 'por_fazer'
-WHERE status = 'em_debito'
-  AND service_type IN ('entrega', 'instalacao')
-  AND delivery_date IS NULL;
+Os fluxos do técnico **já estão correctos** - todos verificam e marcam `pending_pricing` apenas na conclusão:
+
+| Fluxo | Ficheiro | Lógica |
+|-------|----------|--------|
+| Visita (reparo local) | `VisitFlowModals.tsx` | `pending_pricing: true` ao concluir |
+| Oficina | `WorkshopFlowModals.tsx` | `pending_pricing: true` ao concluir |
+| Instalação | `TechnicianInstallationFlow.tsx` | `needsPricing` verificado na conclusão |
+| Entrega | `TechnicianDeliveryFlow.tsx` | `needsPricing` verificado na conclusão |
+
+## Ficheiros a Modificar
+
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/components/modals/CreateDeliveryModal.tsx` | Remover `pending_pricing` da criação |
+| `src/components/modals/CreateInstallationModal.tsx` | Remover `pending_pricing` da criação |
+
+## Fluxo Completo Corrigido
+
+### Serviço de Instalação SEM preço definido
+
+```text
+1. CRIAÇÃO:
+   status: 'por_fazer'
+   final_price: null
+   pending_pricing: false (default)
+   → Aparece na agenda do técnico ✓
+
+2. TÉCNICO EXECUTA:
+   → Faz instalação, tira fotos, recolhe assinatura
+
+3. CONCLUSÃO (TechnicianInstallationFlow):
+   const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
+   status: 'finalizado'
+   pending_pricing: true  ← Marca AQUI
+   → Aparece em "A Precificar" ✓
+
+4. DONO DEFINE PREÇO:
+   pending_pricing: false
+   → Aparece em "Em Débito" (calculado)
 ```
 
-Esta query:
-1. Encontra servicos com status `em_debito` (incorrecto)
-2. Que sejam de entrega ou instalacao
-3. Que ainda nao foram entregues (`delivery_date IS NULL`)
-4. Corrige o status para `por_fazer`
+### Serviço de Instalação COM preço definido
 
-## Proximo Passo
+```text
+1. CRIAÇÃO:
+   status: 'por_fazer'
+   final_price: 120.00
+   pending_pricing: false
+   → Aparece na agenda do técnico ✓
+   → Coexiste com débito (calculado) ✓
 
-Pode executar esta correcao de duas formas:
+2. TÉCNICO EXECUTA:
+   → Faz instalação, tira fotos, recolhe assinatura
 
-**Opcao 1**: Cloud View > Run SQL (no ambiente Test)
-**Opcao 2**: Posso propor uma migracao SQL que sera executada automaticamente
+3. CONCLUSÃO:
+   const needsPricing = (service.final_price || 0) === 0; // false - já tem preço
+   status: 'finalizado'
+   pending_pricing: false  ← Mantém false
+   → NÃO aparece em "A Precificar"
+   → Aparece em "Em Débito" ✓
+```
 
-Apos a correcao, o servico TF-00004 aparecera na agenda do tecnico para o dia de hoje (Sexta, 30/01).
+## Resumo Visual
 
-## Validacao
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    CICLO DE VIDA DO SERVIÇO                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  CRIAÇÃO                    EXECUÇÃO              CONCLUSÃO     │
+│  ────────                   ────────              ─────────     │
+│                                                                 │
+│  status: por_fazer    →    em_execucao    →    finalizado       │
+│  pending_pricing: ✗        pending_pricing: ✗   pending_pricing:│
+│  (nunca na criação)        (ainda não)          ✓ se não tem    │
+│                                                    preço        │
+│                                                                 │
+│  final_price: X€           -                    → Em Débito     │
+│  final_price: null         -                    → A Precificar  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-Apos executar a correcao:
-1. O servico TF-00004 aparece na agenda do tecnico (Sexta)
-2. O servico tambem continua a aparecer na lista "Em Debito" (calculado: final_price > amount_paid)
-3. O tecnico pode executar o fluxo de instalacao
+## Impacto
+
+- Serviços sem preço só aparecem em "A Precificar" após conclusão técnica
+- Serviços com preço coexistem com débito desde a criação
+- Dono pode ver o trabalho realizado antes de definir preço
+- Fluxo de negócio respeita a sequência lógica: trabalho → precificação → pagamento
