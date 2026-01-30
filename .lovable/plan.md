@@ -1,193 +1,109 @@
 
 
-# Plano: Garantir Persistência de Estado em Todos os Fluxos dos Técnicos
+# Plano: Remover Linhas de Assinatura Vazias da Ficha de Impressao
 
-## Análise do Estado Actual
+## Problema Identificado
 
-| Fluxo | Tem Persistência? | Estado |
-|-------|-------------------|--------|
-| Instalação | ✅ Sim | Funcional |
-| Oficina | ✅ Sim | Funcional |
-| **Visita** | ❌ Não | Precisa implementar |
-| **Entrega** | ❌ Não | Precisa implementar |
+Actualmente, quando nao existem assinaturas digitais recolhidas, a ficha mostra linhas vazias para assinatura manual:
 
-O hook `useFlowPersistence` já existe e funciona bem, mas não está a ser usado nos fluxos de **Visita** e **Entrega**.
+```
+_________________________________    _________________________________
+  Assinatura do Cliente                Assinatura do Funcionario
+```
+
+O utilizador quer que:
+- Aparecam **apenas** as assinaturas digitais ja recolhidas
+- Se nao houver assinaturas, **nao mostrar nada**
 
 ---
 
-## O Que Será Garantido
+## Alteracoes Necessarias
 
-1. **Persistência automática** - O estado é guardado no localStorage a cada mudança de etapa
-2. **Restauro automático** - Ao reabrir o fluxo, o técnico continua exactamente onde parou
-3. **Expiração de 24h** - Estados antigos são automaticamente limpos
-4. **Limpeza ao concluir** - O estado é removido após conclusão do serviço
+### Ficheiro: `src/components/modals/ServicePrintModal.tsx`
 
----
+**1. Remover secao de assinatura vazia no PrintContent (linhas 448-458)**
 
-## Alterações Necessárias
-
-### 1. VisitFlowModals.tsx
-
-**Adicionar import do hook:**
+Remover completamente este bloco:
 ```typescript
-import { useFlowPersistence } from '@/hooks/useFlowPersistence';
+{/* Signature Area - Only show if no digital signatures */}
+{signatures.length === 0 && (
+  <div style={{ display: 'grid', ... }}>
+    <div style={{ borderTop: '1px solid #9ca3af', ... }}>
+      <p>Assinatura do Cliente</p>
+    </div>
+    <div style={{ borderTop: '1px solid #9ca3af', ... }}>
+      <p>Assinatura do Funcionário</p>
+    </div>
+  </div>
+)}
 ```
 
-**Adicionar interface compatível:**
-```typescript
-interface VisitFormData {
-  detectedFault: string;
-  photoFile: string | null;
-  decision: DecisionType;
-  usedParts: boolean;
-  usedPartsList: PartEntry[];
-  needsPartOrder: boolean;
-  partToOrder: { name: string; reference: string };
-  [key: string]: unknown;
-}
-```
+**2. Remover secao de assinatura vazia no Preview (linhas 814-824)**
 
-**Usar o hook de persistência:**
+Remover completamente este bloco:
 ```typescript
-// Flow persistence
-const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'visita');
-```
-
-**Modificar o useEffect de inicialização:**
-```typescript
-useEffect(() => {
-  if (isOpen) {
-    const savedState = loadState();
-    if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
-      setFormData(savedState.formData as VisitFormData);
-    } else {
-      setCurrentStep('resumo');
-      setFormData({
-        detectedFault: service.detected_fault || '',
-        photoFile: null,
-        decision: 'reparar_local',
-        usedParts: false,
-        usedPartsList: [{ name: '', reference: '', quantity: 1 }],
-        needsPartOrder: false,
-        partToOrder: { name: '', reference: '' },
-      });
-    }
-  }
-}, [isOpen, service, loadState]);
-```
-
-**Adicionar auto-save:**
-```typescript
-useEffect(() => {
-  if (isOpen && currentStep !== 'resumo') {
-    saveState(currentStep, formData);
-  }
-}, [isOpen, currentStep, formData, saveState]);
-```
-
-**Limpar estado ao concluir** (em `handleSignatureComplete`):
-```typescript
-// Clear persisted state
-clearState();
+{/* Signature Area */}
+{signatures.length === 0 && (
+  <div className="grid grid-cols-2 gap-6 mt-4 pt-3">
+    <div className="border-t border-gray-400 pt-1">
+      <p>Assinatura do Cliente</p>
+    </div>
+    <div className="border-t border-gray-400 pt-1">
+      <p>Assinatura do Funcionário</p>
+    </div>
+  </div>
+)}
 ```
 
 ---
 
-### 2. DeliveryFlowModals.tsx
+## Resultado Visual
 
-**Adicionar import do hook:**
-```typescript
-import { useFlowPersistence } from '@/hooks/useFlowPersistence';
+**Antes (sem assinaturas digitais):**
+```
+┌─────────────────────────────────────────────────────┐
+│ IMPORTANTE - Termos de Guarda                 [QR] │
+│ Os equipamentos so podem permanecer...             │
+├─────────────────────────────────────────────────────┤
+│ _________________     _________________            │
+│ Assinatura Cliente    Assinatura Funcionario       │
+└─────────────────────────────────────────────────────┘
 ```
 
-**Actualizar interface:**
-```typescript
-interface DeliveryFormData {
-  photoFile: string | null;
-  [key: string]: unknown;
-}
+**Depois (sem assinaturas digitais):**
+```
+┌─────────────────────────────────────────────────────┐
+│ IMPORTANTE - Termos de Guarda                 [QR] │
+│ Os equipamentos so podem permanecer...             │
+└─────────────────────────────────────────────────────┘
 ```
 
-**Usar o hook de persistência:**
-```typescript
-// Flow persistence
-const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'entrega');
+**Quando ha assinaturas digitais (mantido igual):**
 ```
-
-**Modificar o useEffect de inicialização:**
-```typescript
-useEffect(() => {
-  if (isOpen) {
-    const savedState = loadState();
-    if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
-      setFormData(savedState.formData as DeliveryFormData);
-    } else {
-      setCurrentStep('resumo');
-      setFormData({ photoFile: null });
-    }
-  }
-}, [isOpen, loadState]);
-```
-
-**Adicionar auto-save:**
-```typescript
-useEffect(() => {
-  if (isOpen && currentStep !== 'resumo') {
-    saveState(currentStep, formData);
-  }
-}, [isOpen, currentStep, formData, saveState]);
-```
-
-**Limpar estado ao concluir** (em `handleSignatureComplete`):
-```typescript
-// Clear persisted state
-clearState();
+┌─────────────────────────────────────────────────────┐
+│ Assinaturas Recolhidas                             │
+│ ┌────────┐ Cliente                                 │
+│ │[assin.]│ Autorizacao de levantamento...          │
+│ └────────┘ 15/01/26 10:30                          │
+├─────────────────────────────────────────────────────┤
+│ IMPORTANTE - Termos de Guarda                 [QR] │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Comportamento Após Implementação
+## Ficheiro Modificado
 
-```text
-CENÁRIO: Técnico a meio de uma Visita
-┌─────────────────────────────────────────────┐
-│ 1. Técnico abre visita                      │
-│ 2. Avança até etapa "Diagnóstico"           │
-│ 3. Escreve diagnóstico parcial              │
-│ 4. Página recarrega (acidente/demora/etc)   │
-│                                             │
-│ 5. Técnico reabre a mesma visita            │
-│    → Sistema detecta estado guardado        │
-│    → Restaura etapa "Diagnóstico"           │
-│    → Restaura texto do diagnóstico          │
-│    → Técnico continua de onde parou ✅       │
-└─────────────────────────────────────────────┘
-```
+| Ficheiro | Linhas | Accao |
+|----------|--------|-------|
+| `src/components/modals/ServicePrintModal.tsx` | 448-458 | Remover bloco |
+| `src/components/modals/ServicePrintModal.tsx` | 814-824 | Remover bloco |
 
 ---
 
-## Ficheiros a Modificar
+## Impacto
 
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/components/technician/VisitFlowModals.tsx` | Adicionar persistência |
-| `src/components/technician/DeliveryFlowModals.tsx` | Adicionar persistência |
-
----
-
-## Resultado Final
-
-Após esta implementação:
-- ✅ **Visita**: Persistência completa
-- ✅ **Instalação**: Persistência completa (já existe)
-- ✅ **Oficina**: Persistência completa (já existe)
-- ✅ **Entrega**: Persistência completa
-
-O técnico **nunca perde progresso** independentemente de:
-- Recarregar a página
-- Fechar o browser acidentalmente
-- Demorar muito tempo numa etapa
-- Perda de conexão temporária
+- A ficha fica mais limpa quando nao ha assinaturas
+- As assinaturas digitais continuam a aparecer quando existem
+- Sem impacto noutras funcionalidades
 
