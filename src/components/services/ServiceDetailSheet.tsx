@@ -581,32 +581,32 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               </Section>
 
               {/* Pricing - Enhanced financial section */}
-              {((service.labor_cost && service.labor_cost > 0) || (service.parts_cost && service.parts_cost > 0) || (service.final_price && service.final_price > 0)) && (
+              {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
                 <Section 
                   title="Informação Financeira" 
                   bgColor="bg-emerald-50"
                   borderColor="border-l-emerald-500"
                 >
                   <div className="space-y-2">
-                    {service.labor_cost && service.labor_cost > 0 && (
+                    {service.labor_cost > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Mão de Obra</span>
                         <span className="font-medium">{service.labor_cost.toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.parts_cost && service.parts_cost > 0 && (
+                    {service.parts_cost > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Peças</span>
                         <span className="font-medium">{service.parts_cost.toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.discount && service.discount > 0 && (
+                    {service.discount > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span>Desconto</span>
                         <span>-{service.discount.toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.final_price && service.final_price > 0 && (
+                    {service.final_price > 0 && (
                       <>
                         <Separator />
                         <div className="flex justify-between font-semibold text-lg">
@@ -623,7 +623,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       </div>
                     )}
                     {/* Em débito e falta para pagamento */}
-                    {service.final_price && service.final_price > 0 && (service.amount_paid || 0) < service.final_price && (
+                    {service.final_price > 0 && (service.amount_paid || 0) < service.final_price && (
                       <>
                         <div className="flex justify-between text-sm text-red-600 font-medium">
                           <span>Em Débito</span>

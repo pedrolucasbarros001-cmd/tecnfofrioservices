@@ -306,7 +306,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         )}
 
         {/* Pricing Summary */}
-        {(service.final_price && service.final_price > 0) && (
+        {service.final_price > 0 && (
           <>
             <Separator className="my-2" />
             <section className="mb-3">
@@ -668,7 +668,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             )}
 
             {/* Pricing Summary */}
-            {(service.final_price && service.final_price > 0) && (
+            {service.final_price > 0 && (
               <>
                 <Separator className="my-2" />
                 <section className="mb-3">
