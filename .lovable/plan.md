@@ -1,29 +1,27 @@
 
 
-# Plano: Azul Vibrante nos Cards do Dashboard
+# Plano: Ajustar Azul dos Cards para Cor Exacta
 
-## Analise da Referencia
+## Analise da Cor de Referencia
 
-Na imagem de referencia, a logica visual e:
-- **Cards acesos** = cor vibrante/clara (roxo-azul brilhante)
-- **Cards apagados** = mesma cor, mas mais escura/opaca
+A imagem mostra um azul ceu vibrante:
+- **Hex aproximado**: #5AA9E6
+- **HSL**: `hsl(207, 74%, 63%)`
 
 ## Problema Actual
 
-Os valores HSL actuais sao muito "lavados":
-- Aceso: `hsl(220, 60%, 92%)` = muito claro, quase branco
-- Apagado: `hsl(220, 40%, 72%)` = azul medio desbotado
+As cores actuais usam hue 230 (azul-violeta):
+- Aceso: `hsl(230, 70%, 65%)` = tom mais roxo
+- Apagado: `hsl(230, 50%, 40%)` = tom escuro roxo
 
-## Solucao: Aumentar Saturacao e Ajustar Luminosidade
+## Solucao: Mudar para Hue 207 (Azul Ceu)
 
-Para obter o efeito vibrante da referencia:
+| Estado | Cor Actual | Cor Nova |
+|--------|------------|----------|
+| **Aceso** | `hsl(230, 70%, 65%)` | `hsl(207, 74%, 63%)` |
+| **Apagado** | `hsl(230, 50%, 40%)` | `hsl(207, 55%, 42%)` |
 
-| Estado | Fundo Actual | Fundo Novo |
-|--------|--------------|------------|
-| **Aceso** | `hsl(220, 60%, 92%)` | `hsl(230, 70%, 65%)` |
-| **Apagado** | `hsl(220, 40%, 72%)` | `hsl(230, 50%, 40%)` |
-
-**Nota**: Ajuste do hue de 220 para 230 para aproximar ao tom roxo-azul da referencia, com saturacao elevada (70%) para vibrancia.
+A diferenca principal e o **hue**: 207 (azul ceu) em vez de 230 (azul-violeta).
 
 ---
 
@@ -37,19 +35,12 @@ Para obter o efeito vibrante da referencia:
 className={cn(
   "cursor-pointer transition-all duration-200",
   isLit 
-    ? "bg-[hsl(230,70%,65%)] border-[hsl(230,60%,55%)] shadow-md ring-1 ring-[hsl(230,80%,75%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
-    : "bg-[hsl(230,50%,40%)] border-[hsl(230,45%,35%)] hover:bg-[hsl(230,50%,45%)]"
+    ? "bg-[hsl(207,74%,63%)] border-[hsl(207,65%,53%)] shadow-md ring-1 ring-[hsl(207,80%,73%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+    : "bg-[hsl(207,55%,42%)] border-[hsl(207,50%,35%)] hover:bg-[hsl(207,55%,47%)]"
 )}
 ```
 
-**Icone, Numero e Label** (linhas 163-177):
-- Todos usam `text-white` em ambos os estados (como pedido: "detalhes em branco")
-
-```typescript
-<Icon className="h-6 w-6 text-white" />
-<span className="text-3xl font-bold text-white">
-<p className="text-sm font-medium mt-auto text-white">
-```
+**Icone, Numero e Label**: Mantém `text-white` (sem alteração).
 
 ---
 
@@ -62,7 +53,7 @@ CARD ACESO (count > 0):
 |                           |
 |  A Precificar             |  <- branco
 +---------------------------+
-   Fundo: azul vibrante claro (#6B7FD9)
+   Fundo: azul ceu vibrante (#5AA9E6)
 
 CARD APAGADO (count = 0):
 +---------------------------+
@@ -70,24 +61,24 @@ CARD APAGADO (count = 0):
 |                           |
 |  Por Fazer                |  <- branco
 +---------------------------+
-   Fundo: azul vibrante escuro (#3D4A80)
+   Fundo: azul ceu escuro (#3D7AB3)
 ```
 
 ---
 
-## Resumo das Cores
+## Resumo das Cores Novas
 
 | Elemento | HSL | Hex Aproximado |
 |----------|-----|----------------|
-| Fundo Aceso | `hsl(230, 70%, 65%)` | #6B7FD9 |
-| Borda Aceso | `hsl(230, 60%, 55%)` | #5968B8 |
-| Fundo Apagado | `hsl(230, 50%, 40%)` | #3D4A80 |
-| Borda Apagado | `hsl(230, 45%, 35%)` | #36426E |
+| Fundo Aceso | `hsl(207, 74%, 63%)` | #5AA9E6 |
+| Borda Aceso | `hsl(207, 65%, 53%)` | #4691CC |
+| Fundo Apagado | `hsl(207, 55%, 42%)` | #3D7AB3 |
+| Borda Apagado | `hsl(207, 50%, 35%)` | #2E6491 |
 | Texto/Icones | `white` | #FFFFFF |
 
 ## Ficheiro Modificado
 
 | Ficheiro | Accao |
 |----------|-------|
-| `src/pages/DashboardPage.tsx` | Actualizar cores dos cards para azul vibrante |
+| `src/pages/DashboardPage.tsx` | Alterar hue de 230 para 207 (azul ceu) |
 
