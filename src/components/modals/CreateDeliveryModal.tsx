@@ -208,10 +208,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
       // Status operacional - sempre por_fazer na criacao
       // O debito e calculado dinamicamente via final_price > amount_paid
-      const status = 'por_fazer';
-      
-      // Se nao tem preco definido, marcar como pending_pricing
-      const needsPricing = !values.final_price || values.final_price <= 0;
+      // pending_pricing só é marcado na CONCLUSÃO pelo técnico, nunca na criação
 
       await createService.mutateAsync({
         customer_id: finalCustomerId,
@@ -226,8 +223,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         notes: values.notes,
         service_type: 'entrega',
         is_sale: true,
-        status,
-        pending_pricing: needsPricing,
+        status: 'por_fazer',
         final_price: values.final_price || null,
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
