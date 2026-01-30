@@ -1,170 +1,147 @@
 
-# Plano: PDF Download + QR Code Universal + Remover QR da Ficha
 
-## Objectivos
+# Plano: Corrigir Formatação do PDF e Botões de Impressão
 
-1. **Adicionar "Baixar PDF"** e remover botão "Imprimir"
-2. **Corrigir rota QR Code** para funcionar com qualquer colaborador autenticado
-3. **Remover todos os QR Codes** da ficha de serviço (tanto na visualização como no PDF)
+## Problemas Identificados
 
-## Parte 1: Download PDF
+### 1. Assinaturas Ilegíveis no PDF
+- A imagem da assinatura está com dimensões muito pequenas: `w-16 h-8` (64x32px)
+- A descrição está cortada com `line-clamp-2`
+- O layout está comprimido num grid de 2 colunas que não dá espaço suficiente
 
-### Ficheiros a Criar
+### 2. Botões "Imprimir" ainda existem
+- **ServiceDetailSheet.tsx** (linhas 325-331): Botões "Imprimir Ficha" e "Imprimir Tag"
+- **ServiceTagModal.tsx** (linha 160-163): Botão "Imprimir Etiqueta" que ainda usa `window.print()`
 
-**1. `src/types/html2pdf.d.ts`**
-```typescript
-declare module 'html2pdf.js' {
-  interface Html2PdfOptions {
-    margin?: number | number[];
-    filename?: string;
-    image?: { type?: string; quality?: number };
-    html2canvas?: object;
-    jsPDF?: { unit?: string; format?: string; orientation?: string };
-  }
+## Solução Proposta
 
-  interface Html2Pdf {
-    set(options: Html2PdfOptions): Html2Pdf;
-    from(element: HTMLElement): Html2Pdf;
-    save(): Promise<void>;
-  }
+### Parte 1: Corrigir Assinaturas na Ficha PDF
 
-  export default function html2pdf(): Html2Pdf;
-}
-```
+**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
 
-**2. `src/utils/pdfUtils.ts`**
-```typescript
-import html2pdf from 'html2pdf.js';
+Alterações na secção de assinaturas (linhas 755-773):
+- Aumentar tamanho da imagem de `w-16 h-8` para `w-24 h-16` (96x64px)
+- Mudar de grid 2 colunas para 1 coluna para dar mais espaço
+- Remover `line-clamp-2` para mostrar descrição completa
+- Usar layout vertical em vez de horizontal
 
-export async function generatePDF({ element, filename }) {
-  const options = {
-    margin: 10,
-    filename: `${filename}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-  await html2pdf().set(options).from(element).save();
-}
-```
-
-### Ficheiros a Modificar
-
-**3. `package.json`** - Adicionar `html2pdf.js`
-
-**4. `src/components/modals/ServicePrintModal.tsx`**
-- Substituir `Printer` por `Download` no import
-- Adicionar `useRef` e `generatePDF`
-- Criar função `handleDownloadPDF`
-- Substituir botão "Imprimir" por "Baixar PDF"
-
-## Parte 2: Remover QR Codes da Ficha
-
-Existem **4 locais** com QR Codes no `ServicePrintModal.tsx`:
-
-| Linha | Local | Acção |
-|-------|-------|-------|
-| 137 | Header desktop (ao lado do código) | Remover |
-| 438 | Termos de guarda desktop | Remover |
-| 499 | Header móvel (ao lado do código) | Remover |
-| 800 | Termos de guarda móvel | Remover |
-
-### Mudanças Específicas
-
-**Linha 133-138** - Header desktop:
+**Antes:**
 ```tsx
-// Antes:
-<div className="flex justify-between items-center mb-3">
-  <div>...</div>
-  <QRCodeSVG value={qrData} size={60} level="M" />
-</div>
-
-// Depois:
-<div className="mb-3">
-  <div>...</div>
-</div>
-```
-
-**Linhas 423-441** - Termos desktop:
-```tsx
-// Antes:
-<section style={{ ... }}>
-  <div style={{ display: 'flex', gap: '12px' }}>
-    <div style={{ flex: 1 }}>...termos...</div>
-    <div style={{ flexShrink: 0 }}>
-      <QRCodeSVG value={qrData} size={50} level="M" />
+<div className="grid grid-cols-2 gap-2">
+  {signatures.map((sig) => (
+    <div className="flex items-center gap-2 p-2 border rounded bg-gray-50">
+      <img src={sig.file_url} className="w-16 h-8 object-contain" />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-xs truncate">{sig.signer_name}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2">...</p>
+      </div>
     </div>
-  </div>
-</section>
+  ))}
+</div>
+```
+
+**Depois:**
+```tsx
+<div className="space-y-3">
+  {signatures.map((sig) => (
+    <div className="flex gap-3 p-3 border rounded bg-gray-50">
+      <img src={sig.file_url} className="w-24 h-16 object-contain border bg-white" />
+      <div className="flex-1">
+        <p className="font-medium text-sm">{sig.signer_name}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-xs text-muted-foreground">{date}</p>
+      </div>
+    </div>
+  ))}
+</div>
+```
+
+### Parte 2: Actualizar Botões no ServiceDetailSheet
+
+**Ficheiro:** `src/components/services/ServiceDetailSheet.tsx`
+
+Alterações (linhas 325-332):
+- Mudar "Imprimir Ficha" para "Ver Ficha" (abre modal com PDF)
+- Mudar "Imprimir Tag" para "Ver Etiqueta" (abre modal da etiqueta)
+- Manter os ícones actuais (o modal ServicePrintModal já tem botão "Baixar PDF")
+
+```tsx
+// Antes:
+<Button variant="outline" size="sm" onClick={() => setShowPrintModal(true)}>
+  <Printer className="h-4 w-4 mr-1" />
+  Imprimir Ficha
+</Button>
+<Button variant="outline" size="sm" onClick={() => setShowTagModal(true)}>
+  <Tag className="h-4 w-4 mr-1" />
+  Imprimir Tag
+</Button>
 
 // Depois:
-<section style={{ ... }}>
-  <div>...termos (sem flex layout)...</div>
-</section>
+<Button variant="outline" size="sm" onClick={() => setShowPrintModal(true)}>
+  <FileText className="h-4 w-4 mr-1" />
+  Ver Ficha
+</Button>
+<Button variant="outline" size="sm" onClick={() => setShowTagModal(true)}>
+  <Tag className="h-4 w-4 mr-1" />
+  Ver Etiqueta
+</Button>
 ```
 
-**Linha 492-500** - Header móvel:
+### Parte 3: Actualizar ServiceTagModal para PDF
+
+**Ficheiro:** `src/components/modals/ServiceTagModal.tsx`
+
+A etiqueta deve também usar PDF em vez de `window.print()`:
+- Importar `generatePDF` e `useRef`
+- Adicionar ref ao container da etiqueta
+- Criar função `handleDownloadPDF`
+- Mudar botão "Imprimir Etiqueta" para "Baixar Etiqueta" com ícone Download
+
 ```tsx
-// Remover QRCodeSVG da estrutura
-```
+// Antes:
+const handlePrint = () => {
+  printServiceTag();
+};
 
-**Linhas 785-802** - Termos móvel:
-```tsx
-// Remover QRCodeSVG e simplificar layout
-```
+<Button onClick={handlePrint}>
+  <Printer className="h-4 w-4 mr-2" />
+  Imprimir Etiqueta
+</Button>
 
-**Limpeza adicional:**
-- Remover import `QRCodeSVG` se não for usado em mais nenhum lugar
-- Remover variável `qrData` se não for mais necessária
+// Depois:
+const tagRef = useRef<HTMLDivElement>(null);
+const [isGenerating, setIsGenerating] = useState(false);
 
-## Parte 3: Rota QR Code Universal
+const handleDownloadPDF = async () => {
+  if (!tagRef.current || !service) return;
+  setIsGenerating(true);
+  try {
+    await generatePDF({ 
+      element: tagRef.current, 
+      filename: `Etiqueta-${service.code}` 
+    });
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
-### Ficheiro a Criar
-
-**5. `src/pages/ServiceConsultPage.tsx`**
-
-Uma página que:
-- Recebe o `serviceId` da URL
-- Busca os dados do serviço
-- Mostra informações da ficha
-- Funciona para qualquer utilizador autenticado (dono, secretária, técnico)
-
-### Ficheiros a Modificar
-
-**6. `src/App.tsx`**
-- Adicionar rota `/service/:serviceId` sem restrição de role:
-```tsx
-<Route path="/service/:serviceId" element={
-  <ProtectedRoute>
-    <ServiceConsultPage />
-  </ProtectedRoute>
-} />
-```
-
-**7. `src/components/modals/ServiceTagModal.tsx`**
-- Actualizar URL do QR (linha 31):
-```typescript
-// De:
-const qrData = `${window.location.origin}/technician/service/${service.id}`;
-
-// Para:
-const qrData = `${window.location.origin}/service/${service.id}`;
+<Button onClick={handleDownloadPDF} disabled={isGenerating}>
+  {isGenerating ? <Loader2 className="animate-spin" /> : <Download />}
+  {isGenerating ? 'A gerar...' : 'Baixar Etiqueta'}
+</Button>
 ```
 
 ## Resumo de Ficheiros
 
-| Ficheiro | Acção |
-|----------|-------|
-| `package.json` | Adicionar `html2pdf.js` |
-| `src/types/html2pdf.d.ts` | **Criar** |
-| `src/utils/pdfUtils.ts` | **Criar** |
-| `src/pages/ServiceConsultPage.tsx` | **Criar** |
-| `src/components/modals/ServicePrintModal.tsx` | Remover QR Codes + Adicionar PDF |
-| `src/components/modals/ServiceTagModal.tsx` | Actualizar URL do QR |
-| `src/App.tsx` | Adicionar nova rota |
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/components/modals/ServicePrintModal.tsx` | Aumentar tamanho assinaturas, melhorar layout |
+| `src/components/services/ServiceDetailSheet.tsx` | Renomear botões para "Ver Ficha" e "Ver Etiqueta" |
+| `src/components/modals/ServiceTagModal.tsx` | Substituir window.print() por PDF download |
 
-## Resultado Final
+## Resultado Esperado
 
-- **Ficha de Serviço**: Sem QR Codes, com botão "Baixar PDF"
-- **Etiqueta (Tag)**: Mantém QR Code que funciona para qualquer colaborador
-- **Rota QR**: `/service/:serviceId` acessível por qualquer utilizador autenticado
+1. **PDF da Ficha**: Assinaturas legíveis com tamanho adequado e descrição completa
+2. **Botões ServiceDetailSheet**: "Ver Ficha" e "Ver Etiqueta" (abrem modais com opção de baixar)
+3. **Modal Etiqueta**: Botão "Baixar Etiqueta" gera PDF `Etiqueta-TF-00005.pdf`
+
