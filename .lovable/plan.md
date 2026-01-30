@@ -1,72 +1,72 @@
 
 
-# Plano: Cards Apagados Azuis com Texto Branco
+# Plano: Modo Claro Fixo + Cards Azuis Corrigidos
 
-## Problema Actual
+## Parte 1: Remover Toggle de Tema
 
-O `opacity-50` sobre o fundo azul claro (`hsl(220,60%,96%)`) cria um efeito **cinzento**, não azul.
+O sistema passara a funcionar apenas em modo claro.
 
-## Solução
+### Alteracoes:
 
-Inverter a lógica visual:
-- **Cards apagados (count = 0)**: Fundo **azul sólido** + texto **branco**
-- **Cards acesos (count > 0)**: Fundo **claro** + texto **azul** (como está)
+**1. `src/App.tsx`**
+- Alterar `defaultTheme="system"` para `defaultTheme="light"`
+- Remover `enableSystem` do ThemeProvider
 
----
+**2. `src/components/layouts/AppLayout.tsx`**
+- Remover import do `ThemeToggle`
+- Remover o componente `<ThemeToggle />` do header
 
-## Paleta Proposta
-
-| Estado | Elemento | Cor |
-|--------|----------|-----|
-| **Apagado** | Fundo | `hsl(220, 50%, 70%)` (azul médio) |
-| **Apagado** | Borda | `hsl(220, 45%, 65%)` |
-| **Apagado** | Ícone/Número/Label | `white` |
-| **Aceso** | Fundo | `hsl(220, 60%, 96%)` (azul claro) |
-| **Aceso** | Borda | `hsl(220, 50%, 88%)` |
-| **Aceso** | Ícone/Número | `hsl(220, 80%, 50%)` (azul vibrante) |
-| **Aceso** | Label | `hsl(220, 50%, 35%)` (azul escuro) |
+**3. `src/components/ThemeToggle.tsx`**
+- Eliminar o ficheiro (nao sera mais utilizado)
 
 ---
 
-## Alteracoes Tecnicas
+## Parte 2: Corrigir Cards do Dashboard
 
-### Ficheiro: `src/pages/DashboardPage.tsx`
+Baseado na imagem de referencia, todos os cards devem ser azuis:
 
-**Card Container (linhas 153-159):**
+| Estado | Fundo | Icone/Numero | Label |
+|--------|-------|--------------|-------|
+| **Aceso** (count > 0) | Azul claro `hsl(220,60%,92%)` | Azul escuro `hsl(220,70%,35%)` | Azul escuro `hsl(220,60%,30%)` |
+| **Apagado** (count = 0) | Azul medio `hsl(220,40%,72%)` | Branco | Branco |
+
+### Alteracoes em `src/pages/DashboardPage.tsx`:
+
+**Card Container (linhas 153-158):**
 
 ```typescript
 className={cn(
   "cursor-pointer transition-all duration-200",
   isLit 
-    ? "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)] shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
-    : "bg-[hsl(220,50%,70%)] border-[hsl(220,45%,65%)] hover:bg-[hsl(220,50%,65%)]"
+    ? "bg-[hsl(220,60%,92%)] border-[hsl(220,50%,85%)] shadow-md ring-1 ring-[hsl(220,70%,50%)]/20 hover:shadow-lg hover:-translate-y-0.5" 
+    : "bg-[hsl(220,40%,72%)] border-[hsl(220,35%,65%)] hover:bg-[hsl(220,40%,68%)]"
 )}
 ```
 
-**Icone (linhas 164-167):**
+**Icone (linhas 163-166):**
 
 ```typescript
 <Icon className={cn(
   "h-6 w-6",
-  isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
+  isLit ? "text-[hsl(220,70%,35%)]" : "text-white"
 )} />
 ```
 
-**Numero (linhas 168-173):**
+**Numero (linhas 167-172):**
 
 ```typescript
 <span className={cn(
   "text-3xl font-bold",
-  isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
+  isLit ? "text-[hsl(220,70%,35%)]" : "text-white"
 )}>
 ```
 
-**Label (linhas 175-179):**
+**Label (linhas 174-177):**
 
 ```typescript
 <p className={cn(
   "text-sm font-medium mt-auto",
-  isLit ? "text-[hsl(220,50%,35%)]" : "text-white"
+  isLit ? "text-[hsl(220,60%,30%)]" : "text-white"
 )}>
 ```
 
@@ -75,23 +75,32 @@ className={cn(
 ## Resultado Visual
 
 ```text
+CARD ACESO (count > 0):
++---------------------------+
+|  [icon]            2      |  <- azul escuro
+|                           |
+|  A Precificar             |  <- azul escuro
++---------------------------+
+   Fundo: azul claro (#D4DEF5)
+   Sombra + ring
+
 CARD APAGADO (count = 0):
 +---------------------------+
 |  [icon]            0      |  <- branco
 |                           |
 |  Por Fazer                |  <- branco
 +---------------------------+
-   Fundo: azul medio
-
-CARD ACESO (count > 0):
-+---------------------------+
-|  [icon]            2      |  <- azul vibrante
-|                           |
-|  A Precificar             |  <- azul escuro
-+---------------------------+
-   Fundo: azul muito claro
-   Sombra + ring
+   Fundo: azul medio (#9AADD4)
 ```
 
-A inversao de cores (azul escuro para apagados, claro para acesos) cria o efeito visual correcto sem usar opacidade.
+---
+
+## Ficheiros Alterados
+
+| Ficheiro | Accao |
+|----------|-------|
+| `src/App.tsx` | Modificar ThemeProvider para modo claro fixo |
+| `src/components/layouts/AppLayout.tsx` | Remover ThemeToggle do header |
+| `src/components/ThemeToggle.tsx` | Eliminar ficheiro |
+| `src/pages/DashboardPage.tsx` | Corrigir cores dos cards |
 
