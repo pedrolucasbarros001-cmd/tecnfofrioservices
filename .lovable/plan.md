@@ -1,178 +1,237 @@
 
+# Plano: Corrigir Logica de Coexistencia de Estados na Criacao e Conclusao de Servicos
 
-# Plano: Simplificar Modal de Definir Preco
+## Problema
 
-## Resumo
+Servicos de Entrega e Instalacao criados com preco definido vao para `em_debito` como status principal, fazendo com que o tecnico NAO consiga ver nem executar o servico.
 
-O utilizador quer simplificar o modal de precificacao, substituindo os campos separados de "Mao de Obra" e "Pecas" por:
-1. Um campo unico de **Preco** (valor total)
-2. Um campo livre de **Descricao** (para detalhar mao de obra, materiais e pecas)
-3. Manter o campo de **Desconto** abaixo
+Adicionalmente, ao concluir uma Entrega sem preco definido, o fluxo nao marca `pending_pricing = true`, perdendo o servico da lista "A Precificar".
 
----
+## Logica Correcta de Coexistencia
 
-## Nova Estrutura do Modal
+Um servico tem DUAS dimensoes:
 
-```text
-┌────────────────────────────────────────────────────┐
-│  Definir Preco - OS-00003                      [X] │
-├────────────────────────────────────────────────────┤
-│                                                    │
-│  Preco (EUR) *                                     │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ 50.00                                        │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  Descricao                                         │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ Mao de obra: Substituicao de compressor      │ │
-│  │ Materiais: Gás R410A, soldadura              │ │
-│  │ Pecas: Compressor 12BTU                      │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  Desconto (EUR)                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ 0                                            │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ Subtotal:                         EUR 50.00  │ │
-│  │─────────────────────────────────────────────│ │
-│  │ Total a cobrar:                   EUR 50.00  │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  [Cancelar]                    [Confirmar Preco]   │
-└────────────────────────────────────────────────────┘
-```
+| Dimensao | Como funciona |
+|----------|---------------|
+| **Operacional** | Campo `status` - onde esta no fluxo (por_fazer → em_execucao → finalizado) |
+| **Financeiro** | Calculado dinamicamente: `final_price > amount_paid` = em debito |
+| **Precificacao** | Campo `pending_pricing` - indica se precisa de definir preco |
 
----
+Estas dimensoes COEXISTEM. Exemplos validos:
+- `status: por_fazer` + debito calculado (final_price > 0, amount_paid = 0)
+- `status: finalizado` + `pending_pricing: true` (precisa de preco)
+- `status: finalizado` + debito calculado (aguarda pagamento)
 
-## Alteracoes Necessarias
+## Correcoes a Implementar
 
-### 1. Base de Dados - Nova Migracao
+### 1. CreateDeliveryModal.tsx
 
-Adicionar campo `pricing_description` na tabela `services`:
-
-```sql
-ALTER TABLE public.services
-ADD COLUMN IF NOT EXISTS pricing_description TEXT;
-
-COMMENT ON COLUMN public.services.pricing_description IS 
-'Descricao livre de mao de obra, materiais e pecas incluidas no preco';
-```
-
-### 2. Types - Actualizar Interface
-
-**Ficheiro:** `src/types/database.ts`
-
-Adicionar campo na interface `Service`:
-
+**Linha 209 - Antes:**
 ```typescript
-export interface Service {
+const status = values.final_price && values.final_price > 0 ? 'em_debito' : 'por_fazer';
+```
+
+**Depois:**
+```typescript
+// Status operacional - sempre por_fazer na criacao
+// O debito e calculado dinamicamente via final_price > amount_paid
+const status = 'por_fazer';
+
+// Se nao tem preco definido, marcar como pending_pricing
+const needsPricing = !values.final_price || values.final_price <= 0;
+```
+
+**Linhas 211-229 - Adicionar pending_pricing:**
+```typescript
+await createService.mutateAsync({
   // ... campos existentes ...
-  pricing_description: string | null;  // NOVO
-}
-```
-
-### 3. Modal - Simplificar Campos
-
-**Ficheiro:** `src/components/modals/SetPriceModal.tsx`
-
-Alteracoes:
-
-| Antes | Depois |
-|-------|--------|
-| Campo "Mao de Obra" (Input number) | Campo "Preco" (Input number) |
-| Campo "Pecas" (Input number) | Campo "Descricao" (Textarea) |
-| Campo "Desconto" (Input number) | Campo "Desconto" (mantido) |
-
-**Estado do componente:**
-
-```typescript
-// ANTES:
-const [laborCost, setLaborCost] = useState('');
-const [partsCost, setPartsCost] = useState('');
-const [discount, setDiscount] = useState('');
-
-// DEPOIS:
-const [price, setPrice] = useState('');
-const [description, setDescription] = useState('');
-const [discount, setDiscount] = useState('');
-```
-
-**Calculo simplificado:**
-
-```typescript
-// ANTES:
-const subtotal = laborValue + partsValue;
-const finalPrice = Math.max(0, subtotal - discountValue);
-
-// DEPOIS:
-const priceValue = parseFloat(price) || 0;
-const discountValue = parseFloat(discount) || 0;
-const finalPrice = Math.max(0, priceValue - discountValue);
-```
-
-**Guardar na base de dados:**
-
-```typescript
-await updateService.mutateAsync({
-  id: service.id,
-  final_price: finalPrice,
-  labor_cost: priceValue,       // Guardar preco no labor_cost para compatibilidade
-  parts_cost: 0,                // Definir como 0
-  discount: discountValue,
-  pricing_description: description,  // NOVO campo
-  pending_pricing: false,
+  status,
+  pending_pricing: needsPricing,  // NOVO
   // ...
 });
 ```
 
-### 4. Carregar Dados Existentes
+### 2. CreateInstallationModal.tsx
 
-No `useEffect`, carregar o preco e descricao:
-
+**Linha 209 - Antes:**
 ```typescript
-useEffect(() => {
-  if (service && open) {
-    // Preco = labor_cost + parts_cost (para servicos antigos)
-    const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
-    setPrice(existingPrice > 0 ? existingPrice.toString() : '');
-    setDescription(service.pricing_description || '');
-    setDiscount(service.discount?.toString() || '0');
-  }
-}, [service, open]);
+const status = values.final_price && values.final_price > 0 ? 'em_debito' : 'por_fazer';
 ```
 
----
+**Depois:**
+```typescript
+// Status operacional - sempre por_fazer na criacao
+const status = 'por_fazer';
 
-## Compatibilidade com Dados Existentes
+// Se nao tem preco definido, marcar como pending_pricing
+const needsPricing = !values.final_price || values.final_price <= 0;
+```
 
-Os servicos ja precificados com campos separados (`labor_cost` + `parts_cost`) continuarao a funcionar:
-- Ao abrir o modal, somamos os dois valores no campo "Preco"
-- A descricao sera vazia para servicos antigos (pode ser preenchida depois)
-- O calculo de `final_price` mantem a mesma logica
+**Linhas 211-229 - Adicionar pending_pricing:**
+```typescript
+await createService.mutateAsync({
+  // ... campos existentes ...
+  status,
+  pending_pricing: needsPricing,  // NOVO
+  // ...
+});
+```
 
----
+### 3. TechnicianDeliveryFlow.tsx
+
+**Linhas 61-66 - Antes:**
+```typescript
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'finalizado',
+  service_location: 'entregue',
+  delivery_date: new Date().toISOString(),
+});
+```
+
+**Depois:**
+```typescript
+// Verificar se precisa de precificacao
+const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
+
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'finalizado',
+  service_location: 'entregue',
+  delivery_date: new Date().toISOString(),
+  pending_pricing: needsPricing,  // NOVO - coexiste com finalizado
+});
+```
+
+### 4. TechnicianInstallationFlow.tsx
+
+**Sem alteracoes necessarias** - ja implementa a logica correcta (linha 87).
+
+## Fluxos Corrigidos
+
+### Entrega Direta COM Preco Definido na Criacao
+
+```text
+Criacao:
+  status: por_fazer
+  final_price: 50.00
+  pending_pricing: false
+
+Tecnico executa:
+  Aparece na sua agenda ✓
+  Faz entrega, recolhe assinatura
+
+Conclusao:
+  status: finalizado
+  pending_pricing: false
+
+Resultado:
+  - NAO aparece em "A Precificar"
+  - Aparece em "Em Debito" (calculado: 50 > 0)
+  - Apos pagamento total, sai de "Em Debito"
+```
+
+### Entrega Direta SEM Preco Definido na Criacao
+
+```text
+Criacao:
+  status: por_fazer
+  final_price: null
+  pending_pricing: true
+
+Tecnico executa:
+  Aparece na sua agenda ✓
+  Faz entrega, recolhe assinatura
+
+Conclusao:
+  status: finalizado
+  pending_pricing: true
+
+Resultado:
+  - Aparece em "A Precificar"
+  - Administrador define preco
+  - Apos definir preco: pending_pricing = false
+  - Passa para "Em Debito" (calculado)
+  - Apos pagamento total, finalizado limpo
+```
+
+### Instalacao COM Preco Definido na Criacao
+
+```text
+Criacao:
+  status: por_fazer
+  final_price: 120.00
+  pending_pricing: false
+
+Tecnico executa:
+  Aparece na sua agenda ✓
+  Faz instalacao, tira fotos, recolhe assinatura
+
+Conclusao:
+  status: finalizado
+  pending_pricing: false (ja tem preco)
+
+Resultado:
+  - NAO aparece em "A Precificar"
+  - Aparece em "Em Debito" (calculado: 120 > 0)
+  - Apos pagamento total, sai de "Em Debito"
+```
+
+### Instalacao SEM Preco Definido na Criacao
+
+```text
+Criacao:
+  status: por_fazer
+  final_price: null
+  pending_pricing: true
+
+Tecnico executa:
+  Aparece na sua agenda ✓
+  Faz instalacao, tira fotos, recolhe assinatura
+
+Conclusao:
+  status: finalizado
+  pending_pricing: true
+
+Resultado:
+  - Aparece em "A Precificar"
+  - Administrador define preco
+  - Passa para "Em Debito"
+  - Apos pagamento total, finalizado limpo
+```
 
 ## Ficheiros a Modificar
 
-| Ficheiro | Accao |
-|----------|-------|
-| Nova migracao SQL | Criar coluna `pricing_description` |
-| `src/integrations/supabase/types.ts` | Adicionar campo ao type (automatico) |
-| `src/types/database.ts` | Adicionar `pricing_description: string \| null` |
-| `src/components/modals/SetPriceModal.tsx` | Simplificar para campo unico + descricao |
+| Ficheiro | Alteracoes |
+|----------|------------|
+| `src/components/modals/CreateDeliveryModal.tsx` | Linha 209: status sempre `por_fazer`, adicionar `pending_pricing` |
+| `src/components/modals/CreateInstallationModal.tsx` | Linha 209: status sempre `por_fazer`, adicionar `pending_pricing` |
+| `src/pages/technician/TechnicianDeliveryFlow.tsx` | Linhas 61-66: adicionar verificacao e `pending_pricing` na conclusao |
 
----
+## Impacto
 
-## Interface Final
+### O que muda:
+- Servicos com preco ja definido aparecem para o tecnico (status operacional `por_fazer`)
+- Servicos sem preco ficam marcados para precificacao desde a criacao
+- Entrega passa a marcar `pending_pricing` na conclusao se nao tiver preco
 
-O modal tera:
-- **Preco (EUR)**: Campo numerico obrigatorio
-- **Descricao**: Textarea opcional para detalhar (mao de obra, materiais, pecas)
-- **Desconto (EUR)**: Campo numerico opcional
-- **Resumo**: Subtotal e Total a cobrar
+### O que NAO muda:
+- Dashboard continua a calcular debito dinamicamente
+- SecretaryDebitoPage continua a funcionar
+- SetPriceModal continua a limpar `pending_pricing` ao definir preco
+- Servicos existentes continuam a funcionar
 
-A funcionalidade de garantia (warranty) mantem-se inalterada - quando activa, todos os campos ficam desactivados.
+## Nota Importante
 
+Servicos ja criados incorretamente com status `em_debito` podem necessitar de correcao manual via SQL:
+
+```sql
+-- Corrigir servicos de entrega/instalacao que estao em em_debito mas deveriam estar por_fazer
+UPDATE public.services
+SET status = 'por_fazer'
+WHERE status = 'em_debito'
+  AND service_type IN ('entrega', 'instalacao')
+  AND delivery_date IS NULL;  -- Ainda nao foram entregues
+```
+
+Esta correcao manual e opcional e pode ser executada se existirem servicos afectados.
