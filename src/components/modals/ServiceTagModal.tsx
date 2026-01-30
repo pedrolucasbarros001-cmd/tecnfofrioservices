@@ -27,8 +27,8 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
     printServiceTag();
   };
 
-  // Generate a full URL for QR code that redirects to the appropriate technician flow
-  const qrData = `${window.location.origin}/technician/service/${service.id}`;
+  // Generate a full URL for QR code that works for any authenticated collaborator
+  const qrData = `${window.location.origin}/service/${service.id}`;
 
   // Print content component - rendered via portal for printing
   const PrintTagContent = () => (

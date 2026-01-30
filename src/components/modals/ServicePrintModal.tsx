@@ -1,8 +1,8 @@
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Printer, PenTool, X } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { AlertTriangle, Download, PenTool, X, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
+import { generatePDF } from '@/utils/pdfUtils';
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -87,12 +88,24 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
     enabled: !!service?.id && open,
   });
 
-  const handlePrint = () => {
-    window.print();
+  const printSheetRef = useRef<HTMLDivElement>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!printSheetRef.current || !service) return;
+    
+    setIsGenerating(true);
+    try {
+      await generatePDF({ 
+        element: printSheetRef.current, 
+        filename: `Ficha-${service.code}` 
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-  const qrData = JSON.stringify({ code: service.code, id: service.id });
 
   const usedParts = parts.filter(p => !p.is_requested);
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
@@ -127,14 +140,11 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </div>
         </div>
 
-        <div className="flex justify-between items-center mb-3">
-          <div>
-            <p style={{ fontSize: '14px', fontFamily: 'monospace', fontWeight: 'bold' }}>Código: {service.code}</p>
-            <p style={{ fontSize: '11px', color: '#666' }}>
-              Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
-            </p>
-          </div>
-          <QRCodeSVG value={qrData} size={60} level="M" />
+        <div className="mb-3">
+          <p style={{ fontSize: '14px', fontFamily: 'monospace', fontWeight: 'bold' }}>Código: {service.code}</p>
+          <p style={{ fontSize: '11px', color: '#666' }}>
+            Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+          </p>
         </div>
 
         <Separator className="my-2" />
@@ -420,24 +430,17 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
         <Separator className="my-2" />
 
-        {/* Terms Section with QR */}
+        {/* Terms Section */}
         <section style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '8px', fontSize: '11px' }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <AlertTriangle style={{ width: '14px', height: '14px' }} />
-                IMPORTANTE - Termos de Guarda
-              </h3>
-              <p style={{ color: '#a16207', lineHeight: '1.4' }}>
-                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-                pela guarda ou danos.
-              </p>
-            </div>
-            <div style={{ flexShrink: 0 }}>
-              <QRCodeSVG value={qrData} size={50} level="M" />
-            </div>
-          </div>
+          <h3 style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <AlertTriangle style={{ width: '14px', height: '14px' }} />
+            IMPORTANTE - Termos de Guarda
+          </h3>
+          <p style={{ color: '#a16207', lineHeight: '1.4' }}>
+            Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
+            conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+            pela guarda ou danos.
+          </p>
         </section>
 
       </div>
@@ -451,9 +454,13 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
           <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
           <div className="flex gap-2">
-            <Button onClick={handlePrint} size="sm">
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir
+            <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isGenerating ? 'A gerar...' : 'Baixar PDF'}
             </Button>
             <DialogClose asChild>
               <Button variant="ghost" size="icon">
@@ -464,7 +471,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         </div>
 
         {/* Conteúdo A4 - isto é o que será impresso */}
-        <div className="print-sheet relative bg-white">
+        <div ref={printSheetRef} className="print-sheet relative bg-white">
           {/* Watermark */}
           <div 
             className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
@@ -489,14 +496,11 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </div>
             </div>
 
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <p className="text-base font-mono font-bold">Código: {service.code}</p>
-                <p className="text-xs text-muted-foreground">
-                  Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
-                </p>
-              </div>
-              <QRCodeSVG value={qrData} size={60} level="M" />
+            <div className="mb-3">
+              <p className="text-base font-mono font-bold">Código: {service.code}</p>
+              <p className="text-xs text-muted-foreground">
+                Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+              </p>
             </div>
 
             <Separator className="my-2" />
@@ -782,24 +786,17 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
             <Separator className="my-2" />
 
-            {/* Terms Section with QR */}
+            {/* Terms Section */}
             <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    IMPORTANTE - Termos de Guarda
-                  </h3>
-                  <p className="text-amber-700 leading-tight">
-                    Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                    conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-                    pela guarda ou danos.
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <QRCodeSVG value={qrData} size={50} level="M" />
-                </div>
-              </div>
+              <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                IMPORTANTE - Termos de Guarda
+              </h3>
+              <p className="text-amber-700 leading-tight">
+                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
+                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                pela guarda ou danos.
+              </p>
             </section>
 
         </div>
