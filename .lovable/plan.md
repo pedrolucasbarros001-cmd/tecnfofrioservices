@@ -1,47 +1,27 @@
 
-# Plano: Intensificar Azul Institucional nos Cards do Dashboard
 
-## Problema Actual
+# Plano: Azul Claro Vibrante com Lógica Aceso/Apagado
 
-Analisando o screenshot:
+## Conceito
 
-| Estado | Problema |
-|--------|----------|
-| **Cards apagados** | Fundo quase branco (`hsl 214,45%,97%`) com `opacity-50` = aparece cinzento |
-| **Cards acesos** | Azul visível mas subtil (`hsl 214,45%,94%`) |
-
-A opacidade está a "lavar" a cor azul, fazendo os cards parecerem cinzentos em vez de azuis claros.
+Aplicar o tom de azul claro vibrante (`hsl(220, 80%, 65%)`) da imagem de referência, **mantendo a lógica de opacidade**:
+- **Cards com 0** = apagados (opacity reduzida)
+- **Cards com 1+** = acesos (opacity total)
 
 ---
 
-## Solução: Usar Cores Sólidas + Variar Lightness
+## Paleta Derivada (Hue 220°)
 
-Em vez de usar opacidade para criar a diferença "aceso/apagado", vamos variar a **intensidade da cor** (lightness) mantendo sempre o matiz azul (214).
+Base de cor vibrante: `#5B8DEF` → `hsl(220, 80%, 65%)`
 
-### Paleta Proposta
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                  CARDS DO DASHBOARD                          │
-├─────────────────────────────────────────────────────────────┤
-│  CARD APAGADO (count = 0):                                   │
-│  ├── Fundo:  hsl(214, 40%, 95%)  (azul muito claro)         │
-│  ├── Borda:  hsl(214, 30%, 88%)  (azul suave)               │
-│  ├── Ícone:  hsl(214, 35%, 70%)  (azul claro)               │
-│  ├── Número: hsl(214, 30%, 75%)  (azul claro)               │
-│  ├── Label:  hsl(214, 25%, 60%)  (azul médio)               │
-│  └── SEM opacity - cor sólida                                │
-│                                                              │
-│  CARD ACESO (count > 0):                                     │
-│  ├── Fundo:  hsl(214, 50%, 92%)  (azul mais saturado)       │
-│  ├── Borda:  hsl(214, 40%, 80%)  (azul mais visível)        │
-│  ├── Ícone:  primary (azul institucional)                   │
-│  ├── Número: primary (azul institucional)                   │
-│  ├── Label:  hsl(214, 40%, 30%)  (azul escuro)              │
-│  ├── Ring:   primary/30                                      │
-│  └── Shadow: md                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+| Elemento | Valor |
+|----------|-------|
+| **Fundo base** | `hsl(220, 60%, 96%)` |
+| **Borda base** | `hsl(220, 50%, 88%)` |
+| **Ícone/Número aceso** | `hsl(220, 80%, 50%)` |
+| **Ícone/Número apagado** | `hsl(220, 40%, 70%)` |
+| **Label aceso** | `hsl(220, 50%, 35%)` |
+| **Label apagado** | `hsl(220, 25%, 55%)` |
 
 ---
 
@@ -49,77 +29,73 @@ Em vez de usar opacidade para criar a diferença "aceso/apagado", vamos variar a
 
 ### Ficheiro: `src/pages/DashboardPage.tsx`
 
-**Card Container (linhas 151-160):**
+**Card Container (linhas 153-158):**
 
 ```typescript
-<Card
-  key={card.key}
-  className={cn(
-    "cursor-pointer transition-all duration-200",
-    isLit 
-      ? "bg-[hsl(214,50%,92%)] border-[hsl(214,40%,80%)] shadow-md ring-1 ring-primary/30 hover:shadow-lg hover:-translate-y-0.5" 
-      : "bg-[hsl(214,40%,95%)] border-[hsl(214,30%,88%)] hover:bg-[hsl(214,45%,93%)]"
-  )}
-  onClick={() => navigate(card.route)}
->
+className={cn(
+  "cursor-pointer transition-all duration-200",
+  "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)]",
+  isLit 
+    ? "opacity-100 shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+    : "opacity-50 hover:opacity-70"
+)}
 ```
 
-**Ícone (linhas 164-167):**
+**Ícone (linhas 163-166):**
 
 ```typescript
 <Icon className={cn(
   "h-6 w-6",
-  isLit ? "text-primary" : "text-[hsl(214,35%,70%)]"
+  isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,40%,70%)]"
 )} />
 ```
 
-**Número (linhas 168-173):**
+**Número (linhas 167-172):**
 
 ```typescript
 <span className={cn(
   "text-3xl font-bold",
-  isLit ? "text-primary" : "text-[hsl(214,30%,75%)]"
+  isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,35%,70%)]"
 )}>
-  {loading ? '...' : count}
-</span>
 ```
 
-**Label (linhas 175-179):**
+**Label (linhas 174-177):**
 
 ```typescript
 <p className={cn(
   "text-sm font-medium mt-auto",
-  isLit ? "text-[hsl(214,40%,30%)]" : "text-[hsl(214,25%,60%)]"
+  isLit ? "text-[hsl(220,50%,35%)]" : "text-[hsl(220,25%,55%)]"
 )}>
-  {card.label}
-</p>
 ```
 
 ---
 
-## Mudança Chave: Remover Opacity
+## Comparativo
 
-| Antes | Depois |
-|-------|--------|
-| `opacity-50` nos cards apagados | **Sem opacity** - cores sólidas |
-| Cores muito claras (97%, 94% lightness) | Cores mais azuis (95%, 92%) |
-| Efeito "cinzento lavado" | Efeito "azul institucional claro" |
+| Aspecto | Actual | Novo |
+|---------|--------|------|
+| **Hue (matiz)** | 214° (azul institucional) | 220° (azul vibrante) |
+| **Lógica lit/dim** | Cores diferentes | **Opacity** (como pedido) |
+| **Fundo** | Cor varia por estado | Cor única + opacity |
+| **Cards com 0** | opacity-50 | opacity-50 ✓ |
+| **Cards com 1+** | opacity-100 | opacity-100 ✓ |
 
 ---
 
-## Resultado Esperado
+## Resultado Visual
 
 ```text
-CARDS APAGADOS:
-• Fundo azul claro visível (não cinzento)
-• Elementos em tons de azul (não cinzento)
-• Sem opacity = cores puras
+CARD APAGADO (count = 0):
+• Fundo azul claro vibrante
+• opacity-50 → efeito "esbatido"
+• Clicável mas visualmente secundário
 
-CARDS ACESOS:
-• Fundo azul mais intenso
-• Borda mais definida
-• Elementos no azul institucional #2B4F84
+CARD ACESO (count > 0):
+• Mesmo fundo azul claro
+• opacity-100 → totalmente visível
 • Sombra e ring para destacar
+• Ícone/número em azul vibrante (#5B8DEF)
 ```
 
-A lógica "aceso/apagado" mantém-se através da **diferença de intensidade** e não da **opacidade**.
+A lógica de opacidade está **restabelecida**, agora usando o tom de azul claro vibrante da imagem de referência.
+
