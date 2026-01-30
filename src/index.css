@@ -527,3 +527,105 @@ body.print-type-tag {
     }
   }
 }
+
+/* ======================================
+   MODAL A4 PARA IMPRESSÃO
+   WYSIWYG - O utilizador vê exactamente o que vai ser impresso
+   ====================================== */
+
+/* Modal com dimensões A4 exactas */
+.print-modal-a4 {
+  width: 210mm !important;
+  max-width: 210mm !important;
+  height: 297mm !important;
+  max-height: 297mm !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+}
+
+/* Conteúdo da ficha com scroll no ecrã */
+.print-modal-a4 .print-sheet {
+  width: 100%;
+  height: calc(297mm - 50px);
+  padding: 10mm;
+  background: white;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Print styles para modal A4 */
+@media print {
+  /* Esconder tudo excepto o dialog */
+  body > *:not([data-radix-dialog-overlay]):not([role="dialog"]) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Esconder overlay do Radix */
+  [data-radix-dialog-overlay] {
+    display: none !important;
+    background: transparent !important;
+  }
+  
+  /* Modal ocupa toda a página sem bordas */
+  .print-modal-a4 {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    left: 0 !important;
+    top: 0 !important;
+    background: white !important;
+  }
+  
+  /* Esconder header com botões na impressão */
+  .print-modal-a4 .no-print {
+    display: none !important;
+  }
+  
+  /* Conteúdo sem scroll na impressão */
+  .print-modal-a4 .print-sheet {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 10mm !important;
+  }
+  
+  /* Garantir visibilidade de todo o conteúdo */
+  .print-modal-a4 .print-sheet * {
+    visibility: visible !important;
+  }
+  
+  /* Cores exactas na impressão */
+  .print-modal-a4 .print-sheet .bg-amber-50 {
+    background-color: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .print-modal-a4 .print-sheet .bg-purple-50 {
+    background-color: #faf5ff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .print-modal-a4 .print-sheet .bg-gray-50 {
+    background-color: #f9fafb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* QR codes e SVGs com cores exactas */
+  .print-modal-a4 .print-sheet svg {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
