@@ -445,17 +445,6 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </div>
         </section>
 
-        {/* Signature Area - Only show if no digital signatures */}
-        {signatures.length === 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '16px', paddingTop: '12px' }}>
-            <div style={{ borderTop: '1px solid #9ca3af', paddingTop: '4px' }}>
-              <p style={{ fontSize: '11px', color: '#666', textAlign: 'center' }}>Assinatura do Cliente</p>
-            </div>
-            <div style={{ borderTop: '1px solid #9ca3af', paddingTop: '4px' }}>
-              <p style={{ fontSize: '11px', color: '#666', textAlign: 'center' }}>Assinatura do Funcionário</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -811,17 +800,6 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </div>
             </section>
 
-            {/* Signature Area */}
-            {signatures.length === 0 && (
-              <div className="grid grid-cols-2 gap-6 mt-4 pt-3">
-                <div className="border-t border-gray-400 pt-1">
-                  <p className="text-xs text-muted-foreground text-center">Assinatura do Cliente</p>
-                </div>
-                <div className="border-t border-gray-400 pt-1">
-                  <p className="text-xs text-muted-foreground text-center">Assinatura do Funcionário</p>
-                </div>
-              </div>
-            )}
           </div>
         </DialogContent>
       </Dialog>
