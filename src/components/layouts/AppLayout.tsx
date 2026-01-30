@@ -2,17 +2,20 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { OwnerSidebar } from './OwnerSidebar';
 import { SecretarySidebar } from './SecretarySidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 
 export function AppLayout() {
   const { role, user } = useAuth();
+  const { isOpen: isOnboardingOpen } = useOnboarding();
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Query for unread notifications count
@@ -86,6 +89,9 @@ export function AppLayout() {
         open={showNotifications}
         onOpenChange={setShowNotifications}
       />
+
+      {/* Onboarding Modal */}
+      {isOnboardingOpen && <OnboardingModal />}
     </SidebarProvider>
   );
 }
