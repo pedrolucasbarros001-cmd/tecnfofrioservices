@@ -142,12 +142,15 @@ export default function TechnicianVisitFlow() {
       });
 
       if (formValues.outcome === 'take_to_workshop') {
-        // Update to workshop status
+        // Update to workshop - remove technician so service becomes available for assignment
         await updateService.mutateAsync({
           id: service.id,
-          status: 'na_oficina',
+          status: 'por_fazer',           // Trigger will enforce this anyway
           service_location: 'oficina',
+          technician_id: null,           // REMOVE technician - service becomes available
           detected_fault: formValues.detected_fault,
+          scheduled_date: null,          // Clear schedule - will be set when assumed
+          scheduled_shift: null,
         });
         toast.success('Equipamento marcado para levar à oficina');
       } else {
