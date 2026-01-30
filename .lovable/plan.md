@@ -1,82 +1,170 @@
 
-# Plano: Remover o "0" que Aparece na Ficha de Serviço
+# Plano: PDF Download + QR Code Universal + Remover QR da Ficha
 
-## Problema Identificado
+## Objectivos
 
-Na ficha de serviço (tanto na visualização do sistema quanto na impressão), aparece um "0" isolado após a seção "Diagnóstico" e antes das "Assinaturas Recolhidas". Este é um bug clássico de React causado por expressões condicionais incorretas.
+1. **Adicionar "Baixar PDF"** e remover botão "Imprimir"
+2. **Corrigir rota QR Code** para funcionar com qualquer colaborador autenticado
+3. **Remover todos os QR Codes** da ficha de serviço (tanto na visualização como no PDF)
 
-## Causa Técnica
+## Parte 1: Download PDF
 
-O problema está na forma como as condições são escritas em React. Quando se usa:
+### Ficheiros a Criar
 
-```jsx
-{service.final_price && service.final_price > 0 && (
-  <Component />
-)}
+**1. `src/types/html2pdf.d.ts`**
+```typescript
+declare module 'html2pdf.js' {
+  interface Html2PdfOptions {
+    margin?: number | number[];
+    filename?: string;
+    image?: { type?: string; quality?: number };
+    html2canvas?: object;
+    jsPDF?: { unit?: string; format?: string; orientation?: string };
+  }
+
+  interface Html2Pdf {
+    set(options: Html2PdfOptions): Html2Pdf;
+    from(element: HTMLElement): Html2Pdf;
+    save(): Promise<void>;
+  }
+
+  export default function html2pdf(): Html2Pdf;
+}
 ```
 
-Se `service.final_price` for `0`:
-1. `service.final_price` avalia para `0` (que é falsy)
-2. O operador `&&` retorna o primeiro valor falsy encontrado: `0`
-3. React renderiza o número `0` no DOM
+**2. `src/utils/pdfUtils.ts`**
+```typescript
+import html2pdf from 'html2pdf.js';
 
-A forma correcta é:
-
-```jsx
-{service.final_price > 0 && (
-  <Component />
-)}
+export async function generatePDF({ element, filename }) {
+  const options = {
+    margin: 10,
+    filename: `${filename}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+  await html2pdf().set(options).from(element).save();
+}
 ```
 
-Porque `0 > 0` avalia para `false`, e React não renderiza `false`.
+### Ficheiros a Modificar
 
-## Ficheiros Afectados
+**3. `package.json`** - Adicionar `html2pdf.js`
 
-### 1. ServiceDetailSheet.tsx
+**4. `src/components/modals/ServicePrintModal.tsx`**
+- Substituir `Printer` por `Download` no import
+- Adicionar `useRef` e `generatePDF`
+- Criar função `handleDownloadPDF`
+- Substituir botão "Imprimir" por "Baixar PDF"
 
-Linhas com o padrão problemático:
-- Linha 584: Condição do wrapper da seção financeira
-- Linha 591: `{service.labor_cost && service.labor_cost > 0 &&`
-- Linha 597: `{service.parts_cost && service.parts_cost > 0 &&`
-- Linha 603: `{service.discount && service.discount > 0 &&`
-- Linha 609: `{service.final_price && service.final_price > 0 &&`
-- Linha 626: `{service.final_price && service.final_price > 0 &&`
+## Parte 2: Remover QR Codes da Ficha
 
-### 2. ServicePrintModal.tsx
+Existem **4 locais** com QR Codes no `ServicePrintModal.tsx`:
 
-Linhas com o padrão problemático:
-- Linha 309: `{(service.final_price && service.final_price > 0) &&`
-- Linha 671: `{(service.final_price && service.final_price > 0) &&`
+| Linha | Local | Acção |
+|-------|-------|-------|
+| 137 | Header desktop (ao lado do código) | Remover |
+| 438 | Termos de guarda desktop | Remover |
+| 499 | Header móvel (ao lado do código) | Remover |
+| 800 | Termos de guarda móvel | Remover |
 
-## Alterações a Fazer
+### Mudanças Específicas
 
-### ServiceDetailSheet.tsx
+**Linha 133-138** - Header desktop:
+```tsx
+// Antes:
+<div className="flex justify-between items-center mb-3">
+  <div>...</div>
+  <QRCodeSVG value={qrData} size={60} level="M" />
+</div>
 
-| Linha | De | Para |
-|-------|-----|------|
-| 584 | `((service.labor_cost && service.labor_cost > 0) \|\| (service.parts_cost && service.parts_cost > 0) \|\| (service.final_price && service.final_price > 0))` | `(service.labor_cost > 0 \|\| service.parts_cost > 0 \|\| service.final_price > 0)` |
-| 591 | `{service.labor_cost && service.labor_cost > 0 &&` | `{service.labor_cost > 0 &&` |
-| 597 | `{service.parts_cost && service.parts_cost > 0 &&` | `{service.parts_cost > 0 &&` |
-| 603 | `{service.discount && service.discount > 0 &&` | `{service.discount > 0 &&` |
-| 609 | `{service.final_price && service.final_price > 0 &&` | `{service.final_price > 0 &&` |
-| 626 | `{service.final_price && service.final_price > 0 &&` | `{service.final_price > 0 &&` |
+// Depois:
+<div className="mb-3">
+  <div>...</div>
+</div>
+```
 
-### ServicePrintModal.tsx
+**Linhas 423-441** - Termos desktop:
+```tsx
+// Antes:
+<section style={{ ... }}>
+  <div style={{ display: 'flex', gap: '12px' }}>
+    <div style={{ flex: 1 }}>...termos...</div>
+    <div style={{ flexShrink: 0 }}>
+      <QRCodeSVG value={qrData} size={50} level="M" />
+    </div>
+  </div>
+</section>
 
-| Linha | De | Para |
-|-------|-----|------|
-| 309 | `{(service.final_price && service.final_price > 0) &&` | `{service.final_price > 0 &&` |
-| 671 | `{(service.final_price && service.final_price > 0) &&` | `{service.final_price > 0 &&` |
+// Depois:
+<section style={{ ... }}>
+  <div>...termos (sem flex layout)...</div>
+</section>
+```
 
-## Notas Importantes
+**Linha 492-500** - Header móvel:
+```tsx
+// Remover QRCodeSVG da estrutura
+```
 
-- A expressão `service.value > 0` é segura mesmo quando `service.value` é `undefined` ou `null`, porque `undefined > 0` e `null > 0` ambos avaliam para `false`
-- Os tipos TypeScript mostram que estes campos são `number` (não nullable), portanto `> 0` é suficiente
-- Esta correção elimina completamente o "0" espúrio que aparece na interface
+**Linhas 785-802** - Termos móvel:
+```tsx
+// Remover QRCodeSVG e simplificar layout
+```
 
-## Resultado Esperado
+**Limpeza adicional:**
+- Remover import `QRCodeSVG` se não for usado em mais nenhum lugar
+- Remover variável `qrData` se não for mais necessária
 
-Após a correção:
-- A ficha de serviço mostrará apenas as seções que têm valores relevantes (> 0)
-- Não haverá mais "0" isolado a aparecer entre as seções
-- O comportamento será consistente tanto na visualização do sistema quanto na impressão
+## Parte 3: Rota QR Code Universal
+
+### Ficheiro a Criar
+
+**5. `src/pages/ServiceConsultPage.tsx`**
+
+Uma página que:
+- Recebe o `serviceId` da URL
+- Busca os dados do serviço
+- Mostra informações da ficha
+- Funciona para qualquer utilizador autenticado (dono, secretária, técnico)
+
+### Ficheiros a Modificar
+
+**6. `src/App.tsx`**
+- Adicionar rota `/service/:serviceId` sem restrição de role:
+```tsx
+<Route path="/service/:serviceId" element={
+  <ProtectedRoute>
+    <ServiceConsultPage />
+  </ProtectedRoute>
+} />
+```
+
+**7. `src/components/modals/ServiceTagModal.tsx`**
+- Actualizar URL do QR (linha 31):
+```typescript
+// De:
+const qrData = `${window.location.origin}/technician/service/${service.id}`;
+
+// Para:
+const qrData = `${window.location.origin}/service/${service.id}`;
+```
+
+## Resumo de Ficheiros
+
+| Ficheiro | Acção |
+|----------|-------|
+| `package.json` | Adicionar `html2pdf.js` |
+| `src/types/html2pdf.d.ts` | **Criar** |
+| `src/utils/pdfUtils.ts` | **Criar** |
+| `src/pages/ServiceConsultPage.tsx` | **Criar** |
+| `src/components/modals/ServicePrintModal.tsx` | Remover QR Codes + Adicionar PDF |
+| `src/components/modals/ServiceTagModal.tsx` | Actualizar URL do QR |
+| `src/App.tsx` | Adicionar nova rota |
+
+## Resultado Final
+
+- **Ficha de Serviço**: Sem QR Codes, com botão "Baixar PDF"
+- **Etiqueta (Tag)**: Mantém QR Code que funciona para qualquer colaborador
+- **Rota QR**: `/service/:serviceId` acessível por qualquer utilizador autenticado
