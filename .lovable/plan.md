@@ -1,36 +1,35 @@
 
 
-# Plano: Modo Claro Fixo + Cards Azuis Corrigidos
+# Plano: Azul Vibrante nos Cards do Dashboard
 
-## Parte 1: Remover Toggle de Tema
+## Analise da Referencia
 
-O sistema passara a funcionar apenas em modo claro.
+Na imagem de referencia, a logica visual e:
+- **Cards acesos** = cor vibrante/clara (roxo-azul brilhante)
+- **Cards apagados** = mesma cor, mas mais escura/opaca
 
-### Alteracoes:
+## Problema Actual
 
-**1. `src/App.tsx`**
-- Alterar `defaultTheme="system"` para `defaultTheme="light"`
-- Remover `enableSystem` do ThemeProvider
+Os valores HSL actuais sao muito "lavados":
+- Aceso: `hsl(220, 60%, 92%)` = muito claro, quase branco
+- Apagado: `hsl(220, 40%, 72%)` = azul medio desbotado
 
-**2. `src/components/layouts/AppLayout.tsx`**
-- Remover import do `ThemeToggle`
-- Remover o componente `<ThemeToggle />` do header
+## Solucao: Aumentar Saturacao e Ajustar Luminosidade
 
-**3. `src/components/ThemeToggle.tsx`**
-- Eliminar o ficheiro (nao sera mais utilizado)
+Para obter o efeito vibrante da referencia:
+
+| Estado | Fundo Actual | Fundo Novo |
+|--------|--------------|------------|
+| **Aceso** | `hsl(220, 60%, 92%)` | `hsl(230, 70%, 65%)` |
+| **Apagado** | `hsl(220, 40%, 72%)` | `hsl(230, 50%, 40%)` |
+
+**Nota**: Ajuste do hue de 220 para 230 para aproximar ao tom roxo-azul da referencia, com saturacao elevada (70%) para vibrancia.
 
 ---
 
-## Parte 2: Corrigir Cards do Dashboard
+## Alteracoes Tecnicas
 
-Baseado na imagem de referencia, todos os cards devem ser azuis:
-
-| Estado | Fundo | Icone/Numero | Label |
-|--------|-------|--------------|-------|
-| **Aceso** (count > 0) | Azul claro `hsl(220,60%,92%)` | Azul escuro `hsl(220,70%,35%)` | Azul escuro `hsl(220,60%,30%)` |
-| **Apagado** (count = 0) | Azul medio `hsl(220,40%,72%)` | Branco | Branco |
-
-### Alteracoes em `src/pages/DashboardPage.tsx`:
+### Ficheiro: `src/pages/DashboardPage.tsx`
 
 **Card Container (linhas 153-158):**
 
@@ -38,36 +37,18 @@ Baseado na imagem de referencia, todos os cards devem ser azuis:
 className={cn(
   "cursor-pointer transition-all duration-200",
   isLit 
-    ? "bg-[hsl(220,60%,92%)] border-[hsl(220,50%,85%)] shadow-md ring-1 ring-[hsl(220,70%,50%)]/20 hover:shadow-lg hover:-translate-y-0.5" 
-    : "bg-[hsl(220,40%,72%)] border-[hsl(220,35%,65%)] hover:bg-[hsl(220,40%,68%)]"
+    ? "bg-[hsl(230,70%,65%)] border-[hsl(230,60%,55%)] shadow-md ring-1 ring-[hsl(230,80%,75%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+    : "bg-[hsl(230,50%,40%)] border-[hsl(230,45%,35%)] hover:bg-[hsl(230,50%,45%)]"
 )}
 ```
 
-**Icone (linhas 163-166):**
+**Icone, Numero e Label** (linhas 163-177):
+- Todos usam `text-white` em ambos os estados (como pedido: "detalhes em branco")
 
 ```typescript
-<Icon className={cn(
-  "h-6 w-6",
-  isLit ? "text-[hsl(220,70%,35%)]" : "text-white"
-)} />
-```
-
-**Numero (linhas 167-172):**
-
-```typescript
-<span className={cn(
-  "text-3xl font-bold",
-  isLit ? "text-[hsl(220,70%,35%)]" : "text-white"
-)}>
-```
-
-**Label (linhas 174-177):**
-
-```typescript
-<p className={cn(
-  "text-sm font-medium mt-auto",
-  isLit ? "text-[hsl(220,60%,30%)]" : "text-white"
-)}>
+<Icon className="h-6 w-6 text-white" />
+<span className="text-3xl font-bold text-white">
+<p className="text-sm font-medium mt-auto text-white">
 ```
 
 ---
@@ -77,12 +58,11 @@ className={cn(
 ```text
 CARD ACESO (count > 0):
 +---------------------------+
-|  [icon]            2      |  <- azul escuro
+|  [icon]            2      |  <- branco
 |                           |
-|  A Precificar             |  <- azul escuro
+|  A Precificar             |  <- branco
 +---------------------------+
-   Fundo: azul claro (#D4DEF5)
-   Sombra + ring
+   Fundo: azul vibrante claro (#6B7FD9)
 
 CARD APAGADO (count = 0):
 +---------------------------+
@@ -90,17 +70,24 @@ CARD APAGADO (count = 0):
 |                           |
 |  Por Fazer                |  <- branco
 +---------------------------+
-   Fundo: azul medio (#9AADD4)
+   Fundo: azul vibrante escuro (#3D4A80)
 ```
 
 ---
 
-## Ficheiros Alterados
+## Resumo das Cores
+
+| Elemento | HSL | Hex Aproximado |
+|----------|-----|----------------|
+| Fundo Aceso | `hsl(230, 70%, 65%)` | #6B7FD9 |
+| Borda Aceso | `hsl(230, 60%, 55%)` | #5968B8 |
+| Fundo Apagado | `hsl(230, 50%, 40%)` | #3D4A80 |
+| Borda Apagado | `hsl(230, 45%, 35%)` | #36426E |
+| Texto/Icones | `white` | #FFFFFF |
+
+## Ficheiro Modificado
 
 | Ficheiro | Accao |
 |----------|-------|
-| `src/App.tsx` | Modificar ThemeProvider para modo claro fixo |
-| `src/components/layouts/AppLayout.tsx` | Remover ThemeToggle do header |
-| `src/components/ThemeToggle.tsx` | Eliminar ficheiro |
-| `src/pages/DashboardPage.tsx` | Corrigir cores dos cards |
+| `src/pages/DashboardPage.tsx` | Actualizar cores dos cards para azul vibrante |
 
