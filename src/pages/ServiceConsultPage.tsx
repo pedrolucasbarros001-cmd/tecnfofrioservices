@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Loader2, Package, User, Wrench, Calendar, MapPin, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Package, User, Wrench, Calendar, MapPin, AlertCircle, PenTool } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,9 +9,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import type { Service } from '@/types/database';
+import type { Service, ServiceSignature } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDefaultRouteForRole } from '@/contexts/AuthContext';
+
+// Helper: descrição amigável para tipos de assinatura
+const getSignatureDescription = (type: string | null): string => {
+  switch (type) {
+    case 'recolha':
+      return 'Autorização de levantamento do aparelho para reparação em oficina';
+    case 'entrega':
+      return 'Confirmação da entrega do aparelho';
+    case 'visita':
+      return 'Confirmação da execução do serviço no local';
+    case 'pedido_peca':
+      return 'Autorização para encomenda de peça';
+    default:
+      return 'Assinatura do cliente';
+  }
+};
 
 export default function ServiceConsultPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -34,6 +50,22 @@ export default function ServiceConsultPage() {
       
       if (error) throw error;
       return data as Service;
+    },
+    enabled: !!serviceId,
+  });
+
+  // Fetch service signatures
+  const { data: signatures = [] } = useQuery({
+    queryKey: ['service-consult-signatures', serviceId],
+    queryFn: async () => {
+      if (!serviceId) return [];
+      const { data, error } = await supabase
+        .from('service_signatures')
+        .select('*')
+        .eq('service_id', serviceId)
+        .order('signed_at', { ascending: true });
+      if (error) throw error;
+      return data as ServiceSignature[];
     },
     enabled: !!serviceId,
   });
@@ -253,6 +285,38 @@ export default function ServiceConsultPage() {
                   <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Signatures */}
+        {signatures.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <PenTool className="h-4 w-4" />
+                Assinaturas Recolhidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {signatures.map((sig) => (
+                <div key={sig.id} className="flex gap-3 p-3 border rounded-lg bg-muted/30">
+                  <img 
+                    src={sig.file_url} 
+                    alt="Assinatura" 
+                    className="w-28 h-20 object-contain border bg-white rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
+                    <p className="text-xs text-muted-foreground mt-1 break-words">
+                      {getSignatureDescription(sig.signature_type)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
