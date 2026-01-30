@@ -403,17 +403,17 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 <PenTool style={{ width: '14px', height: '14px' }} />
                 Assinaturas Recolhidas
               </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {signatures.map((sig) => (
-                  <div key={sig.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
+                  <div key={sig.id} style={{ display: 'flex', gap: '12px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
                     <img 
                       src={sig.file_url} 
                       alt="Assinatura" 
-                      style={{ width: '64px', height: '32px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
+                      style={{ width: '96px', height: '64px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
                     />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: '500', fontSize: '11px' }}>{sig.signer_name || 'Cliente'}</p>
-                      <p style={{ fontSize: '10px', color: '#666', lineHeight: '1.3' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: '500', fontSize: '12px' }}>{sig.signer_name || 'Cliente'}</p>
+                      <p style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
                         {getSignatureDescription(sig.signature_type)}
                       </p>
                       <p style={{ fontSize: '10px', color: '#666' }}>
@@ -752,17 +752,17 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                     <PenTool className="h-4 w-4" />
                     Assinaturas Recolhidas
                   </h2>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-3">
                     {signatures.map((sig) => (
-                      <div key={sig.id} className="flex items-center gap-2 p-2 border rounded bg-gray-50">
+                      <div key={sig.id} className="flex gap-3 p-3 border rounded bg-gray-50">
                         <img 
                           src={sig.file_url} 
                           alt="Assinatura" 
-                          className="w-16 h-8 object-contain border bg-white rounded"
+                          className="w-24 h-16 object-contain border bg-white rounded"
                         />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-xs truncate">{sig.signer_name || 'Cliente'}</p>
-                          <p className="text-xs text-muted-foreground line-clamp-2 leading-tight">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
+                          <p className="text-xs text-muted-foreground leading-tight">
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground">

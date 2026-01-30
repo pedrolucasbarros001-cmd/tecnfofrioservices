@@ -9,7 +9,7 @@ import {
   Wrench,
   AlertCircle,
   Shield,
-  Printer,
+  FileText,
   Tag,
   Clock,
   User,
@@ -323,12 +323,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => setShowPrintModal(true)}>
-                    <Printer className="h-4 w-4 mr-1" />
-                    Imprimir Ficha
+                    <FileText className="h-4 w-4 mr-1" />
+                    Ver Ficha
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setShowTagModal(true)}>
                     <Tag className="h-4 w-4 mr-1" />
-                    Imprimir Tag
+                    Ver Etiqueta
                   </Button>
                 </div>
               </div>
