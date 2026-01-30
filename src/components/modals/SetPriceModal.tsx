@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Shield, AlertTriangle } from 'lucide-react';
@@ -25,8 +26,8 @@ interface SetPriceModalProps {
 }
 
 export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProps) {
-  const [laborCost, setLaborCost] = useState('');
-  const [partsCost, setPartsCost] = useState('');
+  const [price, setPrice] = useState('');
+  const [description, setDescription] = useState('');
   const [discount, setDiscount] = useState('');
   const [warrantyCoversAll, setWarrantyCoversAll] = useState(false);
   
@@ -37,19 +38,19 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   useEffect(() => {
     if (service && open) {
-      setLaborCost(service.labor_cost?.toString() || '');
-      setPartsCost(service.parts_cost?.toString() || '');
+      // Preço = labor_cost + parts_cost (para compatibilidade com serviços antigos)
+      const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
+      setPrice(existingPrice > 0 ? existingPrice.toString() : '');
+      setDescription(service.pricing_description || '');
       setDiscount(service.discount?.toString() || '0');
       // If warranty service, default to covered
       setWarrantyCoversAll(isWarrantyService);
     }
   }, [service, open, isWarrantyService]);
 
-  const laborValue = parseFloat(laborCost) || 0;
-  const partsValue = parseFloat(partsCost) || 0;
+  const priceValue = parseFloat(price) || 0;
   const discountValue = parseFloat(discount) || 0;
-  const subtotal = laborValue + partsValue;
-  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, subtotal - discountValue);
+  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, priceValue - discountValue);
 
   const handleSubmit = async () => {
     if (!service) return;
@@ -77,10 +78,11 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
     await updateService.mutateAsync({
       id: service.id,
-      labor_cost: laborValue,
-      parts_cost: partsValue,
+      labor_cost: priceValue,
+      parts_cost: 0,
       discount: discountValue,
       final_price: finalPrice,
+      pricing_description: description,
       pending_pricing: false,
       ...(newStatus && { status: newStatus }),
       skipToast: true, // Contextual message below
@@ -110,8 +112,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   };
 
   const resetForm = () => {
-    setLaborCost('');
-    setPartsCost('');
+    setPrice('');
+    setDescription('');
     setDiscount('');
     setWarrantyCoversAll(false);
   };
@@ -167,30 +169,28 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="laborCost">Mão de Obra (€) *</Label>
+            <Label htmlFor="price">Preço (€) *</Label>
             <Input
-              id="laborCost"
+              id="price"
               type="number"
               min="0"
               step="0.01"
               placeholder="0.00"
-              value={laborCost}
-              onChange={(e) => setLaborCost(e.target.value)}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
               disabled={warrantyCoversAll}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="partsCost">Peças (€) *</Label>
-            <Input
-              id="partsCost"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              value={partsCost}
-              onChange={(e) => setPartsCost(e.target.value)}
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              placeholder="Mão de obra, materiais e peças incluídas..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               disabled={warrantyCoversAll}
+              rows={3}
             />
           </div>
 
@@ -213,7 +213,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Subtotal:</span>
               <span className={warrantyCoversAll ? 'line-through text-muted-foreground' : ''}>
-                €{subtotal.toFixed(2)}
+                €{priceValue.toFixed(2)}
               </span>
             </div>
             <div className={`border-t ${warrantyCoversAll ? 'border-green-200' : 'border-violet-200'}`} />
