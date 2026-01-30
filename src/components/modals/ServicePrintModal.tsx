@@ -2,11 +2,10 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Download, PenTool, X, Loader2 } from 'lucide-react';
+import { AlertTriangle, Download, PenTool, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -453,21 +452,14 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         {/* Header com botões - escondido na impressão */}
         <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
           <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
-          <div className="flex gap-2">
-            <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
-              {isGenerating ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              {isGenerating ? 'A gerar...' : 'Baixar PDF'}
-            </Button>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
-          </div>
+          <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {isGenerating ? 'A gerar...' : 'Baixar PDF'}
+          </Button>
         </div>
 
         {/* Conteúdo A4 - isto é o que será impresso */}
