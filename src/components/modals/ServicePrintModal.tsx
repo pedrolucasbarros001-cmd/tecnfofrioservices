@@ -405,15 +405,15 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {signatures.map((sig) => (
-                  <div key={sig.id} style={{ display: 'flex', gap: '12px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
+                  <div key={sig.id} style={{ display: 'flex', gap: '16px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
                     <img 
                       src={sig.file_url} 
                       alt="Assinatura" 
-                      style={{ width: '96px', height: '64px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
+                      style={{ width: '120px', height: '80px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
                     />
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontWeight: '500', fontSize: '12px' }}>{sig.signer_name || 'Cliente'}</p>
-                      <p style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
+                      <p style={{ fontSize: '11px', color: '#666', lineHeight: '1.4', wordBreak: 'break-word' }}>
                         {getSignatureDescription(sig.signature_type)}
                       </p>
                       <p style={{ fontSize: '10px', color: '#666' }}>
@@ -754,15 +754,15 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                   </h2>
                   <div className="space-y-3">
                     {signatures.map((sig) => (
-                      <div key={sig.id} className="flex gap-3 p-3 border rounded bg-gray-50">
+                      <div key={sig.id} className="flex gap-4 p-3 border rounded bg-gray-50">
                         <img 
                           src={sig.file_url} 
                           alt="Assinatura" 
-                          className="w-24 h-16 object-contain border bg-white rounded"
+                          className="w-32 h-20 object-contain border bg-white rounded"
                         />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
-                          <p className="text-xs text-muted-foreground leading-tight">
+                          <p className="text-xs text-muted-foreground leading-relaxed break-words">
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground">
