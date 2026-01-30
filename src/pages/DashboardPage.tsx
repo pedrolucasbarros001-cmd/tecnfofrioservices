@@ -153,8 +153,8 @@ export default function DashboardPage() {
               className={cn(
                 "cursor-pointer transition-all duration-200",
                 isLit 
-                  ? "bg-[hsl(230,70%,65%)] border-[hsl(230,60%,55%)] shadow-md ring-1 ring-[hsl(230,80%,75%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
-                  : "bg-[hsl(230,50%,40%)] border-[hsl(230,45%,35%)] hover:bg-[hsl(230,50%,45%)]"
+                  ? "bg-[hsl(207,74%,63%)] border-[hsl(207,65%,53%)] shadow-md ring-1 ring-[hsl(207,80%,73%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+                  : "bg-[hsl(207,55%,42%)] border-[hsl(207,50%,35%)] hover:bg-[hsl(207,55%,47%)]"
               )}
               onClick={() => navigate(card.route)}
             >
