@@ -1,131 +1,104 @@
 
-# Plano: Corrigir Lógica de pending_pricing na Criação de Serviços
+# Plano: Serviço Levantado para Oficina Fica Disponível
 
-## Lógica de Negócio Correcta
+## Regra de Negócio
 
-| Cenário | Na Criação | Após Conclusão Técnica |
-|---------|------------|------------------------|
-| **SEM preço definido** | `pending_pricing: false` | `pending_pricing: true` (técnico marca ao concluir) |
-| **COM preço definido** | `pending_pricing: false` | `pending_pricing: false` (já tem preço) |
+Quando um técnico faz uma visita e decide "Levantar para Oficina":
+1. O serviço vai para `service_location: 'oficina'`
+2. O `technician_id` é **removido** (fica `null`)
+3. O status fica `na_oficina` com técnico nulo → trigger corrige para `por_fazer`
+4. O serviço aparece como **"Disponível para Assumir"** na página de oficina
 
-O serviço só vai para "A Precificar" **após o trabalho ser concluído**, permitindo que o dono veja o que foi feito (diagnóstico, peças usadas, fotos) antes de definir o preço.
+Isto permite:
+- Qualquer técnico da oficina pode assumir o serviço
+- A secretária/dono pode atribuir a um técnico específico
+- Flexibilidade na distribuição de trabalho na oficina
 
-## Problema Actual
+## Alteração Necessária
 
-Os modais `CreateDeliveryModal.tsx` e `CreateInstallationModal.tsx` foram alterados para marcar `pending_pricing: true` na criação quando não há preço definido. Isto está **incorrecto**.
+### Ficheiro: `src/components/technician/VisitFlowModals.tsx`
 
-**Código actual (errado):**
+**Linha ~227-232 - Código actual:**
 ```typescript
-const needsPricing = !values.final_price || values.final_price <= 0;
-pending_pricing: needsPricing,  // ← Marca logo na criação
-```
-
-## Correcção Necessária
-
-Remover a lógica de `pending_pricing` da criação - deve ser sempre `false` ou `null`:
-
-**CreateDeliveryModal.tsx e CreateInstallationModal.tsx:**
-```typescript
-// REMOVER estas linhas:
-// const needsPricing = !values.final_price || values.final_price <= 0;
-// pending_pricing: needsPricing,
-
-// Criar serviço SEM pending_pricing (deixar como default false/null)
-await createService.mutateAsync({
-  // ... outros campos ...
-  status: 'por_fazer',
-  // pending_pricing NÃO é definido aqui - será definido na conclusão
+// Update to workshop
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'na_oficina',
+  service_location: 'oficina',
+  detected_fault: formData.detectedFault,
 });
 ```
 
-## Fluxos de Conclusão (Já Correctos)
+**Código corrigido:**
+```typescript
+// Update to workshop - remove technician so service becomes available
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'por_fazer',           // Trigger will enforce this anyway
+  service_location: 'oficina',
+  technician_id: null,           // REMOVE technician - service becomes available
+  detected_fault: formData.detectedFault,
+  scheduled_date: null,          // Clear schedule - will be set when assumed
+  scheduled_shift: null,
+});
+```
 
-Os fluxos do técnico **já estão correctos** - todos verificam e marcam `pending_pricing` apenas na conclusão:
+## Fluxo Completo
 
-| Fluxo | Ficheiro | Lógica |
-|-------|----------|--------|
-| Visita (reparo local) | `VisitFlowModals.tsx` | `pending_pricing: true` ao concluir |
-| Oficina | `WorkshopFlowModals.tsx` | `pending_pricing: true` ao concluir |
-| Instalação | `TechnicianInstallationFlow.tsx` | `needsPricing` verificado na conclusão |
-| Entrega | `TechnicianDeliveryFlow.tsx` | `needsPricing` verificado na conclusão |
+```text
+VISITA NO CLIENTE
+       │
+       ▼
+┌──────────────────────┐
+│ Técnico decide:      │
+│ "Levantar Oficina"   │
+└──────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────┐
+│ Actualização do Serviço:                     │
+│ • service_location: 'oficina'                │
+│ • technician_id: NULL (removido)             │
+│ • status: 'por_fazer' (trigger garante)      │
+│ • scheduled_date: NULL                       │
+│ • scheduled_shift: NULL                      │
+└──────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────┐
+│ PÁGINA OFICINA (TechnicianOfficePage)        │
+├──────────────────────────────────────────────┤
+│ Serviços Disponíveis para Assumir:           │
+│ ┌────────────────────────────────────────┐   │
+│ │ TF-00006 • Cliente X                   │   │
+│ │ Frigorífico • Não refrigera            │   │
+│ │        [Assumir Serviço]               │   │
+│ └────────────────────────────────────────┘   │
+└──────────────────────────────────────────────┘
+```
+
+## Opção: Manter Técnico (Opcional)
+
+Se em alguns casos o técnico que levantou quiser ficar responsável, podemos adicionar uma opção no fluxo. Mas pela regra de negócio actual, o levantamento sempre liberta o serviço.
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/modals/CreateDeliveryModal.tsx` | Remover `pending_pricing` da criação |
-| `src/components/modals/CreateInstallationModal.tsx` | Remover `pending_pricing` da criação |
+| `src/components/technician/VisitFlowModals.tsx` | Adicionar `technician_id: null` ao levantar para oficina |
 
-## Fluxo Completo Corrigido
+## Detalhes Técnicos
 
-### Serviço de Instalação SEM preço definido
+A trigger `normalize_workshop_status_trigger` já garante que:
+- Serviço na oficina **sem** técnico → status = `por_fazer`
+- Serviço na oficina **com** técnico → status = `na_oficina` ou mais avançado
 
-```text
-1. CRIAÇÃO:
-   status: 'por_fazer'
-   final_price: null
-   pending_pricing: false (default)
-   → Aparece na agenda do técnico ✓
+Portanto, ao definir `technician_id: null`, a trigger automaticamente corrige o status para `por_fazer` se necessário.
 
-2. TÉCNICO EXECUTA:
-   → Faz instalação, tira fotos, recolhe assinatura
+## Validação
 
-3. CONCLUSÃO (TechnicianInstallationFlow):
-   const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
-   status: 'finalizado'
-   pending_pricing: true  ← Marca AQUI
-   → Aparece em "A Precificar" ✓
-
-4. DONO DEFINE PREÇO:
-   pending_pricing: false
-   → Aparece em "Em Débito" (calculado)
-```
-
-### Serviço de Instalação COM preço definido
-
-```text
-1. CRIAÇÃO:
-   status: 'por_fazer'
-   final_price: 120.00
-   pending_pricing: false
-   → Aparece na agenda do técnico ✓
-   → Coexiste com débito (calculado) ✓
-
-2. TÉCNICO EXECUTA:
-   → Faz instalação, tira fotos, recolhe assinatura
-
-3. CONCLUSÃO:
-   const needsPricing = (service.final_price || 0) === 0; // false - já tem preço
-   status: 'finalizado'
-   pending_pricing: false  ← Mantém false
-   → NÃO aparece em "A Precificar"
-   → Aparece em "Em Débito" ✓
-```
-
-## Resumo Visual
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    CICLO DE VIDA DO SERVIÇO                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  CRIAÇÃO                    EXECUÇÃO              CONCLUSÃO     │
-│  ────────                   ────────              ─────────     │
-│                                                                 │
-│  status: por_fazer    →    em_execucao    →    finalizado       │
-│  pending_pricing: ✗        pending_pricing: ✗   pending_pricing:│
-│  (nunca na criação)        (ainda não)          ✓ se não tem    │
-│                                                    preço        │
-│                                                                 │
-│  final_price: X€           -                    → Em Débito     │
-│  final_price: null         -                    → A Precificar  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Impacto
-
-- Serviços sem preço só aparecem em "A Precificar" após conclusão técnica
-- Serviços com preço coexistem com débito desde a criação
-- Dono pode ver o trabalho realizado antes de definir preço
-- Fluxo de negócio respeita a sequência lógica: trabalho → precificação → pagamento
+Após implementação:
+1. Técnico faz visita e escolhe "Levantar para Oficina"
+2. Serviço aparece em "Disponíveis para Assumir" na página da oficina
+3. Qualquer técnico pode clicar "Assumir Serviço"
+4. Ou secretária pode atribuir via modal de atribuição
