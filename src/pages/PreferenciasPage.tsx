@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Bell, Lock, Globe, Info, BellRing, AlertTriangle, Package } from 'lucide-react';
+import { Moon, Sun, Bell, Lock, Globe, Info, BellRing, AlertTriangle, Package, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 export default function PreferenciasPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const { openOnboarding } = useOnboarding();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -274,6 +276,29 @@ export default function PreferenciasPage() {
             </div>
             <Button variant="outline" onClick={() => setShowPasswordModal(true)}>
               Alterar Palavra-passe
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Guide Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Guia do Sistema
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Tutorial</Label>
+              <p className="text-sm text-muted-foreground">
+                Rever o guia de utilização do sistema
+              </p>
+            </div>
+            <Button variant="outline" onClick={openOnboarding}>
+              Ver Guia
             </Button>
           </div>
         </CardContent>
