@@ -1,45 +1,27 @@
 
-
-# Plano: Modal A4 para Impressão de Ficha de Serviço
+# Plano: Corrigir Scroll e Visibilidade dos Botões no Modal A4
 
 ## Problema Identificado
 
-O modal actual (`sm:max-w-[700px]`) não corresponde às proporções A4. Quando se imprime:
-- O browser tenta ajustar o conteúdo às dimensões da página
-- O CSS `@media print` com Portal pode não funcionar consistentemente
-- O preview no ecrã não corresponde ao resultado impresso
+O modal A4 actual tem:
+1. `overflow: hidden` no container principal - corta o conteúdo
+2. O header com botões fica dentro do modal com altura fixa, mas pode ficar invisível
+3. A estrutura não permite scroll adequado do conteúdo enquanto mantém os botões visíveis
 
-## Solução Proposta
+## Solução
 
-Criar um modal com **dimensões exactas de A4** (210mm × 297mm), de forma que:
-1. O utilizador vê exactamente o que vai ser impresso
-2. O browser imprime o conteúdo 1:1
-3. Não há surpresas no preview de impressão
+Reestruturar o CSS para:
+1. O modal ter `overflow: visible` para os filhos
+2. Usar `flex` para separar o header (fixo) do conteúdo (scroll)
+3. O header com botões fica sempre visível no topo
+4. O conteúdo da ficha (print-sheet) tem scroll próprio
 
-## Alterações Necessárias
+## Alterações
 
-### 1. Modificar ServicePrintModal.tsx
+### 1. Actualizar index.css
 
-**Alteração no DialogContent (linha ~455):**
-
-De:
-```typescript
-<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-```
-
-Para:
-```typescript
-<DialogContent className="print-modal-a4 w-[210mm] h-[297mm] max-w-[210mm] max-h-[297mm] overflow-hidden p-0">
-```
-
-O conteúdo interno ficará com scroll se necessário, mas ao imprimir ocupará a página A4 completa.
-
-### 2. Actualizar index.css
-
-Adicionar estilos específicos para o modal de impressão A4:
-
+**De:**
 ```css
-/* Modal A4 para impressão */
 .print-modal-a4 {
   width: 210mm !important;
   max-width: 210mm !important;
@@ -47,160 +29,100 @@ Adicionar estilos específicos para o modal de impressão A4:
   max-height: 297mm !important;
   padding: 0 !important;
   overflow: hidden !important;
+  border-radius: 8px !important;
 }
 
-/* Conteúdo com scroll no ecrã, mas completo na impressão */
 .print-modal-a4 .print-sheet {
-  width: 210mm;
-  min-height: 297mm;
+  width: 100%;
+  height: calc(297mm - 50px);
   padding: 10mm;
   background: white;
   overflow-y: auto;
-  max-height: 297mm;
-}
-
-@media print {
-  /* Esconder tudo excepto o modal A4 */
-  body > *:not([role="dialog"]) {
-    display: none !important;
-  }
-  
-  /* Modal ocupa toda a página */
-  .print-modal-a4 {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    transform: none !important;
-    left: 0 !important;
-    top: 0 !important;
-  }
-  
-  /* Esconder overlay e botões do dialog */
-  [data-radix-dialog-overlay] {
-    display: none !important;
-  }
-  
-  .print-modal-a4 .no-print {
-    display: none !important;
-  }
-  
-  /* Conteúdo sem scroll na impressão */
-  .print-modal-a4 .print-sheet {
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-  }
+  box-sizing: border-box;
 }
 ```
 
-### 3. Estrutura do Modal Actualizada
+**Para:**
+```css
+.print-modal-a4 {
+  width: 210mm !important;
+  max-width: 210mm !important;
+  height: 297mm !important;
+  max-height: 90vh !important; /* Limitar à altura do viewport */
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
 
+.print-modal-a4 .print-sheet {
+  flex: 1;
+  width: 100%;
+  padding: 10mm;
+  background: white;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+```
+
+A chave é:
+- `display: flex` + `flex-direction: column` no modal
+- O header (`.no-print`) fica com altura automática
+- O conteúdo (`.print-sheet`) usa `flex: 1` para ocupar o resto e ter scroll
+
+### 2. Garantir estrutura correcta no ServicePrintModal.tsx
+
+O componente já tem a estrutura correcta:
 ```tsx
-<Dialog open={open} onOpenChange={onOpenChange}>
-  <DialogContent className="print-modal-a4">
-    {/* Header com botões - escondido na impressão */}
-    <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
-      <h2 className="font-semibold">Pré-visualização da Ficha</h2>
-      <div className="flex gap-2">
-        <Button onClick={handlePrint} size="sm">
-          <Printer className="h-4 w-4 mr-2" />
-          Imprimir
-        </Button>
-        <DialogClose asChild>
-          <Button variant="ghost" size="icon">
-            <X className="h-4 w-4" />
-          </Button>
-        </DialogClose>
-      </div>
-    </div>
-    
-    {/* Conteúdo A4 - isto é o que será impresso */}
-    <div className="print-sheet">
-      {/* Watermark, Header, Dados do Cliente, etc... */}
-      {/* Todo o conteúdo existente */}
-    </div>
-  </DialogContent>
-</Dialog>
+<DialogContent className="print-modal-a4">
+  {/* Header - fica fixo no topo */}
+  <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
+    ...botões...
+  </div>
+  
+  {/* Conteúdo - tem scroll */}
+  <div className="print-sheet relative bg-white">
+    ...ficha...
+  </div>
+</DialogContent>
 ```
 
-### 4. Remover Portal
-
-O `createPortal` no final do componente já não será necessário:
-
-```tsx
-// REMOVER esta linha (808):
-{open && createPortal(<PrintContent />, document.body)}
-```
-
-## Fluxo Visual
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    MODAL A4 (210mm × 297mm)                 │
-├─────────────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Pré-visualização da Ficha              [Imprimir] [X]  │ │ ← Escondido na impressão
-│ └─────────────────────────────────────────────────────────┘ │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │                                                         │ │
-│ │  TECNOFRIO Logo              FICHA DE SERVIÇO           │ │
-│ │                                                         │ │
-│ │  Código: TF-00001                        [QR]           │ │
-│ │  Data: 30/01/2026                                       │ │
-│ │                                                         │ │
-│ │  ─────────────────────────────────────────────────────  │ │
-│ │  DADOS DO CLIENTE                                       │ │
-│ │  Nome: João Silva         NIF: 123456789                │ │
-│ │  ...                                                    │ │
-│ │                                                         │ │
-│ │  ─────────────────────────────────────────────────────  │ │
-│ │  DETALHES DO SERVIÇO                                    │ │
-│ │  ...                                                    │ │
-│ │                                                         │ │
-│ │  ─────────────────────────────────────────────────────  │ │
-│ │  TERMOS DE GUARDA                                       │ │
-│ │  Os equipamentos só podem permanecer...                 │ │
-│ │                                                         │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                        Ctrl+P / Imprimir
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     IMPRESSÃO A4                            │
-│                                                             │
-│  O conteúdo é impresso exactamente como mostrado no modal   │
-│  sem header de botões, ocupando a página inteira            │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+Apenas precisa de garantir que o header não seja afectado pelo `overflow: hidden`.
 
 ## Ficheiros a Modificar
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/modals/ServicePrintModal.tsx` | Reestruturar com classes A4, remover Portal |
-| `src/index.css` | Adicionar estilos `.print-modal-a4` |
+| `src/index.css` | Ajustar `.print-modal-a4` para usar flexbox e limitar altura ao viewport |
 
-## Benefícios
+## Resultado Esperado
 
-1. **WYSIWYG**: O utilizador vê exactamente o que vai ser impresso
-2. **Simplicidade**: Sem Portal, sem duplicação de conteúdo
-3. **Fiabilidade**: Funciona em todos os browsers
-4. **Manutenção**: Um único lugar para o conteúdo da ficha
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Pré-visualização da Ficha    [Imprimir] [X] ← SEMPRE VISÍVEL│
+├─────────────────────────────────────────────────────────────┤
+│                                                   ▲         │
+│  TECNOFRIO Logo              FICHA DE SERVIÇO     │         │
+│                                                   │ SCROLL  │
+│  Código: TF-00001                        [QR]     │         │
+│  Data: 30/01/2026                                 │         │
+│                                                   │         │
+│  ─────────────────────────────────────────────    │         │
+│  DADOS DO CLIENTE                                 │         │
+│  ...                                              │         │
+│                                                   │         │
+│  ─────────────────────────────────────────────    │         │
+│  DETALHES DO SERVIÇO                              │         │
+│  ...                                              │         │
+│                                                   │         │
+│  ─────────────────────────────────────────────    │         │
+│  TERMOS DE GUARDA                                 ▼         │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Considerações
+## Detalhes Técnicos
 
-- O modal será bastante grande no ecrã (A4), mas isso é intencional para mostrar exactamente o resultado
-- Em ecrãs pequenos, o modal pode precisar de scroll horizontal (mas isso é aceitável dado o caso de uso)
-- O botão X do Radix Dialog será escondido na impressão junto com o header
+A utilização de `max-height: 90vh` garante que o modal nunca é maior que 90% da altura do ecrã, permitindo que o utilizador veja sempre os botões e possa fazer scroll no conteúdo. O `flex: 1` no `.print-sheet` faz com que este elemento preencha todo o espaço restante após o header.
 
+Na impressão, os estilos `@media print` já removem estas limitações para que o conteúdo completo seja impresso.
