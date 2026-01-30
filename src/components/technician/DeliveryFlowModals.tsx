@@ -219,7 +219,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
               className="flex-1 bg-green-500 hover:bg-green-600" 
               onClick={() => setCurrentStep('deslocacao')}
             >
-              Começar Entrega
+              Caminho para o Cliente
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -249,7 +249,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
               onClick={handleNavigateToClient}
             >
               <Navigation className="h-5 w-5 mr-2" />
-              Caminho para o Cliente
+              Abrir no Mapa
             </Button>
           </div>
 
@@ -329,12 +329,12 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         title="Foto da Entrega"
       />
 
-      {/* Signature Modal */}
+      {/* Signature Modal - Updated title */}
       <SignatureCanvas
         open={showSignature}
         onOpenChange={setShowSignature}
         onConfirm={handleSignatureComplete}
-        title="Assinatura de Confirmação da Entrega"
+        title="Comprovativo de entrega"
       />
     </>
   );

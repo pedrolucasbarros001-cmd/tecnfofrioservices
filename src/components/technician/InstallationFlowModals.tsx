@@ -5,7 +5,9 @@ import {
   Camera, 
   ArrowLeft, 
   ArrowRight,
-  ImageIcon
+  ImageIcon,
+  Package,
+  FileText
 } from 'lucide-react';
 import {
   Dialog,
@@ -17,6 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,9 +30,11 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
+import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
+import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
-type ModalStep = 'resumo' | 'deslocacao' | 'foto_antes' | 'foto_depois' | 'finalizacao';
+type ModalStep = 'resumo' | 'deslocacao' | 'foto_antes' | 'materiais' | 'trabalho' | 'foto_depois' | 'finalizacao';
 
 interface InstallationFlowModalsProps {
   service: Service;
@@ -37,9 +43,12 @@ interface InstallationFlowModalsProps {
   onComplete: () => void;
 }
 
-interface FormData {
+interface InstallationFormData {
   photoAntes: string | null;
   photoDepois: string | null;
+  workPerformed: string;
+  usedMaterials: PartEntry[];
+  [key: string]: unknown;
 }
 
 export function InstallationFlowModals({ service, isOpen, onClose, onComplete }: InstallationFlowModalsProps) {
@@ -47,25 +56,46 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<InstallationFormData>({
     photoAntes: null,
     photoDepois: null,
+    workPerformed: '',
+    usedMaterials: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
+  const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [cameraMode, setCameraMode] = useState<'antes' | 'depois'>('antes');
 
-  // Reset when opened
+  // Flow persistence
+  const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'instalacao');
+
+  // Load saved state on mount
   useEffect(() => {
     if (isOpen) {
-      setCurrentStep('resumo');
-      setFormData({
-        photoAntes: null,
-        photoDepois: null,
-      });
+      const savedState = loadState();
+      if (savedState) {
+        setCurrentStep(savedState.currentStep as ModalStep);
+        setFormData(savedState.formData as InstallationFormData);
+      } else {
+        setCurrentStep('resumo');
+        setFormData({
+          photoAntes: null,
+          photoDepois: null,
+          workPerformed: '',
+          usedMaterials: [],
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, loadState]);
+
+  // Save state on step/formData change
+  useEffect(() => {
+    if (isOpen && currentStep !== 'resumo') {
+      saveState(currentStep, formData);
+    }
+  }, [isOpen, currentStep, formData, saveState]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -102,23 +132,49 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     }
   };
 
+  const handleMaterialsConfirm = async (materials: PartEntry[]) => {
+    // Save materials to database
+    for (const material of materials) {
+      await supabase.from('service_parts').insert({
+        service_id: service.id,
+        part_name: material.name,
+        part_code: material.reference || null,
+        quantity: material.quantity,
+        is_requested: false,
+        arrived: true,
+        cost: 0,
+      });
+    }
+    
+    setFormData(prev => ({ ...prev, usedMaterials: materials }));
+    setShowMaterialsModal(false);
+    queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+    toast.success('Materiais registados!');
+    
+    // Advance to next step
+    setCurrentStep('trabalho');
+  };
+
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
       // Save signature
       await supabase.from('service_signatures').insert({
         service_id: service.id,
-        signature_type: 'visita', // usando tipo compatível com RLS
+        signature_type: 'instalacao',
         file_url: signatureData,
         signer_name: signerName || service.customer?.name,
       });
 
-      // Update service to finalizado
+      // Determine final status - installations go to a_precificar
+      const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
+      
       await updateService.mutateAsync({
         id: service.id,
-        status: 'finalizado',
+        status: needsPricing ? 'a_precificar' : 'finalizado',
         service_location: 'entregue',
-        pending_pricing: true, // instalações também precisam de precificação
+        pending_pricing: needsPricing,
+        work_performed: formData.workPerformed || 'Instalação realizada',
       });
 
       // Log activity
@@ -129,9 +185,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         user?.id
       );
 
+      // Clear persisted state
+      clearState();
+
       queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
       setShowSignature(false);
-      toast.success('Instalação concluída com sucesso!');
+      toast.success(needsPricing ? 'Instalação concluída! Aguarda precificação.' : 'Instalação concluída com sucesso!');
       onComplete();
     } catch (error) {
       console.error('Error completing installation:', error);
@@ -146,6 +205,8 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     setFormData({
       photoAntes: null,
       photoDepois: null,
+      workPerformed: '',
+      usedMaterials: [],
     });
     onClose();
   };
@@ -164,13 +225,13 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const canProceedFromFotoAntes = formData.photoAntes !== null;
   const canProceedFromFotoDepois = formData.photoDepois !== null;
 
-  // Progress calculation (steps 2-5 = indices 0-3)
-  const stepIndex = ['deslocacao', 'foto_antes', 'foto_depois', 'finalizacao'].indexOf(currentStep);
+  // Progress calculation (6 steps after resumo)
+  const stepIndex = ['deslocacao', 'foto_antes', 'materiais', 'trabalho', 'foto_depois', 'finalizacao'].indexOf(currentStep);
   const showProgress = currentStep !== 'resumo';
 
   const ProgressBar = () => (
     <div className="flex gap-1.5 mb-4">
-      {[0, 1, 2, 3].map((idx) => (
+      {[0, 1, 2, 3, 4, 5].map((idx) => (
         <div
           key={idx}
           className={cn(
@@ -203,7 +264,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Resumo da Instalação" step="Passo 1" />
 
@@ -255,7 +316,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -278,7 +339,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               onClick={handleNavigateToClient}
             >
               <Navigation className="h-5 w-5 mr-2" />
-              Caminho para o Cliente
+              Abrir no Mapa
             </Button>
           </div>
 
@@ -297,7 +358,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 3: Foto Antes */}
-      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Foto Antes da Instalação" step="Passo 3" />
 
@@ -340,7 +401,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('foto_depois')}
+              onClick={() => setCurrentStep('materiais')}
               disabled={!canProceedFromFotoAntes}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -349,10 +410,102 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         </DialogContent>
       </Dialog>
 
-      {/* Modal 4: Foto Depois */}
-      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      {/* Modal 4: Materiais */}
+      <Dialog open={currentStep === 'materiais' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Foto Após a Instalação" step="Passo 4" />
+          <ModalHeader title="Materiais Utilizados" step="Passo 4" />
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Registe os materiais utilizados na instalação (tubagem, cabos, acessórios, etc.)
+            </p>
+
+            {formData.usedMaterials.length > 0 ? (
+              <div className="space-y-2">
+                <Label className="text-sm">Materiais registados:</Label>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                  {formData.usedMaterials.map((m, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span>{m.name}</span>
+                      <span className="text-muted-foreground">x{m.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMaterialsModal(true)}
+                >
+                  Editar materiais
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full h-24 flex-col gap-2"
+                onClick={() => setShowMaterialsModal(true)}
+              >
+                <Package className="h-6 w-6 text-muted-foreground" />
+                <span>Registar Materiais</span>
+              </Button>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('foto_antes')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => setCurrentStep('trabalho')}
+            >
+              {formData.usedMaterials.length > 0 ? 'Continuar' : 'Sem Materiais'}
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 5: Descrição do Trabalho */}
+      <Dialog open={currentStep === 'trabalho' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Descrição do Trabalho" step="Passo 5" />
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="work_performed" className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Descreva o trabalho realizado
+              </Label>
+              <Textarea
+                id="work_performed"
+                placeholder="Descreva brevemente a instalação realizada..."
+                value={formData.workPerformed}
+                onChange={(e) => setFormData(prev => ({ ...prev, workPerformed: e.target.value }))}
+                rows={4}
+                className="mt-1.5 text-sm"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('materiais')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => setCurrentStep('foto_depois')}
+            >
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 6: Foto Depois */}
+      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Foto Após a Instalação" step="Passo 6" />
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -414,7 +567,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('foto_antes')}>
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('trabalho')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
@@ -436,12 +589,22 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         title={cameraMode === 'antes' ? 'Foto Antes da Instalação' : 'Foto Após a Instalação'}
       />
 
-      {/* Signature Modal */}
+      {/* Materials Modal */}
+      <UsedPartsModal
+        open={showMaterialsModal}
+        onOpenChange={setShowMaterialsModal}
+        onConfirm={handleMaterialsConfirm}
+        title="Registar Material Utilizado"
+        subtitle="Adicione os materiais utilizados na instalação (tubagem, cabos, acessórios, etc.)"
+        initialParts={formData.usedMaterials.length > 0 ? formData.usedMaterials : undefined}
+      />
+
+      {/* Signature Modal - Updated title */}
       <SignatureCanvas
         open={showSignature}
         onOpenChange={setShowSignature}
         onConfirm={handleSignatureComplete}
-        title="Assinatura de Conclusão da Instalação"
+        title="Confirmação de instalação realizada"
       />
     </>
   );

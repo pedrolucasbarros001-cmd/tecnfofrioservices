@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { 
+  Camera, 
+  Package, 
+  CheckCircle2, 
+  ArrowLeft, 
+  ArrowRight,
+  FileText,
+  Wrench
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,15 +19,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
+import { useAuth } from '@/contexts/AuthContext';
+import { logServiceStart, logPartRequest, logServiceCompletion } from '@/utils/activityLogUtils';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { CameraCapture } from '@/components/shared/CameraCapture';
+import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
+import { ServicePreviousSummary } from '@/components/technician/ServicePreviousSummary';
+import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
-type ModalStep = 'resumo' | 'contexto' | 'identificacao' | 'revisao' | 'finalizacao';
+type ModalStep = 'resumo' | 'iniciar' | 'diagnostico' | 'pecas_usadas' | 'pedir_peca' | 'conclusao';
 
 interface WorkshopFlowModalsProps {
   service: Service;
@@ -28,110 +43,196 @@ interface WorkshopFlowModalsProps {
   onComplete: () => void;
 }
 
-interface FormData {
+interface WorkshopFormData {
   detectedFault: string;
-  photoFile: File | null;
-  photoPreview: string | null;
-  brand: string;
-  model: string;
-  serialNumber: string;
-  finalizationType: 'pedir_peca' | 'concluido';
+  workPerformed: string;
+  usedParts: boolean;
+  usedPartsList: PartEntry[];
+  needsPartOrder: boolean;
+  partToOrder: string;
+  partNotes: string;
+  [key: string]: unknown;
 }
 
 export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: WorkshopFlowModalsProps) {
   const updateService = useUpdateService();
+  const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<WorkshopFormData>({
     detectedFault: '',
-    photoFile: null,
-    photoPreview: null,
-    brand: '',
-    model: '',
-    serialNumber: '',
-    finalizationType: 'concluido',
+    workPerformed: '',
+    usedParts: false,
+    usedPartsList: [],
+    needsPartOrder: false,
+    partToOrder: '',
+    partNotes: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showPartsModal, setShowPartsModal] = useState(false);
 
-  // Pre-fill form with existing data
+  // Flow persistence
+  const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'oficina');
+
+  // Check if service has previous execution history
+  const hasPreviousHistory = !!service.detected_fault;
+
+  // Load saved state or pre-fill from service
   useEffect(() => {
-    if (service && isOpen) {
-      setFormData(prev => ({
-        ...prev,
-        detectedFault: service.detected_fault || '',
-        brand: service.brand || '',
-        model: service.model || '',
-        serialNumber: service.serial_number || '',
-      }));
-      setCurrentStep('resumo');
+    if (isOpen) {
+      const savedState = loadState();
+      if (savedState) {
+        setCurrentStep(savedState.currentStep as ModalStep);
+        setFormData(savedState.formData as WorkshopFormData);
+      } else {
+        setCurrentStep('resumo');
+        setFormData({
+          detectedFault: service.detected_fault || '',
+          workPerformed: service.work_performed || '',
+          usedParts: false,
+          usedPartsList: [],
+          needsPartOrder: false,
+          partToOrder: '',
+          partNotes: '',
+        });
+      }
     }
-  }, [service, isOpen]);
+  }, [isOpen, service, loadState]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, photoFile: file }));
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, photoPreview: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+  // Save state on changes
+  useEffect(() => {
+    if (isOpen && currentStep !== 'resumo') {
+      saveState(currentStep, formData);
     }
-  };
+  }, [isOpen, currentStep, formData, saveState]);
 
-  const removePhoto = () => {
-    setFormData(prev => ({ ...prev, photoFile: null, photoPreview: null }));
-  };
-
-  const handleStart = async () => {
+  const handleStartRepair = async () => {
     try {
       await updateService.mutateAsync({
         id: service.id,
         status: 'em_execucao',
         skipToast: true,
       });
+      
+      // Log activity
+      await logServiceStart(
+        service.code || 'N/A',
+        service.id,
+        profile?.full_name || 'Técnico',
+        user?.id
+      );
+      
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
-      setCurrentStep('contexto');
+      setCurrentStep('diagnostico');
     } catch (error) {
       console.error('Error starting repair:', error);
       toast.error('Erro ao iniciar reparação');
     }
   };
 
-  const handleFinalize = async () => {
+  const handlePartsConfirm = async (parts: PartEntry[]) => {
+    // Save parts to database
+    for (const part of parts) {
+      await supabase.from('service_parts').insert({
+        service_id: service.id,
+        part_name: part.name,
+        part_code: part.reference || null,
+        quantity: part.quantity,
+        is_requested: false,
+        arrived: true,
+        cost: 0,
+      });
+    }
+    
+    setFormData(prev => ({ ...prev, usedPartsList: parts }));
+    setShowPartsModal(false);
+    queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+    toast.success('Peças registadas!');
+  };
+
+  const handleRequestPart = async () => {
+    if (!formData.partToOrder.trim()) {
+      toast.error('Informe o nome da peça a pedir.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      if (formData.finalizationType === 'pedir_peca') {
-        // Save current status before changing to para_pedir_peca
-        const currentStatus = service.status;
-        
-        await updateService.mutateAsync({
-          id: service.id,
-          status: 'para_pedir_peca',
-          detected_fault: formData.detectedFault,
-          brand: formData.brand,
-          model: formData.model,
-          serial_number: formData.serialNumber,
-          last_status_before_part_request: currentStatus,
-          skipToast: true,
-        });
-        toast.success(`Peça solicitada! ${service.code} aguarda aprovação do dono.`);
-      } else {
-        await updateService.mutateAsync({
-          id: service.id,
-          status: 'concluidos',
-          pending_pricing: true,
-          detected_fault: formData.detectedFault,
-          brand: formData.brand,
-          model: formData.model,
-          serial_number: formData.serialNumber,
-          skipToast: true,
-        });
-        toast.success(`${service.code} concluído! Aguarda precificação pelo dono.`);
-      }
+      // Save the part request
+      await supabase.from('service_parts').insert({
+        service_id: service.id,
+        part_name: formData.partToOrder.trim(),
+        notes: formData.partNotes || null,
+        quantity: 1,
+        is_requested: true,
+        arrived: false,
+        cost: 0,
+      });
+
+      // Update service status
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'para_pedir_peca',
+        last_status_before_part_request: service.status,
+        detected_fault: formData.detectedFault,
+        work_performed: formData.workPerformed,
+        skipToast: true,
+      });
+
+      // Log activity
+      await logPartRequest(
+        service.code || 'N/A',
+        service.id,
+        formData.partToOrder.trim(),
+        profile?.full_name || 'Técnico',
+        user?.id
+      );
+
+      clearState();
+      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+      toast.success(`Peça solicitada! ${service.code} aguarda aprovação.`);
       onComplete();
     } catch (error) {
-      console.error('Error finalizing:', error);
-      toast.error('Erro ao finalizar');
+      console.error('Error requesting part:', error);
+      toast.error('Erro ao solicitar peça');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!formData.workPerformed.trim()) {
+      toast.error('Descreva o trabalho realizado.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Update service to concluidos + pending_pricing
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'concluidos',
+        pending_pricing: true,
+        detected_fault: formData.detectedFault,
+        work_performed: formData.workPerformed,
+        skipToast: true,
+      });
+
+      // Log activity
+      await logServiceCompletion(
+        service.code || 'N/A',
+        service.id,
+        profile?.full_name || 'Técnico',
+        user?.id
+      );
+
+      clearState();
+      toast.success(`${service.code} concluído! Aguarda precificação.`);
+      onComplete();
+    } catch (error) {
+      console.error('Error completing repair:', error);
+      toast.error('Erro ao concluir reparação');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,27 +242,23 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
     setCurrentStep('resumo');
     setFormData({
       detectedFault: '',
-      photoFile: null,
-      photoPreview: null,
-      brand: '',
-      model: '',
-      serialNumber: '',
-      finalizationType: 'concluido',
+      workPerformed: '',
+      usedParts: false,
+      usedPartsList: [],
+      needsPartOrder: false,
+      partToOrder: '',
+      partNotes: '',
     });
     onClose();
   };
 
-  // Validation
-  const canProceedFromContexto = formData.detectedFault.trim().length > 0;
-  const canProceedFromIdentificacao = formData.brand.trim().length > 0 && formData.model.trim().length > 0;
-
-  // Progress calculation (steps 2-5 = indices 0-3)
-  const stepIndex = ['contexto', 'identificacao', 'revisao', 'finalizacao'].indexOf(currentStep);
+  // Progress calculation (5 steps after resumo)
+  const stepIndex = ['iniciar', 'diagnostico', 'pecas_usadas', 'pedir_peca', 'conclusao'].indexOf(currentStep);
   const showProgress = currentStep !== 'resumo';
 
   const ProgressBar = () => (
     <div className="flex gap-1.5 mb-4">
-      {[0, 1, 2, 3].map((idx) => (
+      {[0, 1, 2, 3, 4].map((idx) => (
         <div
           key={idx}
           className={cn(
@@ -194,9 +291,18 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo'} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Resumo do Serviço" step="Passo 1" />
+
+          {/* Show previous summary if exists */}
+          {hasPreviousHistory && (
+            <ServicePreviousSummary
+              service={service}
+              onContinue={handleStartRepair}
+              className="mb-4"
+            />
+          )}
 
           <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
             <div className="grid grid-cols-2 gap-3">
@@ -211,7 +317,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Aparelho</p>
-              <p className="font-medium">{service.appliance_type || 'N/A'}</p>
+              <p className="font-medium">
+                {[service.appliance_type, service.brand, service.model].filter(Boolean).join(' ') || 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Avaria Reportada</p>
@@ -223,26 +331,30 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             <Button variant="outline" className="flex-1" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={handleStart}>
-              Começar
-            </Button>
+            {!hasPreviousHistory && (
+              <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={handleStartRepair}>
+                <Wrench className="h-4 w-4 mr-1" />
+                Iniciar Reparação
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal 2: Contexto + Foto */}
-      <Dialog open={currentStep === 'contexto'} onOpenChange={() => handleClose()}>
+      {/* Modal 2: Diagnóstico Complementar */}
+      <Dialog open={currentStep === 'diagnostico' && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Contexto e Foto" step="Passo 2" />
+          <ModalHeader title="Diagnóstico" step="Passo 2" />
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="detected_fault" className="text-sm">
-                Descrição da avaria detectada <span className="text-destructive">*</span>
+              <Label htmlFor="detected_fault" className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Diagnóstico complementar <span className="text-muted-foreground text-xs">(opcional)</span>
               </Label>
               <Textarea
                 id="detected_fault"
-                placeholder="Descreva a avaria que detectou..."
+                placeholder="Adicione detalhes ao diagnóstico..."
                 value={formData.detectedFault}
                 onChange={(e) => setFormData(prev => ({ ...prev, detectedFault: e.target.value }))}
                 rows={3}
@@ -250,40 +362,15 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
               />
             </div>
 
-            <div>
-              <Label className="text-sm">Tirar Foto (opcional)</Label>
-              <div className="mt-1.5">
-                {formData.photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={formData.photoPreview}
-                      alt="Preview"
-                      className="w-full h-32 object-cover rounded-lg"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="absolute bottom-2 right-2 text-xs h-7"
-                      onClick={removePhoto}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                    <Camera className="h-6 w-6 text-muted-foreground mb-1" />
-                    <span className="text-xs text-muted-foreground">Clique para tirar foto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handlePhotoChange}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
+            {/* Optional photo */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCamera(true)}
+            >
+              <Camera className="h-4 w-4 mr-1" />
+              Tirar Foto (Opcional)
+            </Button>
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
@@ -292,8 +379,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep('identificacao')}
-              disabled={!canProceedFromContexto}
+              onClick={() => setCurrentStep('pecas_usadas')}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -301,194 +387,246 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
         </DialogContent>
       </Dialog>
 
-      {/* Modal 3: Identificação */}
-      <Dialog open={currentStep === 'identificacao'} onOpenChange={() => handleClose()}>
+      {/* Modal 3: Peças Usadas */}
+      <Dialog open={currentStep === 'pecas_usadas' && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Identificação do Aparelho" step="Passo 3" />
+          <ModalHeader title="Peças Usadas" step="Passo 3" />
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Foi necessário usar peças nesta reparação?
+            </p>
+
+            <RadioGroup
+              value={formData.usedParts ? 'sim' : 'nao'}
+              onValueChange={(val) => setFormData(prev => ({ ...prev, usedParts: val === 'sim' }))}
+              className="flex gap-4"
+            >
+              <label
+                htmlFor="usedParts_nao"
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors',
+                  !formData.usedParts
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-muted hover:border-muted-foreground/30'
+                )}
+              >
+                <RadioGroupItem value="nao" id="usedParts_nao" />
+                <span className="font-medium text-sm">Não</span>
+              </label>
+
+              <label
+                htmlFor="usedParts_sim"
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors',
+                  formData.usedParts
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-muted hover:border-muted-foreground/30'
+                )}
+              >
+                <RadioGroupItem value="sim" id="usedParts_sim" />
+                <span className="font-medium text-sm">Sim</span>
+              </label>
+            </RadioGroup>
+
+            {formData.usedParts && (
+              <div className="space-y-2">
+                {formData.usedPartsList.length > 0 ? (
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                    {formData.usedPartsList.map((p, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span>{p.name}</span>
+                        <span className="text-muted-foreground">x{p.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowPartsModal(true)}
+                >
+                  <Package className="h-4 w-4 mr-1" />
+                  {formData.usedPartsList.length > 0 ? 'Editar Peças' : 'Registar Peças'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('diagnostico')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+              onClick={() => setCurrentStep('pedir_peca')}
+            >
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 4: Pedir Peça */}
+      <Dialog open={currentStep === 'pedir_peca' && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Pedir Peça?" step="Passo 4" />
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              É necessário pedir alguma peça para continuar a reparação?
+            </p>
+
+            <RadioGroup
+              value={formData.needsPartOrder ? 'sim' : 'nao'}
+              onValueChange={(val) => setFormData(prev => ({ ...prev, needsPartOrder: val === 'sim' }))}
+              className="flex gap-4"
+            >
+              <label
+                htmlFor="needsPart_nao"
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors',
+                  !formData.needsPartOrder
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-muted hover:border-muted-foreground/30'
+                )}
+              >
+                <RadioGroupItem value="nao" id="needsPart_nao" />
+                <span className="font-medium text-sm">Não</span>
+              </label>
+
+              <label
+                htmlFor="needsPart_sim"
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors',
+                  formData.needsPartOrder
+                    ? 'border-yellow-500 bg-yellow-50'
+                    : 'border-muted hover:border-muted-foreground/30'
+                )}
+              >
+                <RadioGroupItem value="sim" id="needsPart_sim" />
+                <span className="font-medium text-sm">Sim</span>
+              </label>
+            </RadioGroup>
+
+            {formData.needsPartOrder && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <Label htmlFor="partToOrder" className="text-sm">Nome da peça *</Label>
+                  <Textarea
+                    id="partToOrder"
+                    placeholder="Nome/descrição da peça necessária..."
+                    value={formData.partToOrder}
+                    onChange={(e) => setFormData(prev => ({ ...prev, partToOrder: e.target.value }))}
+                    rows={2}
+                    className="mt-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="partNotes" className="text-sm">Observações (opcional)</Label>
+                  <Textarea
+                    id="partNotes"
+                    placeholder="Informações adicionais..."
+                    value={formData.partNotes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, partNotes: e.target.value }))}
+                    rows={2}
+                    className="mt-1.5 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('pecas_usadas')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            {formData.needsPartOrder ? (
+              <Button
+                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
+                onClick={handleRequestPart}
+                disabled={isSubmitting || !formData.partToOrder.trim()}
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Solicitar Peça
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 bg-green-500 hover:bg-green-600"
+                onClick={() => setCurrentStep('conclusao')}
+              >
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 5: Conclusão */}
+      <Dialog open={currentStep === 'conclusao' && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Conclusão" step="Passo 5" />
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="brand" className="text-sm">
-                Marca <span className="text-destructive">*</span>
+              <Label htmlFor="work_performed" className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Resumo da reparação *
               </Label>
-              <Input
-                id="brand"
-                placeholder="Ex: Samsung, LG, Bosch..."
-                value={formData.brand}
-                onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
-                className="mt-1.5"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="model" className="text-sm">
-                Modelo <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="model"
-                placeholder="Ex: RT35K5530S8"
-                value={formData.model}
-                onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
-                className="mt-1.5"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="serial" className="text-sm">
-                Número de Série (opcional)
-              </Label>
-              <Input
-                id="serial"
-                placeholder="Número de série do aparelho"
-                value={formData.serialNumber}
-                onChange={(e) => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
-                className="mt-1.5"
+              <Textarea
+                id="work_performed"
+                placeholder="Descreva o trabalho realizado..."
+                value={formData.workPerformed}
+                onChange={(e) => setFormData(prev => ({ ...prev, workPerformed: e.target.value }))}
+                rows={4}
+                className="mt-1.5 text-sm"
               />
             </div>
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('contexto')}>
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('pedir_peca')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep('revisao')}
-              disabled={!canProceedFromIdentificacao}
+              className="flex-1 bg-green-500 hover:bg-green-600"
+              onClick={handleComplete}
+              disabled={isSubmitting || !formData.workPerformed.trim()}
             >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Concluir Reparação
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal 4: Revisão */}
-      <Dialog open={currentStep === 'revisao'} onOpenChange={() => handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Revisão" step="Passo 4" />
+      {/* Camera Modal */}
+      <CameraCapture
+        open={showCamera}
+        onOpenChange={setShowCamera}
+        onCapture={async (imageData) => {
+          await supabase.from('service_photos').insert({
+            service_id: service.id,
+            photo_type: 'oficina',
+            file_url: imageData,
+            description: 'Foto da oficina',
+          });
+          queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+          setShowCamera(false);
+          toast.success('Foto guardada!');
+        }}
+        title="Foto do Aparelho"
+      />
 
-          <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
-            <div>
-              <p className="text-muted-foreground text-xs">Avaria Detectada</p>
-              <p className="font-medium">{formData.detectedFault}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-muted-foreground text-xs">Marca</p>
-                <p className="font-medium">{formData.brand}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Modelo</p>
-                <p className="font-medium">{formData.model}</p>
-              </div>
-            </div>
-
-            {formData.serialNumber && (
-              <div>
-                <p className="text-muted-foreground text-xs">Número de Série</p>
-                <p className="font-medium">{formData.serialNumber}</p>
-              </div>
-            )}
-
-            {formData.photoPreview && (
-              <div>
-                <p className="text-muted-foreground text-xs mb-1.5">Foto</p>
-                <img
-                  src={formData.photoPreview}
-                  alt="Foto do aparelho"
-                  className="w-full h-24 object-cover rounded-lg"
-                />
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('identificacao')}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep('finalizacao')}
-            >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal 5: Finalização */}
-      <Dialog open={currentStep === 'finalizacao'} onOpenChange={() => handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Finalização" step="Passo 5" />
-
-          <RadioGroup
-            value={formData.finalizationType}
-            onValueChange={(val) => setFormData(prev => ({ ...prev, finalizationType: val as 'pedir_peca' | 'concluido' }))}
-            className="space-y-3"
-          >
-            <label
-              htmlFor="pedir_peca"
-              className={cn(
-                'flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors',
-                formData.finalizationType === 'pedir_peca'
-                  ? 'border-orange-500 bg-orange-50'
-                  : 'border-muted hover:border-muted-foreground/30'
-              )}
-            >
-              <RadioGroupItem value="pedir_peca" id="pedir_peca" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-orange-500 shrink-0" />
-                  <span className="font-medium text-sm">Pedir peça</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Necessita de uma peça não disponível
-                </p>
-              </div>
-            </label>
-
-            <label
-              htmlFor="concluido"
-              className={cn(
-                'flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors',
-                formData.finalizationType === 'concluido'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-muted hover:border-muted-foreground/30'
-              )}
-            >
-              <RadioGroupItem value="concluido" id="concluido" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                  <span className="font-medium text-sm">Reparação concluída</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Reparação concluída com sucesso
-                </p>
-              </div>
-            </label>
-          </RadioGroup>
-
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('revisao')}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className={cn(
-                'flex-1',
-                formData.finalizationType === 'concluido'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-orange-500 hover:bg-orange-600'
-              )}
-              onClick={handleFinalize}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'A processar...' : 'Finalizar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Parts Modal */}
+      <UsedPartsModal
+        open={showPartsModal}
+        onOpenChange={setShowPartsModal}
+        onConfirm={handlePartsConfirm}
+        title="Registar Peças Utilizadas"
+        subtitle="Adicione as peças utilizadas na reparação."
+        initialParts={formData.usedPartsList.length > 0 ? formData.usedPartsList : undefined}
+      />
     </>
   );
 }
