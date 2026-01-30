@@ -538,16 +538,18 @@ body.print-type-tag {
   width: 210mm !important;
   max-width: 210mm !important;
   height: 297mm !important;
-  max-height: 297mm !important;
+  max-height: 90vh !important;
   padding: 0 !important;
   overflow: hidden !important;
   border-radius: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Conteúdo da ficha com scroll no ecrã */
 .print-modal-a4 .print-sheet {
+  flex: 1;
   width: 100%;
-  height: calc(297mm - 50px);
   padding: 10mm;
   background: white;
   overflow-y: auto;
