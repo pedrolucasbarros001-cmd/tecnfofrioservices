@@ -152,10 +152,9 @@ export default function DashboardPage() {
               key={card.key}
               className={cn(
                 "cursor-pointer transition-all duration-200",
-                "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)]",
                 isLit 
-                  ? "opacity-100 shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
-                  : "opacity-50 hover:opacity-70"
+                  ? "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)] shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+                  : "bg-[hsl(220,50%,70%)] border-[hsl(220,45%,65%)] hover:bg-[hsl(220,50%,65%)]"
               )}
               onClick={() => navigate(card.route)}
             >
@@ -163,18 +162,18 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <Icon className={cn(
                     "h-6 w-6",
-                    isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,40%,70%)]"
+                    isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
                   )} />
                   <span className={cn(
                     "text-3xl font-bold",
-                    isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,35%,70%)]"
+                    isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
                   )}>
                     {loading ? '...' : count}
                   </span>
                 </div>
                 <p className={cn(
                   "text-sm font-medium mt-auto",
-                  isLit ? "text-[hsl(220,50%,35%)]" : "text-[hsl(220,25%,55%)]"
+                  isLit ? "text-[hsl(220,50%,35%)]" : "text-white"
                 )}>
                   {card.label}
                 </p>
