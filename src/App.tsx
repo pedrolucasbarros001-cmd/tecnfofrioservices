@@ -26,6 +26,7 @@ import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
 import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
 import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
 import ServiceRedirect from "@/pages/technician/ServiceRedirect";
+import ServiceConsultPage from "@/pages/ServiceConsultPage";
 import TVMonitorPage from "@/pages/TVMonitorPage";
 import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
@@ -140,6 +141,9 @@ const App = () => (
                   <ServiceRedirect />
                 </ProtectedRoute>
               } />
+              
+              {/* Universal service route - accessible by any authenticated user */}
+              <Route path="/service/:serviceId" element={<ServiceConsultPage />} />
               
               {/* Shared routes */}
               <Route path="/preferencias" element={<PreferenciasPage />} />
