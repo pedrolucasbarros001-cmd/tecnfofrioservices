@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
+import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'diagnostico' | 'decisao' | 'pecas_usadas' | 'pedir_peca' | 'finalizacao';
@@ -55,7 +56,7 @@ interface VisitFlowModalsProps {
   onComplete: () => void;
 }
 
-interface FormData {
+interface VisitFormData {
   detectedFault: string;
   photoFile: string | null;
   decision: DecisionType;
@@ -66,6 +67,7 @@ interface FormData {
     name: string;
     reference: string;
   };
+  [key: string]: unknown;
 }
 
 export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitFlowModalsProps) {
@@ -73,7 +75,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<VisitFormData>({
     detectedFault: '',
     photoFile: null,
     decision: 'reparar_local',
@@ -87,21 +89,37 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const [showSignature, setShowSignature] = useState(false);
   const [signatureType, setSignatureType] = useState<SignatureType>('conclusao');
 
-  // Reset when opened
+  // Flow persistence
+  const { loadState, saveState, clearState } = useFlowPersistence<VisitFormData>(service.id, 'visita');
+
+  // Load saved state or reset when opened
   useEffect(() => {
     if (isOpen) {
-      setCurrentStep('resumo');
-      setFormData({
-        detectedFault: service.detected_fault || '',
-        photoFile: null,
-        decision: 'reparar_local',
-        usedParts: false,
-        usedPartsList: [{ name: '', reference: '', quantity: 1 }],
-        needsPartOrder: false,
-        partToOrder: { name: '', reference: '' },
-      });
+      const savedState = loadState();
+      if (savedState) {
+        setCurrentStep(savedState.currentStep as ModalStep);
+        setFormData(savedState.formData);
+      } else {
+        setCurrentStep('resumo');
+        setFormData({
+          detectedFault: service.detected_fault || '',
+          photoFile: null,
+          decision: 'reparar_local',
+          usedParts: false,
+          usedPartsList: [{ name: '', reference: '', quantity: 1 }],
+          needsPartOrder: false,
+          partToOrder: { name: '', reference: '' },
+        });
+      }
     }
-  }, [isOpen, service]);
+  }, [isOpen, service, loadState]);
+
+  // Auto-save state on step/data changes
+  useEffect(() => {
+    if (isOpen && currentStep !== 'resumo') {
+      saveState(currentStep, formData);
+    }
+  }, [isOpen, currentStep, formData, saveState]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -253,6 +271,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         toast.success('Visita concluída! Aguarda precificação.');
       }
 
+      // Clear persisted state on completion
+      clearState();
       setShowSignature(false);
       onComplete();
     } catch (error) {
