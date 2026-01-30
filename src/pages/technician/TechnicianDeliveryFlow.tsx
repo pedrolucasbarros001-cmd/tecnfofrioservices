@@ -57,12 +57,16 @@ export default function TechnicianDeliveryFlow() {
         signer_name: service.customer?.name,
       });
 
-      // Update service to finalizado
+      // Verificar se precisa de precificacao (nao e garantia e nao tem preco)
+      const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
+
+      // Update service to finalizado - pending_pricing coexiste com status finalizado
       await updateService.mutateAsync({
         id: service.id,
         status: 'finalizado',
         service_location: 'entregue',
         delivery_date: new Date().toISOString(),
+        pending_pricing: needsPricing,
       });
 
       setShowSignature(false);

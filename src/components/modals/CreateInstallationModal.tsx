@@ -206,7 +206,12 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         finalCustomerId = newCustomer.id;
       }
 
-      const status = values.final_price && values.final_price > 0 ? 'em_debito' : 'por_fazer';
+      // Status operacional - sempre por_fazer na criacao
+      // O debito e calculado dinamicamente via final_price > amount_paid
+      const status = 'por_fazer';
+      
+      // Se nao tem preco definido, marcar como pending_pricing
+      const needsPricing = !values.final_price || values.final_price <= 0;
 
       await createService.mutateAsync({
         customer_id: finalCustomerId,
@@ -222,6 +227,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         service_type: 'instalacao',
         is_installation: true,
         status,
+        pending_pricing: needsPricing,
         final_price: values.final_price || null,
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
