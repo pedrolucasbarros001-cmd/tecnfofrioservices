@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
+import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'finalizacao';
@@ -38,8 +39,9 @@ interface DeliveryFlowModalsProps {
   onComplete: () => void;
 }
 
-interface FormData {
+interface DeliveryFormData {
   photoFile: string | null;
+  [key: string]: unknown;
 }
 
 export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: DeliveryFlowModalsProps) {
@@ -47,22 +49,36 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>('resumo');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<DeliveryFormData>({
     photoFile: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
 
-  // Reset when opened
+  // Flow persistence
+  const { loadState, saveState, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
+
+  // Load saved state or reset when opened
   useEffect(() => {
     if (isOpen) {
-      setCurrentStep('resumo');
-      setFormData({
-        photoFile: null,
-      });
+      const savedState = loadState();
+      if (savedState) {
+        setCurrentStep(savedState.currentStep as ModalStep);
+        setFormData(savedState.formData);
+      } else {
+        setCurrentStep('resumo');
+        setFormData({ photoFile: null });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, loadState]);
+
+  // Auto-save state on step/data changes
+  useEffect(() => {
+    if (isOpen && currentStep !== 'resumo') {
+      saveState(currentStep, formData);
+    }
+  }, [isOpen, currentStep, formData, saveState]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -120,6 +136,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+      
+      // Clear persisted state on completion
+      clearState();
       setShowSignature(false);
       toast.success('Entrega concluída com sucesso!');
       onComplete();
