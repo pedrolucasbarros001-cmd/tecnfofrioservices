@@ -7,7 +7,6 @@ import { OwnerSidebar } from './OwnerSidebar';
 import { SecretarySidebar } from './SecretarySidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,9 +60,6 @@ export function AppLayout() {
           </SidebarTrigger>
           
           <div className="flex-1" />
-          
-          {/* Theme Toggle */}
-          <ThemeToggle />
           
           {/* Notifications */}
           <Button
