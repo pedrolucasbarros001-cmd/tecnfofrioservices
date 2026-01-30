@@ -18,6 +18,8 @@ import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal
 import { SetPriceModal } from '@/components/modals/SetPriceModal';
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
 import { RequestPartModal } from '@/components/modals/RequestPartModal';
+import { ConfirmPartOrderModal } from '@/components/modals/ConfirmPartOrderModal';
+import { PartArrivedModal } from '@/components/modals/PartArrivedModal';
 import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementModal';
 import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ForceStateModal } from '@/components/modals/ForceStateModal';
@@ -25,9 +27,12 @@ import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { useServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +57,8 @@ export default function GeralPage() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
+  const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
 
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -65,6 +72,28 @@ export default function GeralPage() {
   } = useServices({
     status: effectiveStatus as any
   });
+  
+  // Fetch pending parts for all services (for the thermometer indicator)
+  const { data: pendingPartsMap = {} } = useQuery({
+    queryKey: ['all-pending-parts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_parts')
+        .select('service_id, estimated_arrival')
+        .eq('is_requested', true)
+        .eq('arrived', false);
+      if (error) throw error;
+      // Group by service_id, taking the earliest estimated_arrival
+      const map: Record<string, string | null> = {};
+      (data || []).forEach(part => {
+        if (!map[part.service_id] || (part.estimated_arrival && (!map[part.service_id] || part.estimated_arrival < map[part.service_id]!))) {
+          map[part.service_id] = part.estimated_arrival;
+        }
+      });
+      return map;
+    },
+  });
+  
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
   const filteredServices = services.filter(service => {
@@ -148,32 +177,16 @@ export default function GeralPage() {
       console.error('Error finalizing service:', error);
     }
   };
-  // Handler to confirm that the part order has been placed (para_pedir_peca → em_espera_de_peca)
-  const handleConfirmPartOrder = async (service: Service) => {
-    try {
-      await updateService.mutateAsync({
-        id: service.id,
-        status: 'em_espera_de_peca',
-      });
-      toast.success('Pedido de peça registado. Aguardando chegada.');
-    } catch (error) {
-      console.error('Error confirming part order:', error);
-    }
+  // Handler to open the confirm part order modal
+  const handleConfirmPartOrder = (service: Service) => {
+    setCurrentService(service);
+    setShowConfirmPartOrderModal(true);
   };
 
-  // Handler for when the part arrives (em_espera_de_peca → restore previous status)
-  const handleMarkPartArrived = async (service: Service) => {
-    try {
-      // Restore to previous status or default to na_oficina
-      const previousStatus = service.last_status_before_part_request || 'na_oficina';
-      await updateService.mutateAsync({
-        id: service.id,
-        status: previousStatus as any,
-      });
-      toast.success('Peça chegou! Serviço pronto para retomar.');
-    } catch (error) {
-      console.error('Error marking part arrived:', error);
-    }
+  // Handler to open the part arrived modal
+  const handleMarkPartArrived = (service: Service) => {
+    setCurrentService(service);
+    setShowPartArrivedModal(true);
   };
   return <div className="p-6 space-y-6">
       {/* Header */}
@@ -288,9 +301,17 @@ export default function GeralPage() {
                       
                       {/* Estado */}
                       <TableCell>
-                        <Badge className={statusConfig.color}>
-                          {statusConfig.label}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge className={statusConfig.color}>
+                            {statusConfig.label}
+                          </Badge>
+                          {/* Part arrival indicator for services waiting for parts */}
+                          {service.status === 'em_espera_de_peca' && (
+                            <PartArrivalIndicator 
+                              estimatedArrival={pendingPartsMap[service.id] || null} 
+                            />
+                          )}
+                        </div>
                       </TableCell>
                       
                       {/* Tags - Discrete, informative, not dominant */}
@@ -373,6 +394,8 @@ export default function GeralPage() {
       <SetPriceModal service={currentService} open={showSetPriceModal} onOpenChange={setShowSetPriceModal} />
       <RegisterPaymentModal service={currentService} open={showPaymentModal} onOpenChange={setShowPaymentModal} />
       <RequestPartModal service={currentService} open={showRequestPartModal} onOpenChange={setShowRequestPartModal} requireSignature={currentService?.service_location === 'cliente'} />
+      <ConfirmPartOrderModal service={currentService} open={showConfirmPartOrderModal} onOpenChange={setShowConfirmPartOrderModal} />
+      <PartArrivedModal service={currentService} open={showPartArrivedModal} onOpenChange={setShowPartArrivedModal} />
       <DeliveryManagementModal service={currentService} open={showDeliveryMgmtModal} onOpenChange={setShowDeliveryMgmtModal} onAssignDelivery={handleAssignDelivery} />
       <AssignDeliveryModal service={currentService} open={showAssignDeliveryModal} onOpenChange={setShowAssignDeliveryModal} />
       <ForceStateModal service={currentService} open={showForceStateModal} onOpenChange={setShowForceStateModal} />
