@@ -1,84 +1,74 @@
 
 
-# Plano: Azul Claro Vibrante com Lógica Aceso/Apagado
+# Plano: Cards Apagados Azuis com Texto Branco
 
-## Conceito
+## Problema Actual
 
-Aplicar o tom de azul claro vibrante (`hsl(220, 80%, 65%)`) da imagem de referência, **mantendo a lógica de opacidade**:
-- **Cards com 0** = apagados (opacity reduzida)
-- **Cards com 1+** = acesos (opacity total)
+O `opacity-50` sobre o fundo azul claro (`hsl(220,60%,96%)`) cria um efeito **cinzento**, não azul.
 
----
+## Solução
 
-## Paleta Derivada (Hue 220°)
-
-Base de cor vibrante: `#5B8DEF` → `hsl(220, 80%, 65%)`
-
-| Elemento | Valor |
-|----------|-------|
-| **Fundo base** | `hsl(220, 60%, 96%)` |
-| **Borda base** | `hsl(220, 50%, 88%)` |
-| **Ícone/Número aceso** | `hsl(220, 80%, 50%)` |
-| **Ícone/Número apagado** | `hsl(220, 40%, 70%)` |
-| **Label aceso** | `hsl(220, 50%, 35%)` |
-| **Label apagado** | `hsl(220, 25%, 55%)` |
+Inverter a lógica visual:
+- **Cards apagados (count = 0)**: Fundo **azul sólido** + texto **branco**
+- **Cards acesos (count > 0)**: Fundo **claro** + texto **azul** (como está)
 
 ---
 
-## Alterações Técnicas
+## Paleta Proposta
+
+| Estado | Elemento | Cor |
+|--------|----------|-----|
+| **Apagado** | Fundo | `hsl(220, 50%, 70%)` (azul médio) |
+| **Apagado** | Borda | `hsl(220, 45%, 65%)` |
+| **Apagado** | Ícone/Número/Label | `white` |
+| **Aceso** | Fundo | `hsl(220, 60%, 96%)` (azul claro) |
+| **Aceso** | Borda | `hsl(220, 50%, 88%)` |
+| **Aceso** | Ícone/Número | `hsl(220, 80%, 50%)` (azul vibrante) |
+| **Aceso** | Label | `hsl(220, 50%, 35%)` (azul escuro) |
+
+---
+
+## Alteracoes Tecnicas
 
 ### Ficheiro: `src/pages/DashboardPage.tsx`
 
-**Card Container (linhas 153-158):**
+**Card Container (linhas 153-159):**
 
 ```typescript
 className={cn(
   "cursor-pointer transition-all duration-200",
-  "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)]",
   isLit 
-    ? "opacity-100 shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
-    : "opacity-50 hover:opacity-70"
+    ? "bg-[hsl(220,60%,96%)] border-[hsl(220,50%,88%)] shadow-md ring-1 ring-[hsl(220,80%,65%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+    : "bg-[hsl(220,50%,70%)] border-[hsl(220,45%,65%)] hover:bg-[hsl(220,50%,65%)]"
 )}
 ```
 
-**Ícone (linhas 163-166):**
+**Icone (linhas 164-167):**
 
 ```typescript
 <Icon className={cn(
   "h-6 w-6",
-  isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,40%,70%)]"
+  isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
 )} />
 ```
 
-**Número (linhas 167-172):**
+**Numero (linhas 168-173):**
 
 ```typescript
 <span className={cn(
   "text-3xl font-bold",
-  isLit ? "text-[hsl(220,80%,50%)]" : "text-[hsl(220,35%,70%)]"
+  isLit ? "text-[hsl(220,80%,50%)]" : "text-white"
 )}>
 ```
 
-**Label (linhas 174-177):**
+**Label (linhas 175-179):**
 
 ```typescript
 <p className={cn(
   "text-sm font-medium mt-auto",
-  isLit ? "text-[hsl(220,50%,35%)]" : "text-[hsl(220,25%,55%)]"
+  isLit ? "text-[hsl(220,50%,35%)]" : "text-white"
 )}>
 ```
-
----
-
-## Comparativo
-
-| Aspecto | Actual | Novo |
-|---------|--------|------|
-| **Hue (matiz)** | 214° (azul institucional) | 220° (azul vibrante) |
-| **Lógica lit/dim** | Cores diferentes | **Opacity** (como pedido) |
-| **Fundo** | Cor varia por estado | Cor única + opacity |
-| **Cards com 0** | opacity-50 | opacity-50 ✓ |
-| **Cards com 1+** | opacity-100 | opacity-100 ✓ |
 
 ---
 
@@ -86,16 +76,22 @@ className={cn(
 
 ```text
 CARD APAGADO (count = 0):
-• Fundo azul claro vibrante
-• opacity-50 → efeito "esbatido"
-• Clicável mas visualmente secundário
++---------------------------+
+|  [icon]            0      |  <- branco
+|                           |
+|  Por Fazer                |  <- branco
++---------------------------+
+   Fundo: azul medio
 
 CARD ACESO (count > 0):
-• Mesmo fundo azul claro
-• opacity-100 → totalmente visível
-• Sombra e ring para destacar
-• Ícone/número em azul vibrante (#5B8DEF)
++---------------------------+
+|  [icon]            2      |  <- azul vibrante
+|                           |
+|  A Precificar             |  <- azul escuro
++---------------------------+
+   Fundo: azul muito claro
+   Sombra + ring
 ```
 
-A lógica de opacidade está **restabelecida**, agora usando o tom de azul claro vibrante da imagem de referência.
+A inversao de cores (azul escuro para apagados, claro para acesos) cria o efeito visual correcto sem usar opacidade.
 
