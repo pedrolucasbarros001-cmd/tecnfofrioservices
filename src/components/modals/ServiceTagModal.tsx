@@ -1,6 +1,6 @@
-import { createPortal } from 'react-dom';
+import { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { Service } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
-import { printServiceTag } from '@/utils/printUtils';
+import { generatePDF } from '@/utils/pdfUtils';
 
 interface ServiceTagModalProps {
   service: Service | null;
@@ -21,74 +21,26 @@ interface ServiceTagModalProps {
 }
 
 export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModalProps) {
+  const tagRef = useRef<HTMLDivElement>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
   if (!service) return null;
 
-  const handlePrint = () => {
-    printServiceTag();
+  const handleDownloadPDF = async () => {
+    if (!tagRef.current || !service) return;
+    setIsGenerating(true);
+    try {
+      await generatePDF({ 
+        element: tagRef.current, 
+        filename: `Etiqueta-${service.code}` 
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Generate a full URL for QR code that works for any authenticated collaborator
   const qrData = `${window.location.origin}/service/${service.id}`;
-
-  // Print content component - rendered via portal for printing
-  const PrintTagContent = () => (
-    <div className="print-portal print-only">
-      <div className="print-tag">
-        <div style={{ borderTop: '4px solid #0066cc', marginBottom: '12px' }} />
-        
-        <div style={{ textAlign: 'center' }}>
-          {/* Logo */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-            <img 
-              src={tecnofrioLogoFull} 
-              alt="TECNOFRIO" 
-              style={{ height: '36px', objectFit: 'contain' }}
-            />
-          </div>
-          
-          {/* QR Code */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
-            <div style={{ border: '1px solid #e5e7eb', padding: '8px', borderRadius: '8px', backgroundColor: 'white' }}>
-              <QRCodeSVG
-                value={qrData}
-                size={140}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-          </div>
-          
-          {/* Service Code */}
-          <p className="service-code" style={{ fontSize: '20px', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '2px', margin: '12px 0' }}>
-            {service.code}
-          </p>
-          
-          {/* Service Details */}
-          <div style={{ textAlign: 'left', padding: '0 8px', fontSize: '11px' }}>
-            <p style={{ marginBottom: '4px' }}>
-              <span style={{ color: '#666' }}>Cliente:</span>{' '}
-              <span style={{ fontWeight: '500' }}>{service.customer?.name || 'N/A'}</span>
-            </p>
-            <p style={{ marginBottom: '4px' }}>
-              <span style={{ color: '#666' }}>Equipamento:</span>{' '}
-              <span style={{ fontWeight: '500' }}>
-                {[service.appliance_type, service.brand].filter(Boolean).join(' ') || 'N/A'}
-              </span>
-            </p>
-            <p style={{ marginBottom: '4px' }}>
-              <span style={{ color: '#666' }}>Telefone:</span>{' '}
-              <span style={{ fontWeight: '500' }}>{service.customer?.phone || 'N/A'}</span>
-            </p>
-          </div>
-          
-          {/* Footer Note */}
-          <p style={{ fontSize: '9px', color: '#666', padding: '8px', borderTop: '1px solid #e5e7eb', marginTop: '8px' }}>
-            Leia o QR Code para ver detalhes e histórico online
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <>
@@ -99,7 +51,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           </DialogHeader>
 
           {/* Tag content - preview on screen */}
-          <div className="border rounded-lg p-4 bg-card">
+          <div ref={tagRef} className="border rounded-lg p-4 bg-white">
             <Separator className="bg-primary h-1 mb-4" />
             
             <div className="text-center space-y-3">
@@ -157,16 +109,17 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir Etiqueta
+            <Button onClick={handleDownloadPDF} disabled={isGenerating}>
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isGenerating ? 'A gerar...' : 'Baixar Etiqueta'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Print Portal - rendered directly in body, hidden on screen */}
-      {open && createPortal(<PrintTagContent />, document.body)}
     </>
   );
 }
