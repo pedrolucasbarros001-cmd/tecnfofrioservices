@@ -365,21 +365,19 @@
     print-color-adjust: exact !important;
   }
 
-  /* Page setup - A4 default */
+  /* Default @page - overridden dynamically by printUtils.ts */
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
   }
 
-  /* Hide the main app UI */
-  #root {
-    display: none !important;
-  }
-
-  /* Hide Radix overlay */
+  /* Hide Radix overlay - CRITICAL for Safari blank preview fix */
   [data-radix-dialog-overlay] {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
     background: transparent !important;
+    pointer-events: none !important;
   }
 
   /* Show print-only elements */
@@ -395,10 +393,9 @@
 
   /* ========== A4 SHEET (modal) ========== */
   .print-modal-a4 {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    position: static !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
     height: auto !important;
     max-height: none !important;
     margin: 0 !important;
@@ -409,7 +406,7 @@
     transform: none !important;
     background: white !important;
     overflow: visible !important;
-    z-index: 2147483647 !important;
+    display: block !important;
   }
 
   .print-modal-a4 .print-sheet {
@@ -418,7 +415,8 @@
     max-height: none !important;
     overflow: visible !important;
     padding: 10mm !important;
-    page-break-inside: avoid;
+    box-sizing: border-box !important;
+    page-break-inside: auto;
   }
 
   .print-modal-a4 .print-sheet * {
@@ -439,7 +437,6 @@
   }
 
   /* ========== TAG (80mm x 170mm) ========== */
-  /* Override @page for tag printing */
   body.print-type-tag {
     margin: 0 !important;
     padding: 0 !important;
@@ -449,9 +446,7 @@
   .print-tag {
     display: block !important;
     visibility: visible !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: static !important;
     width: 80mm !important;
     height: 170mm !important;
     margin: 0 !important;
@@ -461,7 +456,6 @@
     border-radius: 0 !important;
     box-shadow: none !important;
     box-sizing: border-box !important;
-    z-index: 2147483647 !important;
   }
 
   .print-tag * {
@@ -477,12 +471,10 @@
   .print-portal {
     display: block !important;
     visibility: visible !important;
-    position: fixed !important;
-    inset: 0 !important;
+    position: static !important;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     background: white !important;
-    z-index: 2147483647 !important;
     overflow: visible !important;
   }
 
@@ -490,5 +482,3 @@
     visibility: visible !important;
   }
 }
-
-/* Separate @page rule for tag (injected dynamically if needed) */

@@ -33,7 +33,9 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
     try {
       await generatePDF({ 
         element: tagRef.current, 
-        filename: `Etiqueta-${service.code}` 
+        filename: `Etiqueta-${service.code}`,
+        format: [80, 170],
+        margin: 0
       });
     } finally {
       setIsGenerating(false);
