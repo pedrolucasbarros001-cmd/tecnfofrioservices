@@ -391,6 +391,23 @@
     display: none !important;
   }
 
+  /* CRÍTICO: Esconder toda a aplicação React */
+  #root {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Esconder todos os elementos do body que não são portais */
+  body > *:not([data-radix-portal]):not(.print-portal) {
+    display: none !important;
+  }
+
+  /* Mostrar apenas portais Radix (onde o modal está renderizado) */
+  [data-radix-portal] {
+    display: block !important;
+    visibility: visible !important;
+  }
+
   /* ========== A4 SHEET (modal) ========== */
   .print-modal-a4 {
     position: static !important;
