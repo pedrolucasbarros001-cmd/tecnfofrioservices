@@ -1,128 +1,143 @@
 
-## Objetivo
-Fazer a impressão nativa (botão **Imprimir**) voltar a funcionar (sem “preview em branco”), garantindo:
-- **Ficha** sempre em **A4** e bem alinhada no preview de impressão
-- **Etiqueta** sempre em **80x170mm** e bem alinhada no preview de impressão
-- Manter **Imprimir + PDF** (mas sem PDF “cortado”)
+## Objectivo
+
+Fazer o print preview mostrar **apenas a ficha do modal** (1 página A4), escondendo toda a UI da aplicação (sidebar, OficinaPage, ServiceDetailSheet, etc.).
 
 ---
 
-## O que está acontecendo (causa provável do “preview em branco”)
-Pelo CSS atual (`src/index.css`) vocês tentam ocultar o overlay do Radix no print com:
+## Problema Actual
 
-- `@media print { [data-radix-dialog-overlay] { display:none } }`
+Olhando para a captura de tela, o print preview mostra **3 páginas** porque:
 
-Só que o overlay do `Dialog` **não tem** esse atributo hoje (ver `src/components/ui/dialog.tsx`), então no Safari ele pode estar sendo renderizado/empilhado acima do conteúdo na hora do print.
+1. O CSS de impressão **não esconde o `#root`** (toda a aplicação)
+2. Apenas esconde o overlay do Radix e elementos com `.no-print`
+3. Resultado: A ficha do modal aparece + a página de oficina + o sheet de detalhes - tudo misturado no print
 
-No Safari, quando “Imprimir fundos” está desmarcado (como na sua captura), overlays e backgrounds podem virar uma “folha branca” por cima do conteúdo no preview, resultando em **tudo branco**.
-
----
-
-## Plano de correção (mudanças pequenas, mas certeiras)
-
-### 1) Garantir que o overlay do Dialog seja removido no print (principal)
-**Arquivo:** `src/components/ui/dialog.tsx`
-
-**Ações:**
-- Adicionar o atributo `data-radix-dialog-overlay` no `DialogOverlay` (para casar com o CSS existente).
-- Adicionar a classe `no-print` no botão de fechar padrão do Dialog (para não aparecer o “X” na impressão).
-
-**Resultado esperado:**
-- O Safari não “tampa” a impressão com o overlay e o preview volta a mostrar a ficha/etiqueta.
+O CSS actual (linhas 360-484 de `index.css`) não tem nenhuma regra para esconder `#root`.
 
 ---
 
-### 2) Garantir o tamanho correto no preview de impressão (A4 vs 80x170mm)
-Hoje o CSS tem `@page` fixo em A4 e não há override real para etiqueta (CSS não permite `@page` condicionado por seletor de `body` de forma confiável).
+## Solução: Esconder #root e Mostrar Apenas o Portal
 
-**Arquivo:** `src/utils/printUtils.ts`
+### Ficheiro: `src/index.css`
 
-**Ações:**
-- Evoluir o `triggerPrint(type)` para **injetar dinamicamente** um `<style media="print">` com `@page` correto antes de chamar `window.print()`:
-  - Para ficha: `@page { size: A4 portrait; margin: 0; }`
-  - Para etiqueta: `@page { size: 80mm 170mm; margin: 0; }`
-- Remover esse `<style>` no `afterprint` (e também remover a class do body como já faz).
+Adicionar regras na secção `@media print` (após linha 392) para:
 
-**Por que isso é importante:**
-- Garante que o **preview** do print no browser “entende” o papel correto.
-- Evita casos onde a etiqueta é “encaixada” num A4 e sai desalinhada/cortada.
+1. **Esconder completamente o `#root`** (toda a aplicação React)
+2. **Esconder todos os filhos do body** excepto portais Radix e print-portal
+3. **Garantir que o portal Radix é visível** (onde o modal está)
 
----
+```css
+@media print {
+  /* ... regras existentes ... */
 
-### 3) Ajustar CSS de print para não “duplicar margens” e evitar cortes
-Atualmente vocês têm:
-- `@page margin: 10mm`
-- e também `.print-sheet { padding: 10mm }`
+  /* CRÍTICO: Esconder toda a aplicação React */
+  #root {
+    display: none !important;
+    visibility: hidden !important;
+  }
 
-Isso pode causar redução excessiva de área útil e aumentar chance de corte/scale automático.
+  /* Esconder todos os elementos do body que não são portais */
+  body > *:not([data-radix-portal]):not(.print-portal) {
+    display: none !important;
+  }
 
-**Arquivo:** `src/index.css`
-
-**Ações:**
-- Manter `@page` com `margin: 0` (o injected style do passo 2 manda).
-- Deixar a margem “visual” via `padding` dentro da ficha:
-  - `.print-modal-a4 .print-sheet { padding: 10mm }` (no print)
-- Garantir que o layout do A4 em impressão:
-  - não dependa de scroll (`overflow: visible` no print)
-  - permita quebra de página se um dia passar de 1 folha (ex.: muitas peças/pagamentos)
-- Manter `.print-tag` com `padding: 4mm` e tamanho fixo.
+  /* Mostrar apenas portais Radix (onde o modal está renderizado) */
+  [data-radix-portal] {
+    display: block !important;
+    visibility: visible !important;
+  }
+}
+```
 
 ---
 
-### 4) Consertar o PDF “cortado” (já que vocês querem manter PDF)
-O `generatePDF` atual (`src/utils/pdfUtils.ts`) chama `html2pdf` direto no elemento do modal que tem scroll/limites; isso é uma causa comum de PDF truncado.
+## Por Que Funciona
 
-**Arquivos:**
-- `src/utils/pdfUtils.ts`
-- `src/components/modals/ServicePrintModal.tsx`
-- `src/components/modals/ServiceTagModal.tsx`
+O Radix UI renderiza modais através de **Portals** - elementos que são inseridos directamente no `<body>`, fora do `#root`:
 
-**Ações:**
-1) Atualizar `generatePDF` para:
-- clonar o elemento em um container temporário “offscreen”
-- forçar `overflow: visible`, `height: auto`, remover `max-height`
-- só então gerar o PDF
-- remover o container temporário no final
+```text
+<body>
+  <div id="root">              <- ESCONDIDO no print
+    <OficinaPage />            <- ESCONDIDO
+    <ServiceDetailSheet />     <- ESCONDIDO
+    ...                        <- ESCONDIDO
+  </div>
+  
+  <div data-radix-portal>      <- VISÍVEL no print
+    <DialogOverlay />          <- ESCONDIDO (já tinha regra)
+    <DialogContent>            <- VISÍVEL
+      <.print-modal-a4>        <- A4 Sheet
+        <.print-sheet>         <- Conteúdo da ficha
+    </DialogContent>
+  </div>
+</body>
+```
 
-2) Permitir formato customizado no `generatePDF`:
-- Ficha: `format: 'a4'`, `orientation: 'portrait'`, `margin` compatível
-- Etiqueta: `format: [80, 170]` (em mm), `margin: 0`
-
-**Resultado esperado:**
-- PDF da ficha não sai mais cortado.
-- PDF da etiqueta sai no tamanho correto (80x170) em vez de “etiqueta pequena dentro de A4”.
-
----
-
-## Como vamos validar (checklist)
-1) Abrir um serviço → **Ver Ficha** → clicar **Imprimir**:
-- Safari: preview não pode ficar branco
-- Conteúdo alinhado em A4
-- Sem overlay, sem botão “X” impresso
-
-2) Abrir um serviço → **Ver Etiqueta** → clicar **Imprimir**:
-- Preview deve mostrar papel 80x170mm
-- Conteúdo centralizado/encaixado (sem cortes)
-
-3) Testar PDF:
-- **Baixar PDF** da ficha (sem cortes)
-- **Baixar Etiqueta** no formato correto 80x170mm
-
-4) Teste cruzado:
-- Pelo menos Safari + Chrome (para garantir que o fix não seja específico)
+Ao esconder `#root` e todos os filhos do `body` **excepto** `[data-radix-portal]`, garantimos que apenas o modal de impressão aparece.
 
 ---
 
-## Arquivos que serão alterados
-- `src/components/ui/dialog.tsx` (overlay + close “no-print”)
-- `src/utils/printUtils.ts` (injeção dinâmica de `@page` por tipo)
-- `src/index.css` (ajustes finos de print: overflow/padding/margem)
-- `src/utils/pdfUtils.ts` (PDF sem corte + formatos custom)
-- `src/components/modals/ServicePrintModal.tsx` (usar novo generatePDF/config, sem depender de scroll)
-- `src/components/modals/ServiceTagModal.tsx` (usar novo generatePDF/config 80x170)
+## Sobre o Tamanho do Modal
+
+O utilizador também mencionou que "o modal pode ser menor". O modal actual tem:
+
+- Ecrã: `width: 210mm`, `height: 297mm`, `max-height: 90vh`
+- Print: `width: 210mm`, `height: auto`
+
+O tamanho de **210mm x 297mm** é exactamente A4. No ecrã, o modal mostra um preview WYSIWYG do A4.
+
+**Opções:**
+1. **Manter A4 no modal** (recomendado): Preview fiel ao que será impresso
+2. **Reduzir modal no ecrã**: O preview será menor mas a impressão continua A4
+
+Se o utilizador quer um modal menor no ecrã mas manter A4 no print, podemos ajustar:
+- Ecrã: `max-width: 80vw` e `max-height: 85vh` com scroll
+- Print: Continua `width: 210mm` e `height: auto`
 
 ---
 
-## Riscos / cuidados
-- `afterprint` no Safari às vezes é inconsistente: vamos manter limpeza via `afterprint`, mas incluir fallback com `setTimeout` para remover o `<style>` injetado se necessário.
-- Se algum outro modal precisar do overlay em print (quase nunca), a regra `no-print` pode afetar. Na prática, é desejado: overlay/close não devem ir para papel.
+## Ficheiros a Alterar
+
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/index.css` | Adicionar regras `#root { display: none }` e `body > *:not([data-radix-portal]) { display: none }` na secção `@media print` |
+
+---
+
+## Resultado Esperado
+
+1. **Print preview**: Mostra apenas **1 página** (ou mais se a ficha tiver muito conteúdo)
+2. **Conteúdo**: Apenas a ficha A4 do modal, **sem UI da aplicação** (sem sidebar, sem página de fundo)
+3. **Tamanho**: A4 portrait (210x297mm)
+4. **Etiqueta**: Também funcionará correctamente porque usa o mesmo sistema de portal
+
+---
+
+## Secção Técnica
+
+### Selectores CSS Utilizados
+
+```css
+/* Esconde o root da aplicação React */
+#root { display: none !important; }
+
+/* Esconde tudo no body que não seja portal Radix ou print-portal */
+body > *:not([data-radix-portal]):not(.print-portal) { display: none !important; }
+
+/* Mantém portais Radix visíveis (onde o modal é renderizado) */
+[data-radix-portal] { display: block !important; visibility: visible !important; }
+```
+
+### Hierarquia de Visibilidade no Print
+
+| Elemento | Visível no Print? |
+|----------|-------------------|
+| `#root` (app React) | Não |
+| `body > script, style` | Não (não afecta) |
+| `[data-radix-portal]` | Sim |
+| `[data-radix-dialog-overlay]` | Não (já escondido) |
+| `DialogContent` | Sim |
+| `.print-modal-a4` | Sim |
+| `.print-sheet` | Sim |
+| `.no-print` | Não |
