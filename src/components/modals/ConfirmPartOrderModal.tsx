@@ -31,6 +31,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { parseCurrencyInput } from '@/utils/currencyUtils';
 import type { Service, ServicePart } from '@/types/database';
 
 interface ConfirmPartOrderModalProps {
@@ -115,7 +116,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             .from('service_parts')
             .update({
               estimated_arrival: estimatedArrival,
-              cost: cost ? parseFloat(cost) : null,
+              cost: cost ? parseCurrencyInput(cost) : null,
               notes: notes ? `${part.notes || ''}\nFornecedor: ${supplier}`.trim() : part.notes,
             })
             .eq('id', part.id)
@@ -252,10 +253,9 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="cost"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 150,00"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
                 className="pl-9"

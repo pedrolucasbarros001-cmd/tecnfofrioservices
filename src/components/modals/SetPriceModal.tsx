@@ -16,6 +16,7 @@ import { Shield, AlertTriangle } from 'lucide-react';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPricingSet } from '@/utils/activityLogUtils';
+import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { toast } from 'sonner';
 import type { Service, ServiceStatus } from '@/types/database';
 
@@ -48,8 +49,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     }
   }, [service, open, isWarrantyService]);
 
-  const priceValue = parseFloat(price) || 0;
-  const discountValue = parseFloat(discount) || 0;
+  const priceValue = parseCurrencyInput(price);
+  const discountValue = parseCurrencyInput(discount);
   const finalPrice = warrantyCoversAll ? 0 : Math.max(0, priceValue - discountValue);
 
   const handleSubmit = async () => {
@@ -172,10 +173,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             <Label htmlFor="price">Preço (€) *</Label>
             <Input
               id="price"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
+              type="text"
+              inputMode="decimal"
+              placeholder="Ex: 2.000,00"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               disabled={warrantyCoversAll}
@@ -198,10 +198,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             <Label htmlFor="discount">Desconto (€)</Label>
             <Input
               id="discount"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0"
+              type="text"
+              inputMode="decimal"
+              placeholder="Ex: 50,00"
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
               disabled={warrantyCoversAll}

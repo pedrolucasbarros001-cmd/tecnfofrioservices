@@ -56,6 +56,7 @@ import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
+import { parseCurrencyInput } from '@/utils/currencyUtils';
 import type { Customer } from '@/types/database';
 
 const formSchema = z.object({
@@ -613,12 +614,14 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                           <FormLabel>Preço Definido</FormLabel>
                           <FormControl>
                             <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Ex: 150.00"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="Ex: 2.000,00"
+                              value={field.value?.toString() || ''}
+                              onChange={(e) => {
+                                const parsed = parseCurrencyInput(e.target.value);
+                                field.onChange(parsed > 0 ? parsed : undefined);
+                              }}
                             />
                           </FormControl>
                           <FormDescription className="text-muted-foreground">
