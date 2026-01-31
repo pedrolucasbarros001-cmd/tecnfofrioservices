@@ -326,6 +326,40 @@
 }
 
 /* ======================================
+   PRINT PAGE STYLES - Dedicated Print Page
+   ====================================== */
+.print-page {
+  min-height: 100vh;
+  background: hsl(var(--muted));
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.print-page .print-controls {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: hsl(var(--card));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 210mm;
+}
+
+.print-page .print-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  padding: 10mm;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  border-radius: 0.25rem;
+}
+
+/* ======================================
    PRINT STYLES - Unified System
    Supports: A4 Sheet (via modal) & 80mm Tag (via portal)
    ====================================== */
@@ -391,14 +425,35 @@
     display: none !important;
   }
 
-  /* CRÍTICO: Esconder toda a aplicação React */
-  #root {
+  /* ========== PRINT PAGE (dedicated page) ========== */
+  /* When using the dedicated print page, show it */
+  .print-page {
+    background: white !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+  
+  .print-page .print-controls {
+    display: none !important;
+  }
+  
+  .print-page .print-sheet {
+    width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    border-radius: 0 !important;
+  }
+
+  /* For modal-based printing: hide React app */
+  body:not(:has(.print-page)) #root {
     display: none !important;
     visibility: hidden !important;
   }
 
-  /* Esconder todos os elementos do body que não são portais */
-  body > *:not([data-radix-portal]):not(.print-portal) {
+  /* Esconder todos os elementos do body que não são portais (only for modal printing) */
+  body:not(:has(.print-page)) > *:not([data-radix-portal]):not(.print-portal) {
     display: none !important;
   }
 

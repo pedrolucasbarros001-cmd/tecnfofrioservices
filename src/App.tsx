@@ -28,6 +28,7 @@ import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
 import ServiceRedirect from "@/pages/technician/ServiceRedirect";
 import ServiceConsultPage from "@/pages/ServiceConsultPage";
 import TVMonitorPage from "@/pages/TVMonitorPage";
+import ServicePrintPage from "@/pages/ServicePrintPage";
 import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
@@ -47,6 +48,13 @@ const App = () => (
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/tv-monitor" element={<TVMonitorPage />} />
+            
+            {/* Print page - protected but outside AppLayout */}
+            <Route path="/print/service/:serviceId" element={
+              <ProtectedRoute>
+                <ServicePrintPage />
+              </ProtectedRoute>
+            } />
             
             {/* Protected routes with layout */}
             <Route
