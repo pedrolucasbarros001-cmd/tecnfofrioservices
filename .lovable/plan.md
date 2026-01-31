@@ -1,86 +1,131 @@
 
-# Plano: Página Dedicada para Impressão da Ficha
+# Plano: Página Dedicada para Etiqueta + Acesso Universal via QR Code
 
-## Solução Proposta
+## Objectivo
 
-Criar uma **rota pública** `/print/service/:serviceId` que abre numa nova aba com o conteúdo da ficha formatado para A4, pronto para impressão. Sem sidebar, sem header, sem modal - apenas a ficha limpa.
+1. Criar página dedicada `/print/tag/:serviceId` para impressão da etiqueta (igual ao que foi feito para a ficha)
+2. Garantir que **todos os colaboradores autenticados** podem consultar **qualquer serviço** via QR Code
 
 ---
 
-## Como Vai Funcionar
+## Problema Actual - Acesso via QR Code
 
-1. Utilizador clica em **"Ver Ficha"** → Abre nova aba com `/print/service/{id}`
-2. A nova página carrega a ficha em formato A4, optimizada para impressão
-3. Utilizador pode usar `Cmd+P` / `Ctrl+P` para imprimir directamente
-4. Opção de "Baixar PDF" também disponível na página
+O QR Code das etiquetas aponta para `/service/:serviceId`, que usa a função `can_access_service` para validar acesso. Esta função **só permite técnicos verem serviços que lhes estão atribuídos**.
+
+```sql
+-- Actual: Técnico só vê serviços onde technician_id = o dele
+EXISTS (
+  SELECT 1 FROM public.services s
+  JOIN public.technicians t ON s.technician_id = t.id
+  WHERE s.id = _service_id 
+    AND t.profile_id = public.get_technician_profile_id(_user_id)
+)
+```
+
+**Resultado**: Se um técnico escanear o QR de um serviço de outro técnico, recebe "Serviço não encontrado".
+
+---
+
+## Solução
+
+### Parte 1: Página Dedicada para Etiqueta
+
+Criar `/print/tag/:serviceId` com a mesma abordagem da ficha:
+- Página limpa sem AppLayout
+- Botões "Imprimir" e "Baixar PDF"
+- Formato 80mm x 170mm para impressão
+
+### Parte 2: Acesso Universal para Colaboradores
+
+Modificar a função `can_access_service` para permitir que **qualquer colaborador autenticado** (dono, secretária ou técnico) possa ver **qualquer serviço**:
+
+```sql
+-- Proposta: Qualquer colaborador vê qualquer serviço
+SELECT 
+  public.is_dono(_user_id) OR 
+  public.is_secretaria(_user_id) OR 
+  public.is_tecnico(_user_id)  -- Apenas validar que é técnico, não precisa ser atribuído
+```
+
+Isto é seguro porque:
+- Apenas utilizadores autenticados com role válido acedem
+- Os técnicos já trabalham na mesma empresa
+- O objectivo do QR Code é permitir consulta rápida de qualquer aparelho na oficina
 
 ---
 
 ## Ficheiros a Criar/Alterar
 
-### 1. Nova Página: `src/pages/ServicePrintPage.tsx`
+### 1. Criar: `src/pages/TagPrintPage.tsx`
 
-Página dedicada à impressão que:
-- Não usa `AppLayout` (sem sidebar, sem header)
-- Carrega os dados do serviço via `serviceId` da URL
-- Renderiza a ficha A4 em tamanho real
-- Inclui botões flutuantes no topo: "Imprimir" e "Baixar PDF"
-- CSS específico para esconder os botões na hora de imprimir
+Nova página dedicada à impressão da etiqueta:
 
 ```
-/print/service/:serviceId → ServicePrintPage
-
-Layout da Página:
+Layout:
 ┌──────────────────────────────────────────┐
 │ [← Voltar]         [Imprimir] [PDF]      │  ← Barra no-print
 ├──────────────────────────────────────────┤
 │                                          │
-│     ┌────────────────────────────┐       │
-│     │                            │       │
-│     │     FICHA DE SERVIÇO       │       │
-│     │        (formato A4)        │       │
-│     │                            │       │
-│     │     [todo o conteúdo]      │       │
-│     │                            │       │
-│     └────────────────────────────┘       │
+│     ┌─────────────────────┐              │
+│     │   ═════════════     │ ← Separador  │
+│     │                     │              │
+│     │   [Logo TECNOFRIO]  │              │
+│     │                     │              │
+│     │   ┌─────────────┐   │              │
+│     │   │   QR CODE   │   │              │
+│     │   └─────────────┘   │              │
+│     │                     │              │
+│     │   TF-00XXX          │              │
+│     │                     │              │
+│     │   Cliente: ...      │              │
+│     │   Equipamento: ...  │              │
+│     │   Telefone: ...     │              │
+│     │                     │              │
+│     │   [Texto QR Code]   │              │
+│     └─────────────────────┘              │
 │                                          │
 └──────────────────────────────────────────┘
 ```
 
+Características:
+- Carrega serviço via `serviceId` da URL
+- Gera QR Code apontando para `/service/{id}`
+- Formato 80mm x 170mm
+- CSS específico para impressão
+
 ### 2. Actualizar: `src/App.tsx`
 
-Adicionar nova rota **fora do `AppLayout`** (como TVMonitorPage):
+Adicionar rota `/print/tag/:serviceId` fora do AppLayout:
 
 ```tsx
-{/* Public print routes - no layout */}
-<Route path="/print/service/:serviceId" element={
+<Route path="/print/tag/:serviceId" element={
   <ProtectedRoute>
-    <ServicePrintPage />
+    <TagPrintPage />
   </ProtectedRoute>
 } />
 ```
 
 ### 3. Actualizar: `src/components/services/ServiceDetailSheet.tsx`
 
-Alterar o botão "Ver Ficha" para abrir numa nova aba:
+Alterar botão "Ver Etiqueta" para abrir nova aba:
 
 ```tsx
 // Antes: abre modal
-onClick={() => setShowPrintModal(true)}
+onClick={() => setShowTagModal(true)}
 
 // Depois: abre nova aba
-onClick={() => window.open(`/print/service/${service.id}`, '_blank')}
+onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}
 ```
 
-Remover o `ServicePrintModal` deste componente (já não é necessário).
+Remover o `ServiceTagModal` deste componente.
 
 ### 4. Actualizar: `src/index.css`
 
-Adicionar regras CSS específicas para a página de impressão:
+Adicionar estilos para a página da etiqueta:
 
 ```css
-/* ========== PRINT PAGE STYLES ========== */
-.print-page {
+/* Tag Print Page */
+.print-tag-page {
   min-height: 100vh;
   background: #f5f5f5;
   padding: 2rem;
@@ -89,167 +134,155 @@ Adicionar regras CSS específicas para a página de impressão:
   align-items: center;
 }
 
-.print-page .print-controls {
-  position: sticky;
-  top: 0;
-  z-index: 50;
+.print-tag-page .print-tag-sheet {
+  width: 80mm;
+  min-height: 170mm;
   background: white;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  margin-bottom: 1.5rem;
-  width: 100%;
-  max-width: 210mm;
-}
-
-.print-page .print-sheet {
-  width: 210mm;
-  min-height: 297mm;
-  background: white;
-  padding: 10mm;
+  padding: 4mm;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
 }
 
 @media print {
-  .print-page {
+  .print-tag-page {
     background: white;
     padding: 0;
   }
   
-  .print-page .print-controls {
+  .print-tag-page .print-controls {
     display: none !important;
   }
   
-  .print-page .print-sheet {
-    width: 100%;
-    min-height: auto;
+  .print-tag-page .print-tag-sheet {
+    width: 80mm;
+    min-height: 170mm;
     box-shadow: none;
     margin: 0;
-    padding: 10mm;
   }
 }
 ```
 
+### 5. Migração SQL: Actualizar `can_access_service`
+
+Modificar a função para permitir qualquer técnico (não apenas o atribuído) ver serviços:
+
+```sql
+CREATE OR REPLACE FUNCTION public.can_access_service(_service_id uuid, _user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT 
+    public.is_dono(_user_id) OR 
+    public.is_secretaria(_user_id) OR 
+    public.is_tecnico(_user_id)
+$$;
+```
+
+**Nota**: Esta alteração permite que qualquer colaborador autenticado consulte qualquer serviço. Isto é necessário para o QR Code funcionar universalmente.
+
 ---
 
-## Conteúdo da Página de Impressão
-
-Reutilizar o mesmo layout da ficha que já existe no `ServicePrintModal`, mas agora como componente standalone:
-
-- Logo Tecnofrio
-- Código do serviço e data
-- Dados do cliente
-- Detalhes do serviço
-- Detalhes do equipamento
-- Diagnóstico (se houver)
-- Trabalho realizado (se houver)
-- Peças utilizadas (se houver)
-- Histórico de pagamentos (se houver)
-- Assinaturas (se houver)
-- Termos e condições
-- Watermark
-
----
-
-## Fluxo do Utilizador
+## Fluxo do QR Code (Após Alterações)
 
 ```
-ServiceDetailSheet
-       │
-       ▼ clica "Ver Ficha"
-       │
-   window.open('/print/service/{id}', '_blank')
+Técnico escaneia QR Code de qualquer serviço
        │
        ▼
-┌─────────────────────────────────┐
-│   Nova Aba - ServicePrintPage   │
-│                                 │
-│   [← Voltar] [Imprimir] [PDF]   │
-│                                 │
-│   ┌─────────────────────────┐   │
-│   │    FICHA DE SERVIÇO     │   │
-│   │      (A4 completo)      │   │
-│   └─────────────────────────┘   │
-│                                 │
-└─────────────────────────────────┘
+   /service/{id}
        │
-       ▼ clica "Imprimir"
+       ▼ can_access_service verifica:
+       │  - É dono? ✓
+       │  - É secretária? ✓  
+       │  - É técnico? ✓ (qualquer técnico)
        │
-   window.print() → Preview correcto!
+       ▼
+   ServiceConsultPage
+       │
+       ▼
+   Mostra ficha completa do serviço
 ```
-
----
-
-## Vantagens desta Abordagem
-
-1. **Sem interferência de overlays**: Não há modal, não há overlay Radix
-2. **Página limpa**: Só existe a ficha, nada mais para esconder
-3. **Print nativo funciona**: `Cmd+P` mostra exactamente o que está no ecrã
-4. **Compatível com todos os browsers**: Safari, Chrome, Firefox
-5. **Mantém PDF**: O botão "Baixar PDF" continua disponível
-6. **UX familiar**: Semelhante a como outras plataformas fazem (ex: facturas)
 
 ---
 
 ## Ficheiros Afectados
 
-| Ficheiro | Acção |
-|----------|-------|
-| `src/pages/ServicePrintPage.tsx` | **Criar** - Nova página dedicada |
-| `src/App.tsx` | **Editar** - Adicionar rota `/print/service/:serviceId` |
-| `src/components/services/ServiceDetailSheet.tsx` | **Editar** - Alterar botão para abrir nova aba |
-| `src/index.css` | **Editar** - Adicionar estilos `.print-page` |
+| Ficheiro | Acção | Descrição |
+|----------|-------|-----------|
+| `src/pages/TagPrintPage.tsx` | **Criar** | Página dedicada para impressão da etiqueta |
+| `src/App.tsx` | **Editar** | Adicionar rota `/print/tag/:serviceId` |
+| `src/components/services/ServiceDetailSheet.tsx` | **Editar** | Alterar botão para abrir nova aba, remover ServiceTagModal |
+| `src/index.css` | **Editar** | Adicionar estilos `.print-tag-page` |
+| **Migração SQL** | **Criar** | Actualizar função `can_access_service` |
 
 ---
 
 ## Resultado Esperado
 
-1. **Ver Ficha**: Abre nova aba com ficha A4 pronta para imprimir
-2. **Imprimir**: Preview mostra exactamente 1 página A4 (ou mais se necessário)
-3. **PDF**: Continua a funcionar via botão na página
-4. **Sem bugs Safari**: A página limpa não tem overlays nem modais
+1. **"Ver Etiqueta"**: Abre nova aba com etiqueta 80x170mm pronta para imprimir
+2. **Impressão**: Preview mostra exactamente a etiqueta no tamanho correcto
+3. **PDF**: Botão "Baixar PDF" gera etiqueta em PDF
+4. **QR Code Universal**: Qualquer técnico pode escanear qualquer etiqueta e ver os detalhes do serviço
+5. **Compatibilidade**: Funciona em Safari, Chrome e Firefox
 
 ---
 
 ## Secção Técnica
 
-### Estrutura do Componente ServicePrintPage
+### Estrutura do TagPrintPage
 
 ```tsx
-export default function ServicePrintPage() {
+export default function TagPrintPage() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   
-  // Fetch service data
   const { data: service, isLoading } = useQuery({...});
-  const { data: parts } = useQuery({...});
-  const { data: payments } = useQuery({...});
-  const { data: signatures } = useQuery({...});
   
   const handlePrint = () => window.print();
-  const handleDownloadPDF = async () => {...};
+  const handleDownloadPDF = async () => {
+    await generatePDF({ 
+      element: printRef.current, 
+      filename: `Etiqueta-${service.code}`,
+      format: [80, 170],
+      margin: 0
+    });
+  };
   
-  if (isLoading) return <Loading />;
+  const qrData = `${window.location.origin}/service/${service.id}`;
   
   return (
-    <div className="print-page">
-      {/* Controls - hidden in print */}
-      <div className="print-controls no-print">
-        <Button onClick={() => navigate(-1)}>← Voltar</Button>
-        <Button onClick={handlePrint}>Imprimir</Button>
-        <Button onClick={handleDownloadPDF}>Baixar PDF</Button>
-      </div>
+    <div className="print-tag-page">
+      <div className="print-controls no-print">...</div>
       
-      {/* A4 Sheet - this is what prints */}
-      <div ref={printRef} className="print-sheet">
-        {/* Full service sheet content */}
+      <div ref={printRef} className="print-tag-sheet">
+        <Separator className="bg-primary h-1 mb-4" />
+        <img src={logo} alt="TECNOFRIO" />
+        <QRCodeSVG value={qrData} size={140} level="H" />
+        <p className="font-mono font-bold">{service.code}</p>
+        <div>
+          <p>Cliente: {service.customer?.name}</p>
+          <p>Equipamento: {service.appliance_type} {service.brand}</p>
+          <p>Telefone: {service.customer?.phone}</p>
+        </div>
+        <p className="text-xs">Leia o QR Code para ver detalhes...</p>
       </div>
     </div>
   );
 }
 ```
 
-### Rota sem Layout
+### Justificação da Alteração RLS
 
-A rota `/print/service/:serviceId` fica **fora** do `<Route element={<AppLayout />}>`, assim como a rota `/tv-monitor`. Isto garante que não há sidebar nem header.
+A alteração na função `can_access_service` é segura porque:
+
+1. **Autenticação obrigatória**: Apenas utilizadores logados
+2. **Roles validados**: Só dono, secretária ou técnico
+3. **Mesmo contexto empresarial**: Todos trabalham na mesma oficina
+4. **Caso de uso**: Técnicos precisam consultar aparelhos que não lhes estão atribuídos (ex: aparelho na bancada de outro colega)
+5. **Sem dados sensíveis expostos**: A ficha de consulta não mostra dados financeiros detalhados que não sejam já visíveis
+
+### Rota da Etiqueta
+
+A rota `/print/tag/:serviceId` fica **fora** do `<Route element={<AppLayout />}>`, garantindo que não há sidebar nem header.
