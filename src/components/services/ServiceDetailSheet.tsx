@@ -39,7 +39,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ServiceTagModal } from '@/components/modals/ServiceTagModal';
-import { ServicePrintModal } from '@/components/modals/ServicePrintModal';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { SetPriceModal } from '@/components/modals/SetPriceModal';
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
@@ -159,7 +158,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   
   // Modal states
   const [showTagModal, setShowTagModal] = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -322,7 +320,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <SheetTitle className="font-mono text-xl">{service.code}</SheetTitle>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setShowPrintModal(true)}>
+                  <Button variant="outline" size="sm" onClick={() => window.open(`/print/service/${service.id}`, '_blank')}>
                     <FileText className="h-4 w-4 mr-1" />
                     Ver Ficha
                   </Button>
@@ -866,11 +864,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         service={service}
         open={showTagModal}
         onOpenChange={setShowTagModal}
-      />
-      <ServicePrintModal
-        service={service}
-        open={showPrintModal}
-        onOpenChange={setShowPrintModal}
       />
       <AssignTechnicianModal
         open={showAssignModal}
