@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Printer } from 'lucide-react';
+import { printServiceTag } from '@/utils/printUtils';
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           </DialogHeader>
 
           {/* Tag content - preview on screen */}
-          <div ref={tagRef} className="border rounded-lg p-4 bg-white">
+          <div ref={tagRef} className="print-tag border rounded-lg p-4 bg-white">
             <Separator className="bg-primary h-1 mb-4" />
             
             <div className="text-center space-y-3">
@@ -105,9 +106,13 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
+            </Button>
+            <Button variant="outline" onClick={() => printServiceTag()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
             </Button>
             <Button onClick={handleDownloadPDF} disabled={isGenerating}>
               {isGenerating ? (

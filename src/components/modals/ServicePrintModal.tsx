@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Download, PenTool, Loader2 } from 'lucide-react';
+import { AlertTriangle, Download, PenTool, Loader2, Printer } from 'lucide-react';
+import { printServiceSheet } from '@/utils/printUtils';
 import {
   Dialog,
   DialogContent,
@@ -452,14 +453,33 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         {/* Header com botões - escondido na impressão */}
         <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
           <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
-          <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            {isGenerating ? 'A gerar...' : 'Baixar PDF'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => {
+                // Garantir que o scroll está no topo para renderizar tudo
+                if (printSheetRef.current) {
+                  printSheetRef.current.scrollTop = 0;
+                }
+                // Pequeno delay para garantir render completo
+                setTimeout(() => {
+                  printServiceSheet();
+                }, 100);
+              }} 
+              size="sm" 
+              variant="outline"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
+            <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isGenerating ? 'A gerar...' : 'Baixar PDF'}
+            </Button>
+          </div>
         </div>
 
         {/* Conteúdo A4 - isto é o que será impresso */}

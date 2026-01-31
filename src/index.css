@@ -359,13 +359,19 @@
 
 /* ========== PRINT MEDIA STYLES ========== */
 @media print {
+  /* Reset geral - preservar cores */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   /* Page setup - A4 default */
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 10mm;
   }
 
-  /* Hide the main app */
+  /* Hide the main app UI */
   #root {
     display: none !important;
   }
@@ -382,7 +388,7 @@
     visibility: visible !important;
   }
 
-  /* Hide action headers in print */
+  /* Hide action headers/buttons in print */
   .no-print {
     display: none !important;
   }
@@ -393,22 +399,26 @@
     inset: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    height: auto !important;
+    max-height: none !important;
     margin: 0 !important;
+    padding: 0 !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     transform: none !important;
     background: white !important;
+    overflow: visible !important;
     z-index: 2147483647 !important;
   }
 
   .print-modal-a4 .print-sheet {
-    overflow: visible !important;
-    max-height: none !important;
+    width: 100% !important;
     height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
     padding: 10mm !important;
+    page-break-inside: avoid;
   }
 
   .print-modal-a4 .print-sheet * {
@@ -418,35 +428,59 @@
   /* Colored backgrounds in print */
   .print-modal-a4 .bg-amber-50 {
     background-color: #fffbeb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
   .print-modal-a4 .bg-purple-50 {
     background-color: #faf5ff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
   .print-modal-a4 .bg-gray-50 {
     background-color: #f9fafb !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
-  .print-modal-a4 svg {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  /* ========== TAG (80mm x 170mm) ========== */
+  /* Override @page for tag printing */
+  body.print-type-tag {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* ========== TAG (80mm x 170mm via portal) ========== */
+  /* Tag container - fixed size for 80x170mm */
+  .print-tag {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 80mm !important;
+    height: 170mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background: white !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    z-index: 2147483647 !important;
+  }
+
+  .print-tag * {
+    visibility: visible !important;
+  }
+
+  .print-tag img,
+  .print-tag svg {
+    max-width: 100% !important;
+  }
+
+  /* Print portal for elements that need to be shown outside #root */
   .print-portal {
     display: block !important;
     visibility: visible !important;
     position: fixed !important;
     inset: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    width: 100% !important;
+    height: 100% !important;
     background: white !important;
     z-index: 2147483647 !important;
     overflow: visible !important;
@@ -454,47 +488,6 @@
 
   .print-portal * {
     visibility: visible !important;
-  }
-
-  .print-tag {
-    display: block !important;
-    visibility: visible !important;
-    position: relative !important;
-    width: 80mm !important;
-    max-width: 80mm !important;
-    min-height: 170mm !important;
-    height: auto !important;
-    margin: 0 auto !important;
-    padding: 4mm !important;
-    background: white !important;
-    color: black !important;
-    font-size: 10px !important;
-    line-height: 1.3 !important;
-    border: 1px solid black !important;
-    box-shadow: none !important;
-  }
-
-  .print-tag * {
-    color: black !important;
-  }
-
-  .print-tag img,
-  .print-tag svg {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-tag .service-code {
-    font-size: 18px !important;
-    font-weight: bold !important;
-    letter-spacing: 2px !important;
-  }
-}
-
-/* Tag @page size - must be at top level for some browsers */
-@media print {
-  body.print-type-tag {
-    /* This class is added via JS before print */
   }
 }
 
