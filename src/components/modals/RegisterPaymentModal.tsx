@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPayment } from '@/utils/activityLogUtils';
+import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Service, PaymentMethod } from '@/types/database';
@@ -63,7 +64,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     }
   }, [service, open, remainingBalance]);
 
-  const paymentValue = parseFloat(amount) || 0;
+  const paymentValue = parseCurrencyInput(amount);
   const newBalance = Math.max(0, remainingBalance - paymentValue);
 
   const handleSubmit = async () => {
@@ -184,11 +185,9 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
             <Label htmlFor="amount">Valor a Pagar (€) *</Label>
             <Input
               id="amount"
-              type="number"
-              min="0.01"
-              max={remainingBalance}
-              step="0.01"
-              placeholder={`Max: €${remainingBalance.toFixed(2)}`}
+              type="text"
+              inputMode="decimal"
+              placeholder={`Ex: 2.000,00 (Max: €${remainingBalance.toFixed(2)})`}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
