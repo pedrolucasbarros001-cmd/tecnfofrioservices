@@ -1,151 +1,217 @@
 
+# Plano: Restaurar Impressão Nativa + Garantir Alinhamento
 
-# Plano: Corrigir Assinaturas no PDF e Adicionar à Página de Consulta
+## Problema Actual
 
-## Problemas Identificados
+O PDF gerado via `html2pdf.js` está a cortar o conteúdo. A solução é restaurar a impressão nativa do browser (`window.print()`) com CSS `@media print` bem configurado, mantendo o botão PDF como alternativa.
 
-### 1. Assinatura no PDF com texto cortado
-Olhando para o PDF gerado, vejo que:
-- A descrição da assinatura está cortada ("para reparação em oficina" fica "para reparação em ofici...")  
-- Isto acontece porque o texto está a ser truncado devido ao espaço limitado
+## Solução
 
-### 2. Tamanho da assinatura pequeno
-- A assinatura está visível mas muito comprimida (96x64px)
-- Deveria ser maior para ser legível
-
-### 3. Página de Consulta sem assinaturas
-- A `ServiceConsultPage` (acessada via QR Code) não busca nem exibe assinaturas
-- O utilizador quer ver as assinaturas tanto na ficha para baixar quanto na ficha de consulta
-
-## Solucao Proposta
-
-### Parte 1: Melhorar Assinaturas no ServicePrintModal
+### Parte 1: Restaurar Botão "Imprimir" no Modal da Ficha
 
 **Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
 
-Alteracoes nas linhas 406-424 (PrintContent) e 754-773 (versao desktop):
+Alterações no header do modal (linhas 452-463):
+- Adicionar botão "Imprimir" ao lado do botão "Baixar PDF"
+- Importar `Printer` do lucide-react
+- Importar `printServiceSheet` do `printUtils.ts`
 
-1. **Aumentar tamanho da imagem** de 96x64px para 120x80px
-2. **Garantir que a descricao nao corta** - usar `white-space: normal` e `word-break: break-word`
-3. **Melhorar espacamento** para acomodar o texto completo
-
-**Codigo actual (linhas 408-423):**
 ```tsx
-<div style={{ display: 'flex', gap: '12px', padding: '12px', ... }}>
-  <img style={{ width: '96px', height: '64px', ... }} />
-  <div style={{ flex: 1 }}>
-    <p style={{ fontSize: '11px', ... }}>
-      {getSignatureDescription(sig.signature_type)}
-    </p>
+// Header com botões
+<div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
+  <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
+  <div className="flex gap-2">
+    <Button onClick={() => printServiceSheet()} size="sm" variant="outline">
+      <Printer className="h-4 w-4 mr-2" />
+      Imprimir
+    </Button>
+    <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
+      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+      {isGenerating ? 'A gerar...' : 'Baixar PDF'}
+    </Button>
   </div>
 </div>
 ```
 
-**Codigo corrigido:**
+### Parte 2: Restaurar Botão "Imprimir" no Modal da Etiqueta
+
+**Ficheiro:** `src/components/modals/ServiceTagModal.tsx`
+
+Alterações:
+- Adicionar botão "Imprimir" antes do "Baixar Etiqueta"
+- Importar `Printer` do lucide-react
+- Importar `printServiceTag` do `printUtils.ts`
+- Adicionar classes de impressão ao conteúdo da tag
+
 ```tsx
-<div style={{ display: 'flex', gap: '16px', padding: '12px', ... }}>
-  <img style={{ width: '120px', height: '80px', ... }} />
-  <div style={{ flex: 1, minWidth: 0 }}>
-    <p style={{ fontSize: '11px', lineHeight: '1.4', wordBreak: 'break-word' }}>
-      {getSignatureDescription(sig.signature_type)}
-    </p>
-  </div>
-</div>
+// Footer com botões
+<DialogFooter className="gap-2">
+  <Button variant="outline" onClick={() => onOpenChange(false)}>
+    Cancelar
+  </Button>
+  <Button variant="outline" onClick={() => printServiceTag()}>
+    <Printer className="h-4 w-4 mr-2" />
+    Imprimir
+  </Button>
+  <Button onClick={handleDownloadPDF} disabled={isGenerating}>
+    {isGenerating ? <Loader2 /> : <Download />}
+    {isGenerating ? 'A gerar...' : 'Baixar Etiqueta'}
+  </Button>
+</DialogFooter>
 ```
 
-**Mesma alteracao para a versao desktop (linhas 756-772):**
-- Mudar classe de `w-24 h-16` para `w-32 h-20` (128x80px)
-- Adicionar `break-words` ao paragrafo da descricao
-
-### Parte 2: Adicionar Assinaturas a ServiceConsultPage
-
-**Ficheiro:** `src/pages/ServiceConsultPage.tsx`
-
-Esta pagina e acessada quando alguem escaneia o QR Code. Actualmente nao mostra assinaturas.
-
-**Alteracoes necessarias:**
-
-1. Adicionar query para buscar assinaturas (similar ao ServicePrintModal)
-2. Adicionar query para buscar fotos
-3. Adicionar seccao visual para exibir assinaturas
-4. Adicionar import do icone PenTool
-
-**Novo codigo a adicionar:**
-
+Também adicionar a classe `print-tag` ao container da etiqueta para que o CSS de impressão funcione:
 ```tsx
-// Importar
-import { PenTool } from 'lucide-react';
-import type { ServiceSignature, ServicePhoto } from '@/types/database';
+<div ref={tagRef} className="print-tag border rounded-lg p-4 bg-white">
+```
 
-// Helper para descricao de assinatura
-const getSignatureDescription = (type: string | null): string => {
-  switch (type) {
-    case 'recolha': return 'Autorizacao de levantamento do aparelho';
-    case 'entrega': return 'Confirmacao da entrega do aparelho';
-    case 'visita': return 'Confirmacao da execucao do servico no local';
-    case 'pedido_peca': return 'Autorizacao para encomenda de peca';
-    default: return 'Assinatura do cliente';
+### Parte 3: Ajustar CSS de Impressão
+
+**Ficheiro:** `src/index.css`
+
+O CSS actual já tem regras para A4 e 80x170mm, mas precisamos de alguns ajustes:
+
+1. **Garantir que o modal A4 usa todo o espaço disponível na impressão**
+2. **Garantir que a etiqueta é centrada e não cortada**
+3. **Adicionar regra `@page` específica para a tag**
+
+```css
+/* ========== PRINT MEDIA STYLES ========== */
+@media print {
+  /* Reset geral */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* Page setup - A4 default */
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  /* Page específica para tag */
+  body.print-type-tag @page {
+    size: 80mm 170mm;
+    margin: 0;
+  }
+
+  /* Esconder UI do app */
+  #root,
+  [data-radix-dialog-overlay],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Mostrar elementos de impressão */
+  .print-only,
+  .print-portal {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* ===== FICHA A4 ===== */
+  .print-modal-a4 {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    background: white !important;
+    overflow: visible !important;
+    z-index: 2147483647 !important;
+  }
+
+  .print-modal-a4 .print-sheet {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    page-break-inside: avoid;
+  }
+
+  /* ===== ETIQUETA 80x170mm ===== */
+  .print-tag {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 80mm !important;
+    height: 170mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+}
+```
+
+### Parte 4: Garantir Renderização Completa
+
+O problema de corte pode ocorrer porque o `printSheetRef` captura apenas a área visível do scroll. Precisamos garantir que todo o conteúdo é renderizado antes da impressão.
+
+**Ficheiro:** `src/components/modals/ServicePrintModal.tsx`
+
+Adicionar função que força renderização completa antes de imprimir:
+
+```tsx
+const handlePrint = () => {
+  // Garantir que o scroll está no topo para renderizar tudo
+  if (printSheetRef.current) {
+    printSheetRef.current.scrollTop = 0;
+  }
+  // Pequeno delay para garantir render completo
+  setTimeout(() => {
+    printServiceSheet();
+  }, 100);
 };
-
-// Query para buscar assinaturas
-const { data: signatures = [] } = useQuery({
-  queryKey: ['service-consult-signatures', serviceId],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('service_signatures')
-      .select('*')
-      .eq('service_id', serviceId)
-      .order('signed_at', { ascending: true });
-    if (error) throw error;
-    return data as ServiceSignature[];
-  },
-  enabled: !!serviceId,
-});
-
-// Card de Assinaturas (adicionar apos o Card de Valor)
-{signatures.length > 0 && (
-  <Card>
-    <CardHeader className="pb-2">
-      <CardTitle className="text-sm flex items-center gap-2">
-        <PenTool className="h-4 w-4" />
-        Assinaturas Recolhidas
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      {signatures.map((sig) => (
-        <div key={sig.id} className="flex gap-3 p-3 border rounded-lg bg-muted/30">
-          <img 
-            src={sig.file_url} 
-            alt="Assinatura" 
-            className="w-28 h-20 object-contain border bg-white rounded"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {getSignatureDescription(sig.signature_type)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {format(new Date(sig.signed_at), "dd/MM/yyyy 'as' HH:mm", { locale: pt })}
-            </p>
-          </div>
-        </div>
-      ))}
-    </CardContent>
-  </Card>
-)}
 ```
 
 ## Resumo de Ficheiros
 
-| Ficheiro | Alteracao |
+| Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/modals/ServicePrintModal.tsx` | Aumentar tamanho assinatura, corrigir texto cortado |
-| `src/pages/ServiceConsultPage.tsx` | Adicionar busca e exibicao de assinaturas |
+| `src/components/modals/ServicePrintModal.tsx` | Adicionar botão "Imprimir" + função handlePrint |
+| `src/components/modals/ServiceTagModal.tsx` | Adicionar botão "Imprimir" + classe print-tag |
+| `src/index.css` | Melhorar regras @media print para A4 e 80x170mm |
 
 ## Resultado Esperado
 
-1. **PDF da Ficha**: Assinaturas maiores (120x80px) com descricao completa sem cortes
-2. **Pagina de Consulta**: Card de "Assinaturas Recolhidas" com imagem legivel e descricao completa
-3. **Formato A4**: Mantido - o conteudo ajusta-se ao espaco disponivel
+1. **Modal Ficha**: Dois botões - "Imprimir" (abre diálogo de impressão do browser) e "Baixar PDF"
+2. **Modal Etiqueta**: Dois botões - "Imprimir" e "Baixar Etiqueta"
+3. **Preview de Impressão**: Conteúdo completo e bem alinhado, sem cortes
+4. **Tamanhos**: Ficha em A4 (210x297mm), Etiqueta em 80x170mm
 
+## Secção Técnica
+
+### Porquê a impressão nativa é melhor neste caso
+
+A biblioteca `html2pdf.js` utiliza `html2canvas` internamente, que tem limitações:
+- Não suporta bem conteúdo que excede a área visível (scroll)
+- Pode cortar elementos que não estão renderizados no DOM visível
+- Tem problemas com fontes e cores específicas
+
+A impressão nativa do browser (`window.print()`) com CSS `@media print`:
+- Renderiza todo o conteúdo, independente do scroll
+- Suporta múltiplas páginas automaticamente
+- Respeita regras `@page` para tamanhos específicos
+- Permite ao utilizador escolher impressora e configurações
+
+### Classes CSS utilizadas
+
+- `.print-modal-a4`: Aplicada ao DialogContent do modal da ficha
+- `.print-sheet`: Aplicada ao container interno com o conteúdo A4
+- `.print-tag`: Aplicada ao container da etiqueta
+- `.no-print`: Aplicada a elementos que devem ser escondidos na impressão
+- `.print-only`: Aplicada a elementos que só aparecem na impressão
