@@ -1,288 +1,172 @@
 
-# Plano: Página Dedicada para Etiqueta + Acesso Universal via QR Code
 
-## Objectivo
+# Plano: Suportar Valores Acima de 1.000€
 
-1. Criar página dedicada `/print/tag/:serviceId` para impressão da etiqueta (igual ao que foi feito para a ficha)
-2. Garantir que **todos os colaboradores autenticados** podem consultar **qualquer serviço** via QR Code
+## Problema Identificado
 
----
+Quando o utilizador escreve "2.000" (dois mil euros no formato português), o input `type="number"` interpreta o ponto como **separador decimal**, resultando em "2.00" (dois euros).
 
-## Problema Actual - Acesso via QR Code
-
-O QR Code das etiquetas aponta para `/service/:serviceId`, que usa a função `can_access_service` para validar acesso. Esta função **só permite técnicos verem serviços que lhes estão atribuídos**.
-
-```sql
--- Actual: Técnico só vê serviços onde technician_id = o dele
-EXISTS (
-  SELECT 1 FROM public.services s
-  JOIN public.technicians t ON s.technician_id = t.id
-  WHERE s.id = _service_id 
-    AND t.profile_id = public.get_technician_profile_id(_user_id)
-)
-```
-
-**Resultado**: Se um técnico escanear o QR de um serviço de outro técnico, recebe "Serviço não encontrado".
-
----
+Isto acontece porque:
+- **Formato Português**: 2.000,00 = dois mil euros (ponto = milhares, vírgula = decimais)
+- **Formato HTML number**: 2.000 = dois euros (ponto = decimais)
 
 ## Solução
 
-### Parte 1: Página Dedicada para Etiqueta
+Mudar os campos de valor monetário de `type="number"` para `type="text"` com:
+1. **Padrão de input** que aceita números e separadores
+2. **Função de parsing** que converte formatos europeus
+3. **Validação** para garantir valores válidos
+4. **Formatação visual** para o utilizador ver o valor correctamente
 
-Criar `/print/tag/:serviceId` com a mesma abordagem da ficha:
-- Página limpa sem AppLayout
-- Botões "Imprimir" e "Baixar PDF"
-- Formato 80mm x 170mm para impressão
+## Ficheiros a Alterar
 
-### Parte 2: Acesso Universal para Colaboradores
+| Ficheiro | Campos Afectados |
+|----------|------------------|
+| `src/components/modals/RegisterPaymentModal.tsx` | Valor do pagamento |
+| `src/components/modals/SetPriceModal.tsx` | Preço, Desconto |
+| `src/components/modals/ConfirmPartOrderModal.tsx` | Custo da peça |
+| `src/components/modals/CreateInstallationModal.tsx` | Valor da instalação |
+| `src/components/modals/CreateDeliveryModal.tsx` | Valor da entrega |
 
-Modificar a função `can_access_service` para permitir que **qualquer colaborador autenticado** (dono, secretária ou técnico) possa ver **qualquer serviço**:
+## Implementação
 
-```sql
--- Proposta: Qualquer colaborador vê qualquer serviço
-SELECT 
-  public.is_dono(_user_id) OR 
-  public.is_secretaria(_user_id) OR 
-  public.is_tecnico(_user_id)  -- Apenas validar que é técnico, não precisa ser atribuído
+### 1. Criar Utilitário de Parsing (novo ficheiro)
+
+Criar `src/utils/currencyUtils.ts` com funções para:
+
+```typescript
+// Converte string para número, aceitando formatos PT/EU
+// "2.000,50" → 2000.50
+// "2000.50" → 2000.50
+// "2000" → 2000
+export function parseCurrencyInput(value: string): number
+
+// Formata número para exibição (opcional)
+export function formatCurrency(value: number): string
 ```
 
-Isto é seguro porque:
-- Apenas utilizadores autenticados com role válido acedem
-- Os técnicos já trabalham na mesma empresa
-- O objectivo do QR Code é permitir consulta rápida de qualquer aparelho na oficina
+Lógica do parsing:
+- Se contém vírgula como último separador → formato PT (1.234,56)
+- Se contém ponto como último separador e mais de 2 dígitos depois → milhares PT (1.234)
+- Caso contrário → formato numérico normal
 
----
-
-## Ficheiros a Criar/Alterar
-
-### 1. Criar: `src/pages/TagPrintPage.tsx`
-
-Nova página dedicada à impressão da etiqueta:
-
-```
-Layout:
-┌──────────────────────────────────────────┐
-│ [← Voltar]         [Imprimir] [PDF]      │  ← Barra no-print
-├──────────────────────────────────────────┤
-│                                          │
-│     ┌─────────────────────┐              │
-│     │   ═════════════     │ ← Separador  │
-│     │                     │              │
-│     │   [Logo TECNOFRIO]  │              │
-│     │                     │              │
-│     │   ┌─────────────┐   │              │
-│     │   │   QR CODE   │   │              │
-│     │   └─────────────┘   │              │
-│     │                     │              │
-│     │   TF-00XXX          │              │
-│     │                     │              │
-│     │   Cliente: ...      │              │
-│     │   Equipamento: ...  │              │
-│     │   Telefone: ...     │              │
-│     │                     │              │
-│     │   [Texto QR Code]   │              │
-│     └─────────────────────┘              │
-│                                          │
-└──────────────────────────────────────────┘
-```
-
-Características:
-- Carrega serviço via `serviceId` da URL
-- Gera QR Code apontando para `/service/{id}`
-- Formato 80mm x 170mm
-- CSS específico para impressão
-
-### 2. Actualizar: `src/App.tsx`
-
-Adicionar rota `/print/tag/:serviceId` fora do AppLayout:
+### 2. Actualizar RegisterPaymentModal
 
 ```tsx
-<Route path="/print/tag/:serviceId" element={
-  <ProtectedRoute>
-    <TagPrintPage />
-  </ProtectedRoute>
-} />
+// Antes
+<Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+const paymentValue = parseFloat(amount) || 0;
+
+// Depois
+<Input 
+  type="text" 
+  inputMode="decimal"
+  placeholder="Ex: 2.000,00"
+  value={amount} 
+  onChange={(e) => setAmount(e.target.value)} 
+/>
+const paymentValue = parseCurrencyInput(amount);
 ```
 
-### 3. Actualizar: `src/components/services/ServiceDetailSheet.tsx`
+### 3. Actualizar SetPriceModal
 
-Alterar botão "Ver Etiqueta" para abrir nova aba:
+Aplicar a mesma lógica aos campos:
+- **Preço** (linha 173-182)
+- **Desconto** (linha 199-208)
 
-```tsx
-// Antes: abre modal
-onClick={() => setShowTagModal(true)}
+### 4. Actualizar ConfirmPartOrderModal
 
-// Depois: abre nova aba
-onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}
-```
+Aplicar ao campo de **custo da peça**.
 
-Remover o `ServiceTagModal` deste componente.
+### 5. Actualizar CreateInstallationModal e CreateDeliveryModal
 
-### 4. Actualizar: `src/index.css`
+Aplicar aos campos de **valor**.
 
-Adicionar estilos para a página da etiqueta:
+## Lógica de Parsing Detalhada
 
-```css
-/* Tag Print Page */
-.print-tag-page {
-  min-height: 100vh;
-  background: #f5f5f5;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.print-tag-page .print-tag-sheet {
-  width: 80mm;
-  min-height: 170mm;
-  background: white;
-  padding: 4mm;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-
-@media print {
-  .print-tag-page {
-    background: white;
-    padding: 0;
+```typescript
+export function parseCurrencyInput(value: string): number {
+  if (!value || typeof value !== 'string') return 0;
+  
+  // Remove espaços
+  let cleaned = value.trim();
+  
+  // Detectar formato europeu: 1.234,56 ou 1234,56
+  // Se tem vírgula, assume formato PT/EU
+  if (cleaned.includes(',')) {
+    // Remove pontos (milhares) e substitui vírgula por ponto
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes('.')) {
+    // Verificar se é ponto de milhares (ex: 2.000 sem decimais)
+    const parts = cleaned.split('.');
+    const lastPart = parts[parts.length - 1];
+    
+    // Se último grupo tem 3 dígitos, provavelmente é milhares
+    // Ex: "2.000" → 2000, "2.50" → 2.50
+    if (parts.length > 1 && lastPart.length === 3 && /^\d+$/.test(lastPart)) {
+      // Provavelmente milhares: 2.000 → 2000
+      cleaned = cleaned.replace(/\./g, '');
+    }
+    // Caso contrário, mantém como decimal: 2.50 → 2.50
   }
   
-  .print-tag-page .print-controls {
-    display: none !important;
-  }
-  
-  .print-tag-page .print-tag-sheet {
-    width: 80mm;
-    min-height: 170mm;
-    box-shadow: none;
-    margin: 0;
-  }
+  const result = parseFloat(cleaned);
+  return isNaN(result) ? 0 : result;
 }
 ```
 
-### 5. Migração SQL: Actualizar `can_access_service`
+## Exemplos de Conversão
 
-Modificar a função para permitir qualquer técnico (não apenas o atribuído) ver serviços:
+| Input | Resultado |
+|-------|-----------|
+| `2000` | 2000 |
+| `2.000` | 2000 (detecta milhares) |
+| `2.000,00` | 2000 |
+| `2,50` | 2.50 |
+| `1.234,56` | 1234.56 |
+| `50.00` | 50 |
+| `50,00` | 50 |
 
-```sql
-CREATE OR REPLACE FUNCTION public.can_access_service(_service_id uuid, _user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT 
-    public.is_dono(_user_id) OR 
-    public.is_secretaria(_user_id) OR 
-    public.is_tecnico(_user_id)
-$$;
+## Validação Adicional
+
+Nos handlers de submit, manter validação:
+
+```typescript
+const paymentValue = parseCurrencyInput(amount);
+if (paymentValue <= 0) {
+  toast.error('Introduza um valor válido');
+  return;
+}
 ```
-
-**Nota**: Esta alteração permite que qualquer colaborador autenticado consulte qualquer serviço. Isto é necessário para o QR Code funcionar universalmente.
-
----
-
-## Fluxo do QR Code (Após Alterações)
-
-```
-Técnico escaneia QR Code de qualquer serviço
-       │
-       ▼
-   /service/{id}
-       │
-       ▼ can_access_service verifica:
-       │  - É dono? ✓
-       │  - É secretária? ✓  
-       │  - É técnico? ✓ (qualquer técnico)
-       │
-       ▼
-   ServiceConsultPage
-       │
-       ▼
-   Mostra ficha completa do serviço
-```
-
----
-
-## Ficheiros Afectados
-
-| Ficheiro | Acção | Descrição |
-|----------|-------|-----------|
-| `src/pages/TagPrintPage.tsx` | **Criar** | Página dedicada para impressão da etiqueta |
-| `src/App.tsx` | **Editar** | Adicionar rota `/print/tag/:serviceId` |
-| `src/components/services/ServiceDetailSheet.tsx` | **Editar** | Alterar botão para abrir nova aba, remover ServiceTagModal |
-| `src/index.css` | **Editar** | Adicionar estilos `.print-tag-page` |
-| **Migração SQL** | **Criar** | Actualizar função `can_access_service` |
-
----
 
 ## Resultado Esperado
 
-1. **"Ver Etiqueta"**: Abre nova aba com etiqueta 80x170mm pronta para imprimir
-2. **Impressão**: Preview mostra exactamente a etiqueta no tamanho correcto
-3. **PDF**: Botão "Baixar PDF" gera etiqueta em PDF
-4. **QR Code Universal**: Qualquer técnico pode escanear qualquer etiqueta e ver os detalhes do serviço
-5. **Compatibilidade**: Funciona em Safari, Chrome e Firefox
-
----
+1. **"2.000"** → Registado como **€2.000,00** (dois mil euros)
+2. **"1.500,50"** → Registado como **€1.500,50**
+3. **"50"** → Registado como **€50,00**
+4. **"2,50"** → Registado como **€2,50**
 
 ## Secção Técnica
 
-### Estrutura do TagPrintPage
+### Atributo `inputMode`
 
-```tsx
-export default function TagPrintPage() {
-  const { serviceId } = useParams();
-  const navigate = useNavigate();
-  const printRef = useRef<HTMLDivElement>(null);
-  
-  const { data: service, isLoading } = useQuery({...});
-  
-  const handlePrint = () => window.print();
-  const handleDownloadPDF = async () => {
-    await generatePDF({ 
-      element: printRef.current, 
-      filename: `Etiqueta-${service.code}`,
-      format: [80, 170],
-      margin: 0
-    });
-  };
-  
-  const qrData = `${window.location.origin}/service/${service.id}`;
-  
-  return (
-    <div className="print-tag-page">
-      <div className="print-controls no-print">...</div>
-      
-      <div ref={printRef} className="print-tag-sheet">
-        <Separator className="bg-primary h-1 mb-4" />
-        <img src={logo} alt="TECNOFRIO" />
-        <QRCodeSVG value={qrData} size={140} level="H" />
-        <p className="font-mono font-bold">{service.code}</p>
-        <div>
-          <p>Cliente: {service.customer?.name}</p>
-          <p>Equipamento: {service.appliance_type} {service.brand}</p>
-          <p>Telefone: {service.customer?.phone}</p>
-        </div>
-        <p className="text-xs">Leia o QR Code para ver detalhes...</p>
-      </div>
-    </div>
-  );
-}
-```
+Usar `inputMode="decimal"` para que teclados móveis mostrem o teclado numérico com separadores.
 
-### Justificação da Alteração RLS
+### Compatibilidade
 
-A alteração na função `can_access_service` é segura porque:
+Esta abordagem é compatível com:
+- Desktop: Qualquer formato aceite
+- Mobile: Teclado numérico decimal
+- Safari/Chrome/Firefox: Todos suportam
 
-1. **Autenticação obrigatória**: Apenas utilizadores logados
-2. **Roles validados**: Só dono, secretária ou técnico
-3. **Mesmo contexto empresarial**: Todos trabalham na mesma oficina
-4. **Caso de uso**: Técnicos precisam consultar aparelhos que não lhes estão atribuídos (ex: aparelho na bancada de outro colega)
-5. **Sem dados sensíveis expostos**: A ficha de consulta não mostra dados financeiros detalhados que não sejam já visíveis
+### Ficheiros Criados/Alterados
 
-### Rota da Etiqueta
+| Ficheiro | Acção |
+|----------|-------|
+| `src/utils/currencyUtils.ts` | **Criar** - Funções de parsing |
+| `src/components/modals/RegisterPaymentModal.tsx` | **Editar** - Usar parseCurrencyInput |
+| `src/components/modals/SetPriceModal.tsx` | **Editar** - Usar parseCurrencyInput |
+| `src/components/modals/ConfirmPartOrderModal.tsx` | **Editar** - Usar parseCurrencyInput |
+| `src/components/modals/CreateInstallationModal.tsx` | **Editar** - Usar parseCurrencyInput |
+| `src/components/modals/CreateDeliveryModal.tsx` | **Editar** - Usar parseCurrencyInput |
 
-A rota `/print/tag/:serviceId` fica **fora** do `<Route element={<AppLayout />}>`, garantindo que não há sidebar nem header.
