@@ -1,143 +1,255 @@
 
-## Objectivo
+# Plano: Página Dedicada para Impressão da Ficha
 
-Fazer o print preview mostrar **apenas a ficha do modal** (1 página A4), escondendo toda a UI da aplicação (sidebar, OficinaPage, ServiceDetailSheet, etc.).
+## Solução Proposta
 
----
-
-## Problema Actual
-
-Olhando para a captura de tela, o print preview mostra **3 páginas** porque:
-
-1. O CSS de impressão **não esconde o `#root`** (toda a aplicação)
-2. Apenas esconde o overlay do Radix e elementos com `.no-print`
-3. Resultado: A ficha do modal aparece + a página de oficina + o sheet de detalhes - tudo misturado no print
-
-O CSS actual (linhas 360-484 de `index.css`) não tem nenhuma regra para esconder `#root`.
+Criar uma **rota pública** `/print/service/:serviceId` que abre numa nova aba com o conteúdo da ficha formatado para A4, pronto para impressão. Sem sidebar, sem header, sem modal - apenas a ficha limpa.
 
 ---
 
-## Solução: Esconder #root e Mostrar Apenas o Portal
+## Como Vai Funcionar
 
-### Ficheiro: `src/index.css`
+1. Utilizador clica em **"Ver Ficha"** → Abre nova aba com `/print/service/{id}`
+2. A nova página carrega a ficha em formato A4, optimizada para impressão
+3. Utilizador pode usar `Cmd+P` / `Ctrl+P` para imprimir directamente
+4. Opção de "Baixar PDF" também disponível na página
 
-Adicionar regras na secção `@media print` (após linha 392) para:
+---
 
-1. **Esconder completamente o `#root`** (toda a aplicação React)
-2. **Esconder todos os filhos do body** excepto portais Radix e print-portal
-3. **Garantir que o portal Radix é visível** (onde o modal está)
+## Ficheiros a Criar/Alterar
+
+### 1. Nova Página: `src/pages/ServicePrintPage.tsx`
+
+Página dedicada à impressão que:
+- Não usa `AppLayout` (sem sidebar, sem header)
+- Carrega os dados do serviço via `serviceId` da URL
+- Renderiza a ficha A4 em tamanho real
+- Inclui botões flutuantes no topo: "Imprimir" e "Baixar PDF"
+- CSS específico para esconder os botões na hora de imprimir
+
+```
+/print/service/:serviceId → ServicePrintPage
+
+Layout da Página:
+┌──────────────────────────────────────────┐
+│ [← Voltar]         [Imprimir] [PDF]      │  ← Barra no-print
+├──────────────────────────────────────────┤
+│                                          │
+│     ┌────────────────────────────┐       │
+│     │                            │       │
+│     │     FICHA DE SERVIÇO       │       │
+│     │        (formato A4)        │       │
+│     │                            │       │
+│     │     [todo o conteúdo]      │       │
+│     │                            │       │
+│     └────────────────────────────┘       │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+### 2. Actualizar: `src/App.tsx`
+
+Adicionar nova rota **fora do `AppLayout`** (como TVMonitorPage):
+
+```tsx
+{/* Public print routes - no layout */}
+<Route path="/print/service/:serviceId" element={
+  <ProtectedRoute>
+    <ServicePrintPage />
+  </ProtectedRoute>
+} />
+```
+
+### 3. Actualizar: `src/components/services/ServiceDetailSheet.tsx`
+
+Alterar o botão "Ver Ficha" para abrir numa nova aba:
+
+```tsx
+// Antes: abre modal
+onClick={() => setShowPrintModal(true)}
+
+// Depois: abre nova aba
+onClick={() => window.open(`/print/service/${service.id}`, '_blank')}
+```
+
+Remover o `ServicePrintModal` deste componente (já não é necessário).
+
+### 4. Actualizar: `src/index.css`
+
+Adicionar regras CSS específicas para a página de impressão:
 
 ```css
+/* ========== PRINT PAGE STYLES ========== */
+.print-page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.print-page .print-controls {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 210mm;
+}
+
+.print-page .print-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  padding: 10mm;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
 @media print {
-  /* ... regras existentes ... */
-
-  /* CRÍTICO: Esconder toda a aplicação React */
-  #root {
-    display: none !important;
-    visibility: hidden !important;
+  .print-page {
+    background: white;
+    padding: 0;
   }
-
-  /* Esconder todos os elementos do body que não são portais */
-  body > *:not([data-radix-portal]):not(.print-portal) {
+  
+  .print-page .print-controls {
     display: none !important;
   }
-
-  /* Mostrar apenas portais Radix (onde o modal está renderizado) */
-  [data-radix-portal] {
-    display: block !important;
-    visibility: visible !important;
+  
+  .print-page .print-sheet {
+    width: 100%;
+    min-height: auto;
+    box-shadow: none;
+    margin: 0;
+    padding: 10mm;
   }
 }
 ```
 
 ---
 
-## Por Que Funciona
+## Conteúdo da Página de Impressão
 
-O Radix UI renderiza modais através de **Portals** - elementos que são inseridos directamente no `<body>`, fora do `#root`:
+Reutilizar o mesmo layout da ficha que já existe no `ServicePrintModal`, mas agora como componente standalone:
 
-```text
-<body>
-  <div id="root">              <- ESCONDIDO no print
-    <OficinaPage />            <- ESCONDIDO
-    <ServiceDetailSheet />     <- ESCONDIDO
-    ...                        <- ESCONDIDO
-  </div>
-  
-  <div data-radix-portal>      <- VISÍVEL no print
-    <DialogOverlay />          <- ESCONDIDO (já tinha regra)
-    <DialogContent>            <- VISÍVEL
-      <.print-modal-a4>        <- A4 Sheet
-        <.print-sheet>         <- Conteúdo da ficha
-    </DialogContent>
-  </div>
-</body>
+- Logo Tecnofrio
+- Código do serviço e data
+- Dados do cliente
+- Detalhes do serviço
+- Detalhes do equipamento
+- Diagnóstico (se houver)
+- Trabalho realizado (se houver)
+- Peças utilizadas (se houver)
+- Histórico de pagamentos (se houver)
+- Assinaturas (se houver)
+- Termos e condições
+- Watermark
+
+---
+
+## Fluxo do Utilizador
+
+```
+ServiceDetailSheet
+       │
+       ▼ clica "Ver Ficha"
+       │
+   window.open('/print/service/{id}', '_blank')
+       │
+       ▼
+┌─────────────────────────────────┐
+│   Nova Aba - ServicePrintPage   │
+│                                 │
+│   [← Voltar] [Imprimir] [PDF]   │
+│                                 │
+│   ┌─────────────────────────┐   │
+│   │    FICHA DE SERVIÇO     │   │
+│   │      (A4 completo)      │   │
+│   └─────────────────────────┘   │
+│                                 │
+└─────────────────────────────────┘
+       │
+       ▼ clica "Imprimir"
+       │
+   window.print() → Preview correcto!
 ```
 
-Ao esconder `#root` e todos os filhos do `body` **excepto** `[data-radix-portal]`, garantimos que apenas o modal de impressão aparece.
+---
+
+## Vantagens desta Abordagem
+
+1. **Sem interferência de overlays**: Não há modal, não há overlay Radix
+2. **Página limpa**: Só existe a ficha, nada mais para esconder
+3. **Print nativo funciona**: `Cmd+P` mostra exactamente o que está no ecrã
+4. **Compatível com todos os browsers**: Safari, Chrome, Firefox
+5. **Mantém PDF**: O botão "Baixar PDF" continua disponível
+6. **UX familiar**: Semelhante a como outras plataformas fazem (ex: facturas)
 
 ---
 
-## Sobre o Tamanho do Modal
+## Ficheiros Afectados
 
-O utilizador também mencionou que "o modal pode ser menor". O modal actual tem:
-
-- Ecrã: `width: 210mm`, `height: 297mm`, `max-height: 90vh`
-- Print: `width: 210mm`, `height: auto`
-
-O tamanho de **210mm x 297mm** é exactamente A4. No ecrã, o modal mostra um preview WYSIWYG do A4.
-
-**Opções:**
-1. **Manter A4 no modal** (recomendado): Preview fiel ao que será impresso
-2. **Reduzir modal no ecrã**: O preview será menor mas a impressão continua A4
-
-Se o utilizador quer um modal menor no ecrã mas manter A4 no print, podemos ajustar:
-- Ecrã: `max-width: 80vw` e `max-height: 85vh` com scroll
-- Print: Continua `width: 210mm` e `height: auto`
-
----
-
-## Ficheiros a Alterar
-
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/index.css` | Adicionar regras `#root { display: none }` e `body > *:not([data-radix-portal]) { display: none }` na secção `@media print` |
+| Ficheiro | Acção |
+|----------|-------|
+| `src/pages/ServicePrintPage.tsx` | **Criar** - Nova página dedicada |
+| `src/App.tsx` | **Editar** - Adicionar rota `/print/service/:serviceId` |
+| `src/components/services/ServiceDetailSheet.tsx` | **Editar** - Alterar botão para abrir nova aba |
+| `src/index.css` | **Editar** - Adicionar estilos `.print-page` |
 
 ---
 
 ## Resultado Esperado
 
-1. **Print preview**: Mostra apenas **1 página** (ou mais se a ficha tiver muito conteúdo)
-2. **Conteúdo**: Apenas a ficha A4 do modal, **sem UI da aplicação** (sem sidebar, sem página de fundo)
-3. **Tamanho**: A4 portrait (210x297mm)
-4. **Etiqueta**: Também funcionará correctamente porque usa o mesmo sistema de portal
+1. **Ver Ficha**: Abre nova aba com ficha A4 pronta para imprimir
+2. **Imprimir**: Preview mostra exactamente 1 página A4 (ou mais se necessário)
+3. **PDF**: Continua a funcionar via botão na página
+4. **Sem bugs Safari**: A página limpa não tem overlays nem modais
 
 ---
 
 ## Secção Técnica
 
-### Selectores CSS Utilizados
+### Estrutura do Componente ServicePrintPage
 
-```css
-/* Esconde o root da aplicação React */
-#root { display: none !important; }
-
-/* Esconde tudo no body que não seja portal Radix ou print-portal */
-body > *:not([data-radix-portal]):not(.print-portal) { display: none !important; }
-
-/* Mantém portais Radix visíveis (onde o modal é renderizado) */
-[data-radix-portal] { display: block !important; visibility: visible !important; }
+```tsx
+export default function ServicePrintPage() {
+  const { serviceId } = useParams();
+  const navigate = useNavigate();
+  const printRef = useRef<HTMLDivElement>(null);
+  
+  // Fetch service data
+  const { data: service, isLoading } = useQuery({...});
+  const { data: parts } = useQuery({...});
+  const { data: payments } = useQuery({...});
+  const { data: signatures } = useQuery({...});
+  
+  const handlePrint = () => window.print();
+  const handleDownloadPDF = async () => {...};
+  
+  if (isLoading) return <Loading />;
+  
+  return (
+    <div className="print-page">
+      {/* Controls - hidden in print */}
+      <div className="print-controls no-print">
+        <Button onClick={() => navigate(-1)}>← Voltar</Button>
+        <Button onClick={handlePrint}>Imprimir</Button>
+        <Button onClick={handleDownloadPDF}>Baixar PDF</Button>
+      </div>
+      
+      {/* A4 Sheet - this is what prints */}
+      <div ref={printRef} className="print-sheet">
+        {/* Full service sheet content */}
+      </div>
+    </div>
+  );
+}
 ```
 
-### Hierarquia de Visibilidade no Print
+### Rota sem Layout
 
-| Elemento | Visível no Print? |
-|----------|-------------------|
-| `#root` (app React) | Não |
-| `body > script, style` | Não (não afecta) |
-| `[data-radix-portal]` | Sim |
-| `[data-radix-dialog-overlay]` | Não (já escondido) |
-| `DialogContent` | Sim |
-| `.print-modal-a4` | Sim |
-| `.print-sheet` | Sim |
-| `.no-print` | Não |
+A rota `/print/service/:serviceId` fica **fora** do `<Route element={<AppLayout />}>`, assim como a rota `/tv-monitor`. Isto garante que não há sidebar nem header.
