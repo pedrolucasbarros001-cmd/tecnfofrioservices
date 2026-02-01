@@ -1,113 +1,104 @@
 
-# Plano: Garantir que Serviços Aparecem na Agenda do Técnico
+# Plano: Agenda Diária do Técnico + Corrigir Propagação de Eventos
 
-## Problema Identificado
+## Objectivo
 
-Quando um serviço é criado e atribuído a um técnico, ele **não aparece na agenda do técnico** imediatamente.
-
-### Causa Raiz
-
-O sistema tem **múltiplas queries independentes** para serviços:
-
-| Query Key | Usado Em | Propósito |
-|-----------|----------|-----------|
-| `['services', ...]` | GeralPage, useServices | Lista geral de serviços |
-| `['technician-services', profile?.id]` | ServicosPage | Agenda semanal do técnico |
-| `['technician-office-services', profile?.id]` | TechnicianOfficePage | Serviços de oficina do técnico |
-
-Quando o `useCreateService()` cria um serviço, apenas invalida `['services']`:
-
-```typescript
-// useServices.ts linha 83
-queryClient.invalidateQueries({ queryKey: ['services'] });
-```
-
-**As queries específicas do técnico nunca são invalidadas**, portanto os dados ficam desactualizados.
+1. **Transformar a agenda do técnico de semanal para diária** - mostrar apenas os serviços do dia actual, com navegação para outros dias
+2. **Impedir que cliques nos botões de acção abram a ficha** - adicionar `stopPropagation` nos itens do dropdown
 
 ---
 
-## Solução Proposta
+## Problema 1: Agenda Semanal → Diária
 
-### Estratégia: Invalidação Centralizada
+### Situação Actual
 
-Em vez de invalidar cada query individualmente, vamos criar uma estratégia de invalidação mais abrangente que garante que **todas as queries de serviços** são actualizadas.
+A página `ServicosPage.tsx` mostra **6 dias numa grelha**:
+- Em mobile: 2 colunas (difícil ler quando há muitos serviços)
+- Os cards ficam comprimidos quando há vários serviços no mesmo dia
+- O técnico tem de procurar o dia correcto
 
-### Implementação
+### Solução: Vista Diária
 
-#### 1. Actualizar `useCreateService()` em `src/hooks/useServices.ts`
+Mostrar **apenas um dia de cada vez**:
+- Por defeito: dia actual
+- Navegação: anterior / hoje / próximo
+- Cards maiores com mais espaço para informação
+- Agrupamento por turno (Manhã → Tarde → Noite)
 
-```typescript
-onSuccess: () => {
-  // Invalidar TODAS as queries relacionadas a serviços
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  toast.success('Serviço criado com sucesso!');
-}
+### Layout Proposto
+
 ```
-
-#### 2. Actualizar `useUpdateService()` em `src/hooks/useServices.ts`
-
-```typescript
-onSuccess: ({ skipToast }) => {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  if (!skipToast) {
-    toast.success('Serviço atualizado!');
-  }
-}
-```
-
-#### 3. Actualizar `useDeleteService()` em `src/hooks/useServices.ts`
-
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  toast.success('Serviço eliminado!');
-}
+┌─────────────────────────────────────────────────────┐
+│ 📅 Agenda                                           │
+│                                                     │
+│ [◀] [Hoje] Segunda, 3 de Fevereiro [▶]             │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│ ── MANHÃ ───────────────────────────────────────── │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ TF-00123                        [Visita]        │ │
+│ │ João Silva                                      │ │
+│ │ Frigorífico - Não arrefece                      │ │
+│ │ 🌅 Manhã       [Urgente] [Garantia]            │ │
+│ │                                                 │ │
+│ │        [ ▶ Começar ]                           │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ── TARDE ───────────────────────────────────────── │
+│                                                     │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ TF-00124                     [Instalação]       │ │
+│ │ Maria Santos                                    │ │
+│ │ Ar Condicionado - Instalação nova               │ │
+│ │ ☀️ Tarde                                        │ │
+│ │                                                 │ │
+│ │        [ ▶ Começar ]                           │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ ── SEM TURNO ───────────────────────────────────── │
+│                                                     │
+│           (Sem serviços)                           │
+│                                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Prevenção Futura: Helper de Invalidação
+## Problema 2: Cliques Propagam para Abrir Ficha
 
-Para garantir que isto **nunca mais acontece**, vamos criar um helper centralizado que invalida todas as queries de serviços de uma só vez:
+### Causa
 
-```typescript
-// Em useServices.ts
-function invalidateAllServiceQueries(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-}
+No ficheiro `StateActionButtons.tsx`, os `DropdownMenuItem` não têm `stopPropagation`:
+
+```tsx
+// Actual - PROBLEMA
+<DropdownMenuItem onClick={onAssignTechnician}>
+  Reatribuir Técnico
+</DropdownMenuItem>
+
+<DropdownMenuItem onClick={onReschedule}>
+  Reagendar Serviço
+</DropdownMenuItem>
 ```
 
-Assim, qualquer futuro hook ou componente que modifique serviços pode usar este helper e garantir consistência.
-
----
-
-## Fluxo Corrigido
-
+Quando clica num item do dropdown, o evento sobe até à `TableRow` que tem:
+```tsx
+<TableRow onClick={() => handleServiceClick(service)}>
 ```
-Secretária cria serviço e atribui técnico
-            │
-            ▼
-    useCreateService()
-            │
-            ▼
-  Serviço guardado no Supabase
-            │
-            ▼
-    invalidateQueries:
-    ├── ['services']                    ✓ GeralPage actualizada
-    ├── ['technician-services']         ✓ Agenda do técnico actualizada
-    └── ['technician-office-services']  ✓ Oficina do técnico actualizada
-            │
-            ▼
-  Técnico vê serviço na sua agenda!
+
+### Solução
+
+Adicionar wrapper com `stopPropagation` em TODOS os `DropdownMenuItem`:
+
+```tsx
+// Corrigido
+<DropdownMenuItem onClick={(e) => {
+  e.stopPropagation();
+  onAssignTechnician();
+}}>
+  Reatribuir Técnico
+</DropdownMenuItem>
 ```
 
 ---
@@ -116,55 +107,204 @@ Secretária cria serviço e atribui técnico
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/hooks/useServices.ts` | Adicionar helper + invalidar todas as queries |
+| `src/pages/ServicosPage.tsx` | **Reescrever** - Vista diária em vez de semanal |
+| `src/components/services/StateActionButtons.tsx` | **Editar** - Adicionar `stopPropagation` aos `DropdownMenuItem` |
+
+---
+
+## Implementação Detalhada
+
+### 1. Nova ServicosPage (Vista Diária)
+
+**Estrutura:**
+
+```tsx
+export default function ServicosPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Navegação
+  const goToPrevious = () => setCurrentDate(prev => subDays(prev, 1));
+  const goToToday = () => setCurrentDate(new Date());
+  const goToNext = () => setCurrentDate(prev => addDays(prev, 1));
+  
+  // Filtrar serviços do dia actual
+  const dayServices = useMemo(() => {
+    return services.filter(service => {
+      if (!service.scheduled_date) return false;
+      return isSameDay(parseISO(service.scheduled_date), currentDate);
+    });
+  }, [services, currentDate]);
+  
+  // Agrupar por turno
+  const groupedByShift = useMemo(() => {
+    return {
+      manha: dayServices.filter(s => s.scheduled_shift === 'manha'),
+      tarde: dayServices.filter(s => s.scheduled_shift === 'tarde'),
+      noite: dayServices.filter(s => s.scheduled_shift === 'noite'),
+      sem_turno: dayServices.filter(s => !s.scheduled_shift),
+    };
+  }, [dayServices]);
+}
+```
+
+**Header com navegação:**
+
+```tsx
+<div className="flex items-center justify-between">
+  <div className="flex items-center gap-3">
+    <CalendarDays className="h-6 w-6 text-blue-500" />
+    <h1 className="text-2xl font-bold">Agenda</h1>
+  </div>
+  
+  <div className="flex items-center gap-2">
+    <Button variant="ghost" size="icon" onClick={goToPrevious}>
+      <ChevronLeft className="h-5 w-5" />
+    </Button>
+    
+    <Button 
+      variant={isToday ? "default" : "outline"} 
+      onClick={goToToday}
+      className="min-w-[200px]"
+    >
+      {format(currentDate, "EEEE, d 'de' MMMM", { locale: pt })}
+    </Button>
+    
+    <Button variant="ghost" size="icon" onClick={goToNext}>
+      <ChevronRight className="h-5 w-5" />
+    </Button>
+  </div>
+</div>
+```
+
+**Secções por turno:**
+
+```tsx
+<div className="space-y-6">
+  {(['manha', 'tarde', 'noite', 'sem_turno'] as const).map(shift => {
+    const shiftServices = groupedByShift[shift];
+    const shiftLabel = SHIFT_LABELS[shift] || 'Sem Turno Definido';
+    
+    return (
+      <div key={shift}>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-3">
+          {shiftLabel}
+        </h3>
+        
+        {shiftServices.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            Sem serviços
+          </p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {shiftServices.map(service => (
+              <ServiceCard key={service.id} service={service} onStart={handleStartFlow} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
+```
+
+**Cards maiores (mais legíveis):**
+
+Os cards ocupam mais espaço vertical e horizontal, permitindo:
+- Ler nome completo do cliente
+- Ver descrição da avaria
+- Botões maiores e mais fáceis de clicar
+
+### 2. Corrigir StateActionButtons
+
+**Alterações:**
+
+Todos os `DropdownMenuItem` precisam de `stopPropagation`. São aproximadamente 12 itens no dropdown que precisam desta correcção.
+
+```tsx
+// Exemplo de cada item corrigido:
+<DropdownMenuItem onClick={(e) => {
+  e.stopPropagation();
+  onViewDetails();
+}}>
+  <Eye className="h-4 w-4 mr-2" />
+  Ver Detalhes
+</DropdownMenuItem>
+
+<DropdownMenuItem onClick={(e) => {
+  e.stopPropagation();
+  onAssignTechnician();
+}}>
+  <UserPlus className="h-4 w-4 mr-2" />
+  Atribuir Técnico
+</DropdownMenuItem>
+
+// ... mesma lógica para todos os outros itens
+```
+
+---
+
+## Benefícios da Vista Diária
+
+1. **Maior clareza**: O técnico vê exactamente o que tem para fazer hoje
+2. **Cards maiores**: Mais espaço para informação e botões mais fáceis de clicar
+3. **Agrupamento por turno**: Organização clara da ordem de trabalho
+4. **Navegação simples**: Setas para ver dias anteriores/seguintes
+5. **Mobile-friendly**: Um card por linha em mobile, nada comprimido
 
 ---
 
 ## Resultado Esperado
 
-1. Serviço criado → Aparece imediatamente na agenda do técnico
-2. Serviço actualizado → Reflecte imediatamente em todas as vistas
-3. Serviço eliminado → Desaparece imediatamente de todas as vistas
-4. **Garantia futura**: Helper centralizado previne esquecimentos
+1. **Agenda diária**: Técnico abre a página e vê apenas os serviços de hoje
+2. **Navegação fácil**: Pode ver amanhã, ontem ou qualquer outro dia
+3. **Serviços agrupados**: Manhã → Tarde → Noite → Sem turno
+4. **Cards legíveis**: Tamanho adequado mesmo com muitos serviços
+5. **Dropdowns funcionais**: Clicar em "Reagendar" ou "Reatribuir" NÃO abre a ficha lateral
 
 ---
 
 ## Secção Técnica
 
-### Código Final do Hook
+### Mudanças na Query
 
-```typescript
-import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import type { Service, ServiceStatus } from '@/types/database';
-import { toast } from 'sonner';
+A query existente já busca todos os serviços do técnico. A filtragem por dia será feita no frontend com `useMemo` para performance:
 
-// Helper para invalidar TODAS as queries de serviços
-function invalidateAllServiceQueries(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-}
-
-// ... resto do código com onSuccess a usar o helper
+```tsx
+const dayServices = useMemo(() => {
+  return services.filter(service => {
+    if (!service.scheduled_date) return false;
+    return isSameDay(parseISO(service.scheduled_date), currentDate);
+  });
+}, [services, currentDate]);
 ```
 
-### Por que não usar apenas `['services']` em todo o lado?
+### Estado Vazio
 
-Seria uma opção, mas:
-1. As queries específicas do técnico têm **filtros diferentes** (ex: `service_location`, `status`)
-2. Cada página precisa de dados diferentes (performance)
-3. A invalidação parcial com queryKey prefix **funciona**, mas o React Query precisa de matchear o prefixo exacto
+Quando não há serviços no dia:
 
-A solução de invalidação explícita é mais segura e previsível.
+```tsx
+{dayServices.length === 0 && (
+  <div className="flex flex-col items-center justify-center py-12">
+    <CalendarDays className="h-16 w-16 text-muted-foreground/30 mb-4" />
+    <p className="text-muted-foreground">Sem serviços para este dia</p>
+    <p className="text-sm text-muted-foreground">
+      Use as setas para ver outros dias
+    </p>
+  </div>
+)}
+```
 
-### Alternativa Considerada: Query Key Hierarchy
+### Indicação do Dia Actual
 
-Poderíamos renomear as queries para usar hierarquia:
-- `['services', 'general', ...]`
-- `['services', 'technician', ...]`
-- `['services', 'office', ...]`
+O botão central mostra a data completa e fica destacado quando é hoje:
 
-Assim, `invalidateQueries({ queryKey: ['services'] })` invalidaria todas.
+```tsx
+const isToday = isSameDay(currentDate, new Date());
 
-**Porquê não usar?** Requer alterar múltiplos ficheiros e pode causar regressões. A solução proposta é mais segura e atinge o mesmo objectivo.
+<Button 
+  variant={isToday ? "default" : "outline"} 
+  onClick={goToToday}
+>
+  {format(currentDate, "EEEE, d 'de' MMMM", { locale: pt })}
+</Button>
+```
