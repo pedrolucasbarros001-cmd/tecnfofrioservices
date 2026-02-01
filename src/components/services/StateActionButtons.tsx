@@ -212,20 +212,20 @@ export function StateActionButtons({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="bg-popover">
-          <DropdownMenuItem onClick={onViewDetails}>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
             <Eye className="h-4 w-4 mr-2" />
             Ver Detalhes
           </DropdownMenuItem>
 
           {/* Assign/Reassign Technician */}
           {!service.technician_id && (isDono || isSecretaria) && (
-            <DropdownMenuItem onClick={onAssignTechnician}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignTechnician(); }}>
               <UserPlus className="h-4 w-4 mr-2" />
               Atribuir Técnico
             </DropdownMenuItem>
           )}
           {service.technician_id && service.status !== 'finalizado' && isDono && (
-            <DropdownMenuItem onClick={onAssignTechnician}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignTechnician(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Reatribuir Técnico
             </DropdownMenuItem>
@@ -233,7 +233,7 @@ export function StateActionButtons({
 
           {/* Reschedule Service - Dono or Secretaria */}
           {service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && onReschedule && (
-            <DropdownMenuItem onClick={onReschedule}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onReschedule(); }}>
               <CalendarClock className="h-4 w-4 mr-2" />
               Reagendar Serviço
             </DropdownMenuItem>
@@ -241,7 +241,7 @@ export function StateActionButtons({
 
           {/* Request Part - Technician or Dono during execution */}
           {(service.status === 'em_execucao' || service.status === 'na_oficina') && onRequestPart && (isTecnico || isDono) && (
-            <DropdownMenuItem onClick={onRequestPart}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRequestPart(); }}>
               <Package className="h-4 w-4 mr-2" />
               Solicitar Peça
             </DropdownMenuItem>
@@ -249,7 +249,7 @@ export function StateActionButtons({
 
           {/* Set Price - Only Dono - Shows when pending_pricing=true OR status is a_precificar/concluidos without price */}
           {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && isDono && onSetPrice && (
-            <DropdownMenuItem onClick={onSetPrice}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSetPrice(); }}>
               <DollarSign className="h-4 w-4 mr-2" />
               Definir Preço
             </DropdownMenuItem>
@@ -257,7 +257,7 @@ export function StateActionButtons({
 
           {/* Register Payment - Dono or Secretaria */}
           {isServicePriced && isServiceInDebit && (isDono || isSecretaria) && onRegisterPayment && (
-            <DropdownMenuItem onClick={onRegisterPayment}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRegisterPayment(); }}>
               <CreditCard className="h-4 w-4 mr-2" />
               Registar Pagamento
             </DropdownMenuItem>
@@ -265,7 +265,7 @@ export function StateActionButtons({
 
           {/* Contact Client - Secretaria for debit */}
           {isServiceInDebit && isSecretaria && onContactClient && (
-            <DropdownMenuItem onClick={onContactClient}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onContactClient(); }}>
               <Phone className="h-4 w-4 mr-2" />
               Contactar Cliente
             </DropdownMenuItem>
@@ -273,7 +273,7 @@ export function StateActionButtons({
 
           {/* Manage Delivery - Concluidos with workshop location */}
           {service.status === 'concluidos' && service.service_location === 'oficina' && (isDono || isSecretaria) && onManageDelivery && (
-            <DropdownMenuItem onClick={onManageDelivery}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onManageDelivery(); }}>
               <Truck className="h-4 w-4 mr-2" />
               Gerir Entrega
             </DropdownMenuItem>
@@ -281,7 +281,7 @@ export function StateActionButtons({
 
           {/* Finalize - When conditions met */}
           {canBeFinalized && (isDono || isSecretaria) && onFinalize && (
-            <DropdownMenuItem onClick={onFinalize}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onFinalize(); }}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Finalizar Serviço
             </DropdownMenuItem>
@@ -292,13 +292,13 @@ export function StateActionButtons({
             <>
               <DropdownMenuSeparator />
               {onForceState && (
-                <DropdownMenuItem onClick={onForceState} className="text-amber-600">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onForceState(); }} className="text-amber-600">
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   Mudar Status (Forçado)
                 </DropdownMenuItem>
               )}
               {onDelete && (
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar Serviço
                 </DropdownMenuItem>
