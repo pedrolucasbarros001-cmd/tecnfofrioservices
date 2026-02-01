@@ -1,7 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Service, ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
+
+// Helper para invalidar TODAS as queries de serviços
+// Garante sincronização entre todas as vistas (geral, agenda técnico, oficina)
+function invalidateAllServiceQueries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ['services'] });
+  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+  queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+}
 
 interface UseServicesOptions {
   status?: ServiceStatus | 'all' | 'pending_pricing';
@@ -80,7 +89,7 @@ export function useCreateService() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateAllServiceQueries(queryClient);
       toast.success('Serviço criado com sucesso!');
     },
     onError: (error: Error) => {
@@ -110,7 +119,7 @@ export function useUpdateService() {
       return { data, skipToast };
     },
     onSuccess: ({ skipToast }) => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateAllServiceQueries(queryClient);
       // Only show generic toast if skipToast is not true
       // Components that provide contextual messages should set skipToast: true
       if (!skipToast) {
@@ -137,7 +146,7 @@ export function useDeleteService() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateAllServiceQueries(queryClient);
       toast.success('Serviço eliminado!');
     },
     onError: (error) => {
