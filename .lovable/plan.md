@@ -1,310 +1,170 @@
 
-# Plano: Agenda Diária do Técnico + Corrigir Propagação de Eventos
+# Plano: Renomear "Concluídos" para "Oficina Reparados"
 
 ## Objectivo
 
-1. **Transformar a agenda do técnico de semanal para diária** - mostrar apenas os serviços do dia actual, com navegação para outros dias
-2. **Impedir que cliques nos botões de acção abram a ficha** - adicionar `stopPropagation` nos itens do dropdown
-
----
-
-## Problema 1: Agenda Semanal → Diária
-
-### Situação Actual
-
-A página `ServicosPage.tsx` mostra **6 dias numa grelha**:
-- Em mobile: 2 colunas (difícil ler quando há muitos serviços)
-- Os cards ficam comprimidos quando há vários serviços no mesmo dia
-- O técnico tem de procurar o dia correcto
-
-### Solução: Vista Diária
-
-Mostrar **apenas um dia de cada vez**:
-- Por defeito: dia actual
-- Navegação: anterior / hoje / próximo
-- Cards maiores com mais espaço para informação
-- Agrupamento por turno (Manhã → Tarde → Noite)
-
-### Layout Proposto
-
-```
-┌─────────────────────────────────────────────────────┐
-│ 📅 Agenda                                           │
-│                                                     │
-│ [◀] [Hoje] Segunda, 3 de Fevereiro [▶]             │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│ ── MANHÃ ───────────────────────────────────────── │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ TF-00123                        [Visita]        │ │
-│ │ João Silva                                      │ │
-│ │ Frigorífico - Não arrefece                      │ │
-│ │ 🌅 Manhã       [Urgente] [Garantia]            │ │
-│ │                                                 │ │
-│ │        [ ▶ Começar ]                           │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ── TARDE ───────────────────────────────────────── │
-│                                                     │
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ TF-00124                     [Instalação]       │ │
-│ │ Maria Santos                                    │ │
-│ │ Ar Condicionado - Instalação nova               │ │
-│ │ ☀️ Tarde                                        │ │
-│ │                                                 │ │
-│ │        [ ▶ Começar ]                           │ │
-│ └─────────────────────────────────────────────────┘ │
-│                                                     │
-│ ── SEM TURNO ───────────────────────────────────── │
-│                                                     │
-│           (Sem serviços)                           │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Problema 2: Cliques Propagam para Abrir Ficha
-
-### Causa
-
-No ficheiro `StateActionButtons.tsx`, os `DropdownMenuItem` não têm `stopPropagation`:
-
-```tsx
-// Actual - PROBLEMA
-<DropdownMenuItem onClick={onAssignTechnician}>
-  Reatribuir Técnico
-</DropdownMenuItem>
-
-<DropdownMenuItem onClick={onReschedule}>
-  Reagendar Serviço
-</DropdownMenuItem>
-```
-
-Quando clica num item do dropdown, o evento sobe até à `TableRow` que tem:
-```tsx
-<TableRow onClick={() => handleServiceClick(service)}>
-```
-
-### Solução
-
-Adicionar wrapper com `stopPropagation` em TODOS os `DropdownMenuItem`:
-
-```tsx
-// Corrigido
-<DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  onAssignTechnician();
-}}>
-  Reatribuir Técnico
-</DropdownMenuItem>
-```
+Alterar a nomenclatura do estado **"Concluídos"** para **"Oficina Reparados"** em todo o sistema, garantindo que o novo nome aparece correctamente sem sobreposição de texto.
 
 ---
 
 ## Ficheiros a Alterar
 
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/pages/ServicosPage.tsx` | **Reescrever** - Vista diária em vez de semanal |
-| `src/components/services/StateActionButtons.tsx` | **Editar** - Adicionar `stopPropagation` aos `DropdownMenuItem` |
+| Ficheiro | Localização | Alteração |
+|----------|-------------|-----------|
+| `src/types/database.ts` | Linha 209 | `label: 'Concluídos'` → `label: 'Oficina Reparados'` |
+| `src/pages/DashboardPage.tsx` | Linha 40 | `label: 'Concluídos'` → `label: 'Of. Reparados'` (abreviado para card) |
+| `src/components/layouts/SecretarySidebar.tsx` | Linha 29 | `title: 'Concluídos'` → `title: 'Of. Reparados'` |
+| `src/pages/secretary/SecretaryConcluidosPage.tsx` | Linhas 74, 84, 95 | Actualizar títulos e textos |
+| `src/pages/PerformancePage.tsx` | Linha 13 | `concluidos: 'Concluído'` → `concluidos: 'Of. Reparados'` |
+| `src/pages/TVMonitorPage.tsx` | Linha 79 | `label: 'Concluídos'` → `label: 'Of. Reparados'` |
+| `src/components/shared/ServiceTimeline.tsx` | Linhas 29, 39, 48 | Labels "Concluído" para step → Manter "Reparado" |
+| `src/components/services/ServiceDetailSheet.tsx` | Linhas 129, 139, 148 | Labels de progresso |
 
 ---
 
-## Implementação Detalhada
+## Detalhes por Ficheiro
 
-### 1. Nova ServicosPage (Vista Diária)
+### 1. `src/types/database.ts` (Configuração Central)
 
-**Estrutura:**
+Esta é a **fonte de verdade** para o label do status. A alteração aqui propaga para todos os badges.
 
-```tsx
-export default function ServicosPage() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
-  // Navegação
-  const goToPrevious = () => setCurrentDate(prev => subDays(prev, 1));
-  const goToToday = () => setCurrentDate(new Date());
-  const goToNext = () => setCurrentDate(prev => addDays(prev, 1));
-  
-  // Filtrar serviços do dia actual
-  const dayServices = useMemo(() => {
-    return services.filter(service => {
-      if (!service.scheduled_date) return false;
-      return isSameDay(parseISO(service.scheduled_date), currentDate);
-    });
-  }, [services, currentDate]);
-  
-  // Agrupar por turno
-  const groupedByShift = useMemo(() => {
-    return {
-      manha: dayServices.filter(s => s.scheduled_shift === 'manha'),
-      tarde: dayServices.filter(s => s.scheduled_shift === 'tarde'),
-      noite: dayServices.filter(s => s.scheduled_shift === 'noite'),
-      sem_turno: dayServices.filter(s => !s.scheduled_shift),
-    };
-  }, [dayServices]);
-}
+```typescript
+// Linha 209
+concluidos: { label: 'Oficina Reparados', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
 ```
 
-**Header com navegação:**
+### 2. `src/pages/DashboardPage.tsx` (Cards do Dashboard)
+
+Para evitar sobreposição no card, usar abreviação:
+
+```typescript
+// Linha 40
+{ key: 'concluidos' as const, label: 'Of. Reparados', icon: Truck, route: '/geral?status=concluidos' },
+```
+
+### 3. `src/components/layouts/SecretarySidebar.tsx` (Menu Secretária)
+
+```typescript
+// Linha 29
+{ title: 'Of. Reparados', url: '/concluidos', icon: CheckCircle2 },
+```
+
+A rota permanece `/concluidos` (não afecta funcionamento, apenas o label visível).
+
+### 4. `src/pages/secretary/SecretaryConcluidosPage.tsx` (Página da Secretária)
 
 ```tsx
-<div className="flex items-center justify-between">
-  <div className="flex items-center gap-3">
-    <CalendarDays className="h-6 w-6 text-blue-500" />
-    <h1 className="text-2xl font-bold">Agenda</h1>
-  </div>
-  
-  <div className="flex items-center gap-2">
-    <Button variant="ghost" size="icon" onClick={goToPrevious}>
-      <ChevronLeft className="h-5 w-5" />
-    </Button>
-    
-    <Button 
-      variant={isToday ? "default" : "outline"} 
-      onClick={goToToday}
-      className="min-w-[200px]"
-    >
-      {format(currentDate, "EEEE, d 'de' MMMM", { locale: pt })}
-    </Button>
-    
-    <Button variant="ghost" size="icon" onClick={goToNext}>
-      <ChevronRight className="h-5 w-5" />
-    </Button>
-  </div>
+// Linha 74 - Título da página
+<h1 className="text-2xl font-bold tracking-tight">Oficina Reparados</h1>
+
+// Linha 75-77 - Descrição
+<p className="text-muted-foreground">
+  Serviços reparados na oficina aguardando entrega ou recolha
+</p>
+
+// Linha 84 - Título do card
+<CardTitle className="flex items-center gap-2">
+  Serviços Reparados na Oficina
+  <Badge variant="secondary">{workshopServices.length}</Badge>
+</CardTitle>
+
+// Linha 95 - Estado vazio
+<div className="py-12 text-center text-muted-foreground">
+  Não há serviços reparados aguardando entrega.
 </div>
 ```
 
-**Secções por turno:**
+### 5. `src/pages/PerformancePage.tsx` (Página de Performance)
 
-```tsx
-<div className="space-y-6">
-  {(['manha', 'tarde', 'noite', 'sem_turno'] as const).map(shift => {
-    const shiftServices = groupedByShift[shift];
-    const shiftLabel = SHIFT_LABELS[shift] || 'Sem Turno Definido';
-    
-    return (
-      <div key={shift}>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-3">
-          {shiftLabel}
-        </h3>
-        
-        {shiftServices.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            Sem serviços
-          </p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {shiftServices.map(service => (
-              <ServiceCard key={service.id} service={service} onStart={handleStartFlow} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  })}
-</div>
+```typescript
+// Linha 13
+concluidos: 'Of. Reparados',
 ```
 
-**Cards maiores (mais legíveis):**
+### 6. `src/pages/TVMonitorPage.tsx` (Monitor TV)
 
-Os cards ocupam mais espaço vertical e horizontal, permitindo:
-- Ler nome completo do cliente
-- Ver descrição da avaria
-- Botões maiores e mais fáceis de clicar
+```typescript
+// Linha 78-82
+{ 
+  key: 'concluidos', 
+  label: 'Of. Reparados', 
+  icon: CheckCircle, 
+  color: 'text-emerald-400',
+  filter: (s: TVMonitorService) => s.status === 'concluidos'
+},
+```
 
-### 2. Corrigir StateActionButtons
+### 7. `src/components/shared/ServiceTimeline.tsx` (Timeline de Progresso)
 
-**Alterações:**
+Os labels da timeline indicam etapas do processo. Para serviços de oficina, mudar "Concluído" para "Reparado":
 
-Todos os `DropdownMenuItem` precisam de `stopPropagation`. São aproximadamente 12 itens no dropdown que precisam desta correcção.
+```typescript
+// Linha 29 (Instalação - manter "Concluído" pois não é oficina)
+{ id: 'done', label: 'Concluído', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
 
-```tsx
-// Exemplo de cada item corrigido:
-<DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  onViewDetails();
-}}>
-  <Eye className="h-4 w-4 mr-2" />
-  Ver Detalhes
-</DropdownMenuItem>
+// Linha 39 (Oficina - mudar para "Reparado")
+{ id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
 
-<DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  onAssignTechnician();
-}}>
-  <UserPlus className="h-4 w-4 mr-2" />
-  Atribuir Técnico
-</DropdownMenuItem>
+// Linha 48 (Visita - manter "Concluído")
+{ id: 'done', label: 'Concluído', icon: Check, status: ['a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+```
 
-// ... mesma lógica para todos os outros itens
+### 8. `src/components/services/ServiceDetailSheet.tsx` (Ficha de Detalhes)
+
+Mesma lógica da timeline - apenas oficina usa "Reparado":
+
+```typescript
+// Linha 129 (Instalação - manter)
+{ label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+
+// Linha 139 (Oficina - mudar)
+{ label: 'Reparado', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+
+// Linha 148 (Visita - manter)
+{ label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
 ```
 
 ---
 
-## Benefícios da Vista Diária
+## Estratégia de Abreviação
 
-1. **Maior clareza**: O técnico vê exactamente o que tem para fazer hoje
-2. **Cards maiores**: Mais espaço para informação e botões mais fáceis de clicar
-3. **Agrupamento por turno**: Organização clara da ordem de trabalho
-4. **Navegação simples**: Setas para ver dias anteriores/seguintes
-5. **Mobile-friendly**: Um card por linha em mobile, nada comprimido
+Para evitar sobreposição de texto em espaços limitados:
 
----
-
-## Resultado Esperado
-
-1. **Agenda diária**: Técnico abre a página e vê apenas os serviços de hoje
-2. **Navegação fácil**: Pode ver amanhã, ontem ou qualquer outro dia
-3. **Serviços agrupados**: Manhã → Tarde → Noite → Sem turno
-4. **Cards legíveis**: Tamanho adequado mesmo com muitos serviços
-5. **Dropdowns funcionais**: Clicar em "Reagendar" ou "Reatribuir" NÃO abre a ficha lateral
+| Contexto | Nome Completo | Nome Abreviado |
+|----------|---------------|----------------|
+| SERVICE_STATUS_CONFIG (badges) | Oficina Reparados | - |
+| Dashboard cards | - | Of. Reparados |
+| Menu sidebar | - | Of. Reparados |
+| TV Monitor | - | Of. Reparados |
+| Performance page | - | Of. Reparados |
+| Página SecretaryConcluidosPage (título) | Oficina Reparados | - |
+| Timeline steps (oficina) | - | Reparado |
 
 ---
 
-## Secção Técnica
+## Nota Técnica
 
-### Mudanças na Query
+O **status interno** permanece `'concluidos'` (no código e base de dados). Apenas os **labels visíveis** são alterados para "Oficina Reparados" ou "Of. Reparados".
 
-A query existente já busca todos os serviços do técnico. A filtragem por dia será feita no frontend com `useMemo` para performance:
+Isto significa:
+- Nenhuma migração de base de dados necessária
+- Nenhuma alteração em queries
+- A rota `/concluidos` permanece igual
+- Apenas alterações visuais/UI
 
-```tsx
-const dayServices = useMemo(() => {
-  return services.filter(service => {
-    if (!service.scheduled_date) return false;
-    return isSameDay(parseISO(service.scheduled_date), currentDate);
-  });
-}, [services, currentDate]);
-```
+---
 
-### Estado Vazio
+## Resumo de Alterações
 
-Quando não há serviços no dia:
+| Ficheiro | Linhas Afectadas |
+|----------|------------------|
+| `src/types/database.ts` | 1 |
+| `src/pages/DashboardPage.tsx` | 1 |
+| `src/components/layouts/SecretarySidebar.tsx` | 1 |
+| `src/pages/secretary/SecretaryConcluidosPage.tsx` | 4 |
+| `src/pages/PerformancePage.tsx` | 1 |
+| `src/pages/TVMonitorPage.tsx` | 1 |
+| `src/components/shared/ServiceTimeline.tsx` | 1 |
+| `src/components/services/ServiceDetailSheet.tsx` | 1 |
 
-```tsx
-{dayServices.length === 0 && (
-  <div className="flex flex-col items-center justify-center py-12">
-    <CalendarDays className="h-16 w-16 text-muted-foreground/30 mb-4" />
-    <p className="text-muted-foreground">Sem serviços para este dia</p>
-    <p className="text-sm text-muted-foreground">
-      Use as setas para ver outros dias
-    </p>
-  </div>
-)}
-```
-
-### Indicação do Dia Actual
-
-O botão central mostra a data completa e fica destacado quando é hoje:
-
-```tsx
-const isToday = isSameDay(currentDate, new Date());
-
-<Button 
-  variant={isToday ? "default" : "outline"} 
-  onClick={goToToday}
->
-  {format(currentDate, "EEEE, d 'de' MMMM", { locale: pt })}
-</Button>
-```
+**Total: 8 ficheiros, ~11 alterações**
