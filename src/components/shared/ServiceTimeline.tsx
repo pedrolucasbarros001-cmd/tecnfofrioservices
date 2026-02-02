@@ -18,7 +18,7 @@ const getTimelineSteps = (service: Service) => {
       { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'in_progress', label: 'Em Curso', icon: Truck, status: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'done', label: 'Entregue', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
-      { id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+      { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
@@ -27,7 +27,7 @@ const getTimelineSteps = (service: Service) => {
       { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'in_progress', label: 'Instalação', icon: Wrench, status: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'done', label: 'Concluído', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
-      { id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+      { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
@@ -37,7 +37,7 @@ const getTimelineSteps = (service: Service) => {
       { id: 'workshop', label: 'Na Oficina', icon: Package, status: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'repair', label: 'Reparação', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
-      { id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+      { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
@@ -46,7 +46,7 @@ const getTimelineSteps = (service: Service) => {
     { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
     { id: 'visit', label: 'Visita', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
     { id: 'done', label: 'Concluído', icon: Check, status: ['a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-    { id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+    { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
   ];
 };
 

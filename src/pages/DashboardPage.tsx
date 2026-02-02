@@ -40,7 +40,7 @@ const DASHBOARD_CARDS = [
   { key: 'concluidos' as const, label: 'Of. Reparados', icon: Truck, route: '/geral?status=concluidos' },
   { key: 'a_precificar' as const, label: 'A Precificar', icon: DollarSign, route: '/geral?status=a_precificar' },
   { key: 'em_debito' as const, label: 'Em Débito', icon: AlertCircle, route: '/em-debito' },
-  { key: 'finalizado' as const, label: 'Finalizados', icon: CheckSquare, route: '/geral?status=finalizado' },
+  { key: 'finalizado' as const, label: 'Concluídos', icon: CheckSquare, route: '/geral?status=finalizado' },
   { key: 'orcamentos' as const, label: 'Orçamentos', icon: FileText, route: '/orcamentos' },
 ];
 

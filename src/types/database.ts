@@ -208,7 +208,7 @@ export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, {
   a_precificar: { label: 'A Precificar', color: 'bg-primary/10 text-primary', intensity: 'normal' },
   concluidos: { label: 'Of. Reparados', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
   em_debito: { label: 'Em Débito', color: 'bg-primary/10 text-primary border-l-2 border-l-destructive', intensity: 'normal' },
-  finalizado: { label: 'Finalizado', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
+  finalizado: { label: 'Concluídos', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
 };
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; icon: string }> = {

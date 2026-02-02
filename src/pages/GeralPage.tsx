@@ -172,7 +172,7 @@ export default function GeralPage() {
         status: 'finalizado',
         service_location: 'entregue'
       });
-      toast.success('Serviço finalizado!');
+      toast.success('Serviço concluído!');
     } catch (error) {
       console.error('Error finalizing service:', error);
     }
