@@ -71,9 +71,9 @@ export default function SecretaryConcluidosPage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Concluídos</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Oficina Reparados</h1>
         <p className="text-muted-foreground">
-          Serviços tecnicamente concluídos aguardando entrega ou recolha
+          Serviços reparados na oficina aguardando entrega ou recolha
         </p>
       </div>
 
@@ -81,7 +81,7 @@ export default function SecretaryConcluidosPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Serviços Concluídos na Oficina
+            Serviços Reparados na Oficina
             <Badge variant="secondary">{workshopServices.length}</Badge>
           </CardTitle>
         </CardHeader>
@@ -92,7 +92,7 @@ export default function SecretaryConcluidosPage() {
             </div>
           ) : workshopServices.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              Não há serviços concluídos aguardando entrega.
+              Não há serviços reparados aguardando entrega.
             </div>
           ) : (
             <Table>
