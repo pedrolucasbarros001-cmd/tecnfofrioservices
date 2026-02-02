@@ -1,24 +1,34 @@
 
-# Plano: Renomear "Concluídos" para "Oficina Reparados"
+# Plano: Renomear "Finalizado" para "Concluídos"
 
-## Objectivo
+## Resumo
 
-Alterar a nomenclatura do estado **"Concluídos"** para **"Oficina Reparados"** em todo o sistema, garantindo que o novo nome aparece correctamente sem sobreposição de texto.
+Alterar a nomenclatura do estado **"Finalizado"** para **"Concluídos"** em todo o sistema. Este é o estado final dos serviços - quando tudo está terminado (pago e entregue).
+
+**Importante**: O estado interno permanece `'finalizado'` no código e base de dados. Apenas os labels visíveis ao utilizador serão alterados.
+
+---
+
+## Mapeamento Final de Estados
+
+| Estado Interno | Label Antigo | Label Novo |
+|----------------|--------------|------------|
+| `concluidos` | Concluídos | **Of. Reparados** (já feito) |
+| `finalizado` | Finalizado | **Concluídos** |
 
 ---
 
 ## Ficheiros a Alterar
 
-| Ficheiro | Localização | Alteração |
-|----------|-------------|-----------|
-| `src/types/database.ts` | Linha 209 | `label: 'Concluídos'` → `label: 'Oficina Reparados'` |
-| `src/pages/DashboardPage.tsx` | Linha 40 | `label: 'Concluídos'` → `label: 'Of. Reparados'` (abreviado para card) |
-| `src/components/layouts/SecretarySidebar.tsx` | Linha 29 | `title: 'Concluídos'` → `title: 'Of. Reparados'` |
-| `src/pages/secretary/SecretaryConcluidosPage.tsx` | Linhas 74, 84, 95 | Actualizar títulos e textos |
-| `src/pages/PerformancePage.tsx` | Linha 13 | `concluidos: 'Concluído'` → `concluidos: 'Of. Reparados'` |
-| `src/pages/TVMonitorPage.tsx` | Linha 79 | `label: 'Concluídos'` → `label: 'Of. Reparados'` |
-| `src/components/shared/ServiceTimeline.tsx` | Linhas 29, 39, 48 | Labels "Concluído" para step → Manter "Reparado" |
-| `src/components/services/ServiceDetailSheet.tsx` | Linhas 129, 139, 148 | Labels de progresso |
+| Ficheiro | Alteração |
+|----------|-----------|
+| `src/types/database.ts` | `label: 'Finalizado'` → `label: 'Concluídos'` |
+| `src/pages/DashboardPage.tsx` | `label: 'Finalizados'` → `label: 'Concluídos'` |
+| `src/pages/PerformancePage.tsx` | `finalizado: 'Finalizado'` → `finalizado: 'Concluídos'` |
+| `src/components/shared/ServiceTimeline.tsx` | Labels `'Finalizado'` → `'Concluído'` (4 instâncias) |
+| `src/components/services/ServiceDetailSheet.tsx` | Labels `'Finalizado'` → `'Concluído'` (4 instâncias) |
+| `src/utils/feedbackMessages.ts` | `finalizado com sucesso` → `concluído com sucesso` |
+| `src/pages/GeralPage.tsx` | `Serviço finalizado!` → `Serviço concluído!` |
 
 ---
 
@@ -26,145 +36,119 @@ Alterar a nomenclatura do estado **"Concluídos"** para **"Oficina Reparados"** 
 
 ### 1. `src/types/database.ts` (Configuração Central)
 
-Esta é a **fonte de verdade** para o label do status. A alteração aqui propaga para todos os badges.
+Esta é a fonte de verdade para badges. Linha 211:
 
 ```typescript
-// Linha 209
-concluidos: { label: 'Oficina Reparados', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
+// De:
+finalizado: { label: 'Finalizado', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
+
+// Para:
+finalizado: { label: 'Concluídos', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
 ```
 
 ### 2. `src/pages/DashboardPage.tsx` (Cards do Dashboard)
 
-Para evitar sobreposição no card, usar abreviação:
+Linha 43 - o card do dashboard:
 
 ```typescript
-// Linha 40
-{ key: 'concluidos' as const, label: 'Of. Reparados', icon: Truck, route: '/geral?status=concluidos' },
+// De:
+{ key: 'finalizado' as const, label: 'Finalizados', icon: CheckSquare, route: '/geral?status=finalizado' },
+
+// Para:
+{ key: 'finalizado' as const, label: 'Concluídos', icon: CheckSquare, route: '/geral?status=finalizado' },
 ```
 
-### 3. `src/components/layouts/SecretarySidebar.tsx` (Menu Secretária)
+### 3. `src/pages/PerformancePage.tsx` (Página de Performance)
+
+Linha 15:
 
 ```typescript
-// Linha 29
-{ title: 'Of. Reparados', url: '/concluidos', icon: CheckCircle2 },
+// De:
+finalizado: 'Finalizado',
+
+// Para:
+finalizado: 'Concluídos',
 ```
 
-A rota permanece `/concluidos` (não afecta funcionamento, apenas o label visível).
+### 4. `src/components/shared/ServiceTimeline.tsx` (Timeline de Progresso)
 
-### 4. `src/pages/secretary/SecretaryConcluidosPage.tsx` (Página da Secretária)
-
-```tsx
-// Linha 74 - Título da página
-<h1 className="text-2xl font-bold tracking-tight">Oficina Reparados</h1>
-
-// Linha 75-77 - Descrição
-<p className="text-muted-foreground">
-  Serviços reparados na oficina aguardando entrega ou recolha
-</p>
-
-// Linha 84 - Título do card
-<CardTitle className="flex items-center gap-2">
-  Serviços Reparados na Oficina
-  <Badge variant="secondary">{workshopServices.length}</Badge>
-</CardTitle>
-
-// Linha 95 - Estado vazio
-<div className="py-12 text-center text-muted-foreground">
-  Não há serviços reparados aguardando entrega.
-</div>
-```
-
-### 5. `src/pages/PerformancePage.tsx` (Página de Performance)
+4 instâncias do label `'Finalizado'` nos steps da timeline (linhas 21, 30, 40, 49):
 
 ```typescript
-// Linha 13
-concluidos: 'Of. Reparados',
+// Todas as instâncias de:
+{ id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+
+// Para:
+{ id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
 ```
 
-### 6. `src/pages/TVMonitorPage.tsx` (Monitor TV)
+### 5. `src/components/services/ServiceDetailSheet.tsx` (Ficha de Detalhes)
+
+4 instâncias nos progress steps (linhas 121, 130, 140, 149):
 
 ```typescript
-// Linha 78-82
-{ 
-  key: 'concluidos', 
-  label: 'Of. Reparados', 
-  icon: CheckCircle, 
-  color: 'text-emerald-400',
-  filter: (s: TVMonitorService) => s.status === 'concluidos'
-},
+// Todas as instâncias de:
+{ label: 'Finalizado', statuses: ['finalizado'] },
+
+// Para:
+{ label: 'Concluído', statuses: ['finalizado'] },
 ```
 
-### 7. `src/components/shared/ServiceTimeline.tsx` (Timeline de Progresso)
+### 6. `src/utils/feedbackMessages.ts` (Mensagens de Feedback)
 
-Os labels da timeline indicam etapas do processo. Para serviços de oficina, mudar "Concluído" para "Reparado":
+Linha 148:
 
 ```typescript
-// Linha 29 (Instalação - manter "Concluído" pois não é oficina)
-{ id: 'done', label: 'Concluído', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
+// De:
+return `${serviceCode} finalizado com sucesso!`;
 
-// Linha 39 (Oficina - mudar para "Reparado")
-{ id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
-
-// Linha 48 (Visita - manter "Concluído")
-{ id: 'done', label: 'Concluído', icon: Check, status: ['a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+// Para:
+return `${serviceCode} concluído com sucesso!`;
 ```
 
-### 8. `src/components/services/ServiceDetailSheet.tsx` (Ficha de Detalhes)
+### 7. `src/pages/GeralPage.tsx` (Página Geral)
 
-Mesma lógica da timeline - apenas oficina usa "Reparado":
+Linha 175 - toast de sucesso:
 
 ```typescript
-// Linha 129 (Instalação - manter)
-{ label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+// De:
+toast.success('Serviço finalizado!');
 
-// Linha 139 (Oficina - mudar)
-{ label: 'Reparado', statuses: ['concluidos', 'em_debito', 'finalizado'] },
-
-// Linha 148 (Visita - manter)
-{ label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+// Para:
+toast.success('Serviço concluído!');
 ```
 
 ---
 
-## Estratégia de Abreviação
+## Nota sobre Minúsculas vs Maiúsculas
 
-Para evitar sobreposição de texto em espaços limitados:
-
-| Contexto | Nome Completo | Nome Abreviado |
-|----------|---------------|----------------|
-| SERVICE_STATUS_CONFIG (badges) | Oficina Reparados | - |
-| Dashboard cards | - | Of. Reparados |
-| Menu sidebar | - | Of. Reparados |
-| TV Monitor | - | Of. Reparados |
-| Performance page | - | Of. Reparados |
-| Página SecretaryConcluidosPage (título) | Oficina Reparados | - |
-| Timeline steps (oficina) | - | Reparado |
-
----
-
-## Nota Técnica
-
-O **status interno** permanece `'concluidos'` (no código e base de dados). Apenas os **labels visíveis** são alterados para "Oficina Reparados" ou "Of. Reparados".
-
-Isto significa:
-- Nenhuma migração de base de dados necessária
-- Nenhuma alteração em queries
-- A rota `/concluidos` permanece igual
-- Apenas alterações visuais/UI
+- **Badge/Label geral**: "Concluídos" (plural, usado em listas)
+- **Timeline steps**: "Concluído" (singular, representa um passo)
+- **Mensagens**: "concluído" (minúscula dentro de frase)
 
 ---
 
 ## Resumo de Alterações
 
-| Ficheiro | Linhas Afectadas |
-|----------|------------------|
+| Ficheiro | Linhas |
+|----------|--------|
 | `src/types/database.ts` | 1 |
 | `src/pages/DashboardPage.tsx` | 1 |
-| `src/components/layouts/SecretarySidebar.tsx` | 1 |
-| `src/pages/secretary/SecretaryConcluidosPage.tsx` | 4 |
 | `src/pages/PerformancePage.tsx` | 1 |
-| `src/pages/TVMonitorPage.tsx` | 1 |
-| `src/components/shared/ServiceTimeline.tsx` | 1 |
-| `src/components/services/ServiceDetailSheet.tsx` | 1 |
+| `src/components/shared/ServiceTimeline.tsx` | 4 |
+| `src/components/services/ServiceDetailSheet.tsx` | 4 |
+| `src/utils/feedbackMessages.ts` | 1 |
+| `src/pages/GeralPage.tsx` | 1 |
 
-**Total: 8 ficheiros, ~11 alterações**
+**Total: 7 ficheiros, ~13 alterações**
+
+---
+
+## Resultado Final
+
+Após estas alterações:
+
+| Estado Interno | Label Visível | Uso |
+|----------------|---------------|-----|
+| `concluidos` | Of. Reparados | Serviços reparados na oficina, aguardam entrega |
+| `finalizado` | Concluídos | Serviços totalmente terminados (pagos e entregues) |
