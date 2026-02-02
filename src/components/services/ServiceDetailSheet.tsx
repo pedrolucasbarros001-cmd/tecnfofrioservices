@@ -118,7 +118,7 @@ const getServiceProgressSteps = (service: Service) => {
       { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Em Curso', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Entregue', statuses: ['concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Finalizado', statuses: ['finalizado'] },
+      { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
@@ -127,7 +127,7 @@ const getServiceProgressSteps = (service: Service) => {
       { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Instalação', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Finalizado', statuses: ['finalizado'] },
+      { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
@@ -137,7 +137,7 @@ const getServiceProgressSteps = (service: Service) => {
       { label: 'Na Oficina', statuses: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Reparação', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Reparado', statuses: ['concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Finalizado', statuses: ['finalizado'] },
+      { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
@@ -146,7 +146,7 @@ const getServiceProgressSteps = (service: Service) => {
     { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
     { label: 'Visita', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
     { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
-    { label: 'Finalizado', statuses: ['finalizado'] },
+    { label: 'Concluído', statuses: ['finalizado'] },
   ];
 };
 

@@ -145,5 +145,5 @@ export function getPartArrivedMessage(serviceCode: string): string {
  * Get feedback message for service finalization
  */
 export function getFinalizeMessage(serviceCode: string): string {
-  return `${serviceCode} finalizado com sucesso!`;
+  return `${serviceCode} concluído com sucesso!`;
 }

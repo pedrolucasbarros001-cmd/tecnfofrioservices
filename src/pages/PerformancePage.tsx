@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<string, string> = {
   na_oficina: 'Na Oficina',
   concluidos: 'Of. Reparados',
   em_debito: 'Em Débito',
-  finalizado: 'Finalizado',
+  finalizado: 'Concluídos',
   entregas: 'Entrega',
 };
 
