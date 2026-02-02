@@ -136,7 +136,7 @@ const getServiceProgressSteps = (service: Service) => {
       { label: 'Criado', statuses: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Na Oficina', statuses: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { label: 'Reparação', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Reparado', statuses: ['concluidos', 'em_debito', 'finalizado'] },
       { label: 'Finalizado', statuses: ['finalizado'] },
     ];
   }

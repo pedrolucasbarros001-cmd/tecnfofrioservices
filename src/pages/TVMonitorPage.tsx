@@ -76,7 +76,7 @@ const MONITOR_SECTIONS = [
   },
   { 
     key: 'concluidos', 
-    label: 'Concluídos', 
+    label: 'Of. Reparados', 
     icon: CheckCircle, 
     color: 'text-emerald-400',
     filter: (s: TVMonitorService) => s.status === 'concluidos'

@@ -26,7 +26,7 @@ import {
 const menuItems = [
   { title: 'Geral', url: '/geral', icon: List },
   { title: 'Oficina', url: '/oficina', icon: Wrench },
-  { title: 'Concluídos', url: '/concluidos', icon: CheckCircle2 },
+  { title: 'Of. Reparados', url: '/concluidos', icon: CheckCircle2 },
   { title: 'Em Débito', url: '/em-debito', icon: AlertCircle },
   { title: 'Clientes', url: '/clientes', icon: Users },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
