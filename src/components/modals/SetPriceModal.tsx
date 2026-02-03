@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Shield, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -6,19 +10,51 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Shield, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPricingSet } from '@/utils/activityLogUtils';
-import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { toast } from 'sonner';
 import type { Service, ServiceStatus } from '@/types/database';
+import { 
+  PriceLineItems, 
+  LineItem, 
+  DEFAULT_LINE_ITEM,
+  calculateTotals 
+} from '@/components/pricing/PriceLineItems';
+import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
+
+// Schema for line items
+const lineItemSchema = z.object({
+  reference: z.string().optional(),
+  description: z.string().min(1, 'Descrição é obrigatória'),
+  quantity: z.number().min(1, 'Mínimo 1'),
+  unit_price: z.number().min(0, 'Valor deve ser positivo'),
+  tax_rate: z.number(),
+});
+
+const formSchema = z.object({
+  items: z.array(lineItemSchema).min(1, 'Adicione pelo menos um artigo'),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+interface PricingData {
+  items: Array<{
+    ref?: string;
+    desc: string;
+    qty: number;
+    price: number;
+    tax: number;
+  }>;
+  discount?: { type: 'euro' | 'percent'; value: number };
+  adjustment?: number;
+}
 
 interface SetPriceModalProps {
   service: Service | null;
@@ -27,9 +63,9 @@ interface SetPriceModalProps {
 }
 
 export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProps) {
-  const [price, setPrice] = useState('');
-  const [description, setDescription] = useState('');
-  const [discount, setDiscount] = useState('');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [adjustment, setAdjustment] = useState('');
   const [warrantyCoversAll, setWarrantyCoversAll] = useState(false);
   
   const updateService = useUpdateService();
@@ -37,56 +73,139 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   const isWarrantyService = service?.is_warranty || false;
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      items: [{ ...DEFAULT_LINE_ITEM }],
+    },
+  });
+
+  // Load existing pricing data when modal opens
   useEffect(() => {
     if (service && open) {
-      // Preço = labor_cost + parts_cost (para compatibilidade com serviços antigos)
-      const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
-      setPrice(existingPrice > 0 ? existingPrice.toString() : '');
-      setDescription(service.pricing_description || '');
-      setDiscount(service.discount?.toString() || '0');
+      // Try to parse existing pricing_description as JSON
+      let existingItems: LineItem[] = [];
+      let existingDiscount: { type: 'euro' | 'percent'; value: number } | null = null;
+      let existingAdjustment = 0;
+
+      if (service.pricing_description) {
+        try {
+          const parsed = JSON.parse(service.pricing_description) as PricingData;
+          if (parsed.items && Array.isArray(parsed.items)) {
+            existingItems = parsed.items.map(item => ({
+              reference: item.ref || '',
+              description: item.desc || '',
+              quantity: item.qty || 1,
+              unit_price: item.price || 0,
+              tax_rate: item.tax || 23,
+            }));
+          }
+          if (parsed.discount) {
+            existingDiscount = parsed.discount;
+          }
+          if (parsed.adjustment !== undefined) {
+            existingAdjustment = parsed.adjustment;
+          }
+        } catch {
+          // If not JSON, create a single line from existing data
+          const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
+          if (existingPrice > 0 || service.pricing_description) {
+            existingItems = [{
+              reference: '',
+              description: service.pricing_description || 'Serviço',
+              quantity: 1,
+              unit_price: existingPrice,
+              tax_rate: 23,
+            }];
+          }
+        }
+      } else {
+        // No pricing_description, check if there's existing price data
+        const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
+        if (existingPrice > 0) {
+          existingItems = [{
+            reference: '',
+            description: 'Serviço',
+            quantity: 1,
+            unit_price: existingPrice,
+            tax_rate: 23,
+          }];
+        }
+      }
+
+      // Set form values
+      if (existingItems.length > 0) {
+        form.reset({ items: existingItems });
+      } else {
+        form.reset({ items: [{ ...DEFAULT_LINE_ITEM }] });
+      }
+
+      // Set discount
+      if (existingDiscount) {
+        setDiscountType(existingDiscount.type);
+        setDiscountValue(existingDiscount.value.toString());
+      } else if (service.discount && service.discount > 0) {
+        setDiscountType('euro');
+        setDiscountValue(service.discount.toString());
+      } else {
+        setDiscountValue('');
+        setDiscountType('euro');
+      }
+
+      // Set adjustment
+      setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
+      
       // If warranty service, default to covered
       setWarrantyCoversAll(isWarrantyService);
     }
-  }, [service, open, isWarrantyService]);
+  }, [service, open, isWarrantyService, form]);
 
-  const priceValue = parseCurrencyInput(price);
-  const discountValue = parseCurrencyInput(discount);
-  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, priceValue - discountValue);
+  const watchItems = form.watch('items') || [];
+  const { subtotal, totalTax, total } = calculateTotals(watchItems as LineItem[]);
+  const discountAmount = calculateDiscount(subtotal, discountValue, discountType);
+  const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
+  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, total - discountAmount + adjustmentAmount);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values: FormValues) => {
     if (!service) return;
 
-    // Determinar novo status:
-    // - Se já está finalizado (instalação entregue), permanece finalizado
-    // - Se estava em a_precificar e location=cliente → finalizado
-    // - Se estava em a_precificar e location=oficina → concluidos
-    // - Qualquer outro caso: não muda status (mantém operacional)
+    // Prepare pricing description as JSON
+    const pricingData: PricingData = {
+      items: values.items.map(item => ({
+        ref: item.reference || '',
+        desc: item.description,
+        qty: item.quantity,
+        price: item.unit_price,
+        tax: item.tax_rate,
+      })),
+      discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
+      adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+    };
+
+    // Determine new status
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
     const currentStatus = service.status as ServiceStatus;
     
     let newStatus: ServiceStatus | undefined;
     
-    // Apenas transita status se estiver em a_precificar (status operacional de precificação)
     if (currentStatus === 'a_precificar') {
       if (warrantyCoversAll || !isClientLocation) {
-        newStatus = 'concluidos'; // Oficina: aguarda entrega
+        newStatus = 'concluidos';
       } else {
-        newStatus = 'finalizado'; // Cliente: entrega já feita
+        newStatus = 'finalizado';
       }
     }
-    // Se está finalizado/concluidos, NÃO muda status (mantém operacional intacto)
-    // O débito é tratado como estado financeiro calculado, não como status
 
     await updateService.mutateAsync({
       id: service.id,
-      labor_cost: priceValue,
-      parts_cost: 0,
-      discount: discountValue,
+      labor_cost: subtotal,
+      parts_cost: totalTax, // Store tax separately for reference
+      discount: discountAmount,
       final_price: finalPrice,
-      pricing_description: description,
+      pricing_description: JSON.stringify(pricingData),
       pending_pricing: false,
       ...(newStatus && { status: newStatus }),
-      skipToast: true, // Contextual message below
+      skipToast: true,
     });
 
     // Log activity
@@ -113,9 +232,10 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   };
 
   const resetForm = () => {
-    setPrice('');
-    setDescription('');
-    setDiscount('');
+    form.reset({ items: [{ ...DEFAULT_LINE_ITEM }] });
+    setDiscountValue('');
+    setDiscountType('euro');
+    setAdjustment('');
     setWarrantyCoversAll(false);
   };
 
@@ -126,8 +246,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
             Definir Preço - {service?.code}
             {isWarrantyService && (
@@ -139,104 +259,81 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Warranty Option */}
-          {isWarrantyService && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="warrantyCoversAll"
-                  checked={warrantyCoversAll}
-                  onCheckedChange={(checked) => setWarrantyCoversAll(checked === true)}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+            <ScrollArea className="flex-1 max-h-[calc(90vh-200px)] px-6">
+              <div className="space-y-6 py-4 pr-4">
+                {/* Warranty Option */}
+                {isWarrantyService && (
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="warrantyCoversAll"
+                        checked={warrantyCoversAll}
+                        onCheckedChange={(checked) => setWarrantyCoversAll(checked === true)}
+                      />
+                      <Label htmlFor="warrantyCoversAll" className="cursor-pointer font-medium text-purple-800">
+                        A garantia cobre todo o serviço
+                      </Label>
+                    </div>
+                    <p className="text-xs text-purple-600">
+                      Se marcado, o cliente não será cobrado e o serviço avançará diretamente para conclusão.
+                    </p>
+                  </div>
+                )}
+
+                {/* Warning for warranty not covering */}
+                {isWarrantyService && !warrantyCoversAll && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      A garantia não cobre este serviço. O cliente será cobrado pelo valor definido abaixo.
+                    </p>
+                  </div>
+                )}
+
+                {/* Line Items Table */}
+                <PriceLineItems 
+                  form={form} 
+                  fieldName="items" 
+                  disabled={warrantyCoversAll}
                 />
-                <Label htmlFor="warrantyCoversAll" className="cursor-pointer font-medium text-purple-800">
-                  A garantia cobre todo o serviço
-                </Label>
+
+                {/* Pricing Summary */}
+                <div className="flex justify-end">
+                  <PricingSummary
+                    subtotal={subtotal}
+                    totalTax={totalTax}
+                    discountValue={discountValue}
+                    discountType={discountType}
+                    adjustment={adjustment}
+                    onDiscountValueChange={setDiscountValue}
+                    onDiscountTypeChange={setDiscountType}
+                    onAdjustmentChange={setAdjustment}
+                    disabled={warrantyCoversAll}
+                    warrantyCoversAll={warrantyCoversAll}
+                  />
+                </div>
               </div>
-              <p className="text-xs text-purple-600">
-                Se marcado, o cliente não será cobrado e o serviço avançará diretamente para conclusão.
-              </p>
-            </div>
-          )}
+            </ScrollArea>
 
-          {/* Warning for warranty not covering */}
-          {isWarrantyService && !warrantyCoversAll && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-700">
-                A garantia não cobre este serviço. O cliente será cobrado pelo valor definido abaixo.
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="price">Preço (€) *</Label>
-            <Input
-              id="price"
-              type="text"
-              inputMode="decimal"
-              placeholder="Ex: 2.000,00"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              disabled={warrantyCoversAll}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              placeholder="Mão de obra, materiais e peças incluídas..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={warrantyCoversAll}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="discount">Desconto (€)</Label>
-            <Input
-              id="discount"
-              type="text"
-              inputMode="decimal"
-              placeholder="Ex: 50,00"
-              value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
-              disabled={warrantyCoversAll}
-            />
-          </div>
-
-          {/* Summary Box */}
-          <div className={`p-4 rounded-lg space-y-2 ${warrantyCoversAll ? 'bg-green-50 border border-green-200' : 'bg-violet-50 border border-violet-100'}`}>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Subtotal:</span>
-              <span className={warrantyCoversAll ? 'line-through text-muted-foreground' : ''}>
-                €{priceValue.toFixed(2)}
-              </span>
-            </div>
-            <div className={`border-t ${warrantyCoversAll ? 'border-green-200' : 'border-violet-200'}`} />
-            <div className="flex justify-between items-center">
-              <span className="font-semibold">Total a cobrar:</span>
-              <span className={`font-bold text-lg ${warrantyCoversAll ? 'text-green-600' : 'text-violet-600'}`}>
-                {warrantyCoversAll ? 'Sem cobrança' : `€${finalPrice.toFixed(2)}`}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={updateService.isPending}
-            className={warrantyCoversAll ? 'bg-green-600 hover:bg-green-700' : 'bg-violet-600 hover:bg-violet-700'}
-          >
-            {updateService.isPending ? 'A confirmar...' : (warrantyCoversAll ? 'Confirmar Garantia' : 'Confirmar Preço')}
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateService.isPending}
+                className={warrantyCoversAll ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                {updateService.isPending 
+                  ? 'A confirmar...' 
+                  : (warrantyCoversAll ? 'Confirmar Garantia' : 'Confirmar Preço')
+                }
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

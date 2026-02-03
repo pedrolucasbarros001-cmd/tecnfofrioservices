@@ -55,6 +55,7 @@ import { toast } from 'sonner';
 import type { Customer } from '@/types/database';
 
 const itemSchema = z.object({
+  reference: z.string().optional(),
   name: z.string().min(1, 'Nome do artigo é obrigatório'),
   description: z.string().optional(),
   quantity: z.number().min(1, 'Quantidade mínima é 1'),
@@ -108,7 +109,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       customer_phone: '',
       customer_nif: '',
       items: [
-        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
+        { reference: '', name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
       ],
     },
   });
@@ -436,7 +437,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })
+                          append({ reference: '', name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })
                         }
                       >
                         <Plus className="h-4 w-4 mr-1" />
@@ -448,7 +449,8 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[200px]">Artigo</TableHead>
+                            <TableHead className="w-[100px]">Ref.</TableHead>
+                            <TableHead className="w-[180px]">Artigo</TableHead>
                             <TableHead>Descrição</TableHead>
                             <TableHead className="w-[80px]">Qtd</TableHead>
                             <TableHead className="w-[120px]">Valor (€)</TableHead>
@@ -464,6 +466,19 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
                             return (
                               <TableRow key={field.id}>
+                                <TableCell>
+                                  <FormField
+                                    control={form.control}
+                                    name={`items.${index}.reference`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <Input placeholder="Ref" {...field} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <FormField
                                     control={form.control}
