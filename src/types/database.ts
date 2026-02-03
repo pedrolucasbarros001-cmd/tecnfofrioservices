@@ -21,7 +21,29 @@ export type ScheduledShift = 'manha' | 'tarde' | 'noite';
 
 export type PaymentMethod = 'dinheiro' | 'multibanco' | 'transferencia' | 'mbway';
 
-export type PhotoType = 'visita' | 'oficina' | 'entrega' | 'instalacao' | 'antes' | 'depois';
+export type PhotoType = 
+  | 'visita'       // Genérica (legado)
+  | 'aparelho'     // Foto geral do aparelho
+  | 'etiqueta'     // Etiqueta/placa do aparelho
+  | 'estado'       // Estado físico (amassados, danos)
+  | 'oficina' 
+  | 'entrega' 
+  | 'instalacao' 
+  | 'antes' 
+  | 'depois';
+
+// Photo type labels for display
+export const PHOTO_TYPE_LABELS: Record<PhotoType, string> = {
+  aparelho: 'Aparelho',
+  etiqueta: 'Etiqueta',
+  estado: 'Estado',
+  visita: 'Visita',
+  oficina: 'Oficina',
+  entrega: 'Entrega',
+  instalacao: 'Instalação',
+  antes: 'Antes',
+  depois: 'Depois',
+};
 
 export type SignatureType = 'recolha' | 'entrega' | 'visita' | 'pedido_peca';
 

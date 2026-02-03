@@ -16,7 +16,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import type { Service } from '@/types/database';
+import type { Service, PhotoType } from '@/types/database';
+import { PHOTO_TYPE_LABELS } from '@/types/database';
 
 interface ServicePreviousSummaryProps {
   service: Service;
@@ -164,7 +165,7 @@ export function ServicePreviousSummary({
             </div>
           )}
 
-          {/* Photos */}
+          {/* Photos - grouped by type */}
           {photos && photos.length > 0 && (
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
@@ -173,14 +174,28 @@ export function ServicePreviousSummary({
               </div>
               <div className="grid grid-cols-4 gap-2">
                 {photos.slice(0, 4).map((photo) => (
-                  <img
-                    key={photo.id}
-                    src={photo.file_url}
-                    alt={photo.description || 'Foto do serviço'}
-                    className="w-full h-16 object-cover rounded-lg"
-                  />
+                  <div key={photo.id} className="relative">
+                    <img
+                      src={photo.file_url}
+                      alt={photo.description || 'Foto do serviço'}
+                      className="w-full h-16 object-cover rounded-lg"
+                    />
+                    {photo.photo_type && (
+                      <Badge 
+                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] px-1 py-0"
+                        variant="secondary"
+                      >
+                        {PHOTO_TYPE_LABELS[photo.photo_type as PhotoType] || photo.photo_type}
+                      </Badge>
+                    )}
+                  </div>
                 ))}
               </div>
+              {photos.length > 4 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  +{photos.length - 4} mais fotos
+                </p>
+              )}
             </div>
           )}
 

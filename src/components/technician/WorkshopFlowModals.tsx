@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
 import { ServicePreviousSummary } from '@/components/technician/ServicePreviousSummary';
+import { DiagnosisPhotosGallery } from '@/components/technician/DiagnosisPhotosGallery';
 import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
@@ -303,6 +304,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
               className="mb-4"
             />
           )}
+
+          {/* Show diagnosis photos from visit */}
+          <DiagnosisPhotosGallery serviceId={service.id} className="mb-4" />
 
           <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
             <div className="grid grid-cols-2 gap-3">
