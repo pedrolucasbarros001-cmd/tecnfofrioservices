@@ -32,13 +32,13 @@ interface DashboardStats {
 }
 
 const DASHBOARD_CARDS = [
-  { key: 'por_fazer' as const, label: 'Por Fazer', icon: ClipboardList, route: '/geral?status=por_fazer' },
+  { key: 'por_fazer' as const, label: 'Aberto', icon: ClipboardList, route: '/geral?status=por_fazer' },
   { key: 'em_execucao' as const, label: 'Em Execução', icon: Play, route: '/geral?status=em_execucao' },
-  { key: 'na_oficina' as const, label: 'Na Oficina', icon: Building2, route: '/geral?status=na_oficina' },
-  { key: 'para_pedir_peca' as const, label: 'Para Pedir Peça', icon: Package, route: '/geral?status=para_pedir_peca' },
-  { key: 'em_espera_de_peca' as const, label: 'Em Espera de Peça', icon: Clock, route: '/geral?status=em_espera_de_peca' },
+  { key: 'na_oficina' as const, label: 'Oficina', icon: Building2, route: '/geral?status=na_oficina' },
+  { key: 'para_pedir_peca' as const, label: 'Pedir Peça', icon: Package, route: '/geral?status=para_pedir_peca' },
+  { key: 'em_espera_de_peca' as const, label: 'Espera de Peça', icon: Clock, route: '/geral?status=em_espera_de_peca' },
   { key: 'concluidos' as const, label: 'Of. Reparados', icon: Truck, route: '/geral?status=concluidos' },
-  { key: 'a_precificar' as const, label: 'A Precificar', icon: DollarSign, route: '/geral?status=a_precificar' },
+  { key: 'a_precificar' as const, label: 'Precificar', icon: DollarSign, route: '/geral?status=a_precificar' },
   { key: 'em_debito' as const, label: 'Em Débito', icon: AlertCircle, route: '/em-debito' },
   { key: 'finalizado' as const, label: 'Concluídos', icon: CheckSquare, route: '/geral?status=finalizado' },
   { key: 'orcamentos' as const, label: 'Orçamentos', icon: FileText, route: '/orcamentos' },

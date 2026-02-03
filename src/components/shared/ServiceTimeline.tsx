@@ -34,7 +34,7 @@ const getTimelineSteps = (service: Service) => {
   if (isWorkshop) {
     return [
       { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'workshop', label: 'Na Oficina', icon: Package, status: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+      { id: 'workshop', label: 'Oficina', icon: Package, status: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'repair', label: 'Reparação', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
       { id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
       { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },

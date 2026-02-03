@@ -41,7 +41,7 @@ const MONITOR_SECTIONS = [
   },
   { 
     key: 'na_oficina', 
-    label: 'Na Oficina', 
+    label: 'Oficina', 
     icon: Building2, 
     color: 'text-green-400',
     filter: (s: TVMonitorService) => !!s.technician_id && ['por_fazer', 'na_oficina'].includes(s.status || '')
@@ -55,21 +55,21 @@ const MONITOR_SECTIONS = [
   },
   { 
     key: 'para_pedir_peca', 
-    label: 'Para Pedir Peça', 
+    label: 'Pedir Peça', 
     icon: Package, 
     color: 'text-yellow-400',
     filter: (s: TVMonitorService) => s.status === 'para_pedir_peca'
   },
   { 
     key: 'em_espera_de_peca', 
-    label: 'Em Espera de Peça', 
+    label: 'Espera de Peça', 
     icon: Clock, 
     color: 'text-orange-400',
     filter: (s: TVMonitorService) => s.status === 'em_espera_de_peca'
   },
   { 
     key: 'a_precificar', 
-    label: 'A Precificar', 
+    label: 'Precificar', 
     icon: DollarSign, 
     color: 'text-lime-400',
     filter: (s: TVMonitorService) => s.status === 'a_precificar'
