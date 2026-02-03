@@ -127,11 +127,11 @@ export default function TechnicianOfficePage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
-      por_fazer: { label: 'Por Fazer', className: 'bg-slate-100 text-slate-700' },
+      por_fazer: { label: 'Aberto', className: 'bg-slate-100 text-slate-700' },
       em_execucao: { label: 'Em Execução', className: 'bg-blue-100 text-blue-700' },
-      na_oficina: { label: 'Na Oficina', className: 'bg-orange-100 text-orange-700' },
+      na_oficina: { label: 'Oficina', className: 'bg-orange-100 text-orange-700' },
       para_pedir_peca: { label: 'Pedir Peça', className: 'bg-amber-100 text-amber-700' },
-      em_espera_de_peca: { label: 'Aguarda Peça', className: 'bg-purple-100 text-purple-700' },
+      em_espera_de_peca: { label: 'Espera de Peça', className: 'bg-purple-100 text-purple-700' },
     };
     const info = statusMap[status] || { label: status, className: 'bg-muted text-muted-foreground' };
     return <Badge className={cn('text-xs', info.className)}>{info.label}</Badge>;

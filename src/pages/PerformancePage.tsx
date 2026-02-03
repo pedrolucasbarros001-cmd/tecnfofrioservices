@@ -7,9 +7,9 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 
 const STATUS_LABELS: Record<string, string> = {
-  por_fazer: 'Por Fazer',
+  por_fazer: 'Aberto',
   em_execucao: 'Em Execução',
-  na_oficina: 'Na Oficina',
+  na_oficina: 'Oficina',
   concluidos: 'Of. Reparados',
   em_debito: 'Em Débito',
   finalizado: 'Concluídos',

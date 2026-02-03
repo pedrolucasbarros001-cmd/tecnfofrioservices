@@ -200,12 +200,12 @@ export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, {
   color: string;
   intensity: 'dim' | 'normal' | 'active';
 }> = {
-  por_fazer: { label: 'Por Fazer', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  por_fazer: { label: 'Aberto', color: 'bg-primary/10 text-primary', intensity: 'normal' },
   em_execucao: { label: 'Em Execução', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
-  na_oficina: { label: 'Na Oficina', color: 'bg-primary/10 text-primary', intensity: 'normal' },
-  para_pedir_peca: { label: 'Para Pedir Peça', color: 'bg-primary/10 text-primary border border-dashed border-primary/30', intensity: 'normal' },
-  em_espera_de_peca: { label: 'Em Espera de Peça', color: 'bg-primary/10 text-primary', intensity: 'normal' },
-  a_precificar: { label: 'A Precificar', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  na_oficina: { label: 'Oficina', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  para_pedir_peca: { label: 'Pedir Peça', color: 'bg-primary/10 text-primary border border-dashed border-primary/30', intensity: 'normal' },
+  em_espera_de_peca: { label: 'Espera de Peça', color: 'bg-primary/10 text-primary', intensity: 'normal' },
+  a_precificar: { label: 'Precificar', color: 'bg-primary/10 text-primary', intensity: 'normal' },
   concluidos: { label: 'Of. Reparados', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
   em_debito: { label: 'Em Débito', color: 'bg-primary/10 text-primary border-l-2 border-l-destructive', intensity: 'normal' },
   finalizado: { label: 'Concluídos', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
