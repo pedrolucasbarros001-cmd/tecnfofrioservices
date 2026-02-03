@@ -9,6 +9,7 @@ import type { Service, Customer } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { generatePDF } from '@/utils/pdfUtils';
 import { COMPANY_INFO } from '@/utils/companyInfo';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ServiceTagPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -16,7 +17,10 @@ export default function ServiceTagPage() {
   const tagRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Fetch service data with customer
+  // CRITICAL: Wait for auth before making any queries
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
+  // Fetch service data with customer - ONLY after auth is confirmed
   const { data: service, isLoading, error } = useQuery({
     queryKey: ['service-tag-print', serviceId],
     queryFn: async () => {
@@ -32,10 +36,11 @@ export default function ServiceTagPage() {
       if (error) throw error;
       return data as Service & { customer: Customer };
     },
-    enabled: !!serviceId,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
-  const qrUrl = `${window.location.origin}/service/${serviceId}`;
+  // QR points to internal history page (requires login) - for technician use
+  const qrUrl = `${window.location.origin}/service-detail/${serviceId}`;
 
   const handlePrint = () => {
     window.print();
@@ -56,11 +61,15 @@ export default function ServiceTagPage() {
     }
   };
 
-  if (isLoading) {
+  // CRITICAL: Show loading while auth is being restored (fixes blank page in new tab)
+  if (authLoading || isLoading) {
     return (
       <div className="print-tag-page">
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">
+            {authLoading ? 'A verificar sessão...' : 'A carregar etiqueta...'}
+          </span>
         </div>
       </div>
     );

@@ -13,6 +13,7 @@ import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { generatePDF } from '@/utils/pdfUtils';
 import { COMPANY_INFO } from '@/utils/companyInfo';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -35,8 +36,11 @@ export default function ServicePrintPage() {
   const navigate = useNavigate();
   const printSheetRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // CRITICAL: Wait for auth before making any queries
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
-  // Fetch service data with customer
+  // Fetch service data with customer - ONLY after auth is confirmed
   const { data: service, isLoading: loadingService } = useQuery({
     queryKey: ['service-print', serviceId],
     queryFn: async () => {
@@ -52,7 +56,7 @@ export default function ServicePrintPage() {
       if (error) throw error;
       return data as Service & { customer: Customer };
     },
-    enabled: !!serviceId,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
   // Fetch parts used for this service
@@ -68,7 +72,7 @@ export default function ServicePrintPage() {
       if (error) throw error;
       return data as ServicePart[];
     },
-    enabled: !!serviceId,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
   // Fetch payment history
@@ -84,7 +88,7 @@ export default function ServicePrintPage() {
       if (error) throw error;
       return data as ServicePayment[];
     },
-    enabled: !!serviceId,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
   // Fetch service signatures
@@ -100,7 +104,7 @@ export default function ServicePrintPage() {
       if (error) throw error;
       return data as ServiceSignature[];
     },
-    enabled: !!serviceId,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
   const handlePrint = () => {
@@ -121,11 +125,15 @@ export default function ServicePrintPage() {
     }
   };
 
-  if (loadingService) {
+  // CRITICAL: Show loading while auth is being restored (fixes blank page in new tab)
+  if (authLoading || loadingService) {
     return (
       <div className="print-page">
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">
+            {authLoading ? 'A verificar sessão...' : 'A carregar ficha...'}
+          </span>
         </div>
       </div>
     );
