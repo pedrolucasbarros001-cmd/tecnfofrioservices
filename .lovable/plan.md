@@ -1,381 +1,209 @@
 
-# Plano: Correções e Melhorias no Sistema de Fichas, Etiquetas e Débitos
 
-## Resumo dos Problemas e Soluções
+# Plano: Corrigir Página em Branco da Ficha + Reformular Etiqueta para Histórico Interno
 
-| Problema | Solução |
-|----------|---------|
-| 1. Clique no serviço em débito não abre ficha lateral | Adicionar `ServiceDetailSheet` à página de débitos com handler de clique |
-| 2. "Ver Ficha" abre página em branco | Verificar/corrigir a query e adicionar fallbacks robustos |
-| 3. "Ver Etiqueta" usa modal em vez de página dedicada | Criar página `/print/tag/:serviceId` com tamanho 80mm x 170mm |
-| 4. Forçar estado apenas para admin | Verificar role no modal e adicionar aviso de impacto detalhado |
-| 5. QR Code da etiqueta precisa mostrar link texto | Adicionar link clicável abaixo do QR Code |
-| 6. Todos colaboradores devem acessar ficha/histórico via QR | Confirmar que rota `/service/:serviceId` está acessível a todos |
+## Problema Identificado
+
+1. **"Ver Ficha" abre página em branco**: A rota `/print/service/:serviceId` está protegida por `ProtectedRoute`, mas ao abrir em nova aba com `window.open()`, a sessão de autenticação não está a ser propagada corretamente. A página carrega antes do Supabase restaurar a sessão, resultando em redirect para `/login` ou conteúdo vazio.
+
+2. **Etiqueta deve mostrar histórico interno para técnicos**: O QR code da etiqueta deve apontar para uma página interna com dados completos do serviço + cliente + histórico (exige login), não apenas o status simplificado.
+
+3. **Acesso universal para técnicos**: Qualquer técnico autenticado deve conseguir ler o QR e ver o histórico completo, não apenas o técnico atribuído.
+
+---
+
+## Causa Raiz da Página em Branco
+
+A rota `/print/service/:serviceId` é protegida mas está **fora do AppLayout**, então ao abrir numa nova aba:
+
+1. `window.open()` cria uma nova instância do browser
+2. O Supabase SDK tenta restaurar a sessão do `localStorage`
+3. Enquanto `loading === true`, mostra spinner
+4. Se `loading` termina antes da sessão ser validada → redireciona para `/login` ou mostra vazio
+
+**Solução**: A página de impressão deve aguardar correctamente a restauração da sessão. Verificar que o `ProtectedRoute` tem fallback adequado durante loading.
 
 ---
 
 ## Ficheiros a Alterar
 
-| Ficheiro | Ação | Descrição |
+| Ficheiro | Acao | Descricao |
 |----------|------|-----------|
-| `src/pages/secretary/SecretaryDebitoPage.tsx` | Alterar | Adicionar `ServiceDetailSheet` e handler de clique nas linhas |
-| `src/pages/ServiceTagPage.tsx` | **Criar** | Página dedicada para impressão de etiqueta (80mm x 170mm) |
-| `src/App.tsx` | Alterar | Adicionar rota `/print/tag/:serviceId` |
-| `src/components/services/ServiceDetailSheet.tsx` | Alterar | Mudar botão "Ver Etiqueta" para abrir página em nova aba |
-| `src/components/modals/ForceStateModal.tsx` | Alterar | Adicionar verificação de role e aviso detalhado de impactos |
-| `src/pages/ServiceConsultPage.tsx` | Alterar | Adicionar link texto abaixo do QR Code |
-| `src/index.css` | Alterar | Adicionar estilos para página de etiqueta dedicada |
+| `src/pages/ServicePrintPage.tsx` | Alterar | Aguardar auth antes de fazer query |
+| `src/pages/ServiceTagPage.tsx` | Alterar | QR aponta para ServiceDetailSheet interno |
+| `src/App.tsx` | Alterar | Adicionar rota `/service-detail/:serviceId` para colaboradores |
+| `src/pages/ServiceDetailPage.tsx` | **Criar** | Pagina dedicada para historico interno (colaboradores) |
+| `src/components/auth/ProtectedRoute.tsx` | Verificar | Garantir que loading mostra spinner adequado |
+| Supabase RLS | Alterar | Permitir todos tecnicos verem qualquer servico |
 
 ---
 
-## Detalhes por Ficheiro
+## Detalhes Tecnicos
 
-### 1. SecretaryDebitoPage.tsx - Adicionar Ficha de Detalhes
+### 1. ServicePrintPage.tsx - Corrigir Pagina em Branco
 
-**Problema**: Ao clicar num serviço na página "Em Débito", não abre a ficha lateral como acontece na página Geral.
+O problema esta em que a query corre antes de confirmar autenticacao. Adicionar verificacao:
 
-**Solução**: 
-- Importar e adicionar `ServiceDetailSheet`
-- Adicionar estado `selectedService` e `showDetailSheet`
-- Tornar as linhas da tabela clicáveis
-
-```typescript
-// Adicionar imports
-import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
-
-// Adicionar estados
-const [selectedService, setSelectedService] = useState<Service | null>(null);
-const [showDetailSheet, setShowDetailSheet] = useState(false);
-
-// Handler para clique na linha
-const handleServiceClick = (service: Service) => {
-  setSelectedService(service);
-  setShowDetailSheet(true);
-};
-
-// Adicionar cursor-pointer e onClick na TableRow
-<TableRow 
-  key={service.id} 
-  className="cursor-pointer hover:bg-muted/50"
-  onClick={() => handleServiceClick(service)}
->
-
-// Adicionar ServiceDetailSheet no final
-<ServiceDetailSheet
-  service={selectedService}
-  open={showDetailSheet}
-  onOpenChange={setShowDetailSheet}
-/>
-```
-
----
-
-### 2. ServiceTagPage.tsx - Nova Página de Etiqueta (80mm x 170mm)
-
-Criar página dedicada similar à `ServicePrintPage.tsx` mas para etiquetas:
-
-**Características**:
-- Tamanho físico: **80mm largura x 170mm altura** (17cm)
-- Controlos: Voltar, Imprimir, Baixar PDF
-- Layout centrado na página
-- QR Code aponta para `/service/:serviceId`
-- **Link texto visível** abaixo do QR Code para acesso fácil
-
-**Estrutura**:
-```text
-┌──────────────────────────────────────────────────────────┐
-│  [← Voltar]                  [Imprimir]  [Baixar PDF]    │
-└──────────────────────────────────────────────────────────┘
-
-        ┌────────────────────────┐
-        │  ━━━━━━━━━━━━━━━━━━━━  │  ← Barra azul
-        │                        │
-        │    [LOGO TECNOFRIO]    │
-        │                        │
-        │    ┌──────────────┐    │
-        │    │   QR CODE    │    │
-        │    └──────────────┘    │
-        │                        │
-        │     TF-00123           │  ← Código grande
-        │                        │
-        │  Cliente: João Silva   │
-        │  Equip: Frigorífico    │
-        │  Samsung RT38K         │
-        │  Tel: 912 345 678      │
-        │                        │
-        │  ───────────────────   │
-        │  Leia o QR ou aceda:   │
-        │  tecnofrio.app/s/abc   │  ← Link curto
-        └────────────────────────┘
-              80mm x 170mm
-```
-
-**Código Principal**:
-```typescript
-export default function ServiceTagPage() {
-  const { serviceId } = useParams<{ serviceId: string }>();
-  const navigate = useNavigate();
-  const tagRef = useRef<HTMLDivElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Fetch service with customer
-  const { data: service, isLoading, error } = useQuery({
-    queryKey: ['service-tag-print', serviceId],
-    queryFn: async () => {
-      if (!serviceId) throw new Error('ID não fornecido');
-      const { data, error } = await supabase
-        .from('services')
-        .select('*, customer:customers(*)')
-        .eq('id', serviceId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!serviceId,
-  });
-
-  const qrData = `${window.location.origin}/service/${serviceId}`;
-  
-  // ... handlers para print e PDF
-}
-```
-
----
-
-### 3. App.tsx - Adicionar Rota da Etiqueta
-
-```typescript
-// Após a rota /print/service/:serviceId, adicionar:
-<Route path="/print/tag/:serviceId" element={
-  <ProtectedRoute>
-    <ServiceTagPage />
-  </ProtectedRoute>
-} />
-```
-
----
-
-### 4. ServiceDetailSheet.tsx - Mudar Botão "Ver Etiqueta"
-
-**Antes** (abre modal):
-```typescript
-<Button variant="outline" size="sm" onClick={() => setShowTagModal(true)}>
-  <Tag className="h-4 w-4 mr-1" />
-  Ver Etiqueta
-</Button>
-```
-
-**Depois** (abre página em nova aba):
-```typescript
-<Button 
-  variant="outline" 
-  size="sm" 
-  onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}
->
-  <Tag className="h-4 w-4 mr-1" />
-  Ver Etiqueta
-</Button>
-```
-
-**Também remover**:
-- Estado `showTagModal`
-- Import do `ServiceTagModal`
-- Componente `<ServiceTagModal />` no JSX
-
----
-
-### 5. ForceStateModal.tsx - Restringir a Admin + Aviso Detalhado
-
-**Adicionar verificação de role**:
 ```typescript
 import { useAuth } from '@/contexts/AuthContext';
 
-const { role } = useAuth();
-const isAdmin = role === 'dono';
-
-// Se não for admin, não permitir abrir o modal
-if (!isAdmin) {
-  return null; // Ou mostrar mensagem de acesso negado
+export default function ServicePrintPage() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { serviceId } = useParams();
+  
+  // Esperar autenticacao antes de fazer query
+  const { data: service, isLoading: loadingService, error } = useQuery({
+    queryKey: ['service-print', serviceId],
+    queryFn: async () => {
+      // ... fetch logic
+    },
+    enabled: !!serviceId && isAuthenticated && !authLoading, // <-- Adicionar
+  });
+  
+  // Mostrar loading enquanto auth carrega
+  if (authLoading) {
+    return (
+      <div className="print-page">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 }
 ```
 
-**Adicionar aviso de impacto detalhado**:
-```typescript
-// Mapear impactos por transição
-const getImpactWarning = (fromStatus: ServiceStatus, toStatus: ServiceStatus) => {
-  const warnings: string[] = [];
-  
-  // Se voltar para estados anteriores
-  if (['por_fazer', 'em_execucao'].includes(toStatus) && 
-      ['concluidos', 'finalizado'].includes(fromStatus)) {
-    warnings.push('O serviço será reaberto e poderá requerer novo agendamento.');
-  }
-  
-  // Se saltar para finalizado
-  if (toStatus === 'finalizado') {
-    warnings.push('O serviço será marcado como entregue ao cliente.');
-    warnings.push('Valores financeiros serão considerados liquidados.');
-  }
-  
-  // Se mudar de/para estados de peça
-  if (['para_pedir_peca', 'em_espera_de_peca'].includes(toStatus) ||
-      ['para_pedir_peca', 'em_espera_de_peca'].includes(fromStatus)) {
-    warnings.push('O fluxo de peças pode ficar inconsistente.');
-  }
-  
-  return warnings;
-};
-```
+### 2. ServiceTagPage.tsx - Mesma Correcao
 
-**Nova UI com avisos**:
+Aplicar o mesmo padrao para a pagina de etiqueta.
+
+### 3. ServiceDetailPage.tsx - Nova Pagina de Historico Interno
+
+Criar pagina dedicada para visualizacao completa do servico por colaboradores (via QR):
+
 ```text
-┌────────────────────────────────────────────────────────────┐
-│  ⚠️ Forçar Mudança de Estado                               │
-│                                                            │
-│  TF-00123                                                  │
-│  Estado atual: Em Execução                                 │
-│                                                            │
-│  Novo Estado: [Dropdown]                                   │
-│                                                            │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │ ⚠️ IMPACTOS DESTA MUDANÇA:                         │    │
-│  │                                                     │    │
-│  │ • O serviço será reaberto e poderá requerer         │    │
-│  │   novo agendamento.                                 │    │
-│  │ • O técnico verá este serviço novamente na         │    │
-│  │   sua agenda.                                       │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  Esta operação ignora as regras normais de transição e     │
-│  pode causar inconsistências nos dados.                    │
-│                                                            │
-│                        [Cancelar]  [Confirmar Mudança]     │
-└────────────────────────────────────────────────────────────┘
+URL: /service-detail/:serviceId
+Acesso: Qualquer colaborador autenticado (dono, secretaria, tecnico)
+Conteudo:
+- Dados do cliente
+- Dados do equipamento
+- Estado atual
+- Historico de atividades (activity_logs)
+- Fotos capturadas
+- Assinaturas recolhidas
+- Pecas utilizadas/pedidas
+- Pagamentos (se nao for tecnico, ou se for permitido ver)
+
+Layout: Similar ao ServiceDetailSheet mas em pagina completa
 ```
 
----
+**Estrutura Visual**:
+```text
++------------------------------------------+
+| <- Voltar          TECNOFRIO      [Print]|
++------------------------------------------+
+| TF-00123                                 |
+| Estado: Em Execucao [badge]              |
++------------------------------------------+
+|                                          |
+| CLIENTE                                  |
+| Nome: Joao Silva                         |
+| Telefone: 912 345 678                    |
+| Morada: Rua X, 123                       |
++------------------------------------------+
+| EQUIPAMENTO                              |
+| Tipo: Frigorifico                        |
+| Marca: Samsung                           |
+| Modelo: RT38K                            |
+| Avaria: Nao faz frio                     |
++------------------------------------------+
+| HISTORICO                                |
+| 03/02 10:00 - Servico criado             |
+| 03/02 11:00 - Tecnico atribuido          |
+| 03/02 14:30 - Visita realizada           |
+| ...                                      |
++------------------------------------------+
+| FOTOS (3)                                |
+| [img] [img] [img]                        |
++------------------------------------------+
+| ASSINATURAS                              |
+| [sig] Recolha - Joao Silva 03/02         |
++------------------------------------------+
+```
 
-### 6. ServiceConsultPage.tsx - Adicionar Link Texto
+### 4. ServiceTagPage.tsx - QR Aponta para Historico Interno
 
-Adicionar link clicável abaixo da informação do status para facilitar acesso pelo cliente que não tem QR reader:
+Mudar o URL do QR code:
 
 ```typescript
-// Após o card de status, adicionar link
-<div className="text-center text-sm text-muted-foreground">
-  <p>Link de acesso:</p>
-  <a 
-    href={window.location.href} 
-    className="text-primary underline break-all"
-  >
-    {window.location.href}
-  </a>
-</div>
+// Antes:
+const qrUrl = `${window.location.origin}/service/${serviceId}`;
+
+// Depois:
+const qrUrl = `${window.location.origin}/service-detail/${serviceId}`;
 ```
 
----
+Isto faz com que ao ler o QR, o colaborador seja levado para a pagina de historico completo (exige login).
 
-### 7. index.css - Estilos para Página de Etiqueta
-
-Adicionar estilos específicos para a página dedicada de etiqueta:
-
-```css
-/* ========== PRINT TAG PAGE (80mm x 170mm) ========== */
-.print-tag-page {
-  min-height: 100vh;
-  background: hsl(var(--muted));
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.print-tag-page .print-controls {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: hsl(var(--card));
-  padding: 1rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  margin-bottom: 1.5rem;
-  width: 100%;
-  max-width: 300px;
-}
-
-.print-tag-page .print-tag-container {
-  width: 80mm;
-  min-height: 170mm;
-  background: white;
-  padding: 4mm;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  border-radius: 0.25rem;
-  box-sizing: border-box;
-}
-
-@media print {
-  .print-tag-page {
-    background: white !important;
-    padding: 0 !important;
-  }
-
-  .print-tag-page .print-controls {
-    display: none !important;
-  }
-
-  .print-tag-page .print-tag-container {
-    width: 80mm !important;
-    height: 170mm !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 4mm !important;
-    border-radius: 0 !important;
-  }
-
-  @page {
-    size: 80mm 170mm;
-    margin: 0;
-  }
-}
-```
-
----
-
-## Verificação de Acesso Universal ao QR Code
-
-A rota `/service/:serviceId` já está dentro do layout protegido mas sem restrição de role específica:
+### 5. App.tsx - Nova Rota
 
 ```typescript
-// Em App.tsx, linha 154:
-<Route path="/service/:serviceId" element={<ServiceConsultPage />} />
+// Adicionar dentro do AppLayout protegido:
+<Route path="/service-detail/:serviceId" element={<ServiceDetailPage />} />
 ```
 
-Isto significa que qualquer utilizador autenticado (dono, secretária, técnico) pode aceder. O `can_access_service` function na base de dados também permite acesso universal para colaboradores.
+### 6. RLS - Permitir Todos Tecnicos Verem Qualquer Servico
 
-**Confirmado**: Todos os colaboradores já podem aceder às fichas via QR Code.
+Atualmente a funcao `can_access_service` ja permite acesso a qualquer dono/secretaria/tecnico atribuido. Para permitir **todos os tecnicos**, precisamos modificar:
+
+```sql
+-- Funcao atualizada
+CREATE OR REPLACE FUNCTION public.can_access_service(_service_id uuid, _user_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT 
+    public.is_dono(_user_id) OR 
+    public.is_secretaria(_user_id) OR 
+    public.is_tecnico(_user_id)  -- Qualquer tecnico pode ver qualquer servico
+$function$
+```
+
+**Nota**: Se preferir manter restricao por atribuicao, nao alterar a funcao e usar acesso direto sem can_access_service para esta pagina especifica.
 
 ---
 
-## Resumo de Alterações
+## Resumo de Alteracoes
 
-| Ficheiro | Tipo | Descrição |
+| Ficheiro | Tipo | Descricao |
 |----------|------|-----------|
-| `src/pages/secretary/SecretaryDebitoPage.tsx` | Alterar | +30 linhas (DetailSheet) |
-| `src/pages/ServiceTagPage.tsx` | **Criar** | ~180 linhas |
-| `src/App.tsx` | Alterar | +6 linhas (rota) |
-| `src/components/services/ServiceDetailSheet.tsx` | Alterar | -10 linhas (remover modal) |
-| `src/components/modals/ForceStateModal.tsx` | Alterar | +40 linhas (impactos) |
-| `src/pages/ServiceConsultPage.tsx` | Alterar | +10 linhas (link) |
-| `src/index.css` | Alterar | +40 linhas (estilos) |
+| `src/pages/ServicePrintPage.tsx` | Alterar | +10 linhas (aguardar auth) |
+| `src/pages/ServiceTagPage.tsx` | Alterar | +10 linhas (aguardar auth) + mudar URL QR |
+| `src/pages/ServiceDetailPage.tsx` | **Criar** | ~250 linhas |
+| `src/App.tsx` | Alterar | +1 rota |
+| Supabase RLS | Alterar | Permitir todos tecnicos |
 
-**Total: 7 ficheiros (1 novo, 6 alterados)**
+**Total: 4 ficheiros alterados + 1 novo + 1 migracao SQL**
 
 ---
 
 ## Resultado Esperado
 
-1. **Débitos**: Clique no serviço abre ficha lateral completa
-2. **Ficha**: Página dedicada funcional (corrigida se necessário)
-3. **Etiqueta**: Página dedicada 80x170mm com impressão profissional
-4. **Forçar Estado**: Apenas admin pode usar + avisos de impacto detalhados
-5. **QR Code**: Link texto visível para acesso fácil pelo cliente
-6. **Acesso Universal**: Confirmado que todos colaboradores acedem via QR
+1. **Pagina de Ficha (Ver Ficha)**: Nunca mais aparece em branco - aguarda auth antes de carregar
+2. **Pagina de Etiqueta (Ver Etiqueta)**: Nunca mais aparece em branco - aguarda auth antes de carregar
+3. **QR Code da Etiqueta**: Aponta para `/service-detail/:id` com historico completo
+4. **Acesso Universal**: Qualquer tecnico autenticado pode ler QR e ver historico de qualquer servico
+5. **Cliente (pagina publica)**: Mantem-se `/service/:id` para consulta simplificada de status (se necessario separar)
+
+---
+
+## Pagina de Consulta do Cliente
+
+A pagina `/service/:id` (ServiceConsultPage) continuara a existir para clientes finais. O QR da etiqueta agora aponta para a versao interna, mas podemos criar uma segunda versao da etiqueta (cliente) se necessario no futuro.
+
+**Fluxo Final**:
+- Etiqueta Tecnico: QR → `/service-detail/:id` → Historico interno (requer login)
+- Link para Cliente: Pode ser gerado separadamente se necessario
+
