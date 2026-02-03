@@ -326,8 +326,10 @@
 }
 
 /* ======================================
-   PRINT PAGE STYLES - Dedicated Print Page
+   PRINT PAGE STYLES - Dedicated Print Pages
    ====================================== */
+
+/* ========== A4 Print Page (Service Sheet) ========== */
 .print-page {
   min-height: 100vh;
   background: hsl(var(--muted));
@@ -357,6 +359,39 @@
   padding: 10mm;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   border-radius: 0.25rem;
+}
+
+/* ========== Tag Print Page (80mm x 170mm) ========== */
+.print-tag-page {
+  min-height: 100vh;
+  background: hsl(var(--muted));
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.print-tag-page .print-controls {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: hsl(var(--card));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 300px;
+}
+
+.print-tag-page .print-tag-container {
+  width: 80mm;
+  min-height: 170mm;
+  background: white;
+  padding: 4mm;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  border-radius: 0.25rem;
+  box-sizing: border-box;
 }
 
 /* ======================================
@@ -425,7 +460,7 @@
     display: none !important;
   }
 
-  /* ========== PRINT PAGE (dedicated page) ========== */
+  /* ========== PRINT PAGE (dedicated A4 page) ========== */
   /* When using the dedicated print page, show it */
   .print-page {
     background: white !important;
@@ -446,8 +481,29 @@
     border-radius: 0 !important;
   }
 
+  /* ========== TAG PRINT PAGE (80mm x 170mm) ========== */
+  .print-tag-page {
+    background: white !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+  
+  .print-tag-page .print-controls {
+    display: none !important;
+  }
+  
+  .print-tag-page .print-tag-container {
+    width: 80mm !important;
+    height: 170mm !important;
+    min-height: 170mm !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    border-radius: 0 !important;
+  }
+
   /* For modal-based printing: hide React app */
-  body:not(:has(.print-page)) #root {
+  body:not(:has(.print-page)):not(:has(.print-tag-page)) #root {
     display: none !important;
     visibility: hidden !important;
   }
