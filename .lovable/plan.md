@@ -1,244 +1,302 @@
 
-# Plano: Reformular Modal de Precificação com Artigos e Melhorar Modal de Orçamento
 
-## Resumo
+# Plano: Melhorias na Ficha de Impressão, Consulta de QR Code, Canvas de Assinatura e Modal de Peças
 
-Transformar o **SetPriceModal** (modal de precificação) para ter uma estrutura semelhante ao modal de orçamento, permitindo adicionar múltiplos artigos/linhas com referência, descrição, quantidade, valor e imposto - conforme a imagem de referência.
+## Resumo das Alterações Solicitadas
 
-O **CreateBudgetModal** já possui a funcionalidade de adicionar linhas, mas vamos garantir que a interface seja consistente com a referência.
-
----
-
-## Análise da Imagem de Referência
-
-A imagem mostra um formulário de linhas com:
-- **Dropdown "Adicionar Artigo"** no topo (para selecionar artigos pré-definidos)
-- **Colunas**: Artigo (Referência), Descrição, Qtd, Valor, Imposto (0%/6%/13%/23%), Valor Final
-- **Botão de confirmação** (✓) por linha
-- **Botão de remover** (✕) por linha
-- **Resumo financeiro**: Subtotal, Desconto, IVA, Ajuste, Total
+1. **Ficha de Impressão (PDF/Print)**: Adicionar dados da empresa no cabeçalho (morada, telefone, email)
+2. **Mostrar IVA na Ficha**: Quando aplicável, exibir o IVA no resumo financeiro
+3. **Página de Consulta QR Code**: Redesenhar para mostrar status do serviço relevante para o cliente
+4. **Canvas de Assinatura**: Simplificar para corrigir bug ao assinar com o dedo
+5. **Modal Pedir Peça (Admin)**: Remover seleção manual de data, fixar **5 dias úteis** automáticos com indicador de cor
 
 ---
 
-## Ficheiros a Criar/Alterar
+## Dados da Empresa (Conforme Imagens)
+
+- **Morada**: R. Dom Pedro IV 3 R/C, Bairro da Coxa, 5300-124 Bragança
+- **Telefone**: 273 332 772
+- **Email**: tecno.frio@sapo.pt
+
+---
+
+## Ficheiros a Alterar
 
 | Ficheiro | Ação | Descrição |
 |----------|------|-----------|
-| `src/components/modals/SetPriceModal.tsx` | **Reformular** | Adicionar sistema de linhas com artigos |
-| `src/components/modals/CreateBudgetModal.tsx` | **Ajustar** | Melhorias de UX para consistência |
+| `src/utils/companyInfo.ts` | Criar | Constantes da empresa |
+| `src/utils/dateUtils.ts` | Criar | Função para calcular dias úteis |
+| `src/pages/ServicePrintPage.tsx` | Alterar | Adicionar header com dados da empresa + mostrar IVA |
+| `src/pages/ServiceConsultPage.tsx` | Reformular | Redesenhar para cliente final (status-focused) |
+| `src/components/shared/SignatureCanvas.tsx` | Simplificar | Corrigir bug de touch com implementação mais robusta |
+| `src/components/modals/ConfirmPartOrderModal.tsx` | Simplificar | Remover opções de data, fixar 5 dias úteis automáticos |
+| `src/components/shared/PartArrivalIndicator.tsx` | Ajustar | Atualizar cores para verde/amarelo/laranja/vermelho baseado em dias úteis |
 
 ---
 
-## Detalhes da Implementação
+## Detalhes por Ficheiro
 
-### 1. SetPriceModal - Nova Estrutura
+### 1. dateUtils.ts - Função para Calcular Dias Úteis
 
-**Antes**: Campo único de preço + descrição + desconto
-
-**Depois**: Sistema de linhas com artigos (similar ao CreateBudgetModal)
+Nova função para adicionar dias úteis (excluindo sábados e domingos):
 
 ```typescript
-// Nova estrutura de dados para cada linha
-interface PriceLineItem {
-  id: string;
-  reference: string;      // Referência do artigo
-  description: string;    // Descrição detalhada
-  quantity: number;       // Quantidade
-  unit_price: number;     // Valor unitário
-  tax_rate: number;       // Taxa de imposto (0, 6, 13, 23)
+// src/utils/dateUtils.ts
+
+/**
+ * Adiciona dias úteis a uma data (exclui sábados e domingos)
+ */
+export function addBusinessDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  let addedDays = 0;
+  
+  while (addedDays < days) {
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
+    // 0 = Domingo, 6 = Sábado
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++;
+    }
+  }
+  
+  return result;
 }
 
-// Taxas de IVA disponíveis
-const TAX_RATES = [
-  { value: 0, label: '0%', code: 'IVA0' },
-  { value: 6, label: '6%', code: 'IVA6' },
-  { value: 13, label: '13%', code: 'IVA13' },
-  { value: 23, label: '23%', code: 'IVA23' },
-];
-```
-
-**Estrutura do Modal**:
-1. **Header** com código do serviço e badge de garantia (se aplicável)
-2. **Secção de Garantia** (se serviço de garantia)
-3. **Tabela de Artigos**:
-   - Coluna: Referência (input texto)
-   - Coluna: Descrição (input texto, mais largo)
-   - Coluna: Qtd (input numérico)
-   - Coluna: Valor € (input numérico)
-   - Coluna: Imposto (select com taxas IVA)
-   - Coluna: Total (calculado automaticamente)
-   - Coluna: Ações (botão remover)
-4. **Botão "Adicionar Linha"** abaixo da tabela
-5. **Resumo Financeiro**:
-   - Subtotal (soma de todos os artigos)
-   - Desconto (input com opção € ou %)
-   - IVA Total
-   - Ajuste (opcional)
-   - **Total a Cobrar** (destacado)
-6. **Footer** com botões Cancelar e Confirmar
-
-### 2. Cálculos Financeiros
-
-```typescript
-// Para cada linha
-const lineSubtotal = quantity * unit_price;
-const lineTax = lineSubtotal * (tax_rate / 100);
-const lineTotal = lineSubtotal + lineTax;
-
-// Totais gerais
-const subtotal = sum(all lineSubtotals);
-const totalTax = sum(all lineTaxes);
-const discountAmount = calculateDiscount(subtotal, discountValue, discountType);
-const adjustmentAmount = parseFloat(adjustment) || 0;
-const finalTotal = subtotal + totalTax - discountAmount + adjustmentAmount;
-```
-
-### 3. Desconto com Opção % ou €
-
-Adicionar toggle para tipo de desconto:
-- **€**: Valor fixo em euros
-- **%**: Percentagem sobre o subtotal
-
-```typescript
-const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
-const [discountValue, setDiscountValue] = useState('');
-
-const calculateDiscount = () => {
-  const value = parseCurrencyInput(discountValue);
-  if (discountType === 'percent') {
-    return subtotal * (value / 100);
+/**
+ * Calcula dias úteis restantes até uma data
+ */
+export function getBusinessDaysRemaining(targetDate: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const target = new Date(targetDate);
+  target.setHours(0, 0, 0, 0);
+  
+  if (target <= today) {
+    // Calcula dias úteis atrasados (negativo)
+    let days = 0;
+    const current = new Date(target);
+    while (current < today) {
+      current.setDate(current.getDate() + 1);
+      const dayOfWeek = current.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        days--;
+      }
+    }
+    return days;
   }
-  return value;
+  
+  // Calcula dias úteis restantes (positivo)
+  let days = 0;
+  const current = new Date(today);
+  while (current < target) {
+    current.setDate(current.getDate() + 1);
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      days++;
+    }
+  }
+  return days;
+}
+```
+
+---
+
+### 2. ServicePrintPage.tsx - Cabeçalho da Empresa + IVA
+
+**Novo Header**:
+```text
+┌────────────────────────────────────────────────────────────────┐
+│  [LOGO TECNOFRIO]                          Ficha de Serviço    │
+├────────────────────────────────────────────────────────────────┤
+│  📍 R. Dom Pedro IV 3 R/C, Bairro da Coxa, 5300-124 Bragança   │
+│  📞 273 332 772  |  ✉️ tecno.frio@sapo.pt                       │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**IVA no Resumo Financeiro**:
+```
+Subtotal (s/ IVA):     €1.234,56
+IVA:                    €284,00     ← Nova linha (quando > 0)
+Desconto:               -€50,00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOTAL:                €1.468,56
+```
+
+---
+
+### 3. ServiceConsultPage.tsx - Redesenhar para Cliente Final
+
+Página focada no status do serviço para o cliente que lê o QR Code:
+
+**Informação a MANTER**:
+- Código do serviço
+- Estado atual (com descrição amigável)
+- Equipamento (tipo, marca, modelo)
+- Data de entrada
+- Localização (Cliente/Oficina)
+- Valor a pagar (se definido)
+- Contactos da empresa
+
+**Descrições Amigáveis por Estado**:
+```typescript
+const STATUS_CLIENT_MESSAGES = {
+  por_fazer: 'O seu serviço está na fila de espera para agendamento.',
+  em_execucao: 'O técnico está a trabalhar no seu equipamento.',
+  na_oficina: 'O seu equipamento está na nossa oficina para diagnóstico.',
+  para_pedir_peca: 'Estamos a providenciar peças necessárias para a reparação.',
+  em_espera_de_peca: 'A aguardar chegada de peças encomendadas.',
+  a_precificar: 'A reparação foi concluída. Estamos a calcular o valor final.',
+  concluidos: 'Reparação concluída! O seu equipamento está pronto para levantamento.',
+  em_debito: 'Serviço concluído. Aguardamos o pagamento.',
+  finalizado: 'Serviço concluído e entregue. Obrigado pela preferência!',
 };
 ```
 
-### 4. Salvamento dos Dados
-
-Ao confirmar o preço:
-1. Calcular o preço final (subtotal + IVA - desconto + ajuste)
-2. Guardar na base de dados:
-   - `labor_cost`: subtotal (valor base)
-   - `parts_cost`: 0 (compatibilidade)
-   - `discount`: valor do desconto calculado
-   - `final_price`: total final
-   - `pricing_description`: JSON ou texto com detalhes dos artigos
-3. Atualizar status do serviço conforme lógica existente
-
-### 5. CreateBudgetModal - Consistência
-
-O modal de orçamento já tem a estrutura de linhas. Ajustes menores:
-- Adicionar campo **Referência** se não existir
-- Garantir consistência visual com o SetPriceModal
-- Adicionar opção de **Desconto %** além de €
-- Adicionar campo de **Ajuste** opcional
-
 ---
 
-## Layout Visual (SetPriceModal)
+### 4. SignatureCanvas.tsx - Simplificar e Corrigir Bug Touch
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Definir Preço - SRV-00123                    [Badge Garantia]   │
-├─────────────────────────────────────────────────────────────────┤
-│ [Se garantia: opção de cobrir todo o serviço]                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [+ Adicionar Linha]                                            │
-│                                                                 │
-│  ┌──────────┬────────────────┬─────┬────────┬────────┬────────┐ │
-│  │Referência│ Descrição      │ Qtd │ Valor  │Imposto │ Total  │ │
-│  ├──────────┼────────────────┼─────┼────────┼────────┼────────┤ │
-│  │ [input]  │ [input largo]  │ [1] │[0.00]  │ [23%▼] │ €0.00  │✕│
-│  └──────────┴────────────────┴─────┴────────┴────────┴────────┘ │
-│                                                                 │
-│                              ┌──────────────────────────────────┤
-│                              │ Subtotal:          €1.234,56     │
-│                              │ Desconto: [___] [€▼]  -€50,00    │
-│                              │ IVA (23%):          €284,00      │
-│                              │ Ajuste: [___]         €0,00      │
-│                              ├──────────────────────────────────┤
-│                              │ TOTAL:           €1.468,56       │
-│                              └──────────────────────────────────┤
-├─────────────────────────────────────────────────────────────────┤
-│                              [Cancelar]  [Confirmar Preço]      │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Solução**: Implementação mais robusta com API Pointer unificada:
 
----
-
-## Mapeamento de Dados para Base de Dados
-
-O serviço tem os seguintes campos financeiros:
-- `labor_cost`: Usado para guardar o subtotal
-- `parts_cost`: 0 (não usado separadamente)
-- `discount`: Valor do desconto em €
-- `final_price`: Total final a cobrar
-- `pricing_description`: Texto/JSON com descrição detalhada
-
-Para guardar os artigos detalhados, usar `pricing_description` como JSON:
-```json
-{
-  "items": [
-    { "ref": "001", "desc": "Compressor", "qty": 1, "price": 500, "tax": 23 },
-    { "ref": "002", "desc": "Mão de obra", "qty": 2, "price": 50, "tax": 23 }
-  ],
-  "discount": { "type": "euro", "value": 50 },
-  "adjustment": 0
-}
-```
-
----
-
-## Secção Técnica
-
-### Dependências
-- `react-hook-form` com `useFieldArray` para gestão dinâmica de linhas
-- `zod` para validação do formulário
-- Componentes UI existentes (Table, Input, Select, Button)
-
-### Schema de Validação
 ```typescript
-const lineItemSchema = z.object({
-  reference: z.string().optional(),
-  description: z.string().min(1, 'Descrição é obrigatória'),
-  quantity: z.number().min(1, 'Mínimo 1'),
-  unit_price: z.number().min(0, 'Valor deve ser positivo'),
-  tax_rate: z.number(),
-});
+// Usar Pointer API unificada (funciona para touch e mouse)
+onPointerDown={handlePointerDown}
+onPointerMove={handlePointerMove}
+onPointerUp={handlePointerUp}
+onPointerLeave={handlePointerUp}
 
-const formSchema = z.object({
-  items: z.array(lineItemSchema).min(1, 'Adicione pelo menos um artigo'),
-  discount_type: z.enum(['euro', 'percent']),
-  discount_value: z.string(),
-  adjustment: z.string(),
-  warranty_covers_all: z.boolean(),
-});
+// Usar setPointerCapture para manter tracking
+// Usar offsetX/offsetY para coordenadas precisas
+// Remover scaling 2x do canvas
 ```
 
-### Estado Inicial
-Ao abrir o modal com um serviço existente:
-- Se `pricing_description` contém JSON válido, popular as linhas
-- Senão, criar uma linha vazia para começar
-- Preencher desconto com valor existente
+---
+
+### 5. ConfirmPartOrderModal.tsx - Simplificar com 5 Dias Úteis
+
+**Antes**: Permite escolher entre 3 dias, 1 semana, 2 semanas ou data específica
+
+**Depois**: Automático **5 dias úteis** fixos, sem opção manual
+
+**Nova Interface**:
+```text
+┌────────────────────────────────────────────────────────────────┐
+│  📦 Registar Pedido de Peça                                    │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  TF-00123                                                      │
+│  Frigorífico Samsung RT38K                                     │
+│                                                                │
+│  Peças Solicitadas                                             │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ Compressor                                      x1     │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                │
+│  ℹ️ Previsão de Chegada: 5 dias úteis (dd/MM/yyyy)             │
+│     Esta previsão serve como termómetro para o indicador       │
+│     de urgência quando em "Espera de Peça".                    │
+│                                                                │
+│  Fornecedor                                                    │
+│  [___________________________]                                 │
+│                                                                │
+│  Custo da Peça (€)                                             │
+│  [___________________________]                                 │
+│                                                                │
+│  Notas                                                         │
+│  [___________________________]                                 │
+│                                                                │
+│                         [Cancelar]  [Confirmar Pedido]         │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Lógica de Cálculo**:
+```typescript
+import { addBusinessDays } from '@/utils/dateUtils';
+
+// Ao confirmar, calcular data de chegada
+const getEstimatedArrivalDate = (): string => {
+  const arrivalDate = addBusinessDays(new Date(), 5);
+  return format(arrivalDate, 'yyyy-MM-dd');
+};
+```
+
+---
+
+### 6. PartArrivalIndicator.tsx - Termómetro com Dias Úteis
+
+**Atualizar para usar dias úteis e 4 níveis de cor**:
+
+| Dias Úteis Restantes | Cor | Label |
+|----------------------|-----|-------|
+| ≥ 4 dias úteis | 🟢 Verde | "Chega em X dias úteis" |
+| 2-3 dias úteis | 🟡 Amarelo | "Chega em X dias úteis" |
+| 1 dia útil | 🟠 Laranja | "Chega amanhã" |
+| 0 ou atrasada | 🔴 Vermelho | "Chega hoje" / "Atrasada X dias úteis" |
+
+**Código atualizado**:
+```typescript
+import { getBusinessDaysRemaining } from '@/utils/dateUtils';
+
+const getIndicatorConfig = () => {
+  const businessDaysRemaining = getBusinessDaysRemaining(arrival);
+  
+  if (businessDaysRemaining < 0) {
+    // Atrasada - Vermelho
+    return { 
+      color: 'bg-red-500', 
+      textColor: 'text-red-600',
+      label: `Atrasada ${Math.abs(businessDaysRemaining)} dia${Math.abs(businessDaysRemaining) !== 1 ? 's úteis' : ' útil'}`,
+    };
+  }
+  if (businessDaysRemaining === 0) {
+    // Chega hoje - Vermelho
+    return { color: 'bg-red-500', textColor: 'text-red-600', label: 'Chega hoje' };
+  }
+  if (businessDaysRemaining === 1) {
+    // Chega amanhã - Laranja
+    return { color: 'bg-orange-500', textColor: 'text-orange-600', label: 'Chega amanhã' };
+  }
+  if (businessDaysRemaining <= 3) {
+    // 2-3 dias - Amarelo
+    return { 
+      color: 'bg-yellow-400', 
+      textColor: 'text-yellow-600',
+      label: `Chega em ${businessDaysRemaining} dias úteis`,
+    };
+  }
+  // 4+ dias - Verde
+  return { 
+    color: 'bg-green-500', 
+    textColor: 'text-green-600',
+    label: `Chega em ${businessDaysRemaining} dias úteis`,
+  };
+};
+```
 
 ---
 
 ## Resumo de Alterações
 
-| Ficheiro | Tipo | Linhas Estimadas |
-|----------|------|------------------|
-| `src/components/modals/SetPriceModal.tsx` | Reformular | ~350 linhas |
-| `src/components/modals/CreateBudgetModal.tsx` | Pequenos ajustes | ~20 linhas |
+| Ficheiro | Tipo | Descrição |
+|----------|------|-----------|
+| `src/utils/companyInfo.ts` | Criar | Constantes da empresa |
+| `src/utils/dateUtils.ts` | Criar | Funções para dias úteis |
+| `src/pages/ServicePrintPage.tsx` | Alterar | Header + IVA |
+| `src/pages/ServiceConsultPage.tsx` | Reformular | Página cliente QR |
+| `src/components/shared/SignatureCanvas.tsx` | Simplificar | Corrigir bug touch |
+| `src/components/modals/ConfirmPartOrderModal.tsx` | Simplificar | 5 dias úteis automáticos |
+| `src/components/shared/PartArrivalIndicator.tsx` | Ajustar | Termómetro dias úteis |
 
-**Total: 2 ficheiros, reformulação significativa**
+**Total: 7 ficheiros**
 
 ---
 
 ## Resultado Esperado
 
-- Modal de precificação com interface profissional de linhas/artigos
-- Possibilidade de adicionar múltiplos artigos com IVA individual
-- Desconto em € ou %
-- Campo de ajuste para pequenas correções
-- Resumo financeiro claro e visível
-- Consistência visual entre modal de orçamento e precificação
+1. **Ficha de Serviço**: Cabeçalho profissional com dados da empresa + IVA visível
+2. **Consulta QR**: Página limpa e focada para o cliente ver apenas o seu status
+3. **Assinatura**: Funciona corretamente em dispositivos móveis com touch
+4. **Pedido Peça**: Interface simplificada com **5 dias úteis** automáticos
+5. **Indicador**: Termómetro visual com 4 níveis de cor baseado em **dias úteis restantes**
+
