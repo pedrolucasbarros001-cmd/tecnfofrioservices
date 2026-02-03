@@ -1,34 +1,31 @@
 
-# Plano: Renomear "Finalizado" para "Concluídos"
+# Plano: Renomear Estados do Sistema
 
 ## Resumo
 
-Alterar a nomenclatura do estado **"Finalizado"** para **"Concluídos"** em todo o sistema. Este é o estado final dos serviços - quando tudo está terminado (pago e entregue).
-
-**Importante**: O estado interno permanece `'finalizado'` no código e base de dados. Apenas os labels visíveis ao utilizador serão alterados.
-
----
-
-## Mapeamento Final de Estados
+Alterar a nomenclatura de 5 estados conforme solicitado:
 
 | Estado Interno | Label Antigo | Label Novo |
 |----------------|--------------|------------|
-| `concluidos` | Concluídos | **Of. Reparados** (já feito) |
-| `finalizado` | Finalizado | **Concluídos** |
+| `por_fazer` | Por Fazer | **Aberto** |
+| `na_oficina` | Na Oficina | **Oficina** |
+| `para_pedir_peca` | Para Pedir Peça | **Pedir Peça** |
+| `em_espera_de_peca` | Em Espera de Peça | **Espera de Peça** |
+| `a_precificar` | A Precificar | **Precificar** |
 
 ---
 
 ## Ficheiros a Alterar
 
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/types/database.ts` | `label: 'Finalizado'` → `label: 'Concluídos'` |
-| `src/pages/DashboardPage.tsx` | `label: 'Finalizados'` → `label: 'Concluídos'` |
-| `src/pages/PerformancePage.tsx` | `finalizado: 'Finalizado'` → `finalizado: 'Concluídos'` |
-| `src/components/shared/ServiceTimeline.tsx` | Labels `'Finalizado'` → `'Concluído'` (4 instâncias) |
-| `src/components/services/ServiceDetailSheet.tsx` | Labels `'Finalizado'` → `'Concluído'` (4 instâncias) |
-| `src/utils/feedbackMessages.ts` | `finalizado com sucesso` → `concluído com sucesso` |
-| `src/pages/GeralPage.tsx` | `Serviço finalizado!` → `Serviço concluído!` |
+| Ficheiro | Alterações |
+|----------|------------|
+| `src/types/database.ts` | 5 labels (fonte central) |
+| `src/pages/DashboardPage.tsx` | 4 labels |
+| `src/pages/PerformancePage.tsx` | 2 labels |
+| `src/pages/TVMonitorPage.tsx` | 5 labels |
+| `src/pages/technician/TechnicianOfficePage.tsx` | 4 labels |
+| `src/components/shared/ServiceTimeline.tsx` | 1 label |
+| `src/components/services/ServiceDetailSheet.tsx` | 1 label |
 
 ---
 
@@ -36,119 +33,154 @@ Alterar a nomenclatura do estado **"Finalizado"** para **"Concluídos"** em todo
 
 ### 1. `src/types/database.ts` (Configuração Central)
 
-Esta é a fonte de verdade para badges. Linha 211:
+Esta é a fonte de verdade para todos os badges do sistema:
 
 ```typescript
-// De:
-finalizado: { label: 'Finalizado', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
+// Linha 203-208 - De:
+por_fazer: { label: 'Por Fazer', ... },
+na_oficina: { label: 'Na Oficina', ... },
+para_pedir_peca: { label: 'Para Pedir Peça', ... },
+em_espera_de_peca: { label: 'Em Espera de Peça', ... },
+a_precificar: { label: 'A Precificar', ... },
 
 // Para:
-finalizado: { label: 'Concluídos', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
+por_fazer: { label: 'Aberto', ... },
+na_oficina: { label: 'Oficina', ... },
+para_pedir_peca: { label: 'Pedir Peça', ... },
+em_espera_de_peca: { label: 'Espera de Peça', ... },
+a_precificar: { label: 'Precificar', ... },
 ```
 
 ### 2. `src/pages/DashboardPage.tsx` (Cards do Dashboard)
 
-Linha 43 - o card do dashboard:
-
 ```typescript
-// De:
-{ key: 'finalizado' as const, label: 'Finalizados', icon: CheckSquare, route: '/geral?status=finalizado' },
+// Linhas 35-41 - De:
+{ key: 'por_fazer', label: 'Por Fazer', ... },
+{ key: 'na_oficina', label: 'Na Oficina', ... },
+{ key: 'para_pedir_peca', label: 'Para Pedir Peça', ... },
+{ key: 'em_espera_de_peca', label: 'Em Espera de Peça', ... },
+{ key: 'a_precificar', label: 'A Precificar', ... },
 
 // Para:
-{ key: 'finalizado' as const, label: 'Concluídos', icon: CheckSquare, route: '/geral?status=finalizado' },
+{ key: 'por_fazer', label: 'Aberto', ... },
+{ key: 'na_oficina', label: 'Oficina', ... },
+{ key: 'para_pedir_peca', label: 'Pedir Peça', ... },
+{ key: 'em_espera_de_peca', label: 'Espera de Peça', ... },
+{ key: 'a_precificar', label: 'Precificar', ... },
 ```
 
 ### 3. `src/pages/PerformancePage.tsx` (Página de Performance)
 
-Linha 15:
-
 ```typescript
-// De:
-finalizado: 'Finalizado',
+// Linhas 10-12 - De:
+por_fazer: 'Por Fazer',
+na_oficina: 'Na Oficina',
 
 // Para:
-finalizado: 'Concluídos',
+por_fazer: 'Aberto',
+na_oficina: 'Oficina',
 ```
 
-### 4. `src/components/shared/ServiceTimeline.tsx` (Timeline de Progresso)
-
-4 instâncias do label `'Finalizado'` nos steps da timeline (linhas 21, 30, 40, 49):
+### 4. `src/pages/TVMonitorPage.tsx` (Monitor TV)
 
 ```typescript
-// Todas as instâncias de:
-{ id: 'finished', label: 'Finalizado', icon: Check, status: ['finalizado'] },
+// Linhas 44, 58, 65, 72 - De:
+{ key: 'na_oficina', label: 'Na Oficina', ... },
+{ key: 'para_pedir_peca', label: 'Para Pedir Peça', ... },
+{ key: 'em_espera_de_peca', label: 'Em Espera de Peça', ... },
+{ key: 'a_precificar', label: 'A Precificar', ... },
 
 // Para:
-{ id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
+{ key: 'na_oficina', label: 'Oficina', ... },
+{ key: 'para_pedir_peca', label: 'Pedir Peça', ... },
+{ key: 'em_espera_de_peca', label: 'Espera de Peça', ... },
+{ key: 'a_precificar', label: 'Precificar', ... },
 ```
 
-### 5. `src/components/services/ServiceDetailSheet.tsx` (Ficha de Detalhes)
-
-4 instâncias nos progress steps (linhas 121, 130, 140, 149):
+### 5. `src/pages/technician/TechnicianOfficePage.tsx` (Página Oficina Técnico)
 
 ```typescript
-// Todas as instâncias de:
-{ label: 'Finalizado', statuses: ['finalizado'] },
+// Linhas 130-134 - De:
+por_fazer: { label: 'Por Fazer', ... },
+na_oficina: { label: 'Na Oficina', ... },
+para_pedir_peca: { label: 'Pedir Peça', ... },
+em_espera_de_peca: { label: 'Aguarda Peça', ... },
 
 // Para:
-{ label: 'Concluído', statuses: ['finalizado'] },
+por_fazer: { label: 'Aberto', ... },
+na_oficina: { label: 'Oficina', ... },
+para_pedir_peca: { label: 'Pedir Peça', ... },
+em_espera_de_peca: { label: 'Espera de Peça', ... },
 ```
 
-### 6. `src/utils/feedbackMessages.ts` (Mensagens de Feedback)
+### 6. `src/components/shared/ServiceTimeline.tsx` (Timeline)
 
-Linha 148:
+O label "Na Oficina" aparece como step da timeline para serviços de oficina:
 
 ```typescript
-// De:
-return `${serviceCode} finalizado com sucesso!`;
+// Linha 37 - De:
+{ id: 'workshop', label: 'Na Oficina', icon: Package, ... },
 
 // Para:
-return `${serviceCode} concluído com sucesso!`;
+{ id: 'workshop', label: 'Oficina', icon: Package, ... },
 ```
 
-### 7. `src/pages/GeralPage.tsx` (Página Geral)
+### 7. `src/components/services/ServiceDetailSheet.tsx` (Ficha de Detalhes)
 
-Linha 175 - toast de sucesso:
+O label "Na Oficina" aparece nos progress steps:
 
 ```typescript
-// De:
-toast.success('Serviço finalizado!');
+// Linha 137 - De:
+{ label: 'Na Oficina', statuses: [...] },
 
 // Para:
-toast.success('Serviço concluído!');
+{ label: 'Oficina', statuses: [...] },
 ```
 
 ---
 
-## Nota sobre Minúsculas vs Maiúsculas
+## Nota Técnica
 
-- **Badge/Label geral**: "Concluídos" (plural, usado em listas)
-- **Timeline steps**: "Concluído" (singular, representa um passo)
-- **Mensagens**: "concluído" (minúscula dentro de frase)
+Os **estados internos** permanecem inalterados no código e base de dados:
+- `por_fazer` → mantém (apenas label muda para "Aberto")
+- `na_oficina` → mantém (apenas label muda para "Oficina")
+- `para_pedir_peca` → mantém (apenas label muda para "Pedir Peça")
+- `em_espera_de_peca` → mantém (apenas label muda para "Espera de Peça")
+- `a_precificar` → mantém (apenas label muda para "Precificar")
+
+Isto significa:
+- Nenhuma migração de base de dados necessária
+- Nenhuma alteração em queries ou rotas
+- Apenas alterações visuais/UI
 
 ---
 
 ## Resumo de Alterações
 
-| Ficheiro | Linhas |
-|----------|--------|
-| `src/types/database.ts` | 1 |
-| `src/pages/DashboardPage.tsx` | 1 |
-| `src/pages/PerformancePage.tsx` | 1 |
-| `src/components/shared/ServiceTimeline.tsx` | 4 |
-| `src/components/services/ServiceDetailSheet.tsx` | 4 |
-| `src/utils/feedbackMessages.ts` | 1 |
-| `src/pages/GeralPage.tsx` | 1 |
+| Ficheiro | Quantidade |
+|----------|------------|
+| `src/types/database.ts` | 5 |
+| `src/pages/DashboardPage.tsx` | 5 |
+| `src/pages/PerformancePage.tsx` | 2 |
+| `src/pages/TVMonitorPage.tsx` | 4 |
+| `src/pages/technician/TechnicianOfficePage.tsx` | 4 |
+| `src/components/shared/ServiceTimeline.tsx` | 1 |
+| `src/components/services/ServiceDetailSheet.tsx` | 1 |
 
-**Total: 7 ficheiros, ~13 alterações**
+**Total: 7 ficheiros, ~22 alterações**
 
 ---
 
 ## Resultado Final
 
-Após estas alterações:
-
-| Estado Interno | Label Visível | Uso |
-|----------------|---------------|-----|
-| `concluidos` | Of. Reparados | Serviços reparados na oficina, aguardam entrega |
-| `finalizado` | Concluídos | Serviços totalmente terminados (pagos e entregues) |
+| Estado Interno | Label Novo |
+|----------------|------------|
+| `por_fazer` | Aberto |
+| `em_execucao` | Em Execução (sem alteração) |
+| `na_oficina` | Oficina |
+| `para_pedir_peca` | Pedir Peça |
+| `em_espera_de_peca` | Espera de Peça |
+| `a_precificar` | Precificar |
+| `concluidos` | Of. Reparados (já alterado) |
+| `em_debito` | Em Débito (sem alteração) |
+| `finalizado` | Concluídos (já alterado) |
