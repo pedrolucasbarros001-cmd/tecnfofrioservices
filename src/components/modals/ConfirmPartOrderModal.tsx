@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Package, Calendar, DollarSign } from 'lucide-react';
-import { addDays, format } from 'date-fns';
+import { Package, DollarSign, Info } from 'lucide-react';
+import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
   Dialog,
@@ -13,25 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
+import { addBusinessDays } from '@/utils/dateUtils';
 import type { Service, ServicePart } from '@/types/database';
 
 interface ConfirmPartOrderModalProps {
@@ -40,16 +27,9 @@ interface ConfirmPartOrderModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ARRIVAL_PRESETS = [
-  { label: '3 dias', days: 3 },
-  { label: '1 semana', days: 7 },
-  { label: '2 semanas', days: 14 },
-  { label: 'Data específica', days: -1 },
-];
+const BUSINESS_DAYS_ESTIMATE = 5;
 
 export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPartOrderModalProps) {
-  const [arrivalPreset, setArrivalPreset] = useState<string>('7');
-  const [specificDate, setSpecificDate] = useState<Date | undefined>();
   const [supplier, setSupplier] = useState('');
   const [cost, setCost] = useState('');
   const [notes, setNotes] = useState('');
@@ -79,33 +59,20 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      setArrivalPreset('7');
-      setSpecificDate(undefined);
       setSupplier('');
       setCost('');
       setNotes('');
     }
   }, [open]);
 
-  const getEstimatedArrivalDate = (): string => {
-    const days = parseInt(arrivalPreset);
-    if (days === -1 && specificDate) {
-      return format(specificDate, 'yyyy-MM-dd');
-    }
-    if (days > 0) {
-      return format(addDays(new Date(), days), 'yyyy-MM-dd');
-    }
-    return '';
-  };
+  // Calculate estimated arrival date (5 business days from today)
+  const estimatedArrivalDate = addBusinessDays(new Date(), BUSINESS_DAYS_ESTIMATE);
+  const estimatedArrivalFormatted = format(estimatedArrivalDate, 'dd/MM/yyyy', { locale: pt });
 
   const handleSubmit = async () => {
     if (!service) return;
 
-    const estimatedArrival = getEstimatedArrivalDate();
-    if (!estimatedArrival) {
-      toast.error('Por favor, defina a previsão de chegada da peça.');
-      return;
-    }
+    const estimatedArrival = format(estimatedArrivalDate, 'yyyy-MM-dd');
 
     setIsSubmitting(true);
     try {
@@ -117,7 +84,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             .update({
               estimated_arrival: estimatedArrival,
               cost: cost ? parseCurrencyInput(cost) : null,
-              notes: notes ? `${part.notes || ''}\nFornecedor: ${supplier}`.trim() : part.notes,
+              notes: supplier ? `${part.notes || ''}\nFornecedor: ${supplier}`.trim() : part.notes,
             })
             .eq('id', part.id)
         );
@@ -135,7 +102,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
       queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
 
-      toast.success(`Pedido registado! Peça prevista para ${format(new Date(estimatedArrival), 'dd/MM/yyyy', { locale: pt })}.`);
+      toast.success(`Pedido registado! Peça prevista para ${estimatedArrivalFormatted}.`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error confirming part order:', error);
@@ -185,55 +152,20 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             </div>
           )}
 
-          {/* Estimated Arrival */}
-          <div className="space-y-2">
-            <Label htmlFor="arrivalPreset">Previsão de Chegada *</Label>
-            <Select value={arrivalPreset} onValueChange={setArrivalPreset}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o prazo" />
-              </SelectTrigger>
-              <SelectContent>
-                {ARRIVAL_PRESETS.map((preset) => (
-                  <SelectItem key={preset.days} value={preset.days.toString()}>
-                    {preset.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Specific Date Picker - only show when "Data específica" is selected */}
-          {arrivalPreset === '-1' && (
-            <div className="space-y-2">
-              <Label>Data Específica *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !specificDate && 'text-muted-foreground'
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {specificDate
-                      ? format(specificDate, 'PPP', { locale: pt })
-                      : 'Selecione a data'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={specificDate}
-                    onSelect={setSpecificDate}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+          {/* Estimated Arrival Info */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-blue-800">
+                  Previsão de Chegada: {estimatedArrivalFormatted}
+                </p>
+                <p className="text-sm text-blue-600 mt-1">
+                  {BUSINESS_DAYS_ESTIMATE} dias úteis a partir de hoje. Esta previsão serve como termómetro para o indicador de urgência.
+                </p>
+              </div>
             </div>
-          )}
+          </div>
 
           {/* Supplier (optional) */}
           <div className="space-y-2">
@@ -280,10 +212,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
           <Button variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || (arrivalPreset === '-1' && !specificDate)}
-          >
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? 'A registar...' : 'Confirmar Pedido'}
           </Button>
         </DialogFooter>
