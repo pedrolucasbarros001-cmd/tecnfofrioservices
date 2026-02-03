@@ -1,22 +1,23 @@
 
+# Plano: Fotos Estruturadas nas Visitas de Reparação + Acesso a Fotos Anteriores na Oficina
 
-# Plano: Melhorias na Ficha de Impressão, Consulta de QR Code, Canvas de Assinatura e Modal de Peças
+## Resumo
 
-## Resumo das Alterações Solicitadas
-
-1. **Ficha de Impressão (PDF/Print)**: Adicionar dados da empresa no cabeçalho (morada, telefone, email)
-2. **Mostrar IVA na Ficha**: Quando aplicável, exibir o IVA no resumo financeiro
-3. **Página de Consulta QR Code**: Redesenhar para mostrar status do serviço relevante para o cliente
-4. **Canvas de Assinatura**: Simplificar para corrigir bug ao assinar com o dedo
-5. **Modal Pedir Peça (Admin)**: Remover seleção manual de data, fixar **5 dias úteis** automáticos com indicador de cor
+Implementar um fluxo de **fotos obrigatórias e estruturadas** para visitas de reparação, substituindo a foto única atual por um sistema de 3 etapas. Também permitir que técnicos na oficina visualizem as fotos tiradas durante o diagnóstico inicial.
 
 ---
 
-## Dados da Empresa (Conforme Imagens)
+## Requisitos do Utilizador
 
-- **Morada**: R. Dom Pedro IV 3 R/C, Bairro da Coxa, 5300-124 Bragança
-- **Telefone**: 273 332 772
-- **Email**: tecno.frio@sapo.pt
+1. **Visitas de Reparação**: Captura estruturada de fotos
+   - Fotografia do aparelho (obrigatória)
+   - Fotografia da etiqueta do aparelho (obrigatória)
+   - Foto do estado do aparelho - amassados, danos etc. (opcional, com opção de anexar mais)
+
+2. **Oficina**: Não precisa de tirar novas fotos
+   - Mas o técnico deve poder ver as fotos do diagnóstico anterior
+
+3. **Apenas para serviços de reparação** (`service_type === 'reparacao'`)
 
 ---
 
@@ -24,253 +25,255 @@
 
 | Ficheiro | Ação | Descrição |
 |----------|------|-----------|
-| `src/utils/companyInfo.ts` | Criar | Constantes da empresa |
-| `src/utils/dateUtils.ts` | Criar | Função para calcular dias úteis |
-| `src/pages/ServicePrintPage.tsx` | Alterar | Adicionar header com dados da empresa + mostrar IVA |
-| `src/pages/ServiceConsultPage.tsx` | Reformular | Redesenhar para cliente final (status-focused) |
-| `src/components/shared/SignatureCanvas.tsx` | Simplificar | Corrigir bug de touch com implementação mais robusta |
-| `src/components/modals/ConfirmPartOrderModal.tsx` | Simplificar | Remover opções de data, fixar 5 dias úteis automáticos |
-| `src/components/shared/PartArrivalIndicator.tsx` | Ajustar | Atualizar cores para verde/amarelo/laranja/vermelho baseado em dias úteis |
+| `src/types/database.ts` | Alterar | Adicionar novos tipos de foto |
+| `src/components/technician/VisitFlowModals.tsx` | Reformular | Substituir passo 'foto' por fluxo multi-etapas |
+| `src/components/technician/WorkshopFlowModals.tsx` | Alterar | Adicionar visualização de fotos anteriores |
+| `src/components/technician/ServicePreviousSummary.tsx` | Alterar | Mostrar fotos categorizadas por tipo |
 
 ---
 
 ## Detalhes por Ficheiro
 
-### 1. dateUtils.ts - Função para Calcular Dias Úteis
+### 1. database.ts - Novos Tipos de Foto
 
-Nova função para adicionar dias úteis (excluindo sábados e domingos):
+Atualizar o tipo `PhotoType` para incluir as novas categorias:
 
 ```typescript
-// src/utils/dateUtils.ts
+export type PhotoType = 
+  | 'visita'           // Genérica (legado)
+  | 'aparelho'         // Foto geral do aparelho
+  | 'etiqueta'         // Etiqueta/placa do aparelho
+  | 'estado'           // Estado físico (amassados, danos)
+  | 'oficina'          // Foto tirada na oficina
+  | 'entrega' 
+  | 'instalacao' 
+  | 'antes' 
+  | 'depois';
+```
 
-/**
- * Adiciona dias úteis a uma data (exclui sábados e domingos)
- */
-export function addBusinessDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  let addedDays = 0;
-  
-  while (addedDays < days) {
-    result.setDate(result.getDate() + 1);
-    const dayOfWeek = result.getDay();
-    // 0 = Domingo, 6 = Sábado
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      addedDays++;
-    }
-  }
-  
-  return result;
-}
+### 2. VisitFlowModals.tsx - Novo Fluxo Multi-Fotos
 
-/**
- * Calcula dias úteis restantes até uma data
- */
-export function getBusinessDaysRemaining(targetDate: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const target = new Date(targetDate);
-  target.setHours(0, 0, 0, 0);
-  
-  if (target <= today) {
-    // Calcula dias úteis atrasados (negativo)
-    let days = 0;
-    const current = new Date(target);
-    while (current < today) {
-      current.setDate(current.getDate() + 1);
-      const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        days--;
-      }
-    }
-    return days;
-  }
-  
-  // Calcula dias úteis restantes (positivo)
-  let days = 0;
-  const current = new Date(today);
-  while (current < target) {
-    current.setDate(current.getDate() + 1);
-    const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      days++;
-    }
-  }
-  return days;
+**Estrutura Atual**:
+```
+resumo → deslocacao → foto → diagnostico → decisao → ...
+```
+
+**Nova Estrutura**:
+```
+resumo → deslocacao → foto_aparelho → foto_etiqueta → foto_estado → diagnostico → decisao → ...
+```
+
+**Novos Estados no FormData**:
+```typescript
+interface VisitFormData {
+  // ... existing fields
+  photoAparelho: string | null;    // Obrigatório
+  photoEtiqueta: string | null;    // Obrigatório
+  photosEstado: string[];          // Opcional, pode ter múltiplas
+  // Remove: photoFile (obsoleto)
 }
 ```
 
----
+**Fluxo de Fotos**:
 
-### 2. ServicePrintPage.tsx - Cabeçalho da Empresa + IVA
-
-**Novo Header**:
+**Passo 3 - Foto do Aparelho** (Obrigatória):
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│  [LOGO TECNOFRIO]                          Ficha de Serviço    │
-├────────────────────────────────────────────────────────────────┤
-│  📍 R. Dom Pedro IV 3 R/C, Bairro da Coxa, 5300-124 Bragança   │
-│  📞 273 332 772  |  ✉️ tecno.frio@sapo.pt                       │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  📷 Fotografia do Aparelho                              │
+│                                                        │
+│  Tire uma foto geral do aparelho                    │
+│                                                        │
+│  ┌─────────────────────────────────────────┐           │
+│  │                                         │           │
+│  │         [Área de preview da foto]       │           │
+│  │                                         │           │
+│  └─────────────────────────────────────────┘           │
+│                                                        │
+│  [Tirar Foto]                                          │
+│                                                        │
+│  [← Anterior]                    [Continuar →]         │
+│                          (só ativa com foto)           │
+└────────────────────────────────────────────────────────┘
 ```
 
-**IVA no Resumo Financeiro**:
+**Passo 4 - Foto da Etiqueta** (Obrigatória):
+```text
+┌────────────────────────────────────────────────────────┐
+│  🏷️ Fotografia da Etiqueta                             │
+│                                                        │
+│  Tire uma foto da etiqueta do aparelho           │
+│  (número de série, modelo, etc.)                       │
+│                                                        │
+│  ┌─────────────────────────────────────────┐           │
+│  │                                         │           │
+│  │         [Área de preview da foto]       │           │
+│  │                                         │           │
+│  └─────────────────────────────────────────┘           │
+│                                                        │
+│  [Tirar Foto]                                          │
+│                                                        │
+│  [← Anterior]                    [Continuar →]         │
+│                          (só ativa com foto)           │
+└────────────────────────────────────────────────────────┘
 ```
-Subtotal (s/ IVA):     €1.234,56
-IVA:                    €284,00     ← Nova linha (quando > 0)
-Desconto:               -€50,00
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TOTAL:                €1.468,56
+
+**Passo 5 - Foto do Estado** (obrigatório):
+```text
+┌────────────────────────────────────────────────────────┐
+│  📋 Estado do Aparelho                                  │
+│                                                        │
+│  Registe o estado físico do aparelho               │
+│  (amassados, riscos, danos visíveis)                  │
+│                                                        │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                       │
+│  │foto1│ │foto2│ │ + │ │     │                        │
+│  └─────┘ └─────┘ └─────┘ └─────┘                       │
+│                                                        │
+│  [📷 Adicionar Foto]  [📎 Anexar da Galeria]           │
+│                                                        │
+│  ℹ️ Opcional - pode avançar sem fotos                  │
+│                                                        │
+│  [← Anterior]                    [Continuar →]         │
+└────────────────────────────────────────────────────────┘
 ```
 
----
-
-### 3. ServiceConsultPage.tsx - Redesenhar para Cliente Final
-
-Página focada no status do serviço para o cliente que lê o QR Code:
-
-**Informação a MANTER**:
-- Código do serviço
-- Estado atual (com descrição amigável)
-- Equipamento (tipo, marca, modelo)
-- Data de entrada
-- Localização (Cliente/Oficina)
-- Valor a pagar (se definido)
-- Contactos da empresa
-
-**Descrições Amigáveis por Estado**:
+**Lógica de Salvamento**:
 ```typescript
-const STATUS_CLIENT_MESSAGES = {
-  por_fazer: 'O seu serviço está na fila de espera para agendamento.',
-  em_execucao: 'O técnico está a trabalhar no seu equipamento.',
-  na_oficina: 'O seu equipamento está na nossa oficina para diagnóstico.',
-  para_pedir_peca: 'Estamos a providenciar peças necessárias para a reparação.',
-  em_espera_de_peca: 'A aguardar chegada de peças encomendadas.',
-  a_precificar: 'A reparação foi concluída. Estamos a calcular o valor final.',
-  concluidos: 'Reparação concluída! O seu equipamento está pronto para levantamento.',
-  em_debito: 'Serviço concluído. Aguardamos o pagamento.',
-  finalizado: 'Serviço concluído e entregue. Obrigado pela preferência!',
+// Ao capturar cada foto, salvar imediatamente na BD
+const handlePhotoCaptureAparelho = async (imageData: string) => {
+  await supabase.from('service_photos').insert({
+    service_id: service.id,
+    photo_type: 'aparelho',  // Novo tipo
+    file_url: imageData,
+    description: 'Fotografia do aparelho',
+  });
+  setFormData(prev => ({ ...prev, photoAparelho: imageData }));
+};
+
+const handlePhotoCaptureEtiqueta = async (imageData: string) => {
+  await supabase.from('service_photos').insert({
+    service_id: service.id,
+    photo_type: 'etiqueta',  // Novo tipo
+    file_url: imageData,
+    description: 'Fotografia da etiqueta do aparelho',
+  });
+  setFormData(prev => ({ ...prev, photoEtiqueta: imageData }));
+};
+
+const handlePhotoCaptureEstado = async (imageData: string) => {
+  await supabase.from('service_photos').insert({
+    service_id: service.id,
+    photo_type: 'estado',  // Novo tipo
+    file_url: imageData,
+    description: 'Estado do aparelho',
+  });
+  setFormData(prev => ({ 
+    ...prev, 
+    photosEstado: [...prev.photosEstado, imageData] 
+  }));
+};
+```
+
+**Atualização de Passos**:
+```typescript
+type ModalStep = 
+  | 'resumo' 
+  | 'deslocacao' 
+  | 'foto_aparelho'    // Novo
+  | 'foto_etiqueta'    // Novo
+  | 'foto_estado'      // Novo
+  | 'diagnostico' 
+  | 'decisao' 
+  | 'pecas_usadas' 
+  | 'pedir_peca';
+```
+
+### 3. WorkshopFlowModals.tsx - Acesso a Fotos Anteriores
+
+No modal de resumo da oficina, adicionar secção para visualizar as fotos tiradas na visita:
+
+```typescript
+// Buscar fotos do diagnóstico (visita)
+const { data: diagnosisPhotos } = useQuery({
+  queryKey: ['service-diagnosis-photos', service.id],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('service_photos')
+      .select('*')
+      .eq('service_id', service.id)
+      .in('photo_type', ['aparelho', 'etiqueta', 'estado', 'visita'])
+      .order('uploaded_at', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+  enabled: !!service.id,
+});
+```
+
+**UI no Modal de Resumo**:
+```text
+┌────────────────────────────────────────────────────────┐
+│  🔧 Oficina - TF-00123                                 │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│  [Resumo do atendimento anterior - já existente]       │
+│                                                        │
+│  📷 Fotos do Diagnóstico                               │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  [Aparelho]  [Etiqueta]  [Estado x2]             │  │
+│  │  ┌─────┐     ┌─────┐     ┌─────┐ ┌─────┐         │  │
+│  │  │     │     │     │     │     │ │     │         │  │
+│  │  │ 📷  │     │ 🏷️  │     │ 📋  │ │ 📋  │         │  │
+│  │  │     │     │     │     │     │ │     │         │  │
+│  │  └─────┘     └─────┘     └─────┘ └─────┘         │  │
+│  │                                                  │  │
+│  │  Clique para ampliar                             │  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                        │
+│  [Iniciar Reparação]                                   │
+└────────────────────────────────────────────────────────┘
+```
+
+### 4. ServicePreviousSummary.tsx - Fotos Categorizadas
+
+Atualizar o componente para mostrar fotos agrupadas por tipo:
+
+```typescript
+// Agrupar fotos por tipo
+const groupedPhotos = photos?.reduce((acc, photo) => {
+  const type = photo.photo_type || 'visita';
+  if (!acc[type]) acc[type] = [];
+  acc[type].push(photo);
+  return acc;
+}, {} as Record<string, typeof photos>);
+
+// Renderização com labels
+const PHOTO_TYPE_LABELS = {
+  aparelho: 'Aparelho',
+  etiqueta: 'Etiqueta',
+  estado: 'Estado',
+  visita: 'Visita',
+  oficina: 'Oficina',
 };
 ```
 
 ---
 
-### 4. SignatureCanvas.tsx - Simplificar e Corrigir Bug Touch
+## Validação por Tipo de Serviço
 
-**Solução**: Implementação mais robusta com API Pointer unificada:
+Este fluxo multi-fotos **só se aplica a serviços de reparação**:
 
 ```typescript
-// Usar Pointer API unificada (funciona para touch e mouse)
-onPointerDown={handlePointerDown}
-onPointerMove={handlePointerMove}
-onPointerUp={handlePointerUp}
-onPointerLeave={handlePointerUp}
+// No VisitFlowModals
+const isReparacao = service.service_type === 'reparacao';
 
-// Usar setPointerCapture para manter tracking
-// Usar offsetX/offsetY para coordenadas precisas
-// Remover scaling 2x do canvas
-```
-
----
-
-### 5. ConfirmPartOrderModal.tsx - Simplificar com 5 Dias Úteis
-
-**Antes**: Permite escolher entre 3 dias, 1 semana, 2 semanas ou data específica
-
-**Depois**: Automático **5 dias úteis** fixos, sem opção manual
-
-**Nova Interface**:
-```text
-┌────────────────────────────────────────────────────────────────┐
-│  📦 Registar Pedido de Peça                                    │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  TF-00123                                                      │
-│  Frigorífico Samsung RT38K                                     │
-│                                                                │
-│  Peças Solicitadas                                             │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ Compressor                                      x1     │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                                                                │
-│  ℹ️ Previsão de Chegada: 5 dias úteis (dd/MM/yyyy)             │
-│     Esta previsão serve como termómetro para o indicador       │
-│     de urgência quando em "Espera de Peça".                    │
-│                                                                │
-│  Fornecedor                                                    │
-│  [___________________________]                                 │
-│                                                                │
-│  Custo da Peça (€)                                             │
-│  [___________________________]                                 │
-│                                                                │
-│  Notas                                                         │
-│  [___________________________]                                 │
-│                                                                │
-│                         [Cancelar]  [Confirmar Pedido]         │
-└────────────────────────────────────────────────────────────────┘
-```
-
-**Lógica de Cálculo**:
-```typescript
-import { addBusinessDays } from '@/utils/dateUtils';
-
-// Ao confirmar, calcular data de chegada
-const getEstimatedArrivalDate = (): string => {
-  const arrivalDate = addBusinessDays(new Date(), 5);
-  return format(arrivalDate, 'yyyy-MM-dd');
-};
-```
-
----
-
-### 6. PartArrivalIndicator.tsx - Termómetro com Dias Úteis
-
-**Atualizar para usar dias úteis e 4 níveis de cor**:
-
-| Dias Úteis Restantes | Cor | Label |
-|----------------------|-----|-------|
-| ≥ 4 dias úteis | 🟢 Verde | "Chega em X dias úteis" |
-| 2-3 dias úteis | 🟡 Amarelo | "Chega em X dias úteis" |
-| 1 dia útil | 🟠 Laranja | "Chega amanhã" |
-| 0 ou atrasada | 🔴 Vermelho | "Chega hoje" / "Atrasada X dias úteis" |
-
-**Código atualizado**:
-```typescript
-import { getBusinessDaysRemaining } from '@/utils/dateUtils';
-
-const getIndicatorConfig = () => {
-  const businessDaysRemaining = getBusinessDaysRemaining(arrival);
-  
-  if (businessDaysRemaining < 0) {
-    // Atrasada - Vermelho
-    return { 
-      color: 'bg-red-500', 
-      textColor: 'text-red-600',
-      label: `Atrasada ${Math.abs(businessDaysRemaining)} dia${Math.abs(businessDaysRemaining) !== 1 ? 's úteis' : ' útil'}`,
-    };
+// Se não for reparação, manter fluxo simples (foto única opcional)
+const getStepsForService = () => {
+  if (isReparacao) {
+    return ['resumo', 'deslocacao', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'diagnostico', 'decisao', ...];
   }
-  if (businessDaysRemaining === 0) {
-    // Chega hoje - Vermelho
-    return { color: 'bg-red-500', textColor: 'text-red-600', label: 'Chega hoje' };
-  }
-  if (businessDaysRemaining === 1) {
-    // Chega amanhã - Laranja
-    return { color: 'bg-orange-500', textColor: 'text-orange-600', label: 'Chega amanhã' };
-  }
-  if (businessDaysRemaining <= 3) {
-    // 2-3 dias - Amarelo
-    return { 
-      color: 'bg-yellow-400', 
-      textColor: 'text-yellow-600',
-      label: `Chega em ${businessDaysRemaining} dias úteis`,
-    };
-  }
-  // 4+ dias - Verde
-  return { 
-    color: 'bg-green-500', 
-    textColor: 'text-green-600',
-    label: `Chega em ${businessDaysRemaining} dias úteis`,
-  };
+  return ['resumo', 'deslocacao', 'foto', 'diagnostico', 'decisao', ...]; // Fluxo original
 };
 ```
 
@@ -280,23 +283,18 @@ const getIndicatorConfig = () => {
 
 | Ficheiro | Tipo | Descrição |
 |----------|------|-----------|
-| `src/utils/companyInfo.ts` | Criar | Constantes da empresa |
-| `src/utils/dateUtils.ts` | Criar | Funções para dias úteis |
-| `src/pages/ServicePrintPage.tsx` | Alterar | Header + IVA |
-| `src/pages/ServiceConsultPage.tsx` | Reformular | Página cliente QR |
-| `src/components/shared/SignatureCanvas.tsx` | Simplificar | Corrigir bug touch |
-| `src/components/modals/ConfirmPartOrderModal.tsx` | Simplificar | 5 dias úteis automáticos |
-| `src/components/shared/PartArrivalIndicator.tsx` | Ajustar | Termómetro dias úteis |
+| `src/types/database.ts` | Alterar | +3 tipos de foto |
+| `src/components/technician/VisitFlowModals.tsx` | Reformular | Substituir passo único por 3 etapas |
+| `src/components/technician/WorkshopFlowModals.tsx` | Alterar | Adicionar galeria de fotos anteriores |
+| `src/components/technician/ServicePreviousSummary.tsx` | Alterar | Fotos agrupadas por tipo |
 
-**Total: 7 ficheiros**
+**Total: 4 ficheiros**
 
 ---
 
 ## Resultado Esperado
 
-1. **Ficha de Serviço**: Cabeçalho profissional com dados da empresa + IVA visível
-2. **Consulta QR**: Página limpa e focada para o cliente ver apenas o seu status
-3. **Assinatura**: Funciona corretamente em dispositivos móveis com touch
-4. **Pedido Peça**: Interface simplificada com **5 dias úteis** automáticos
-5. **Indicador**: Termómetro visual com 4 níveis de cor baseado em **dias úteis restantes**
-
+1. **Visitas de Reparação**: 3 etapas de foto estruturadas (aparelho, etiqueta, estado)
+2. **Oficina**: Técnico visualiza fotos do diagnóstico sem precisar tirar novas
+3. **Outros tipos de serviço**: Mantém o fluxo de foto única opcional
+4. **Evita duplicação**: Fotos tiradas na visita ficam disponíveis na oficina
