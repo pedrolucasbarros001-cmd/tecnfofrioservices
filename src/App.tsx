@@ -30,6 +30,7 @@ import ServiceConsultPage from "@/pages/ServiceConsultPage";
 import TVMonitorPage from "@/pages/TVMonitorPage";
 import ServicePrintPage from "@/pages/ServicePrintPage";
 import ServiceTagPage from "@/pages/ServiceTagPage";
+import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
@@ -156,8 +157,9 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
-              {/* Universal service route - accessible by any authenticated user */}
+              {/* Universal service routes - accessible by any authenticated user */}
               <Route path="/service/:serviceId" element={<ServiceConsultPage />} />
+              <Route path="/service-detail/:serviceId" element={<ServiceDetailPage />} />
               
               {/* Shared routes */}
               <Route path="/preferencias" element={<PreferenciasPage />} />
