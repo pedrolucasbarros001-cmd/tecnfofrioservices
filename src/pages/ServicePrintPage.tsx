@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, MapPin, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,7 @@ import type { Service, ServicePart, ServicePayment, ServiceSignature, Customer }
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { generatePDF } from '@/utils/pdfUtils';
+import { COMPANY_INFO } from '@/utils/companyInfo';
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -151,6 +152,37 @@ export default function ServicePrintPage() {
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
 
+  // Parse pricing_description to extract subtotal and IVA
+  const pricingDetails = useMemo(() => {
+    if (!service.pricing_description) {
+      return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
+    }
+    
+    try {
+      const parsed = JSON.parse(service.pricing_description);
+      if (parsed.items && Array.isArray(parsed.items)) {
+        const subtotal = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number }) => {
+          const qty = item.qty || item.quantity || 1;
+          const price = item.price || item.unit_price || 0;
+          return sum + (qty * price);
+        }, 0);
+        
+        const iva = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number; tax?: number; tax_rate?: number }) => {
+          const qty = item.qty || item.quantity || 1;
+          const price = item.price || item.unit_price || 0;
+          const tax = item.tax || item.tax_rate || 0;
+          return sum + ((qty * price) * (tax / 100));
+        }, 0);
+        
+        return { subtotal, iva, hasItemizedPricing: true };
+      }
+    } catch {
+      // Fallback to existing fields
+    }
+    
+    return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
+  }, [service.pricing_description, service.labor_cost, service.parts_cost]);
+
   return (
     <div className="print-page">
       {/* Controls - hidden in print */}
@@ -192,7 +224,7 @@ export default function ServicePrintPage() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-3 relative z-10">
+        <div className="flex items-center justify-between mb-2 relative z-10">
           <img 
             src={tecnofrioLogoFull} 
             alt="TECNOFRIO" 
@@ -203,14 +235,28 @@ export default function ServicePrintPage() {
           </div>
         </div>
 
+        {/* Company Contact Info */}
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-2 border-y py-1.5 bg-muted/30">
+          <div className="flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            <span>{COMPANY_INFO.fullAddress}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Phone className="h-3 w-3" />
+            <span>{COMPANY_INFO.phone}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Mail className="h-3 w-3" />
+            <span>{COMPANY_INFO.email}</span>
+          </div>
+        </div>
+
         <div className="mb-3">
           <p className="text-base font-mono font-bold">Código: {service.code}</p>
           <p className="text-xs text-muted-foreground">
             Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
           </p>
         </div>
-
-        <Separator className="my-2" />
 
         {/* Customer Data */}
         <section className="mb-3">
@@ -385,16 +431,16 @@ export default function ServicePrintPage() {
             <section className="mb-3">
               <h2 className="text-sm font-semibold mb-1 border-b pb-1">Resumo Financeiro</h2>
               <div className="grid grid-cols-2 gap-1 text-xs max-w-xs ml-auto">
-                {service.labor_cost && service.labor_cost > 0 && (
+                {pricingDetails.subtotal > 0 && (
                   <div className="flex justify-between col-span-2">
-                    <span className="text-muted-foreground">Mão de Obra:</span>
-                    <span>{service.labor_cost.toFixed(2)} €</span>
+                    <span className="text-muted-foreground">Subtotal (s/ IVA):</span>
+                    <span>{pricingDetails.subtotal.toFixed(2)} €</span>
                   </div>
                 )}
-                {service.parts_cost && service.parts_cost > 0 && (
+                {pricingDetails.iva > 0 && (
                   <div className="flex justify-between col-span-2">
-                    <span className="text-muted-foreground">Peças:</span>
-                    <span>{service.parts_cost.toFixed(2)} €</span>
+                    <span className="text-muted-foreground">IVA:</span>
+                    <span>{pricingDetails.iva.toFixed(2)} €</span>
                   </div>
                 )}
                 {service.discount && service.discount > 0 && (

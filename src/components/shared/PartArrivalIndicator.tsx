@@ -1,4 +1,4 @@
-import { differenceInDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import {
@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getBusinessDaysRemaining } from '@/utils/dateUtils';
 
 interface PartArrivalIndicatorProps {
   estimatedArrival: string | null;
@@ -38,46 +39,58 @@ export function PartArrivalIndicator({
     );
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
   const arrival = new Date(estimatedArrival);
   arrival.setHours(0, 0, 0, 0);
   
-  const daysRemaining = differenceInDays(arrival, today);
+  const businessDaysRemaining = getBusinessDaysRemaining(arrival);
 
   const getIndicatorConfig = () => {
-    if (daysRemaining < 0) {
+    if (businessDaysRemaining < 0) {
+      // Overdue - Red
+      const absVal = Math.abs(businessDaysRemaining);
       return {
-        color: 'bg-destructive',
-        textColor: 'text-destructive',
-        label: `Atrasada ${Math.abs(daysRemaining)} dia${Math.abs(daysRemaining) !== 1 ? 's' : ''}`,
+        color: 'bg-red-500',
+        textColor: 'text-red-600',
+        label: `Atrasada ${absVal} dia${absVal !== 1 ? 's úteis' : ' útil'}`,
         icon: AlertTriangle,
         tooltip: `Prevista para ${format(arrival, 'dd/MM/yyyy', { locale: pt })} - Atrasada!`,
       };
     }
-    if (daysRemaining === 0) {
+    if (businessDaysRemaining === 0) {
+      // Arrives today - Red
       return {
-        color: 'bg-destructive',
-        textColor: 'text-destructive',
+        color: 'bg-red-500',
+        textColor: 'text-red-600',
         label: 'Chega hoje',
         icon: Clock,
         tooltip: 'Prevista para hoje',
       };
     }
-    if (daysRemaining <= 2) {
+    if (businessDaysRemaining === 1) {
+      // Arrives tomorrow - Orange
       return {
-        color: 'bg-amber-500',
-        textColor: 'text-amber-600',
-        label: daysRemaining === 1 ? 'Chega amanhã' : `Chega em ${daysRemaining} dias`,
+        color: 'bg-orange-500',
+        textColor: 'text-orange-600',
+        label: 'Chega amanhã',
         icon: Clock,
         tooltip: `Prevista para ${format(arrival, 'dd/MM/yyyy', { locale: pt })}`,
       };
     }
+    if (businessDaysRemaining <= 3) {
+      // 2-3 business days - Yellow
+      return {
+        color: 'bg-yellow-400',
+        textColor: 'text-yellow-600',
+        label: `Chega em ${businessDaysRemaining} dias úteis`,
+        icon: Clock,
+        tooltip: `Prevista para ${format(arrival, 'dd/MM/yyyy', { locale: pt })}`,
+      };
+    }
+    // 4+ business days - Green
     return {
       color: 'bg-green-500',
       textColor: 'text-green-600',
-      label: `Chega em ${daysRemaining} dias`,
+      label: `Chega em ${businessDaysRemaining} dias úteis`,
       icon: CheckCircle,
       tooltip: `Prevista para ${format(arrival, 'dd/MM/yyyy', { locale: pt })}`,
     };

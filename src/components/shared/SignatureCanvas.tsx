@@ -28,7 +28,6 @@ export function SignatureCanvas({
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [signerName, setSignerName] = useState('');
-  const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -36,11 +35,10 @@ export function SignatureCanvas({
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Set canvas size
+        // Set canvas size to match CSS size
         const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * 2;
-        canvas.height = rect.height * 2;
-        ctx.scale(2, 2);
+        canvas.width = rect.width;
+        canvas.height = rect.height;
         
         // Set drawing styles
         ctx.strokeStyle = '#000';
@@ -55,56 +53,39 @@ export function SignatureCanvas({
     }
   }, [open]);
 
-  const getCoordinates = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return null;
-
-    const rect = canvas.getBoundingClientRect();
+    if (!canvas) return;
     
-    if ('touches' in e) {
-      const touch = e.touches[0];
-      return {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top,
-      };
-    } else {
-      return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      };
+    // Capture pointer for tracking outside canvas
+    canvas.setPointerCapture(e.pointerId);
+    
+    setIsDrawing(true);
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
     }
   }, []);
 
-  const startDrawing = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    const coords = getCoordinates(e);
-    if (coords) {
-      setIsDrawing(true);
-      setLastPoint(coords);
-    }
-  }, [getCoordinates]);
-
-  const draw = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    if (!isDrawing || !canvasRef.current || !lastPoint) return;
-
-    const coords = getCoordinates(e);
-    if (!coords) return;
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !canvasRef.current) return;
 
     const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(lastPoint.x, lastPoint.y);
-      ctx.lineTo(coords.x, coords.y);
-      ctx.stroke();
-      setLastPoint(coords);
-      setHasSignature(true);
-    }
-  }, [isDrawing, lastPoint, getCoordinates]);
+    if (!ctx) return;
 
-  const stopDrawing = useCallback(() => {
+    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.stroke();
+    setHasSignature(true);
+  }, [isDrawing]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
     setIsDrawing(false);
-    setLastPoint(null);
   }, []);
 
   const clearSignature = useCallback(() => {
@@ -160,13 +141,12 @@ export function SignatureCanvas({
               <canvas
                 ref={canvasRef}
                 className="w-full h-48 touch-none cursor-crosshair"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+                style={{ touchAction: 'none' }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onPointerCancel={handlePointerUp}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center">
