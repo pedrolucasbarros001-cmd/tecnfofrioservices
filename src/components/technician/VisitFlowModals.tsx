@@ -11,7 +11,9 @@ import {
   Package,
   Truck,
   X,
-  Plus
+  Plus,
+  Tag,
+  ClipboardList
 } from 'lucide-react';
 import {
   Dialog,
@@ -37,9 +39,31 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { useFlowPersistence } from '@/hooks/useFlowPersistence';
-import type { Service } from '@/types/database';
+import type { Service, PhotoType } from '@/types/database';
 
-type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'diagnostico' | 'decisao' | 'pecas_usadas' | 'pedir_peca' | 'finalizacao';
+// Steps for repair services (reparacao)
+type RepairModalStep = 
+  | 'resumo' 
+  | 'deslocacao' 
+  | 'foto_aparelho' 
+  | 'foto_etiqueta' 
+  | 'foto_estado' 
+  | 'diagnostico' 
+  | 'decisao' 
+  | 'pecas_usadas' 
+  | 'pedir_peca';
+
+// Steps for other services (original flow)
+type OtherModalStep = 
+  | 'resumo' 
+  | 'deslocacao' 
+  | 'foto' 
+  | 'diagnostico' 
+  | 'decisao' 
+  | 'pecas_usadas' 
+  | 'pedir_peca';
+
+type ModalStep = RepairModalStep | OtherModalStep;
 type DecisionType = 'reparar_local' | 'levantar_oficina';
 type SignatureType = 'conclusao' | 'recolha' | 'pedido_peca';
 
@@ -58,7 +82,12 @@ interface VisitFlowModalsProps {
 
 interface VisitFormData {
   detectedFault: string;
+  // Legacy single photo
   photoFile: string | null;
+  // Structured photos for reparacao
+  photoAparelho: string | null;
+  photoEtiqueta: string | null;
+  photosEstado: string[];
   decision: DecisionType;
   usedParts: boolean;
   usedPartsList: PartEntry[];
@@ -78,6 +107,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const [formData, setFormData] = useState<VisitFormData>({
     detectedFault: '',
     photoFile: null,
+    photoAparelho: null,
+    photoEtiqueta: null,
+    photosEstado: [],
     decision: 'reparar_local',
     usedParts: false,
     usedPartsList: [{ name: '', reference: '', quantity: 1 }],
@@ -86,8 +118,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [currentPhotoType, setCurrentPhotoType] = useState<PhotoType>('visita');
   const [showSignature, setShowSignature] = useState(false);
   const [signatureType, setSignatureType] = useState<SignatureType>('conclusao');
+
+  // Check if this is a repair service
+  const isReparacao = service.service_type === 'reparacao';
 
   // Flow persistence
   const { loadState, saveState, clearState } = useFlowPersistence<VisitFormData>(service.id, 'visita');
@@ -104,6 +140,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         setFormData({
           detectedFault: service.detected_fault || '',
           photoFile: null,
+          photoAparelho: null,
+          photoEtiqueta: null,
+          photosEstado: [],
           decision: 'reparar_local',
           usedParts: false,
           usedPartsList: [{ name: '', reference: '', quantity: 1 }],
@@ -135,18 +174,43 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
     try {
       await supabase.from('service_photos').insert({
         service_id: service.id,
-        photo_type: 'visita',
+        photo_type: currentPhotoType,
         file_url: imageData,
-        description: 'Foto da visita',
+        description: getPhotoDescription(currentPhotoType),
       });
       queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-      setFormData(prev => ({ ...prev, photoFile: imageData }));
+      
+      // Update form data based on photo type
+      if (currentPhotoType === 'aparelho') {
+        setFormData(prev => ({ ...prev, photoAparelho: imageData }));
+      } else if (currentPhotoType === 'etiqueta') {
+        setFormData(prev => ({ ...prev, photoEtiqueta: imageData }));
+      } else if (currentPhotoType === 'estado') {
+        setFormData(prev => ({ ...prev, photosEstado: [...prev.photosEstado, imageData] }));
+      } else {
+        setFormData(prev => ({ ...prev, photoFile: imageData }));
+      }
+      
       setShowCamera(false);
       toast.success('Foto guardada!');
     } catch (error) {
       console.error('Error saving photo:', error);
       toast.error('Erro ao guardar foto');
     }
+  };
+
+  const getPhotoDescription = (type: PhotoType): string => {
+    switch (type) {
+      case 'aparelho': return 'Fotografia do aparelho';
+      case 'etiqueta': return 'Fotografia da etiqueta do aparelho';
+      case 'estado': return 'Estado do aparelho';
+      default: return 'Foto da visita';
+    }
+  };
+
+  const openCamera = (type: PhotoType) => {
+    setCurrentPhotoType(type);
+    setShowCamera(true);
   };
 
   // Save used parts to database
@@ -326,6 +390,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
     setFormData({
       detectedFault: '',
       photoFile: null,
+      photoAparelho: null,
+      photoEtiqueta: null,
+      photosEstado: [],
       decision: 'reparar_local',
       usedParts: false,
       usedPartsList: [{ name: '', reference: '', quantity: 1 }],
@@ -359,18 +426,33 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
     }));
   };
 
-  // Validation
-  const canProceedFromFoto = formData.photoFile !== null;
+  const removeEstadoPhoto = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      photosEstado: prev.photosEstado.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Validation - for reparacao need aparelho and etiqueta photos
+  const canProceedFromFotoAparelho = formData.photoAparelho !== null;
+  const canProceedFromFotoEtiqueta = formData.photoEtiqueta !== null;
+  const canProceedFromFotoEstado = formData.photosEstado.length > 0; // Estado is now required
+  const canProceedFromFoto = formData.photoFile !== null; // Legacy for non-reparacao
   const canProceedFromDiagnostico = formData.detectedFault.trim().length > 0;
 
-  // Progress calculation - now 7 steps for reparar_local path
-  const getStepIndex = () => {
-    const steps = ['resumo', 'deslocacao', 'foto', 'diagnostico', 'decisao', 'pecas_usadas', 'pedir_peca'];
-    return steps.indexOf(currentStep);
+  // Get step list based on service type
+  const getSteps = (): string[] => {
+    if (isReparacao) {
+      return ['resumo', 'deslocacao', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'diagnostico', 'decisao', 'pecas_usadas', 'pedir_peca'];
+    }
+    return ['resumo', 'deslocacao', 'foto', 'diagnostico', 'decisao', 'pecas_usadas', 'pedir_peca'];
   };
-  const stepIndex = getStepIndex();
+
+  // Progress calculation
+  const steps = getSteps();
+  const stepIndex = steps.indexOf(currentStep);
   const showProgress = currentStep !== 'resumo';
-  const totalSteps = formData.decision === 'reparar_local' ? 7 : 5;
+  const totalSteps = formData.decision === 'reparar_local' ? steps.length : (isReparacao ? 7 : 5);
 
   const ProgressBar = () => (
     <div className="flex gap-1.5 mb-4">
@@ -401,6 +483,22 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
       </div>
     </DialogHeader>
   );
+
+  // Navigate to next/previous step
+  const goToPreviousPhotoStep = () => {
+    if (currentStep === 'foto_etiqueta') setCurrentStep('foto_aparelho');
+    else if (currentStep === 'foto_estado') setCurrentStep('foto_etiqueta');
+    else if (currentStep === 'diagnostico' && isReparacao) setCurrentStep('foto_estado');
+    else if (currentStep === 'diagnostico') setCurrentStep('foto');
+    else setCurrentStep('deslocacao');
+  };
+
+  const goToNextPhotoStep = () => {
+    if (currentStep === 'foto_aparelho') setCurrentStep('foto_etiqueta');
+    else if (currentStep === 'foto_etiqueta') setCurrentStep('foto_estado');
+    else if (currentStep === 'foto_estado') setCurrentStep('diagnostico');
+    else if (currentStep === 'foto') setCurrentStep('diagnostico');
+  };
 
   if (!isOpen) return null;
 
@@ -488,7 +586,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
             </Button>
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => setCurrentStep('foto')}
+              onClick={() => setCurrentStep(isReparacao ? 'foto_aparelho' : 'foto')}
             >
               Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -496,63 +594,255 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         </DialogContent>
       </Dialog>
 
-      {/* Modal 3: Foto */}
-      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Tirar Foto" step="Passo 3" />
+      {/* Modal 3a: Foto do Aparelho (only for reparacao) */}
+      {isReparacao && (
+        <Dialog open={currentStep === 'foto_aparelho' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Foto do Aparelho" step="Passo 3" />
 
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Tire uma foto do aparelho antes de iniciar o diagnóstico.
-            </p>
-
-            {formData.photoFile ? (
-              <div className="relative">
-                <img
-                  src={formData.photoFile}
-                  alt="Foto do aparelho"
-                  className="w-full h-48 object-cover rounded-lg"
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="absolute bottom-2 right-2"
-                  onClick={() => setShowCamera(true)}
-                >
-                  Nova Foto
-                </Button>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Camera className="h-4 w-4 text-blue-500" />
+                <span>Tire uma foto geral do aparelho</span>
+                <span className="text-destructive">*</span>
               </div>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full h-32 flex-col gap-2"
-                onClick={() => setShowCamera(true)}
-              >
-                <Camera className="h-8 w-8 text-muted-foreground" />
-                <span>Tirar Foto</span>
+
+              {formData.photoAparelho ? (
+                <div className="relative">
+                  <img
+                    src={formData.photoAparelho}
+                    alt="Foto do aparelho"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-2 right-2"
+                    onClick={() => openCamera('aparelho')}
+                  >
+                    Nova Foto
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-32 flex-col gap-2"
+                  onClick={() => openCamera('aparelho')}
+                >
+                  <Camera className="h-8 w-8 text-muted-foreground" />
+                  <span>Tirar Foto do Aparelho</span>
+                </Button>
+              )}
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
               </Button>
-            )}
-          </div>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={goToNextPhotoStep}
+                disabled={!canProceedFromFotoAparelho}
+              >
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => setCurrentStep('diagnostico')}
-              disabled={!canProceedFromFoto}
-            >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal 3b: Foto da Etiqueta (only for reparacao) */}
+      {isReparacao && (
+        <Dialog open={currentStep === 'foto_etiqueta' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
 
-      {/* Modal 4: Diagnóstico */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Tag className="h-4 w-4 text-blue-500" />
+                <span>Tire uma foto da etiqueta do aparelho</span>
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Capture a etiqueta com número de série, modelo, etc.
+              </p>
+
+              {formData.photoEtiqueta ? (
+                <div className="relative">
+                  <img
+                    src={formData.photoEtiqueta}
+                    alt="Foto da etiqueta"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-2 right-2"
+                    onClick={() => openCamera('etiqueta')}
+                  >
+                    Nova Foto
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-32 flex-col gap-2"
+                  onClick={() => openCamera('etiqueta')}
+                >
+                  <Tag className="h-8 w-8 text-muted-foreground" />
+                  <span>Tirar Foto da Etiqueta</span>
+                </Button>
+              )}
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={goToNextPhotoStep}
+                disabled={!canProceedFromFotoEtiqueta}
+              >
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal 3c: Foto do Estado (only for reparacao) */}
+      {isReparacao && (
+        <Dialog open={currentStep === 'foto_estado' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Estado do Aparelho" step="Passo 5" />
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm">
+                <ClipboardList className="h-4 w-4 text-blue-500" />
+                <span>Registe o estado físico do aparelho</span>
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fotografe amassados, riscos, ou danos visíveis
+              </p>
+
+              {formData.photosEstado.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {formData.photosEstado.map((photo, idx) => (
+                    <div key={idx} className="relative group">
+                      <img
+                        src={photo}
+                        alt={`Estado ${idx + 1}`}
+                        className="w-full h-20 object-cover rounded-lg"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeEstadoPhoto(idx)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => openCamera('estado')}
+                    className="flex flex-col items-center justify-center h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                  >
+                    <Plus className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Mais</span>
+                  </button>
+                </div>
+              )}
+
+              {formData.photosEstado.length === 0 && (
+                <Button
+                  variant="outline"
+                  className="w-full h-32 flex-col gap-2"
+                  onClick={() => openCamera('estado')}
+                >
+                  <ClipboardList className="h-8 w-8 text-muted-foreground" />
+                  <span>Tirar Foto do Estado</span>
+                </Button>
+              )}
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={goToNextPhotoStep}
+                disabled={!canProceedFromFotoEstado}
+              >
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
+      {!isReparacao && (
+        <Dialog open={currentStep === 'foto' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Tirar Foto" step="Passo 3" />
+
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Tire uma foto do aparelho antes de iniciar o diagnóstico.
+              </p>
+
+              {formData.photoFile ? (
+                <div className="relative">
+                  <img
+                    src={formData.photoFile}
+                    alt="Foto do aparelho"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-2 right-2"
+                    onClick={() => openCamera('visita')}
+                  >
+                    Nova Foto
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-32 flex-col gap-2"
+                  onClick={() => openCamera('visita')}
+                >
+                  <Camera className="h-8 w-8 text-muted-foreground" />
+                  <span>Tirar Foto</span>
+                </Button>
+              )}
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={() => setCurrentStep('diagnostico')}
+                disabled={!canProceedFromFoto}
+              >
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal 4/6: Diagnóstico */}
       <Dialog open={currentStep === 'diagnostico' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Diagnóstico" step="Passo 4" />
+          <ModalHeader title="Diagnóstico" step={isReparacao ? 'Passo 6' : 'Passo 4'} />
 
           <div className="space-y-4">
             <div>
@@ -571,7 +861,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('foto')}>
+            <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
@@ -585,10 +875,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         </DialogContent>
       </Dialog>
 
-      {/* Modal 5: Decisão - Only 2 options now */}
+      {/* Modal 5/7: Decisão */}
       <Dialog open={currentStep === 'decisao' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Decisão" step="Passo 5" />
+          <ModalHeader title="Decisão" step={isReparacao ? 'Passo 7' : 'Passo 5'} />
 
           <p className="text-sm text-muted-foreground mb-4">
             Qual será o próximo passo?
@@ -662,10 +952,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         </DialogContent>
       </Dialog>
 
-      {/* Modal 6: Peças Usadas (only for reparar_local) */}
+      {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
       <Dialog open={currentStep === 'pecas_usadas' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Peças Usadas" step="Passo 6" />
+          <ModalHeader title="Peças Usadas" step={isReparacao ? 'Passo 8' : 'Passo 6'} />
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -766,10 +1056,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         </DialogContent>
       </Dialog>
 
-      {/* Modal 7: Pedir Peça? (only for reparar_local) */}
+      {/* Modal 7/9: Pedir Peça? (only for reparar_local) */}
       <Dialog open={currentStep === 'pedir_peca' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
-          <ModalHeader title="Precisa Pedir Peça?" step="Passo 7" />
+          <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? 'Passo 9' : 'Passo 7'} />
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -862,7 +1152,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         open={showCamera}
         onOpenChange={setShowCamera}
         onCapture={handlePhotoCapture}
-        title="Foto do Aparelho"
+        title={getPhotoDescription(currentPhotoType)}
       />
 
       {/* Signature Modal */}
