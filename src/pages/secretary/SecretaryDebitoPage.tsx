@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, Phone, Mail, CreditCard } from 'lucide-react';
+import { DollarSign, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
+import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { useServices } from '@/hooks/useServices';
 import type { Service } from '@/types/database';
 
@@ -20,6 +21,8 @@ export default function SecretaryDebitoPage() {
   const [currentService, setCurrentService] = useState<Service | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
 
@@ -100,7 +103,14 @@ export default function SecretaryDebitoPage() {
                   const pending = finalPrice - amountPaid;
 
                   return (
-                    <TableRow key={service.id}>
+                    <TableRow 
+                      key={service.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedService(service);
+                        setShowDetailSheet(true);
+                      }}
+                    >
                       <TableCell className="font-mono font-semibold text-primary">
                         {service.code}
                       </TableCell>
@@ -125,7 +135,7 @@ export default function SecretaryDebitoPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -162,6 +172,13 @@ export default function SecretaryDebitoPage() {
         service={currentService}
         open={showContactModal}
         onOpenChange={setShowContactModal}
+      />
+      
+      {/* Service Detail Sheet */}
+      <ServiceDetailSheet
+        service={selectedService}
+        open={showDetailSheet}
+        onOpenChange={setShowDetailSheet}
       />
     </div>
   );

@@ -226,6 +226,21 @@ export default function ServiceConsultPage() {
 
         <Separator />
 
+        {/* Access Link for clients */}
+        <div className="text-center space-y-2 py-4">
+          <p className="text-xs text-muted-foreground">
+            Link de acesso a esta página:
+          </p>
+          <a 
+            href={window.location.href} 
+            className="text-sm text-primary underline break-all font-mono"
+          >
+            {window.location.href}
+          </a>
+        </div>
+
+        <Separator />
+
         {/* Company Contact */}
         <div className="text-center space-y-3 text-sm text-muted-foreground pb-6">
           <p className="font-medium text-foreground">{COMPANY_INFO.name} - {COMPANY_INFO.city}</p>

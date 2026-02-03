@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ServiceTagModal } from '@/components/modals/ServiceTagModal';
+// ServiceTagModal removed - using dedicated page instead
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { SetPriceModal } from '@/components/modals/SetPriceModal';
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
@@ -157,7 +157,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const deleteService = useDeleteService();
   
   // Modal states
-  const [showTagModal, setShowTagModal] = useState(false);
+  // showTagModal removed - using dedicated page instead
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -324,7 +324,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <FileText className="h-4 w-4 mr-1" />
                     Ver Ficha
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowTagModal(true)}>
+                  <Button variant="outline" size="sm" onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}>
                     <Tag className="h-4 w-4 mr-1" />
                     Ver Etiqueta
                   </Button>
@@ -860,11 +860,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       </Sheet>
 
       {/* All Modals */}
-      <ServiceTagModal
-        service={service}
-        open={showTagModal}
-        onOpenChange={setShowTagModal}
-      />
       <AssignTechnicianModal
         open={showAssignModal}
         onOpenChange={(open) => {
