@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
+import { ConvertBudgetModal } from '@/components/modals/ConvertBudgetModal';
 import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -44,7 +45,9 @@ export default function OrcamentosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
+  const [budgetToConvert, setBudgetToConvert] = useState<any | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
 
   const { data: budgets = [], isLoading, refetch } = useQuery({
@@ -93,54 +96,9 @@ export default function OrcamentosPage() {
     }
   };
 
-  const handleConvertToService = async (budget: any, skipConfirm = false) => {
-    if (!skipConfirm) {
-      const confirmed = window.confirm('Deseja converter este orçamento em serviço?');
-      if (!confirmed) {
-        // Just mark as approved without converting
-        await handleUpdateStatus(budget.id, 'aprovado');
-        return;
-      }
-    }
-
-    try {
-      // Create service from budget
-      const { data: service, error: serviceError } = await supabase
-        .from('services')
-        .insert({
-          customer_id: budget.customer_id,
-          appliance_type: budget.appliance_type,
-          brand: budget.brand,
-          model: budget.model,
-          fault_description: budget.fault_description,
-          notes: budget.notes,
-          service_type: 'reparacao',
-          status: 'por_fazer',
-          service_location: 'oficina',
-          final_price: budget.estimated_total,
-        })
-        .select()
-        .single();
-
-      if (serviceError) throw serviceError;
-
-      // Update budget as converted
-      const { error: updateError } = await supabase
-        .from('budgets')
-        .update({
-          status: 'convertido',
-          converted_service_id: service.id,
-        })
-        .eq('id', budget.id);
-
-      if (updateError) throw updateError;
-
-      toast.success('Orçamento convertido em serviço com sucesso!');
-      refetch();
-    } catch (error) {
-      console.error('Error converting budget:', error);
-      toast.error('Erro ao converter orçamento');
-    }
+  const handleOpenConvertModal = (budget: any) => {
+    setBudgetToConvert(budget);
+    setShowConvertModal(true);
   };
 
   const handleViewDetails = (budget: any) => {
@@ -299,7 +257,7 @@ export default function OrcamentosPage() {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleConvertToService(budget);
+                                  handleOpenConvertModal(budget);
                                 }}
                               >
                                 <ArrowRight className="h-4 w-4 mr-2 text-blue-500" />
@@ -322,6 +280,14 @@ export default function OrcamentosPage() {
       <CreateBudgetModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
+        onSuccess={() => refetch()}
+      />
+
+      {/* Convert Budget Modal */}
+      <ConvertBudgetModal
+        open={showConvertModal}
+        onOpenChange={setShowConvertModal}
+        budget={budgetToConvert}
         onSuccess={() => refetch()}
       />
 

@@ -481,7 +481,7 @@
     border-radius: 0 !important;
   }
 
-  /* ========== TAG PRINT PAGE (80mm x 170mm) ========== */
+  /* ========== TAG PRINT PAGE (4x6 inches = 102mm x 152mm) ========== */
   .print-tag-page {
     background: white !important;
     padding: 0 !important;
@@ -493,9 +493,9 @@
   }
   
   .print-tag-page .print-tag-container {
-    width: 80mm !important;
-    height: 170mm !important;
-    min-height: 170mm !important;
+    width: 102mm !important;
+    height: 152mm !important;
+    min-height: 152mm !important;
     box-shadow: none !important;
     margin: 0 !important;
     padding: 4mm !important;
@@ -509,7 +509,8 @@
   }
 
   /* Esconder todos os elementos do body que não são portais (only for modal printing) */
-  body:not(:has(.print-page)) > *:not([data-radix-portal]):not(.print-portal) {
+  /* CRITICAL: Exclude BOTH .print-page AND .print-tag-page from this rule */
+  body:not(:has(.print-page)):not(:has(.print-tag-page)) > *:not([data-radix-portal]):not(.print-portal) {
     display: none !important;
   }
 
@@ -564,19 +565,19 @@
     background-color: #f9fafb !important;
   }
 
-  /* ========== TAG (80mm x 170mm) ========== */
+  /* ========== TAG (4x6 inches = 102mm x 152mm) ========== */
   body.print-type-tag {
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Tag container - fixed size for 80x170mm */
+  /* Tag container - fixed size for 4x6 inches (102mm x 152mm) */
   .print-tag {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 80mm !important;
-    height: 170mm !important;
+    width: 102mm !important;
+    height: 152mm !important;
     margin: 0 !important;
     padding: 4mm !important;
     background: white !important;
