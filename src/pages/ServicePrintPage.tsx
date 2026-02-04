@@ -260,7 +260,7 @@ export default function ServicePrintPage() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-2 relative z-10">
+        <div className="flex items-center justify-between mb-1.5 relative z-10">
           <img 
             src={tecnofrioLogoFull} 
             alt="TECNOFRIO" 
@@ -272,7 +272,7 @@ export default function ServicePrintPage() {
         </div>
 
         {/* Company Contact Info */}
-        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-2 border-y py-1.5 bg-muted/30">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-1.5 border-y py-1 bg-muted/30">
           <div className="flex items-center gap-1">
             <MapPin className="h-3 w-3" />
             <span>{COMPANY_INFO.fullAddress}</span>
@@ -287,7 +287,7 @@ export default function ServicePrintPage() {
           </div>
         </div>
 
-        <div className="mb-3">
+        <div className="mb-2">
           <p className="text-base font-mono font-bold">Código: {service.code}</p>
           <p className="text-xs text-muted-foreground">
             Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
@@ -295,8 +295,8 @@ export default function ServicePrintPage() {
         </div>
 
         {/* Customer Data */}
-        <section className="mb-3">
-          <h2 className="text-sm font-semibold mb-2 border-b pb-1">Dados do Cliente</h2>
+        <section className="mb-2">
+          <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Dados do Cliente</h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
             <div>
               <span className="text-muted-foreground">Nome:</span>{' '}
@@ -325,11 +325,11 @@ export default function ServicePrintPage() {
           </div>
         </section>
 
-        <Separator className="my-2" />
+        <Separator className="my-1" />
 
         {/* Service Details */}
-        <section className="mb-3">
-          <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Serviço</h2>
+        <section className="mb-2">
+          <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Detalhes do Serviço</h2>
           <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
             <div>
               <span className="text-muted-foreground">Categoria:</span>{' '}
@@ -360,11 +360,11 @@ export default function ServicePrintPage() {
           </div>
         </section>
 
-        <Separator className="my-2" />
+        <Separator className="my-1" />
 
         {/* Equipment Details */}
-        <section className="mb-3">
-          <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Equipamento</h2>
+        <section className="mb-2">
+          <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Detalhes do Equipamento</h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
             <div>
               <span className="text-muted-foreground">Tipo:</span>{' '}
@@ -398,9 +398,9 @@ export default function ServicePrintPage() {
         {/* Warranty Section */}
         {service.is_warranty && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3 bg-purple-50 rounded p-2">
-              <h2 className="text-sm font-semibold mb-1 text-purple-800">Serviço em Garantia</h2>
+            <Separator className="my-1" />
+            <section className="mb-2 bg-purple-50 rounded p-1.5">
+              <h2 className="text-xs font-semibold mb-0.5 text-purple-800">Serviço em Garantia</h2>
               <div className="grid grid-cols-2 gap-x-6 text-xs">
                 <div>
                   <span className="text-purple-600">Marca:</span>{' '}
@@ -418,10 +418,10 @@ export default function ServicePrintPage() {
         {/* Work Performed */}
         {service.work_performed && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-1 border-b pb-1">Trabalho Realizado</h2>
-              <p className="text-xs whitespace-pre-wrap">{service.work_performed}</p>
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Trabalho Realizado</h2>
+              <p className="text-xs whitespace-pre-wrap leading-tight">{service.work_performed}</p>
             </section>
           </>
         )}
@@ -429,9 +429,9 @@ export default function ServicePrintPage() {
         {/* Parts Used */}
         {usedParts.length > 0 && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-1 border-b pb-1">Peças Utilizadas</h2>
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Peças Utilizadas</h2>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
@@ -463,9 +463,9 @@ export default function ServicePrintPage() {
         {/* Pricing Summary */}
         {service.final_price && service.final_price > 0 && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-1 border-b pb-1">Resumo Financeiro</h2>
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Resumo Financeiro</h2>
               <div className="grid grid-cols-2 gap-1 text-xs max-w-xs ml-auto">
                 {pricingDetails.subtotal > 0 && (
                   <div className="flex justify-between col-span-2">
@@ -509,9 +509,9 @@ export default function ServicePrintPage() {
         {/* Payment History */}
         {payments.length > 0 && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-1 border-b pb-1">Histórico de Pagamentos</h2>
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Histórico de Pagamentos</h2>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
@@ -543,26 +543,26 @@ export default function ServicePrintPage() {
         {/* Service Signatures */}
         {signatures.length > 0 && (
           <>
-            <Separator className="my-2" />
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-2 border-b pb-1 flex items-center gap-1">
-                <PenTool className="h-4 w-4" />
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-1 border-b pb-0.5 flex items-center gap-1">
+                <PenTool className="h-3 w-3" />
                 Assinaturas Recolhidas
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {signatures.map((sig) => (
-                  <div key={sig.id} className="flex gap-4 p-3 border rounded bg-gray-50">
+                  <div key={sig.id} className="flex gap-2 p-1.5 border rounded bg-gray-50">
                     <img 
                       src={sig.file_url} 
                       alt="Assinatura" 
-                      className="w-32 h-20 object-contain border bg-white rounded"
+                      className="w-24 h-14 object-contain border bg-white rounded"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed break-words">
+                      <p className="font-medium text-xs">{sig.signer_name || 'Cliente'}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight break-words">
                         {getSignatureDescription(sig.signature_type)}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] text-muted-foreground">
                         {format(new Date(sig.signed_at), "dd/MM/yy HH:mm")}
                       </p>
                     </div>
@@ -573,15 +573,15 @@ export default function ServicePrintPage() {
           </>
         )}
 
-        <Separator className="my-2" />
+        <Separator className="my-1" />
 
         {/* Terms Section */}
-        <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-          <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
-            <AlertTriangle className="h-4 w-4" />
+        <section className="bg-amber-50 border border-amber-200 rounded p-1.5 text-xs">
+          <h3 className="font-semibold text-amber-800 mb-0.5 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
             IMPORTANTE - Termos de Guarda
           </h3>
-          <p className="text-amber-700 leading-tight">
+          <p className="text-amber-700 leading-tight text-[10px]">
             Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
             conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
             pela guarda ou danos.
