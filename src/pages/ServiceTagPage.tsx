@@ -54,7 +54,7 @@ export default function ServiceTagPage() {
       await generatePDF({ 
         element: tagRef.current, 
         filename: `Etiqueta-${service.code}`,
-        format: [80, 170], // 80mm x 170mm
+        format: [102, 152], // 4x6 inches (102mm x 152mm)
       });
     } finally {
       setIsGenerating(false);
