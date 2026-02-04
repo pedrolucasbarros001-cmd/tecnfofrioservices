@@ -1,209 +1,239 @@
 
+# Plano: Corrigir Impressão de Fichas e Etiquetas + Ajustar Tamanho da Etiqueta para 4x6 + Fluxo de Orçamentos
 
-# Plano: Corrigir Página em Branco da Ficha + Reformular Etiqueta para Histórico Interno
+## Resumo dos Problemas e Soluções
 
-## Problema Identificado
-
-1. **"Ver Ficha" abre página em branco**: A rota `/print/service/:serviceId` está protegida por `ProtectedRoute`, mas ao abrir em nova aba com `window.open()`, a sessão de autenticação não está a ser propagada corretamente. A página carrega antes do Supabase restaurar a sessão, resultando em redirect para `/login` ou conteúdo vazio.
-
-2. **Etiqueta deve mostrar histórico interno para técnicos**: O QR code da etiqueta deve apontar para uma página interna com dados completos do serviço + cliente + histórico (exige login), não apenas o status simplificado.
-
-3. **Acesso universal para técnicos**: Qualquer técnico autenticado deve conseguir ler o QR e ver o histórico completo, não apenas o técnico atribuído.
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| Preview de impressão em branco (ficha e etiqueta) | CSS na linha 512 esconde conteúdo porque falta exclusão para `.print-tag-page` | Corrigir selector CSS para incluir `:not(:has(.print-tag-page))` |
+| Tamanho da etiqueta errado (80x170mm) | Configuração inicial incorreta | Alterar para **4x6 polegadas** (102mm x 152mm) |
+| Serviços de orçamento criados como "visita" | Lógica de conversão define `service_type: 'reparacao'` fixo | Alterar para permitir escolha do tipo antes de converter |
 
 ---
 
-## Causa Raiz da Página em Branco
+## Problema 1: CSS de Impressão (CRÍTICO)
 
-A rota `/print/service/:serviceId` é protegida mas está **fora do AppLayout**, então ao abrir numa nova aba:
+### Causa Raiz
+No ficheiro `src/index.css`, linha 512:
 
-1. `window.open()` cria uma nova instância do browser
-2. O Supabase SDK tenta restaurar a sessão do `localStorage`
-3. Enquanto `loading === true`, mostra spinner
-4. Se `loading` termina antes da sessão ser validada → redireciona para `/login` ou mostra vazio
+```css
+/* ANTES - PROBLEMA */
+body:not(:has(.print-page)) > *:not([data-radix-portal]):not(.print-portal) {
+  display: none !important;
+}
+```
 
-**Solução**: A página de impressão deve aguardar correctamente a restauração da sessão. Verificar que o `ProtectedRoute` tem fallback adequado durante loading.
+Esta regra esconde TODOS os elementos do `body` excepto portais Radix. O problema é que a página de etiqueta (`.print-tag-page`) **não está excluída** deste selector, então o conteúdo é escondido durante a impressão.
+
+A linha 506 protege o `#root` correctamente com `.print-tag-page`, mas a linha 512 anula isso.
+
+### Correção
+Adicionar `:not(:has(.print-tag-page))` ao selector:
+
+```css
+/* DEPOIS - CORRIGIDO */
+body:not(:has(.print-page)):not(:has(.print-tag-page)) > *:not([data-radix-portal]):not(.print-portal) {
+  display: none !important;
+}
+```
+
+Isto garante que quando existe `.print-tag-page` (ou `.print-page`) no body, o conteúdo NÃO é escondido.
+
+---
+
+## Problema 2: Tamanho da Etiqueta (4x6 polegadas)
+
+### Conversão de Medidas
+- **4 polegadas** = 101.6mm ≈ **102mm**
+- **6 polegadas** = 152.4mm ≈ **152mm**
+
+### Ficheiros a Alterar
+
+**1. `src/index.css`** - Alterar todas as referências de 80x170mm para 102x152mm:
+
+```css
+/* De */
+.print-tag-page .print-tag-container {
+  width: 80mm !important;
+  height: 170mm !important;
+  min-height: 170mm !important;
+}
+
+/* Para */
+.print-tag-page .print-tag-container {
+  width: 102mm !important;
+  height: 152mm !important;
+  min-height: 152mm !important;
+}
+```
+
+**2. `src/pages/ServiceTagPage.tsx`** - Alterar geração de PDF:
+
+```typescript
+// De
+await generatePDF({ 
+  element: tagRef.current, 
+  filename: `Etiqueta-${service.code}`,
+  format: [80, 170], // 80mm x 170mm
+});
+
+// Para
+await generatePDF({ 
+  element: tagRef.current, 
+  filename: `Etiqueta-${service.code}`,
+  format: [102, 152], // 4x6 polegadas (102mm x 152mm)
+});
+```
+
+**3. `src/utils/printUtils.ts`** - Alterar configuração de @page:
+
+```typescript
+// De
+tag: '@page { size: 80mm 170mm; margin: 0; }',
+
+// Para
+tag: '@page { size: 102mm 152mm; margin: 0; }', // 4x6 polegadas
+```
+
+---
+
+## Problema 3: Conversão de Orçamento em Serviço
+
+### Problema Atual
+Quando um orçamento é convertido em serviço, o tipo é definido automaticamente como `'reparacao'`:
+
+```typescript
+// OrcamentosPage.tsx linha 117 e BudgetDetailPanel.tsx linha 97
+service_type: 'reparacao',
+```
+
+### Solução
+Antes de converter, perguntar ao utilizador qual o tipo de serviço:
+- Instalação
+- Reparação
+- Entrega
+
+Isto pode ser feito com um modal de selecção ou um dialog simples.
+
+### Implementação
+
+**Criar modal `ConvertBudgetModal.tsx`**:
+
+```typescript
+// Opções de tipo de serviço
+const SERVICE_TYPES = [
+  { value: 'instalacao', label: 'Instalação' },
+  { value: 'reparacao', label: 'Reparação' },
+  { value: 'entrega', label: 'Entrega' },
+];
+```
+
+**Fluxo**:
+1. Utilizador clica em "Converter em Serviço"
+2. Abre modal perguntando o tipo
+3. Utilizador selecciona (instalação/reparação/entrega)
+4. Serviço é criado com o tipo seleccionado
+5. Orçamento é marcado como "convertido"
 
 ---
 
 ## Ficheiros a Alterar
 
-| Ficheiro | Acao | Descricao |
+| Ficheiro | Ação | Descrição |
 |----------|------|-----------|
-| `src/pages/ServicePrintPage.tsx` | Alterar | Aguardar auth antes de fazer query |
-| `src/pages/ServiceTagPage.tsx` | Alterar | QR aponta para ServiceDetailSheet interno |
-| `src/App.tsx` | Alterar | Adicionar rota `/service-detail/:serviceId` para colaboradores |
-| `src/pages/ServiceDetailPage.tsx` | **Criar** | Pagina dedicada para historico interno (colaboradores) |
-| `src/components/auth/ProtectedRoute.tsx` | Verificar | Garantir que loading mostra spinner adequado |
-| Supabase RLS | Alterar | Permitir todos tecnicos verem qualquer servico |
+| `src/index.css` | Alterar | Corrigir selector linha 512 + tamanho 4x6 |
+| `src/pages/ServiceTagPage.tsx` | Alterar | Tamanho PDF 102x152mm |
+| `src/utils/printUtils.ts` | Alterar | @page size 102x152mm |
+| `src/components/modals/ConvertBudgetModal.tsx` | **Criar** | Modal para seleccionar tipo de serviço |
+| `src/pages/OrcamentosPage.tsx` | Alterar | Usar novo modal em vez de confirm() |
+| `src/components/shared/BudgetDetailPanel.tsx` | Alterar | Usar novo modal em vez de conversão directa |
 
 ---
 
-## Detalhes Tecnicos
+## Detalhes Técnicos
 
-### 1. ServicePrintPage.tsx - Corrigir Pagina em Branco
+### CSS Corrigido (index.css linhas 505-515)
 
-O problema esta em que a query corre antes de confirmar autenticacao. Adicionar verificacao:
+```css
+/* For modal-based printing: hide React app */
+body:not(:has(.print-page)):not(:has(.print-tag-page)) #root {
+  display: none !important;
+  visibility: hidden !important;
+}
 
-```typescript
-import { useAuth } from '@/contexts/AuthContext';
-
-export default function ServicePrintPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
-  const { serviceId } = useParams();
-  
-  // Esperar autenticacao antes de fazer query
-  const { data: service, isLoading: loadingService, error } = useQuery({
-    queryKey: ['service-print', serviceId],
-    queryFn: async () => {
-      // ... fetch logic
-    },
-    enabled: !!serviceId && isAuthenticated && !authLoading, // <-- Adicionar
-  });
-  
-  // Mostrar loading enquanto auth carrega
-  if (authLoading) {
-    return (
-      <div className="print-page">
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </div>
-    );
-  }
+/* Esconder todos os elementos do body que não são portais */
+/* CRITICAL: Exclude BOTH .print-page AND .print-tag-page */
+body:not(:has(.print-page)):not(:has(.print-tag-page)) > *:not([data-radix-portal]):not(.print-portal) {
+  display: none !important;
 }
 ```
 
-### 2. ServiceTagPage.tsx - Mesma Correcao
+### Tamanho da Etiqueta 4x6 (CSS)
 
-Aplicar o mesmo padrao para a pagina de etiqueta.
+```css
+/* ========== TAG PRINT PAGE (4x6 inches = 102mm x 152mm) ========== */
+.print-tag-page .print-tag-container {
+  width: 102mm !important;
+  height: 152mm !important;
+  min-height: 152mm !important;
+  /* ... resto igual */
+}
 
-### 3. ServiceDetailPage.tsx - Nova Pagina de Historico Interno
+/* Na secção .print-tag (modal) também */
+.print-tag {
+  width: 102mm !important;
+  height: 152mm !important;
+  /* ... resto igual */
+}
+```
 
-Criar pagina dedicada para visualizacao completa do servico por colaboradores (via QR):
+### ConvertBudgetModal
 
 ```text
-URL: /service-detail/:serviceId
-Acesso: Qualquer colaborador autenticado (dono, secretaria, tecnico)
-Conteudo:
-- Dados do cliente
-- Dados do equipamento
-- Estado atual
-- Historico de atividades (activity_logs)
-- Fotos capturadas
-- Assinaturas recolhidas
-- Pecas utilizadas/pedidas
-- Pagamentos (se nao for tecnico, ou se for permitido ver)
-
-Layout: Similar ao ServiceDetailSheet mas em pagina completa
+┌─────────────────────────────────────────────────────────────┐
+│  Converter Orçamento em Serviço                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Seleccione o tipo de serviço a criar:                      │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  ○ Instalação                                          │  │
+│  │    Montagem de equipamento novo                        │  │
+│  ├───────────────────────────────────────────────────────┤  │
+│  │  ○ Reparação                                           │  │
+│  │    Diagnóstico e reparação de avaria                   │  │
+│  ├───────────────────────────────────────────────────────┤  │
+│  │  ○ Entrega                                             │  │
+│  │    Entrega de equipamento ao cliente                   │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                             │
+│  Local do serviço:                                          │
+│  ○ Cliente (Visita)    ○ Oficina                            │
+│                                                             │
+│                            [Cancelar]  [Criar Serviço]      │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-**Estrutura Visual**:
-```text
-+------------------------------------------+
-| <- Voltar          TECNOFRIO      [Print]|
-+------------------------------------------+
-| TF-00123                                 |
-| Estado: Em Execucao [badge]              |
-+------------------------------------------+
-|                                          |
-| CLIENTE                                  |
-| Nome: Joao Silva                         |
-| Telefone: 912 345 678                    |
-| Morada: Rua X, 123                       |
-+------------------------------------------+
-| EQUIPAMENTO                              |
-| Tipo: Frigorifico                        |
-| Marca: Samsung                           |
-| Modelo: RT38K                            |
-| Avaria: Nao faz frio                     |
-+------------------------------------------+
-| HISTORICO                                |
-| 03/02 10:00 - Servico criado             |
-| 03/02 11:00 - Tecnico atribuido          |
-| 03/02 14:30 - Visita realizada           |
-| ...                                      |
-+------------------------------------------+
-| FOTOS (3)                                |
-| [img] [img] [img]                        |
-+------------------------------------------+
-| ASSINATURAS                              |
-| [sig] Recolha - Joao Silva 03/02         |
-+------------------------------------------+
-```
-
-### 4. ServiceTagPage.tsx - QR Aponta para Historico Interno
-
-Mudar o URL do QR code:
-
-```typescript
-// Antes:
-const qrUrl = `${window.location.origin}/service/${serviceId}`;
-
-// Depois:
-const qrUrl = `${window.location.origin}/service-detail/${serviceId}`;
-```
-
-Isto faz com que ao ler o QR, o colaborador seja levado para a pagina de historico completo (exige login).
-
-### 5. App.tsx - Nova Rota
-
-```typescript
-// Adicionar dentro do AppLayout protegido:
-<Route path="/service-detail/:serviceId" element={<ServiceDetailPage />} />
-```
-
-### 6. RLS - Permitir Todos Tecnicos Verem Qualquer Servico
-
-Atualmente a funcao `can_access_service` ja permite acesso a qualquer dono/secretaria/tecnico atribuido. Para permitir **todos os tecnicos**, precisamos modificar:
-
-```sql
--- Funcao atualizada
-CREATE OR REPLACE FUNCTION public.can_access_service(_service_id uuid, _user_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  SELECT 
-    public.is_dono(_user_id) OR 
-    public.is_secretaria(_user_id) OR 
-    public.is_tecnico(_user_id)  -- Qualquer tecnico pode ver qualquer servico
-$function$
-```
-
-**Nota**: Se preferir manter restricao por atribuicao, nao alterar a funcao e usar acesso direto sem can_access_service para esta pagina especifica.
 
 ---
 
-## Resumo de Alteracoes
+## Resumo de Alterações
 
-| Ficheiro | Tipo | Descricao |
-|----------|------|-----------|
-| `src/pages/ServicePrintPage.tsx` | Alterar | +10 linhas (aguardar auth) |
-| `src/pages/ServiceTagPage.tsx` | Alterar | +10 linhas (aguardar auth) + mudar URL QR |
-| `src/pages/ServiceDetailPage.tsx` | **Criar** | ~250 linhas |
-| `src/App.tsx` | Alterar | +1 rota |
-| Supabase RLS | Alterar | Permitir todos tecnicos |
+| Ficheiro | Tipo | Linhas |
+|----------|------|--------|
+| `src/index.css` | Alterar | ~15 linhas (selector + tamanhos) |
+| `src/pages/ServiceTagPage.tsx` | Alterar | ~5 linhas (dimensões) |
+| `src/utils/printUtils.ts` | Alterar | ~2 linhas (@page size) |
+| `src/components/modals/ConvertBudgetModal.tsx` | **Criar** | ~150 linhas |
+| `src/pages/OrcamentosPage.tsx` | Alterar | ~20 linhas (usar modal) |
+| `src/components/shared/BudgetDetailPanel.tsx` | Alterar | ~15 linhas (usar modal) |
 
-**Total: 4 ficheiros alterados + 1 novo + 1 migracao SQL**
+**Total: 6 ficheiros (1 novo, 5 alterados)**
 
 ---
 
 ## Resultado Esperado
 
-1. **Pagina de Ficha (Ver Ficha)**: Nunca mais aparece em branco - aguarda auth antes de carregar
-2. **Pagina de Etiqueta (Ver Etiqueta)**: Nunca mais aparece em branco - aguarda auth antes de carregar
-3. **QR Code da Etiqueta**: Aponta para `/service-detail/:id` com historico completo
-4. **Acesso Universal**: Qualquer tecnico autenticado pode ler QR e ver historico de qualquer servico
-5. **Cliente (pagina publica)**: Mantem-se `/service/:id` para consulta simplificada de status (se necessario separar)
-
----
-
-## Pagina de Consulta do Cliente
-
-A pagina `/service/:id` (ServiceConsultPage) continuara a existir para clientes finais. O QR da etiqueta agora aponta para a versao interna, mas podemos criar uma segunda versao da etiqueta (cliente) se necessario no futuro.
-
-**Fluxo Final**:
-- Etiqueta Tecnico: QR → `/service-detail/:id` → Historico interno (requer login)
-- Link para Cliente: Pode ser gerado separadamente se necessario
-
+1. **Impressão de Fichas**: Preview mostra conteúdo A4 completo
+2. **Impressão de Etiquetas**: Preview mostra conteúdo 4x6" (102x152mm)
+3. **Conversão de Orçamentos**: Utilizador escolhe tipo (instalação/reparação/entrega) e local (cliente/oficina) antes de converter
+4. **Nenhuma página em branco**: CSS corrigido previne este problema permanentemente
