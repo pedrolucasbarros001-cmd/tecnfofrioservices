@@ -9,7 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import type { Service, Customer, ServicePart, ServiceSignature, ServicePhoto, ActivityLog } from '@/types/database';
+import type { Service, Customer, ServicePart, ServiceSignature, ServicePhoto } from '@/types/database';
+
+// Activity log type (from Supabase)
+interface ActivityLog {
+  id: string;
+  service_id: string | null;
+  actor_id: string | null;
+  action_type: string;
+  description: string;
+  is_public: boolean | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { useAuth } from '@/contexts/AuthContext';
 
