@@ -361,7 +361,7 @@
   border-radius: 0.25rem;
 }
 
-/* ========== Tag Print Page (80mm x 170mm) ========== */
+/* ========== Tag Print Page (4x6 inches = 102mm x 152mm) ========== */
 .print-tag-page {
   min-height: 100vh;
   background: hsl(var(--muted));
@@ -385,8 +385,8 @@
 }
 
 .print-tag-page .print-tag-container {
-  width: 80mm;
-  min-height: 170mm;
+  width: 102mm;
+  min-height: 152mm;
   background: white;
   padding: 4mm;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
@@ -396,7 +396,7 @@
 
 /* ======================================
    PRINT STYLES - Unified System
-   Supports: A4 Sheet (via modal) & 80mm Tag (via portal)
+   Supports: A4 Sheet (via modal) & 4x6 Tag (102x152mm via dedicated page)
    ====================================== */
 
 /* Screen: Hide print-only content */
