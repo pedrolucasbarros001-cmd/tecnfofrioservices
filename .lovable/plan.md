@@ -1,135 +1,105 @@
 
-## Objetivo
-Fazer com que as páginas dedicadas **Ver Ficha** (`/print/service/:serviceId`) e **Ver Etiqueta** (`/print/tag/:serviceId`) deixem de abrir “em branco” e mostrem:
-- **Ficha** em **A4**, com botões “Imprimir” e “Baixar PDF”.
-- **Etiqueta** em **4x6"** (102mm x 152mm), com “Imprimir” e “Baixar PDF”.
+# Plano: Ajustar Ficha A4 para Caber Tudo numa Única Página
 
-## O que está a acontecer (diagnóstico provável)
-Hoje os botões “Ver Ficha / Ver Etiqueta” abrem uma **nova aba** via `window.open('/print/...')`.
+## Problema Identificado
 
-Em ambientes como o **Preview do Lovable** (app dentro de iframe / URL com `__lovable_token`), duas coisas podem causar “aba em branco”:
-1) A nova aba pode abrir **sem o query param `__lovable_token`** (quando ele existe), e o preview pode não carregar corretamente.
-2) Mesmo carregando, a nova aba pode **não ter a sessão Supabase** (storage particionado entre iframe e top-level em alguns browsers). Aí a rota protegida redireciona e o utilizador “perde” a renderização da ficha/etiqueta.
+O conteúdo da ficha A4 excede 297mm de altura, causando overflow para uma segunda página. O aviso de 30 dias (secção final) acaba por aparecer isolado numa segunda folha.
 
-A correção mais robusta é:
-- Abrir a nova aba **preservando o query string atual** (incluindo `__lovable_token` quando existir).
-- Implementar um **“bridge” de sessão** (opener → nova aba) via `postMessage`, para garantir que a aba de impressão consegue autenticar mesmo quando o storage não é partilhado.
-- Evitar que `ProtectedRoute` bloqueie a montagem das páginas de impressão antes do bridge atuar (senão a página nunca chega a executar a lógica de recuperação).
+**Causas:**
+- Espaçamentos (`mb-3`, `my-2`) demasiado generosos
+- Assinaturas ocupam muito espaço vertical (`w-32 h-20` = 80px de altura cada)
+- Separadores (`<Separator>`) adicionam altura extra
+- Tamanhos de fonte em alguns títulos (`text-sm`) podem ser reduzidos
 
 ---
 
-## Mudanças planejadas (alto nível)
-### 1) Abrir “Ver Ficha / Ver Etiqueta” com URL completa (preservar query params)
-**Porquê:** resolve o caso do preview exigir `__lovable_token` e evita “branco” por URL incompleta.
+## Estratégia de Solução
 
-**Implementação:**
-- Criar um helper tipo `openInNewTabPreservingQuery(pathname: string)` que:
-  - Constrói `new URL(pathname, window.location.href)`
-  - Copia `window.location.search` (ou pelo menos o `__lovable_token` se existir)
-  - Faz `window.open(url.toString(), '_blank')`
+### Abordagem: Layout Compacto para A4
 
-**Locais a atualizar:**
-- `src/components/services/ServiceDetailSheet.tsx` (onde está “Ver Ficha” e “Ver Etiqueta”)
-- `src/pages/ServiceDetailPage.tsx` (botão que abre ficha)
-- (Opcional) qualquer outro `window.open('/print/...')` encontrado via search.
+Vou reduzir espaçamentos e tamanhos para que todo o conteúdo caiba em ~277mm de altura útil (297mm - 2×10mm de padding).
 
----
-
-### 2) Session Bridge (Supabase) para nova aba de impressão
-**Porquê:** em browsers com storage particionado (muito comum com iframes/preview), a nova aba abre “sem sessão”. O bridge injeta a sessão na nova aba sem colocar tokens na URL.
-
-**2.1) Listener global no app (responde pedidos de sessão)**
-Adicionar no `AuthProvider` (`src/contexts/AuthContext.tsx`) um `window.addEventListener('message', ...)` que:
-- Valida `event.origin === window.location.origin`
-- Se receber `{ type: 'REQUEST_SUPABASE_SESSION' }`:
-  - chama `supabase.auth.getSession()`
-  - se houver `session`, responde para `event.source` com `{ type: 'SUPABASE_SESSION', access_token, refresh_token }`
-- Cleanup no unmount.
-
-**2.2) Hook/efeito nas páginas de impressão (pede sessão ao opener)**
-Em `src/pages/ServicePrintPage.tsx` e `src/pages/ServiceTagPage.tsx`:
-- No mount:
-  - chama `supabase.auth.getSession()`
-  - se **não** houver sessão e `window.opener` existir:
-    - registra listener de message para receber `SUPABASE_SESSION`
-    - manda `window.opener.postMessage({ type: 'REQUEST_SUPABASE_SESSION' }, window.location.origin)`
-    - ao receber tokens, chama `supabase.auth.setSession({ access_token, refresh_token })`
-- UX: mostrar um estado “A verificar sessão…” enquanto tenta o bridge.
-- Timeout opcional (ex.: 3–5s): se não receber sessão, mostrar CTA para Login.
-
-**Segurança:**
-- Não enviar tokens para origem diferente.
-- Só aceitar mensagens do `window.location.origin`.
+| Elemento | Antes | Depois |
+|----------|-------|--------|
+| Margem entre secções | `mb-3` (12px) | `mb-2` (8px) |
+| Separadores | `my-2` (8px cada) | `my-1` (4px cada) |
+| Padding de secções | `p-2`, `p-3` | `p-1.5` |
+| Assinaturas (imagem) | `w-32 h-20` (128×80px) | `w-24 h-16` (96×64px) |
+| Assinaturas (container) | `gap-4 p-3` | `gap-2 p-2` |
+| Títulos secção | `text-sm` | `text-xs font-semibold` |
+| Espaço pós-header | `mb-2` | `mb-1.5` |
 
 ---
 
-### 3) Ajustar proteção de rota para não impedir o bridge
-Hoje as rotas de impressão estão assim (em `src/App.tsx`):
-```tsx
-<Route path="/print/service/:serviceId" element={<ProtectedRoute><ServicePrintPage/></ProtectedRoute>} />
-<Route path="/print/tag/:serviceId" element={<ProtectedRoute><ServiceTagPage/></ProtectedRoute>} />
+## Alterações no Ficheiro
+
+### `src/pages/ServicePrintPage.tsx`
+
+**1. Header (linhas 262-288)**
+- Reduzir `mb-2` → `mb-1.5` no header
+- Reduzir padding do contact info `py-1.5` → `py-1`
+
+**2. Todas as secções (linhas 298-575)**
+- Alterar `mb-3` → `mb-2` em todas as `<section>`
+- Alterar `my-2` → `my-1` em todos os `<Separator>`
+- Alterar títulos `text-sm` → `text-xs` (mantendo `font-semibold`)
+
+**3. Secção de Assinaturas (linhas 543-573)**
+- Reduzir container: `gap-4 p-3` → `gap-2 p-1.5`
+- Reduzir imagem: `w-32 h-20` → `w-24 h-14`
+- Reduzir espaçamento: `space-y-3` → `space-y-2`
+
+**4. Secção Termos/30 dias (linhas 578-589)**
+- Reduzir padding: `p-2` → `p-1.5`
+- Já está `text-xs`, manter
+
+**5. Garantia (linhas 399-416)**
+- Reduzir padding: `p-2` → `p-1.5`
+
+---
+
+## Resumo das Alterações
+
+```text
+Ficheiro: src/pages/ServicePrintPage.tsx
+
+┌─────────────────────────────────────────────────────────────┐
+│  ANTES                           │  DEPOIS                  │
+├─────────────────────────────────────────────────────────────┤
+│  mb-3 (todas secções)            │  mb-2                    │
+│  my-2 (separadores)              │  my-1                    │
+│  text-sm (títulos secção)        │  text-xs font-semibold   │
+│  gap-4 p-3 (assinaturas)         │  gap-2 p-1.5             │
+│  w-32 h-20 (imagem assinatura)   │  w-24 h-14               │
+│  space-y-3 (lista assinaturas)   │  space-y-2               │
+│  py-1.5 (contact info)           │  py-1                    │
+│  p-2 (garantia, termos)          │  p-1.5                   │
+└─────────────────────────────────────────────────────────────┘
 ```
-Isto impede a página de impressão de montar quando a nova aba abre sem sessão (e aí nunca roda o bridge).
-
-**Opção A (recomendada): remover `ProtectedRoute` dessas rotas**
-- Deixar as páginas de impressão montarem.
-- Dentro delas, controlar:
-  - “A verificar sessão…”
-  - Se falhar: “Precisa de login” (botão vai para `/login` com redirect de volta)
-
-**Opção B:** criar um `PrintProtectedRoute` que aguarda um “auth settle” extra e não redireciona imediatamente. (Mais complexo; A é mais simples e resiliente.)
 
 ---
 
-### 4) Melhorar fallback e mensagens (para não parecer “em branco”)
-Em ambas páginas:
-- Se `!authLoading && !isAuthenticated` após tentar o bridge:
-  - Mostrar um bloco claro:
-    - “Sessão não encontrada nesta aba.”
-    - Botão “Fazer login” que navega para `/login` e volta ao `/print/...` depois do login.
-- Se React Query der `error`, mostrar erro + “Tentar novamente”.
+## Impacto Visual
+
+- A ficha mantém a mesma estrutura e legibilidade
+- Todo o conteúdo (incluindo assinaturas e aviso de 30 dias) cabe numa única página A4
+- O aspecto profissional é preservado (apenas mais compacto)
+- Funciona tanto para impressão directa quanto para PDF
 
 ---
 
-### 5) Garantir 4x6 em todos os caminhos de etiqueta
-Já existe `format: [102, 152]` no `ServiceTagPage.tsx`, mas há util antigo:
-- `src/utils/pdfUtils.ts` tem `generateTagPDF()` ainda em **[80, 170]**.
-  - Atualizar para `[102, 152]` para não haver inconsistências em outros pontos (ex.: modal de etiqueta).
+## Ficheiros a Alterar
 
-Também ajustar texto/comentário no `ServiceTagPage.tsx`:
-- “Tag Content - 80mm x 170mm” → “4x6 (102mm x 152mm)”.
+| Ficheiro | Acção | Descrição |
+|----------|-------|-----------|
+| `src/pages/ServicePrintPage.tsx` | Alterar | Reduzir espaçamentos e tamanhos para layout compacto |
 
 ---
 
-## Arquivos que serão mexidos
-1) `src/components/services/ServiceDetailSheet.tsx`  
-2) `src/pages/ServiceDetailPage.tsx`  
-3) `src/contexts/AuthContext.tsx`  
-4) `src/App.tsx`  
-5) `src/pages/ServicePrintPage.tsx`  
-6) `src/pages/ServiceTagPage.tsx`  
-7) `src/utils/pdfUtils.ts`  
-(+ opcional: um helper novo `src/utils/openInNewTab.ts` e/ou `src/hooks/usePrintSessionBridge.ts` para manter o código limpo)
+## Resultado Esperado
 
----
-
-## Como vamos testar (checklist)
-1) No Preview do Lovable (dentro do editor):
-   - Abrir um serviço → clicar **Ver Ficha**:
-     - Nova aba deve mostrar “A verificar sessão…” por instantes e depois a Ficha A4 completa.
-     - Botões **Imprimir** e **Baixar PDF** funcionam.
-   - Clicar **Ver Etiqueta**:
-     - Renderiza etiqueta em 4x6 (102x152mm), com QR code e botões funcionando.
-2) No site publicado (top-level):
-   - Repetir os mesmos passos e confirmar que não depende do `__lovable_token`.
-3) Caso sem sessão:
-   - Abrir manualmente `/print/service/:id` em janela anónima:
-     - Deve mostrar CTA de login (não “branco”).
-
----
-
-## Riscos / Observações
-- O bridge depende de `window.opener`. Se o browser abrir a aba com `noopener` automaticamente, o fallback (CTA login) resolve.
-- Como estamos a enviar `refresh_token` via `postMessage`, a validação estrita de `origin` é obrigatória.
-
-Se aprovar este plano, na implementação eu foco primeiro em: (1) preservar query no `window.open`, (2) session bridge, (3) remover `ProtectedRoute` das rotas de print, porque isso normalmente resolve o “branco” de forma definitiva no preview e em browsers com storage particionado.
+1. ✅ Ficha A4 com TODO o conteúdo numa única página
+2. ✅ Aviso de 30 dias visível na mesma página (não em página separada)
+3. ✅ Assinaturas legíveis mas mais compactas
+4. ✅ PDF gerado também com página única
+5. ✅ Impressão directa sem segunda página em branco
