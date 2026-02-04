@@ -58,6 +58,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment, type ServicePhoto, type ServiceSignature } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -320,11 +321,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <SheetTitle className="font-mono text-xl">{service.code}</SheetTitle>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => window.open(`/print/service/${service.id}`, '_blank')}>
+                  <Button variant="outline" size="sm" onClick={() => openInNewTabPreservingQuery(`/print/service/${service.id}`)}>
                     <FileText className="h-4 w-4 mr-1" />
                     Ver Ficha
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}>
+                  <Button variant="outline" size="sm" onClick={() => openInNewTabPreservingQuery(`/print/tag/${service.id}`)}>
                     <Tag className="h-4 w-4 mr-1" />
                     Ver Etiqueta
                   </Button>

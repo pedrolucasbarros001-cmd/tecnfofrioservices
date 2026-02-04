@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Loader2, Printer, ArrowLeft, Link as LinkIcon } from 'lucide-react';
+import { Download, Loader2, Printer, ArrowLeft, Link as LinkIcon, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import type { Service, Customer } from '@/types/database';
@@ -10,6 +10,7 @@ import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { generatePDF } from '@/utils/pdfUtils';
 import { COMPANY_INFO } from '@/utils/companyInfo';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrintSessionBridge } from '@/hooks/usePrintSessionBridge';
 
 export default function ServiceTagPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -17,7 +18,10 @@ export default function ServiceTagPage() {
   const tagRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // CRITICAL: Wait for auth before making any queries
+  // Session bridge for new tab authentication
+  const { isSettling: sessionSettling, sessionRestored } = usePrintSessionBridge();
+
+  // Auth state from context
   const { isAuthenticated, loading: authLoading } = useAuth();
 
   // Fetch service data with customer - ONLY after auth is confirmed
@@ -61,14 +65,38 @@ export default function ServiceTagPage() {
     }
   };
 
-  // CRITICAL: Show loading while auth is being restored (fixes blank page in new tab)
-  if (authLoading || isLoading) {
+  // Combined loading state: auth settling + session bridge + query loading
+  const isLoadingState = authLoading || sessionSettling || isLoading;
+  
+  // If session bridge is done and we're still not authenticated, show login prompt
+  const showLoginPrompt = !sessionSettling && !authLoading && !isAuthenticated;
+  
+  if (showLoginPrompt) {
+    return (
+      <div className="print-tag-page">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+          <LogIn className="h-12 w-12 text-muted-foreground" />
+          <p className="text-muted-foreground text-center">
+            Sessão não encontrada nesta aba.
+          </p>
+          <Link to={`/login?redirect=/print/tag/${serviceId}`}>
+            <Button>
+              <LogIn className="h-4 w-4 mr-2" />
+              Fazer Login
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  
+  if (isLoadingState) {
     return (
       <div className="print-tag-page">
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">
-            {authLoading ? 'A verificar sessão...' : 'A carregar etiqueta...'}
+            {sessionSettling ? 'A verificar sessão...' : authLoading ? 'A autenticar...' : 'A carregar etiqueta...'}
           </span>
         </div>
       </div>
@@ -117,7 +145,7 @@ export default function ServiceTagPage() {
         </div>
       </div>
 
-      {/* Tag Content - 80mm x 170mm */}
+      {/* Tag Content - 4x6 inches (102mm x 152mm) */}
       <div ref={tagRef} className="print-tag-container">
         {/* Top accent bar */}
         <div className="h-2 bg-primary rounded-t-sm -mx-[4mm] -mt-[4mm]" />

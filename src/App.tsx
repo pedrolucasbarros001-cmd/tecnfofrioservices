@@ -51,17 +51,9 @@ const App = () => (
             <Route path="/login" element={<LoginPage />} />
             <Route path="/tv-monitor" element={<TVMonitorPage />} />
             
-            {/* Print pages - protected but outside AppLayout */}
-            <Route path="/print/service/:serviceId" element={
-              <ProtectedRoute>
-                <ServicePrintPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/print/tag/:serviceId" element={
-              <ProtectedRoute>
-                <ServiceTagPage />
-              </ProtectedRoute>
-            } />
+            {/* Print pages - outside AppLayout, handle own auth via session bridge */}
+            <Route path="/print/service/:serviceId" element={<ServicePrintPage />} />
+            <Route path="/print/tag/:serviceId" element={<ServiceTagPage />} />
             
             {/* Protected routes with layout */}
             <Route

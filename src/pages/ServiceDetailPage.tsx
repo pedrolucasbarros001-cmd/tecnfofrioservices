@@ -24,6 +24,7 @@ interface ActivityLog {
 }
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { useAuth } from '@/contexts/AuthContext';
+import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -166,7 +167,7 @@ export default function ServiceDetailPage() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => window.open(`/print/service/${serviceId}`, '_blank')}
+            onClick={() => openInNewTabPreservingQuery(`/print/service/${serviceId}`)}
           >
             <Printer className="h-4 w-4 mr-2" />
             Ficha
