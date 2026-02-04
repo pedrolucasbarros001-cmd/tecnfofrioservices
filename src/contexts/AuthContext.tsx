@@ -59,8 +59,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Session bridge listener: respond to print pages requesting session
+    const handleSessionRequest = async (event: MessageEvent) => {
+      // Security: only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
+        console.log('[AuthContext] Received session request from new tab');
+        
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session && event.source) {
+            console.log('[AuthContext] Sending session to new tab');
+            (event.source as Window).postMessage(
+              {
+                type: 'SUPABASE_SESSION',
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+              },
+              window.location.origin
+            );
+          } else {
+            console.log('[AuthContext] No session to share');
+          }
+        } catch (err) {
+          console.error('[AuthContext] Error responding to session request:', err);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleSessionRequest);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener('message', handleSessionRequest);
     };
   }, []);
 

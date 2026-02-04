@@ -109,13 +109,13 @@ export async function generateSheetPDF(element: HTMLElement, filename: string): 
 }
 
 /**
- * Generate 80x170mm PDF for service tags
+ * Generate 4x6 inch (102x152mm) PDF for service tags
  */
 export async function generateTagPDF(element: HTMLElement, filename: string): Promise<void> {
   return generatePDF({
     element,
     filename,
-    format: [80, 170],
+    format: [102, 152],
     orientation: 'portrait',
     margin: 0
   });

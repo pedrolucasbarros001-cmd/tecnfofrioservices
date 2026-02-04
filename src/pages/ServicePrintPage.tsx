@@ -1,9 +1,9 @@
 import { useRef, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, MapPin, Phone, Mail } from 'lucide-react';
+import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, MapPin, Phone, Mail, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { generatePDF } from '@/utils/pdfUtils';
 import { COMPANY_INFO } from '@/utils/companyInfo';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrintSessionBridge } from '@/hooks/usePrintSessionBridge';
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -37,7 +38,10 @@ export default function ServicePrintPage() {
   const printSheetRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // CRITICAL: Wait for auth before making any queries
+  // Session bridge for new tab authentication
+  const { isSettling: sessionSettling, sessionRestored } = usePrintSessionBridge();
+  
+  // Auth state from context
   const { isAuthenticated, loading: authLoading } = useAuth();
 
   // Fetch service data with customer - ONLY after auth is confirmed
@@ -107,6 +111,37 @@ export default function ServicePrintPage() {
     enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
+  // Parse pricing_description to extract subtotal and IVA - must be before any returns
+  const pricingDetails = useMemo(() => {
+    if (!service?.pricing_description) {
+      return { subtotal: service?.labor_cost || 0, iva: service?.parts_cost || 0, hasItemizedPricing: false };
+    }
+    
+    try {
+      const parsed = JSON.parse(service.pricing_description);
+      if (parsed.items && Array.isArray(parsed.items)) {
+        const subtotal = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number }) => {
+          const qty = item.qty || item.quantity || 1;
+          const price = item.price || item.unit_price || 0;
+          return sum + (qty * price);
+        }, 0);
+        
+        const iva = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number; tax?: number; tax_rate?: number }) => {
+          const qty = item.qty || item.quantity || 1;
+          const price = item.price || item.unit_price || 0;
+          const tax = item.tax || item.tax_rate || 0;
+          return sum + ((qty * price) * (tax / 100));
+        }, 0);
+        
+        return { subtotal, iva, hasItemizedPricing: true };
+      }
+    } catch {
+      // Fallback to existing fields
+    }
+    
+    return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
+  }, [service?.pricing_description, service?.labor_cost, service?.parts_cost]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -125,14 +160,38 @@ export default function ServicePrintPage() {
     }
   };
 
-  // CRITICAL: Show loading while auth is being restored (fixes blank page in new tab)
-  if (authLoading || loadingService) {
+  // Combined loading state: auth settling + session bridge + query loading
+  const isLoading = authLoading || sessionSettling || loadingService;
+  
+  // If session bridge is done and we're still not authenticated, show login prompt
+  const showLoginPrompt = !sessionSettling && !authLoading && !isAuthenticated;
+  
+  if (showLoginPrompt) {
+    return (
+      <div className="print-page">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+          <LogIn className="h-12 w-12 text-muted-foreground" />
+          <p className="text-muted-foreground text-center">
+            Sessão não encontrada nesta aba.
+          </p>
+          <Link to={`/login?redirect=/print/service/${serviceId}`}>
+            <Button>
+              <LogIn className="h-4 w-4 mr-2" />
+              Fazer Login
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  
+  if (isLoading) {
     return (
       <div className="print-page">
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">
-            {authLoading ? 'A verificar sessão...' : 'A carregar ficha...'}
+            {sessionSettling ? 'A verificar sessão...' : authLoading ? 'A autenticar...' : 'A carregar ficha...'}
           </span>
         </div>
       </div>
@@ -159,37 +218,6 @@ export default function ServicePrintPage() {
   const usedParts = parts.filter(p => !p.is_requested);
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-
-  // Parse pricing_description to extract subtotal and IVA
-  const pricingDetails = useMemo(() => {
-    if (!service.pricing_description) {
-      return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
-    }
-    
-    try {
-      const parsed = JSON.parse(service.pricing_description);
-      if (parsed.items && Array.isArray(parsed.items)) {
-        const subtotal = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number }) => {
-          const qty = item.qty || item.quantity || 1;
-          const price = item.price || item.unit_price || 0;
-          return sum + (qty * price);
-        }, 0);
-        
-        const iva = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number; tax?: number; tax_rate?: number }) => {
-          const qty = item.qty || item.quantity || 1;
-          const price = item.price || item.unit_price || 0;
-          const tax = item.tax || item.tax_rate || 0;
-          return sum + ((qty * price) * (tax / 100));
-        }, 0);
-        
-        return { subtotal, iva, hasItemizedPricing: true };
-      }
-    } catch {
-      // Fallback to existing fields
-    }
-    
-    return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
-  }, [service.pricing_description, service.labor_cost, service.parts_cost]);
 
   return (
     <div className="print-page">
