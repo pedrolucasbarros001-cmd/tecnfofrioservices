@@ -1,181 +1,163 @@
 
 
-# Plano: Redesenhar Etiqueta + Garantir Persistência de Dados
+# Plano: Remover Histórico da Oficina ADM + Push Notifications Nativas
 
 ## Objectivo
-1. Redesenhar a etiqueta de impressão para corresponder exactamente à imagem de referência
-2. Garantir que nenhum conteúdo desaparece ao navegar entre páginas (colaboradores, etc.)
+1. **Remover** a secção "Histórico de Atividades" da página `/oficina` (administrador)
+2. **Manter** o feed de atividades na página `/tv-monitor` (já está no footer)
+3. **Implementar Push Notifications** para que os utilizadores recebam alertas reais nos telemóveis
 
 ---
 
-## Parte 1: Redesenho da Etiqueta (Baseado na Imagem)
+## Parte 1: Remover Histórico da Página Oficina (Admin)
 
-### Design Pretendido (Análise da Imagem)
+### Alterações em `src/pages/OficinaPage.tsx`
+
+**Remover:**
+- Importação do hook `useActivityLogs`
+- Query `const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });`
+- Toda a secção `<Card>` do "Histórico de Atividades" (linhas 208-242)
+
+**Resultado:** A página ficará apenas com o grid de serviços e botões de acção.
+
+---
+
+## Parte 2: Push Notifications Nativas
+
+### Arquitectura
 
 ```text
-┌─────────────────────────────────┐
-│ ████████████████████████████████│  <- Barra azul grossa no topo
-│                                 │
-│         [LOGO TECNOFRIO]        │  <- Logo centralizado
-│                                 │
-│         ┌───────────────┐       │
-│         │               │       │  <- QR Code grande (140px)
-│         │    QR CODE    │       │     com borda arredondada
-│         │               │       │
-│         └───────────────┘       │
-│                                 │
-│          TF-00007               │  <- Código grande, bold, mono
-│                                 │
-│  Cliente: Pedro                 │  <- Campos inline (label + valor)
-│  Equipamento: Frigo             │
-│  Telefone: 913460132            │
-│                                 │
-│  Leia o QR Code para ver        │  <- Texto rodapé simples
-│  detalhes e histórico online    │     (sem URL, sem empresa)
-│                                 │
-│ ─────────────────────────────── │  <- Linha fina no final
-└─────────────────────────────────┘
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Frontend      │────▶│  Supabase DB     │────▶│  Edge Function  │
+│   (Browser)     │     │  (notifications) │     │  (send-push)    │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+        │                                                │
+        │ 1. Request Permission                          │
+        │ 2. Get Push Subscription                       │
+        │ 3. Store subscription in DB                    │
+        │                                                ▼
+        │                                        ┌─────────────────┐
+        │◀───────────────────────────────────────│  Web Push API   │
+        │            Push Notification           │  (Firebase/etc) │
+        └────────────────────────────────────────└─────────────────┘
 ```
 
-### Diferenças a Corrigir
+### Componentes a Criar
 
-| Elemento | Actual | Pretendido |
-|----------|--------|------------|
-| Barra azul | `h-2` (8px) | `h-3` (12px) |
-| QR Code | `size={100}` | `size={140}` |
-| Separador entre QR e código | Existe | Remover |
-| Campo Marca/Modelo | Existe | Remover |
-| Campos | Separados (label + p) | Inline (label: valor) |
-| Secção URL + Empresa | Existe | Remover |
-| Texto rodapé | "Leia o QR ou aceda:" | "Leia o QR Code para ver detalhes e histórico online" |
-| Linha final | Não existe | Adicionar |
-
-### Ficheiros a Alterar
-
-1. **`src/pages/ServiceTagPage.tsx`** - Página dedicada de impressão
-2. **`src/components/modals/ServiceTagModal.tsx`** - Modal de pré-visualização
-
----
-
-## Parte 2: Garantir Persistência de Dados
-
-### Problema Identificado
-
-O utilizador reportou que a página "Colaboradores" mostrava "nenhum colaborador" momentaneamente. Isto pode ocorrer por:
-
-1. **Estado de loading** - A query ainda não terminou
-2. **Hot Module Replacement (HMR)** - React reinicia componentes durante desenvolvimento
-3. **Sessão não estabelecida** - RLS bloqueia dados antes da autenticação
-
-### Dados Confirmados
-
-A base de dados contém **4 colaboradores** registados:
-- Renata Goulart
-- Lucas Barros  
-- Pedro Lucas
-- nloatelli
-
-### Soluções
-
-1. **Melhorar UX durante loading** - Mostrar skeleton/spinner claro
-2. **Adicionar `staleTime`** - Manter dados em cache por mais tempo
-3. **Evitar flash "vazio"** - Só mostrar "nenhum encontrado" após loading terminar
-
-### Ficheiros a Alterar
-
-1. **`src/pages/ColaboradoresPage.tsx`** - Adicionar `staleTime` e melhorar loading
-
----
-
-## Implementação Detalhada
-
-### 1. ServiceTagPage.tsx - Novo Layout
-
-```tsx
-{/* Tag Content - Matching Reference Image */}
-<div ref={tagRef} className="print-tag-container">
-  {/* Top accent bar - THICKER */}
-  <div className="h-3 bg-primary -mx-[4mm] -mt-[4mm]" />
-  
-  {/* Logo */}
-  <div className="flex justify-center mt-6 mb-6">
-    <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-12 object-contain"/>
-  </div>
-
-  {/* QR Code - LARGER */}
-  <div className="flex justify-center mb-6">
-    <div className="p-3 bg-white border border-gray-200 rounded-lg">
-      <QRCodeSVG value={qrUrl} size={140} level="H" />
-    </div>
-  </div>
-
-  {/* Service Code - Large */}
-  <div className="text-center mb-6">
-    <p className="text-3xl font-bold font-mono tracking-wide">
-      {service.code}
-    </p>
-  </div>
-
-  {/* Customer Info - INLINE format */}
-  <div className="space-y-2 text-base px-2">
-    <p>
-      <span className="text-gray-500 italic">Cliente:</span>{' '}
-      <span className="font-medium">{service.customer?.name || 'N/A'}</span>
-    </p>
-    <p>
-      <span className="text-gray-500 italic">Equipamento:</span>{' '}
-      <span className="font-medium">{service.appliance_type || 'N/A'}</span>
-    </p>
-    <p>
-      <span className="text-gray-500 italic">Telefone:</span>{' '}
-      <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
-    </p>
-  </div>
-
-  {/* Footer text - SIMPLE */}
-  <div className="mt-6 text-center">
-    <p className="text-sm text-gray-500">
-      Leia o QR Code para ver detalhes e histórico online
-    </p>
-  </div>
-
-  {/* Bottom line */}
-  <div className="mt-4 border-t border-gray-200" />
-</div>
+#### 1. Nova tabela `push_subscriptions`
+```sql
+CREATE TABLE push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, endpoint)
+);
 ```
 
-### 2. ServiceTagModal.tsx - Mesmo Layout (Consistência)
+#### 2. Service Worker (`public/sw.js`)
+```javascript
+self.addEventListener('push', function(event) {
+  const data = event.data?.json() || {};
+  const options = {
+    body: data.message,
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    data: { url: data.url || '/' }
+  };
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'TECNOFRIO', options)
+  );
+});
 
-Aplicar o mesmo design para manter consistência entre modal e página dedicada.
-
-### 3. ColaboradoresPage.tsx - Melhorar Query
-
-```tsx
-const { data: users = [], isLoading, refetch } = useQuery({
-  queryKey: ['collaborators'],
-  queryFn: async () => { /* ... */ },
-  staleTime: 1000 * 60 * 5, // 5 minutos - evita refetch desnecessário
-  refetchOnWindowFocus: false, // Não refetch ao voltar à janela
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data.url));
 });
 ```
 
+#### 3. Hook `usePushNotifications.ts`
+```typescript
+// Responsável por:
+// - Verificar suporte do browser
+// - Pedir permissão
+// - Registar service worker
+// - Obter subscription
+// - Guardar subscription na BD
+```
+
+#### 4. Componente de prompt para permissão
+Mostrar um banner/toast amigável pedindo permissão na primeira vez que o utilizador entra.
+
+#### 5. Edge Function `send-push`
+Quando uma notificação é criada na BD, envia push para os dispositivos registados.
+
+#### 6. Database Trigger
+Trigger que chama a edge function quando INSERT em `notifications`.
+
 ---
 
-## Resumo de Alterações
+## Ficheiros a Criar/Alterar
 
-| Ficheiro | Acção |
-|----------|-------|
-| `src/pages/ServiceTagPage.tsx` | Redesenhar layout conforme imagem |
-| `src/components/modals/ServiceTagModal.tsx` | Aplicar mesmo design |
-| `src/pages/ColaboradoresPage.tsx` | Adicionar `staleTime` e melhorar loading |
+| Ficheiro | Acção | Descrição |
+|----------|-------|-----------|
+| `src/pages/OficinaPage.tsx` | Alterar | Remover secção de histórico |
+| `public/sw.js` | Criar | Service Worker para push |
+| `src/hooks/usePushNotifications.ts` | Criar | Hook para gerir push |
+| `src/components/shared/PushPermissionBanner.tsx` | Criar | Banner para pedir permissão |
+| `src/components/layouts/AppLayout.tsx` | Alterar | Integrar banner de push |
+| `supabase/functions/send-push/index.ts` | Criar | Edge function para enviar push |
+| Migração SQL | Criar | Tabela push_subscriptions + trigger |
+
+---
+
+## Fluxo de Implementação
+
+### Etapa 1: Remover Histórico da Oficina
+- Alterar `OficinaPage.tsx`
+
+### Etapa 2: Infraestrutura Push
+- Criar tabela `push_subscriptions`
+- Criar Service Worker
+- Criar hook `usePushNotifications`
+
+### Etapa 3: UI de Permissão
+- Criar banner/componente de permissão
+- Integrar no AppLayout
+
+### Etapa 4: Envio de Push
+- Criar edge function `send-push`
+- Configurar trigger na tabela `notifications`
+- Gerar VAPID keys para Web Push
+
+---
+
+## Notas Técnicas
+
+### VAPID Keys
+Para Web Push funcionar, precisamos de gerar um par de chaves VAPID:
+- Chave pública: será usada no frontend
+- Chave privada: será um secret na edge function
+
+### Compatibilidade
+- Push Notifications funcionam em:
+  - Chrome (Android/Desktop)
+  - Firefox (Desktop/Android)
+  - Safari 16+ (macOS/iOS 16.4+)
+  - Edge
+
+### Permissões
+O browser só permite pedir permissão após interacção do utilizador (clique).
 
 ---
 
 ## Resultado Esperado
 
-1. Etiqueta com layout exactamente igual à imagem de referência
-2. QR Code maior e mais legível
-3. Informações simplificadas (sem marca/modelo, sem URL escrita)
-4. Colaboradores nunca "desaparecem" - dados persistem em cache
-5. Loading claro enquanto dados carregam
+1. ✅ Página Oficina (admin) sem o card de histórico de atividades
+2. ✅ Monitor TV mantém o feed de atividades no footer
+3. ✅ Utilizadores podem receber notificações push nos telemóveis
+4. ✅ Banner amigável pede permissão (uma vez)
+5. ✅ Notificações do sistema (peça chegou, serviço atribuído, etc.) aparecem como push
 
