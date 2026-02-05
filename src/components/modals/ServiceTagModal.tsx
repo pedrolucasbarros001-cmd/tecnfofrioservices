@@ -10,7 +10,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import type { Service } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { generatePDF } from '@/utils/pdfUtils';
@@ -53,60 +52,67 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>
 
-          {/* Tag content - preview on screen */}
-          <div ref={tagRef} className="print-tag border rounded-lg p-4 bg-white">
-            <Separator className="bg-primary h-1 mb-4" />
-            
-            <div className="text-center space-y-3">
-              {/* Logo/Brand */}
-              <div className="flex items-center justify-center">
-                <img 
-                  src={tecnofrioLogoFull} 
-                  alt="TECNOFRIO" 
-                  className="h-10 object-contain"
-                />
-              </div>
-              
-              {/* QR Code */}
-              <div className="flex justify-center py-2">
-                <QRCodeSVG
-                  value={qrData}
-                  size={140}
-                  level="H"
-                  includeMargin={false}
-                  className="border p-2 rounded-lg bg-white"
-                />
-              </div>
-              
-              {/* Service Code */}
-              <p className="text-2xl font-mono font-bold tracking-wider text-foreground">
-                {service.code}
-              </p>
-              
-              {/* Service Details */}
-              <div className="text-left space-y-1 px-2 text-sm">
-                <p>
-                  <span className="text-muted-foreground">Cliente:</span>{' '}
-                  <span className="font-medium text-foreground">{service.customer?.name || 'N/A'}</span>
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Equipamento:</span>{' '}
-                  <span className="font-medium text-foreground">
-                    {[service.appliance_type, service.brand].filter(Boolean).join(' ') || 'N/A'}
-                  </span>
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Telefone:</span>{' '}
-                  <span className="font-medium text-foreground">{service.customer?.phone || 'N/A'}</span>
-                </p>
-              </div>
-              
-              {/* Footer Note */}
-              <p className="text-xs text-muted-foreground px-2 pt-1 border-t">
-                Leia o QR Code para ver detalhes e histórico online
-              </p>
-            </div>
-          </div>
+         {/* Tag content - preview on screen - matching reference image */}
+         <div ref={tagRef} className="print-tag border rounded-lg p-4 bg-white">
+           {/* Top accent bar - THICKER */}
+           <div className="h-3 bg-primary -mx-4 -mt-4 rounded-t-lg" />
+           
+           {/* Logo */}
+           <div className="flex justify-center mt-6 mb-6">
+             <img 
+               src={tecnofrioLogoFull} 
+               alt="TECNOFRIO" 
+               className="h-12 object-contain"
+             />
+           </div>
+           
+           {/* QR Code - LARGER */}
+           {/* QR Code - LARGER */}
+           <div className="flex justify-center mb-6">
+             <div className="p-3 bg-background border rounded-lg">
+               <QRCodeSVG
+                 value={qrData}
+                 size={140}
+                 level="H"
+                 includeMargin={false}
+               />
+             </div>
+           </div>
+           
+           {/* Service Code - Large */}
+           <div className="text-center mb-6">
+             <p className="text-3xl font-mono font-bold tracking-wide text-foreground">
+               {service.code}
+             </p>
+           </div>
+           
+           {/* Customer Info - INLINE format */}
+           <div className="space-y-2 text-base px-2">
+             <p>
+               <span className="text-muted-foreground italic">Cliente:</span>{' '}
+               <span className="font-medium text-foreground">{service.customer?.name || 'N/A'}</span>
+             </p>
+             <p>
+               <span className="text-muted-foreground italic">Equipamento:</span>{' '}
+               <span className="font-medium text-foreground">{service.appliance_type || 'N/A'}</span>
+             </p>
+             <p>
+               <span className="text-muted-foreground italic">Telefone:</span>{' '}
+               <span className="font-medium text-foreground">{service.customer?.phone || 'N/A'}</span>
+             </p>
+           </div>
+           
+           {/* Footer text - SIMPLE */}
+           <div className="mt-6 text-center">
+             <p className="text-sm text-muted-foreground">
+               Leia o QR Code para ver detalhes e histórico online
+             </p>
+           </div>
+           
+           {/* Bottom line */}
+           {/* Bottom line */}
+           <div className="mt-4 border-t border-border" />
+         </div>
 
           <DialogFooter className="gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

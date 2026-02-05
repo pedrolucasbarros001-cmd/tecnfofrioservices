@@ -2,13 +2,12 @@ import { useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Loader2, Printer, ArrowLeft, Link as LinkIcon, LogIn } from 'lucide-react';
+import { Download, Loader2, Printer, ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import type { Service, Customer } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import { generatePDF } from '@/utils/pdfUtils';
-import { COMPANY_INFO } from '@/utils/companyInfo';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrintSessionBridge } from '@/hooks/usePrintSessionBridge';
 
@@ -147,86 +146,64 @@ export default function ServiceTagPage() {
 
       {/* Tag Content - 4x6 inches (102mm x 152mm) */}
       <div ref={tagRef} className="print-tag-container">
-        {/* Top accent bar */}
-        <div className="h-2 bg-primary rounded-t-sm -mx-[4mm] -mt-[4mm]" />
-        
-        {/* Logo */}
-        <div className="flex justify-center mt-4 mb-4">
-          <img 
-            src={tecnofrioLogoFull} 
-            alt="TECNOFRIO" 
-            className="h-8 object-contain"
-          />
-        </div>
-
-        {/* QR Code */}
-        <div className="flex justify-center mb-3">
-          <div className="p-2 bg-white border border-gray-200 rounded">
-            <QRCodeSVG 
-              value={qrUrl} 
-              size={100} 
-              level="H"
-              includeMargin={false}
-            />
-          </div>
-        </div>
-
-        {/* Service Code - Large */}
-        <div className="text-center mb-4">
-          <p className="text-2xl font-bold font-mono tracking-wide">
-            {service.code}
-          </p>
-        </div>
-
-        {/* Separator */}
-        <div className="border-t border-gray-300 my-3" />
-
-        {/* Customer & Equipment Info */}
-        <div className="space-y-2 text-sm">
-          <div>
-            <span className="text-gray-500">Cliente:</span>
-            <p className="font-medium truncate">{service.customer?.name || 'N/A'}</p>
-          </div>
-          
-          <div>
-            <span className="text-gray-500">Equipamento:</span>
-            <p className="font-medium truncate">
-              {service.appliance_type || 'N/A'}
-            </p>
-          </div>
-          
-          <div>
-            <span className="text-gray-500">Marca/Modelo:</span>
-            <p className="font-medium truncate">
-              {[service.brand, service.model].filter(Boolean).join(' ') || 'N/A'}
-            </p>
-          </div>
-          
-          <div>
-            <span className="text-gray-500">Telefone:</span>
-            <p className="font-medium">{service.customer?.phone || 'N/A'}</p>
-          </div>
-        </div>
-
-        {/* Separator */}
-        <div className="border-t border-gray-300 my-3" />
-
-        {/* Link for manual access */}
-        <div className="text-center space-y-1">
-          <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
-            <LinkIcon className="h-3 w-3" />
-            <span>Leia o QR ou aceda:</span>
-          </div>
-          <p className="text-xs font-mono text-primary break-all">
-            {qrUrl}
-          </p>
-        </div>
-
-        {/* Company Info */}
-        <div className="mt-4 pt-3 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500">{COMPANY_INFO.name}</p>
-          <p className="text-xs text-gray-500">{COMPANY_INFO.phone}</p>
-        </div>
+       {/* Top accent bar - THICKER */}
+       <div className="h-3 bg-primary -mx-[4mm] -mt-[4mm]" />
+       
+       {/* Logo */}
+       <div className="flex justify-center mt-6 mb-6">
+         <img 
+           src={tecnofrioLogoFull} 
+           alt="TECNOFRIO" 
+           className="h-12 object-contain"
+         />
+       </div>
+ 
+       {/* QR Code - LARGER */}
+       {/* QR Code - LARGER */}
+       <div className="flex justify-center mb-6">
+         <div className="p-3 bg-background border rounded-lg">
+           <QRCodeSVG 
+             value={qrUrl} 
+             size={140} 
+             level="H"
+             includeMargin={false}
+           />
+         </div>
+       </div>
+ 
+       {/* Service Code - Large */}
+       <div className="text-center mb-6">
+         <p className="text-3xl font-bold font-mono tracking-wide">
+           {service.code}
+         </p>
+       </div>
+ 
+       {/* Customer Info - INLINE format */}
+       <div className="space-y-2 text-base px-2">
+         <p>
+           <span className="text-muted-foreground italic">Cliente:</span>{' '}
+           <span className="font-medium">{service.customer?.name || 'N/A'}</span>
+         </p>
+         <p>
+           <span className="text-muted-foreground italic">Equipamento:</span>{' '}
+           <span className="font-medium">{service.appliance_type || 'N/A'}</span>
+         </p>
+         <p>
+           <span className="text-muted-foreground italic">Telefone:</span>{' '}
+           <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
+         </p>
+       </div>
+ 
+       {/* Footer text - SIMPLE */}
+       <div className="mt-6 text-center">
+         <p className="text-sm text-muted-foreground">
+           Leia o QR Code para ver detalhes e histórico online
+         </p>
+       </div>
+ 
+       {/* Bottom line */}
+       {/* Bottom line */}
+       <div className="mt-4 border-t border-border" />
       </div>
     </div>
   );
