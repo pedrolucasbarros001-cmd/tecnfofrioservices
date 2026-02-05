@@ -1,105 +1,181 @@
 
-# Plano: Ajustar Ficha A4 para Caber Tudo numa Única Página
 
-## Problema Identificado
+# Plano: Redesenhar Etiqueta + Garantir Persistência de Dados
 
-O conteúdo da ficha A4 excede 297mm de altura, causando overflow para uma segunda página. O aviso de 30 dias (secção final) acaba por aparecer isolado numa segunda folha.
-
-**Causas:**
-- Espaçamentos (`mb-3`, `my-2`) demasiado generosos
-- Assinaturas ocupam muito espaço vertical (`w-32 h-20` = 80px de altura cada)
-- Separadores (`<Separator>`) adicionam altura extra
-- Tamanhos de fonte em alguns títulos (`text-sm`) podem ser reduzidos
+## Objectivo
+1. Redesenhar a etiqueta de impressão para corresponder exactamente à imagem de referência
+2. Garantir que nenhum conteúdo desaparece ao navegar entre páginas (colaboradores, etc.)
 
 ---
 
-## Estratégia de Solução
+## Parte 1: Redesenho da Etiqueta (Baseado na Imagem)
 
-### Abordagem: Layout Compacto para A4
-
-Vou reduzir espaçamentos e tamanhos para que todo o conteúdo caiba em ~277mm de altura útil (297mm - 2×10mm de padding).
-
-| Elemento | Antes | Depois |
-|----------|-------|--------|
-| Margem entre secções | `mb-3` (12px) | `mb-2` (8px) |
-| Separadores | `my-2` (8px cada) | `my-1` (4px cada) |
-| Padding de secções | `p-2`, `p-3` | `p-1.5` |
-| Assinaturas (imagem) | `w-32 h-20` (128×80px) | `w-24 h-16` (96×64px) |
-| Assinaturas (container) | `gap-4 p-3` | `gap-2 p-2` |
-| Títulos secção | `text-sm` | `text-xs font-semibold` |
-| Espaço pós-header | `mb-2` | `mb-1.5` |
-
----
-
-## Alterações no Ficheiro
-
-### `src/pages/ServicePrintPage.tsx`
-
-**1. Header (linhas 262-288)**
-- Reduzir `mb-2` → `mb-1.5` no header
-- Reduzir padding do contact info `py-1.5` → `py-1`
-
-**2. Todas as secções (linhas 298-575)**
-- Alterar `mb-3` → `mb-2` em todas as `<section>`
-- Alterar `my-2` → `my-1` em todos os `<Separator>`
-- Alterar títulos `text-sm` → `text-xs` (mantendo `font-semibold`)
-
-**3. Secção de Assinaturas (linhas 543-573)**
-- Reduzir container: `gap-4 p-3` → `gap-2 p-1.5`
-- Reduzir imagem: `w-32 h-20` → `w-24 h-14`
-- Reduzir espaçamento: `space-y-3` → `space-y-2`
-
-**4. Secção Termos/30 dias (linhas 578-589)**
-- Reduzir padding: `p-2` → `p-1.5`
-- Já está `text-xs`, manter
-
-**5. Garantia (linhas 399-416)**
-- Reduzir padding: `p-2` → `p-1.5`
-
----
-
-## Resumo das Alterações
+### Design Pretendido (Análise da Imagem)
 
 ```text
-Ficheiro: src/pages/ServicePrintPage.tsx
+┌─────────────────────────────────┐
+│ ████████████████████████████████│  <- Barra azul grossa no topo
+│                                 │
+│         [LOGO TECNOFRIO]        │  <- Logo centralizado
+│                                 │
+│         ┌───────────────┐       │
+│         │               │       │  <- QR Code grande (140px)
+│         │    QR CODE    │       │     com borda arredondada
+│         │               │       │
+│         └───────────────┘       │
+│                                 │
+│          TF-00007               │  <- Código grande, bold, mono
+│                                 │
+│  Cliente: Pedro                 │  <- Campos inline (label + valor)
+│  Equipamento: Frigo             │
+│  Telefone: 913460132            │
+│                                 │
+│  Leia o QR Code para ver        │  <- Texto rodapé simples
+│  detalhes e histórico online    │     (sem URL, sem empresa)
+│                                 │
+│ ─────────────────────────────── │  <- Linha fina no final
+└─────────────────────────────────┘
+```
 
-┌─────────────────────────────────────────────────────────────┐
-│  ANTES                           │  DEPOIS                  │
-├─────────────────────────────────────────────────────────────┤
-│  mb-3 (todas secções)            │  mb-2                    │
-│  my-2 (separadores)              │  my-1                    │
-│  text-sm (títulos secção)        │  text-xs font-semibold   │
-│  gap-4 p-3 (assinaturas)         │  gap-2 p-1.5             │
-│  w-32 h-20 (imagem assinatura)   │  w-24 h-14               │
-│  space-y-3 (lista assinaturas)   │  space-y-2               │
-│  py-1.5 (contact info)           │  py-1                    │
-│  p-2 (garantia, termos)          │  p-1.5                   │
-└─────────────────────────────────────────────────────────────┘
+### Diferenças a Corrigir
+
+| Elemento | Actual | Pretendido |
+|----------|--------|------------|
+| Barra azul | `h-2` (8px) | `h-3` (12px) |
+| QR Code | `size={100}` | `size={140}` |
+| Separador entre QR e código | Existe | Remover |
+| Campo Marca/Modelo | Existe | Remover |
+| Campos | Separados (label + p) | Inline (label: valor) |
+| Secção URL + Empresa | Existe | Remover |
+| Texto rodapé | "Leia o QR ou aceda:" | "Leia o QR Code para ver detalhes e histórico online" |
+| Linha final | Não existe | Adicionar |
+
+### Ficheiros a Alterar
+
+1. **`src/pages/ServiceTagPage.tsx`** - Página dedicada de impressão
+2. **`src/components/modals/ServiceTagModal.tsx`** - Modal de pré-visualização
+
+---
+
+## Parte 2: Garantir Persistência de Dados
+
+### Problema Identificado
+
+O utilizador reportou que a página "Colaboradores" mostrava "nenhum colaborador" momentaneamente. Isto pode ocorrer por:
+
+1. **Estado de loading** - A query ainda não terminou
+2. **Hot Module Replacement (HMR)** - React reinicia componentes durante desenvolvimento
+3. **Sessão não estabelecida** - RLS bloqueia dados antes da autenticação
+
+### Dados Confirmados
+
+A base de dados contém **4 colaboradores** registados:
+- Renata Goulart
+- Lucas Barros  
+- Pedro Lucas
+- nloatelli
+
+### Soluções
+
+1. **Melhorar UX durante loading** - Mostrar skeleton/spinner claro
+2. **Adicionar `staleTime`** - Manter dados em cache por mais tempo
+3. **Evitar flash "vazio"** - Só mostrar "nenhum encontrado" após loading terminar
+
+### Ficheiros a Alterar
+
+1. **`src/pages/ColaboradoresPage.tsx`** - Adicionar `staleTime` e melhorar loading
+
+---
+
+## Implementação Detalhada
+
+### 1. ServiceTagPage.tsx - Novo Layout
+
+```tsx
+{/* Tag Content - Matching Reference Image */}
+<div ref={tagRef} className="print-tag-container">
+  {/* Top accent bar - THICKER */}
+  <div className="h-3 bg-primary -mx-[4mm] -mt-[4mm]" />
+  
+  {/* Logo */}
+  <div className="flex justify-center mt-6 mb-6">
+    <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-12 object-contain"/>
+  </div>
+
+  {/* QR Code - LARGER */}
+  <div className="flex justify-center mb-6">
+    <div className="p-3 bg-white border border-gray-200 rounded-lg">
+      <QRCodeSVG value={qrUrl} size={140} level="H" />
+    </div>
+  </div>
+
+  {/* Service Code - Large */}
+  <div className="text-center mb-6">
+    <p className="text-3xl font-bold font-mono tracking-wide">
+      {service.code}
+    </p>
+  </div>
+
+  {/* Customer Info - INLINE format */}
+  <div className="space-y-2 text-base px-2">
+    <p>
+      <span className="text-gray-500 italic">Cliente:</span>{' '}
+      <span className="font-medium">{service.customer?.name || 'N/A'}</span>
+    </p>
+    <p>
+      <span className="text-gray-500 italic">Equipamento:</span>{' '}
+      <span className="font-medium">{service.appliance_type || 'N/A'}</span>
+    </p>
+    <p>
+      <span className="text-gray-500 italic">Telefone:</span>{' '}
+      <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
+    </p>
+  </div>
+
+  {/* Footer text - SIMPLE */}
+  <div className="mt-6 text-center">
+    <p className="text-sm text-gray-500">
+      Leia o QR Code para ver detalhes e histórico online
+    </p>
+  </div>
+
+  {/* Bottom line */}
+  <div className="mt-4 border-t border-gray-200" />
+</div>
+```
+
+### 2. ServiceTagModal.tsx - Mesmo Layout (Consistência)
+
+Aplicar o mesmo design para manter consistência entre modal e página dedicada.
+
+### 3. ColaboradoresPage.tsx - Melhorar Query
+
+```tsx
+const { data: users = [], isLoading, refetch } = useQuery({
+  queryKey: ['collaborators'],
+  queryFn: async () => { /* ... */ },
+  staleTime: 1000 * 60 * 5, // 5 minutos - evita refetch desnecessário
+  refetchOnWindowFocus: false, // Não refetch ao voltar à janela
+});
 ```
 
 ---
 
-## Impacto Visual
+## Resumo de Alterações
 
-- A ficha mantém a mesma estrutura e legibilidade
-- Todo o conteúdo (incluindo assinaturas e aviso de 30 dias) cabe numa única página A4
-- O aspecto profissional é preservado (apenas mais compacto)
-- Funciona tanto para impressão directa quanto para PDF
-
----
-
-## Ficheiros a Alterar
-
-| Ficheiro | Acção | Descrição |
-|----------|-------|-----------|
-| `src/pages/ServicePrintPage.tsx` | Alterar | Reduzir espaçamentos e tamanhos para layout compacto |
+| Ficheiro | Acção |
+|----------|-------|
+| `src/pages/ServiceTagPage.tsx` | Redesenhar layout conforme imagem |
+| `src/components/modals/ServiceTagModal.tsx` | Aplicar mesmo design |
+| `src/pages/ColaboradoresPage.tsx` | Adicionar `staleTime` e melhorar loading |
 
 ---
 
 ## Resultado Esperado
 
-1. ✅ Ficha A4 com TODO o conteúdo numa única página
-2. ✅ Aviso de 30 dias visível na mesma página (não em página separada)
-3. ✅ Assinaturas legíveis mas mais compactas
-4. ✅ PDF gerado também com página única
-5. ✅ Impressão directa sem segunda página em branco
+1. Etiqueta com layout exactamente igual à imagem de referência
+2. QR Code maior e mais legível
+3. Informações simplificadas (sem marca/modelo, sem URL escrita)
+4. Colaboradores nunca "desaparecem" - dados persistem em cache
+5. Loading claro enquanto dados carregam
+
