@@ -36,6 +36,7 @@ import { EditUserModal } from '@/components/modals/EditUserModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AppRole } from '@/types/database';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface UserWithRole {
   id: string;
@@ -89,32 +90,21 @@ export default function ColaboradoresPage() {
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['collaborators'],
     queryFn: async () => {
-      // Get all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: true });
+      // Get all data in parallel for faster loading
+      const [profilesRes, rolesRes, techniciansRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: true }),
+        supabase.from('user_roles').select('*'),
+        supabase.from('technicians').select('profile_id, active'),
+      ]);
 
-      if (profilesError) throw profilesError;
-
-      // Get all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
-
-      if (rolesError) throw rolesError;
-
-      // Get technicians to check active status
-      const { data: technicians, error: techError } = await supabase
-        .from('technicians')
-        .select('profile_id, active');
-
-      if (techError) throw techError;
+      if (profilesRes.error) throw profilesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
+      if (techniciansRes.error) throw techniciansRes.error;
 
       // Combine data
-      const usersWithRoles: UserWithRole[] = profiles.map((profile) => {
-        const userRole = roles.find((r) => r.user_id === profile.user_id);
-        const technician = technicians.find((t) => t.profile_id === profile.id);
+      const usersWithRoles: UserWithRole[] = profilesRes.data.map((profile) => {
+        const userRole = rolesRes.data.find((r) => r.user_id === profile.user_id);
+        const technician = techniciansRes.data.find((t) => t.profile_id === profile.id);
         
         return {
           id: profile.id,
@@ -129,6 +119,9 @@ export default function ColaboradoresPage() {
 
       return usersWithRoles;
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos - evita refetch desnecessário
+    refetchOnWindowFocus: false, // Não refetch ao voltar à janela
+    refetchOnMount: 'always', // Garante dados frescos ao montar
   });
 
   // Filter users
@@ -225,12 +218,23 @@ export default function ColaboradoresPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              A carregar...
+            <div className="p-6 space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-3 w-[150px]" />
+                  </div>
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              ))}
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              Nenhum colaborador encontrado.
+              {searchTerm || roleFilter !== 'all' 
+                ? 'Nenhum colaborador corresponde aos filtros.'
+                : 'Nenhum colaborador registado.'}
             </div>
           ) : (
             <Table>
