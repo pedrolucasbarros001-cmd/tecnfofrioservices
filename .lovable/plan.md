@@ -1,163 +1,206 @@
 
+# Plano: Corrigir Orçamentos - Guardar Artigos e Funcionalidade de Impressão
 
-# Plano: Remover Histórico da Oficina ADM + Push Notifications Nativas
+## Problema Identificado
 
-## Objectivo
-1. **Remover** a secção "Histórico de Atividades" da página `/oficina` (administrador)
-2. **Manter** o feed de atividades na página `/tv-monitor` (já está no footer)
-3. **Implementar Push Notifications** para que os utilizadores recebam alertas reais nos telemóveis
+### 1. Dados não são guardados (Aparelho/Artigos vazios)
+Ao criar um orçamento no modal `CreateBudgetModal`, os **itens/artigos detalhados** (referência, nome, descrição, quantidade, valor, IVA) são calculados para obter os totais mas **nunca são guardados** na base de dados.
 
----
+**Causa:** A tabela `budgets` não tem uma coluna `pricing_description` para armazenar o JSON dos artigos (ao contrário da tabela `services` que tem).
 
-## Parte 1: Remover Histórico da Página Oficina (Admin)
+**Resultado:** No painel de detalhes, a secção "Aparelho" aparece vazia porque `appliance_type`, `brand`, `model` são `null`.
 
-### Alterações em `src/pages/OficinaPage.tsx`
-
-**Remover:**
-- Importação do hook `useActivityLogs`
-- Query `const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });`
-- Toda a secção `<Card>` do "Histórico de Atividades" (linhas 208-242)
-
-**Resultado:** A página ficará apenas com o grid de serviços e botões de acção.
-
----
-
-## Parte 2: Push Notifications Nativas
-
-### Arquitectura
-
-```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Frontend      │────▶│  Supabase DB     │────▶│  Edge Function  │
-│   (Browser)     │     │  (notifications) │     │  (send-push)    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-        │                                                │
-        │ 1. Request Permission                          │
-        │ 2. Get Push Subscription                       │
-        │ 3. Store subscription in DB                    │
-        │                                                ▼
-        │                                        ┌─────────────────┐
-        │◀───────────────────────────────────────│  Web Push API   │
-        │            Push Notification           │  (Firebase/etc) │
-        └────────────────────────────────────────└─────────────────┘
+### 2. Botão "Imprimir" não funciona
+O botão está presente no `BudgetDetailPanel` mas não executa qualquer acção:
+```tsx
+<Button variant="outline" size="sm">
+  <Printer className="h-4 w-4 mr-2" />
+  Imprimir
+</Button>
 ```
+Falta o `onClick` e não existe página de impressão para orçamentos.
 
-### Componentes a Criar
+---
 
-#### 1. Nova tabela `push_subscriptions`
+## Solução Proposta
+
+### Parte 1: Adicionar coluna `pricing_description` à tabela budgets
+
+Nova migração SQL para adicionar a coluna:
 ```sql
-CREATE TABLE push_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  endpoint TEXT NOT NULL,
-  p256dh TEXT NOT NULL,
-  auth TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, endpoint)
-);
+ALTER TABLE budgets ADD COLUMN pricing_description TEXT;
 ```
 
-#### 2. Service Worker (`public/sw.js`)
-```javascript
-self.addEventListener('push', function(event) {
-  const data = event.data?.json() || {};
-  const options = {
-    body: data.message,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    data: { url: data.url || '/' }
-  };
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'TECNOFRIO', options)
-  );
-});
+### Parte 2: Guardar artigos no CreateBudgetModal
 
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
-});
-```
+Alterar a função `processSubmit` para serializar os items como JSON:
 
-#### 3. Hook `usePushNotifications.ts`
 ```typescript
-// Responsável por:
-// - Verificar suporte do browser
-// - Pedir permissão
-// - Registar service worker
-// - Obter subscription
-// - Guardar subscription na BD
+// Antes
+const { error } = await supabase.from('budgets').insert({
+  // ... outros campos
+  estimated_labor: subtotal,
+  estimated_parts: 0,
+  estimated_total: total,
+});
+
+// Depois
+const pricingData = {
+  items: values.items.map(item => ({
+    ref: item.reference,
+    description: item.name,
+    details: item.description,
+    qty: item.quantity,
+    price: item.unit_price,
+    tax: item.tax_rate,
+  })),
+};
+
+const { error } = await supabase.from('budgets').insert({
+  // ... outros campos
+  estimated_labor: subtotal,
+  estimated_parts: totalTax,
+  estimated_total: total,
+  pricing_description: JSON.stringify(pricingData),
+});
 ```
 
-#### 4. Componente de prompt para permissão
-Mostrar um banner/toast amigável pedindo permissão na primeira vez que o utilizador entra.
+### Parte 3: Exibir artigos no BudgetDetailPanel
 
-#### 5. Edge Function `send-push`
-Quando uma notificação é criada na BD, envia push para os dispositivos registados.
+Adicionar secção "Artigos" no painel de detalhes que mostra os items do JSON:
 
-#### 6. Database Trigger
-Trigger que chama a edge function quando INSERT em `notifications`.
+```tsx
+{/* Artigos Section - NOVO */}
+{budget.pricing_description && (() => {
+  try {
+    const parsed = JSON.parse(budget.pricing_description);
+    if (parsed.items?.length > 0) {
+      return (
+        <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 p-4">
+          <h3 className="font-semibold text-sm text-purple-700 mb-3">
+            Artigos do Orçamento
+          </h3>
+          <table className="w-full text-sm">
+            {/* Cabeçalho e linhas dos artigos */}
+          </table>
+        </div>
+      );
+    }
+  } catch { /* ignore */ }
+  return null;
+})()}
+```
+
+### Parte 4: Criar página de impressão BudgetPrintPage
+
+Criar novo ficheiro `src/pages/BudgetPrintPage.tsx` baseado no `ServicePrintPage`, adaptado para orçamentos:
+- Usa mesmo layout A4
+- Mostra informação do cliente
+- Mostra tabela de artigos com IVA
+- Mostra totais (Subtotal, IVA, Total)
+- Indica validade do orçamento
+- Inclui termos/condições
+
+### Parte 5: Adicionar rota no App.tsx
+
+```tsx
+// Depois das rotas de impressão existentes
+<Route path="/print/budget/:budgetId" element={<BudgetPrintPage />} />
+```
+
+### Parte 6: Conectar botão "Imprimir" no BudgetDetailPanel
+
+```tsx
+import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+
+// No botão
+<Button 
+  variant="outline" 
+  size="sm"
+  onClick={() => openInNewTabPreservingQuery(`/print/budget/${budget.id}`)}
+>
+  <Printer className="h-4 w-4 mr-2" />
+  Imprimir
+</Button>
+```
 
 ---
 
-## Ficheiros a Criar/Alterar
+## Ficheiros a Alterar/Criar
 
 | Ficheiro | Acção | Descrição |
 |----------|-------|-----------|
-| `src/pages/OficinaPage.tsx` | Alterar | Remover secção de histórico |
-| `public/sw.js` | Criar | Service Worker para push |
-| `src/hooks/usePushNotifications.ts` | Criar | Hook para gerir push |
-| `src/components/shared/PushPermissionBanner.tsx` | Criar | Banner para pedir permissão |
-| `src/components/layouts/AppLayout.tsx` | Alterar | Integrar banner de push |
-| `supabase/functions/send-push/index.ts` | Criar | Edge function para enviar push |
-| Migração SQL | Criar | Tabela push_subscriptions + trigger |
+| `supabase/migrations/[timestamp]_add_budget_pricing.sql` | Criar | Adicionar coluna pricing_description |
+| `src/components/modals/CreateBudgetModal.tsx` | Alterar | Guardar items como JSON em pricing_description |
+| `src/components/shared/BudgetDetailPanel.tsx` | Alterar | Exibir artigos + conectar botão imprimir |
+| `src/pages/BudgetPrintPage.tsx` | Criar | Nova página de impressão A4 para orçamentos |
+| `src/App.tsx` | Alterar | Adicionar rota /print/budget/:budgetId |
+| `src/integrations/supabase/types.ts` | Alterar | Adicionar pricing_description ao tipo Budget |
 
 ---
 
-## Fluxo de Implementação
+## Estrutura do JSON (pricing_description)
 
-### Etapa 1: Remover Histórico da Oficina
-- Alterar `OficinaPage.tsx`
-
-### Etapa 2: Infraestrutura Push
-- Criar tabela `push_subscriptions`
-- Criar Service Worker
-- Criar hook `usePushNotifications`
-
-### Etapa 3: UI de Permissão
-- Criar banner/componente de permissão
-- Integrar no AppLayout
-
-### Etapa 4: Envio de Push
-- Criar edge function `send-push`
-- Configurar trigger na tabela `notifications`
-- Gerar VAPID keys para Web Push
+```json
+{
+  "items": [
+    {
+      "ref": "REF001",
+      "description": "Mão de Obra",
+      "details": "Reparação de compressor",
+      "qty": 2,
+      "price": 100.00,
+      "tax": 23
+    }
+  ]
+}
+```
 
 ---
 
-## Notas Técnicas
+## Layout da Página de Impressão do Orçamento
 
-### VAPID Keys
-Para Web Push funcionar, precisamos de gerar um par de chaves VAPID:
-- Chave pública: será usada no frontend
-- Chave privada: será um secret na edge function
-
-### Compatibilidade
-- Push Notifications funcionam em:
-  - Chrome (Android/Desktop)
-  - Firefox (Desktop/Android)
-  - Safari 16+ (macOS/iOS 16.4+)
-  - Edge
-
-### Permissões
-O browser só permite pedir permissão após interacção do utilizador (clique).
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  [LOGO]    TECNOFRIO           Orçamento: ORC-00001         │
+│            Contactos da empresa          Data: 06/02/2026   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  CLIENTE                                                    │
+│  Nome: Pedro Lucas                                          │
+│  Telefone: 997654765        NIF: 688098542                  │
+│  Morada: ...                                                │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ARTIGOS                                                    │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Ref.  │ Descrição      │ Qtd │ Valor │ IVA │ Total  │   │
+│  ├───────┼────────────────┼─────┼───────┼─────┼────────┤   │
+│  │ REF01 │ Mão de Obra    │  1  │ 2000€ │ 23% │ 2460€  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│                              Subtotal:     2000.00 €        │
+│                              IVA:           460.00 €        │
+│                              ─────────────────────────      │
+│                              TOTAL:        2460.00 €        │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  OBSERVAÇÕES                                                │
+│  [Notas do orçamento]                                       │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Válido até: [data] | Orçamento sujeito a confirmação       │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Resultado Esperado
 
-1. ✅ Página Oficina (admin) sem o card de histórico de atividades
-2. ✅ Monitor TV mantém o feed de atividades no footer
-3. ✅ Utilizadores podem receber notificações push nos telemóveis
-4. ✅ Banner amigável pede permissão (uma vez)
-5. ✅ Notificações do sistema (peça chegou, serviço atribuído, etc.) aparecem como push
-
+1. ✅ Artigos do orçamento são guardados na BD (coluna pricing_description)
+2. ✅ Painel de detalhes mostra artigos com referência, descrição, qtd, valor e IVA
+3. ✅ Secção "Aparelho" mostra dados correctamente (se preenchidos)
+4. ✅ Botão "Imprimir" abre página de impressão em nova aba
+5. ✅ Página de impressão usa mesmo estilo das fichas de serviço (A4)
+6. ✅ PDF pode ser descarregado
