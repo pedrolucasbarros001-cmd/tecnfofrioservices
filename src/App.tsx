@@ -31,6 +31,7 @@ import TVMonitorPage from "@/pages/TVMonitorPage";
 import ServicePrintPage from "@/pages/ServicePrintPage";
 import ServiceTagPage from "@/pages/ServiceTagPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
+import BudgetPrintPage from "@/pages/BudgetPrintPage";
 import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
@@ -54,6 +55,7 @@ const App = () => (
             {/* Print pages - outside AppLayout, handle own auth via session bridge */}
             <Route path="/print/service/:serviceId" element={<ServicePrintPage />} />
             <Route path="/print/tag/:serviceId" element={<ServiceTagPage />} />
+            <Route path="/print/budget/:budgetId" element={<BudgetPrintPage />} />
             
             {/* Protected routes with layout */}
             <Route

@@ -219,6 +219,18 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         finalCustomerId = newCustomer.id;
       }
 
+      // Serialize items to JSON for pricing_description
+      const pricingData = {
+        items: values.items.map(item => ({
+          ref: item.reference || '',
+          description: item.name,
+          details: item.description || '',
+          qty: item.quantity,
+          price: item.unit_price,
+          tax: item.tax_rate,
+        })),
+      };
+
       const { error } = await supabase.from('budgets').insert({
         customer_id: finalCustomerId || null,
         appliance_type: values.appliance_type,
@@ -227,9 +239,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         fault_description: values.fault_description,
         notes: values.notes,
         estimated_labor: subtotal,
-        estimated_parts: 0,
+        estimated_parts: totalTax,
         estimated_total: total,
         status: 'pendente',
+        pricing_description: JSON.stringify(pricingData),
       });
 
       if (error) throw error;
