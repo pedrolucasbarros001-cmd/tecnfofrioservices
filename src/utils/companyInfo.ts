@@ -4,6 +4,7 @@
 
 export const COMPANY_INFO = {
   name: 'TECNOFRIO',
+  nif: '502123456',
   address: 'R. Dom Pedro IV 3 R/C, Bairro da Coxa',
   postalCode: '5300-124',
   city: 'Bragança',

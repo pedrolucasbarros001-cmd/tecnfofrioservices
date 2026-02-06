@@ -84,6 +84,7 @@ export type Database = {
           id: string
           model: string | null
           notes: string | null
+          pricing_description: string | null
           status: string | null
           updated_at: string
           valid_until: string | null
@@ -102,6 +103,7 @@ export type Database = {
           id?: string
           model?: string | null
           notes?: string | null
+          pricing_description?: string | null
           status?: string | null
           updated_at?: string
           valid_until?: string | null
@@ -120,6 +122,7 @@ export type Database = {
           id?: string
           model?: string | null
           notes?: string | null
+          pricing_description?: string | null
           status?: string | null
           updated_at?: string
           valid_until?: string | null

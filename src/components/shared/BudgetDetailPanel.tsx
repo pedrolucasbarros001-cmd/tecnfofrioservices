@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -12,6 +12,7 @@ import {
   X,
   ArrowRight,
   Package,
+  ShoppingCart,
 } from 'lucide-react';
 import {
   Sheet,
@@ -26,7 +27,16 @@ import { Separator } from '@/components/ui/separator';
 import { ConvertBudgetModal } from '@/components/modals/ConvertBudgetModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+
+interface BudgetItem {
+  ref?: string;
+  description: string;
+  details?: string;
+  qty: number;
+  price: number;
+  tax: number;
+}
 
 interface BudgetDetailPanelProps {
   open: boolean;
@@ -50,6 +60,49 @@ export function BudgetDetailPanel({
 }: BudgetDetailPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+
+  // Parse pricing_description to extract items
+  const pricingDetails = useMemo(() => {
+    if (!budget?.pricing_description) {
+      return { 
+        items: [] as BudgetItem[], 
+        subtotal: budget?.estimated_labor || 0, 
+        iva: budget?.estimated_parts || 0,
+        total: budget?.estimated_total || 0
+      };
+    }
+    
+    try {
+      const parsed = JSON.parse(budget.pricing_description);
+      if (parsed.items && Array.isArray(parsed.items)) {
+        const items: BudgetItem[] = parsed.items;
+        
+        const subtotal = items.reduce((sum, item) => {
+          return sum + (item.qty * item.price);
+        }, 0);
+        
+        const iva = items.reduce((sum, item) => {
+          return sum + ((item.qty * item.price) * (item.tax / 100));
+        }, 0);
+        
+        return { 
+          items, 
+          subtotal, 
+          iva,
+          total: subtotal + iva
+        };
+      }
+    } catch {
+      // Fallback to existing fields
+    }
+    
+    return { 
+      items: [] as BudgetItem[], 
+      subtotal: budget?.estimated_labor || 0, 
+      iva: budget?.estimated_parts || 0,
+      total: budget?.estimated_total || 0
+    };
+  }, [budget?.pricing_description, budget?.estimated_labor, budget?.estimated_parts, budget?.estimated_total]);
 
   if (!budget) return null;
 
@@ -101,7 +154,11 @@ export function BudgetDetailPanel({
                   {statusConfig?.label || budget.status}
                 </Badge>
               </div>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => openInNewTabPreservingQuery(`/print/budget/${budget.id}`)}
+              >
                 <Printer className="h-4 w-4 mr-2" />
                 Imprimir
               </Button>
@@ -177,6 +234,55 @@ export function BudgetDetailPanel({
                 </div>
               )}
 
+              {/* Articles Section */}
+              {pricingDetails.items.length > 0 && (
+                <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
+                  <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4" />
+                    Artigos do Orçamento
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-1.5 font-medium">Ref.</th>
+                          <th className="text-left py-1.5 font-medium">Descrição</th>
+                          <th className="text-center py-1.5 font-medium">Qtd</th>
+                          <th className="text-right py-1.5 font-medium">Valor</th>
+                          <th className="text-center py-1.5 font-medium">IVA</th>
+                          <th className="text-right py-1.5 font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pricingDetails.items.map((item, index) => {
+                          const lineSubtotal = item.qty * item.price;
+                          const lineTax = lineSubtotal * (item.tax / 100);
+                          const lineTotal = lineSubtotal + lineTax;
+                          
+                          return (
+                            <tr key={index} className="border-b last:border-0">
+                              <td className="py-1.5">{item.ref || '-'}</td>
+                              <td className="py-1.5">
+                                {item.description}
+                                {item.details && (
+                                  <span className="text-muted-foreground block text-[10px]">
+                                    {item.details}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-1.5 text-center">{item.qty}</td>
+                              <td className="py-1.5 text-right">{formatCurrency(item.price)}</td>
+                              <td className="py-1.5 text-center">{item.tax}%</td>
+                              <td className="py-1.5 text-right font-medium">{formatCurrency(lineTotal)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Financial Summary */}
               <div className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 p-4">
                 <h3 className="font-semibold text-sm text-emerald-700 dark:text-emerald-400 mb-3">
@@ -184,17 +290,17 @@ export function BudgetDetailPanel({
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Mão de Obra</span>
-                    <span>{formatCurrency(budget.estimated_labor)}</span>
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatCurrency(pricingDetails.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Peças</span>
-                    <span>{formatCurrency(budget.estimated_parts)}</span>
+                    <span className="text-muted-foreground">IVA</span>
+                    <span>{formatCurrency(pricingDetails.iva)}</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between text-base font-bold">
                     <span className="text-foreground">Total</span>
-                    <span className="text-orange-600">{formatCurrency(budget.estimated_total)}</span>
+                    <span className="text-primary">{formatCurrency(pricingDetails.total)}</span>
                   </div>
                 </div>
               </div>
