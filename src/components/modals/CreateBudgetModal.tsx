@@ -55,7 +55,6 @@ import { toast } from 'sonner';
 import type { Customer } from '@/types/database';
 
 const itemSchema = z.object({
-  reference: z.string().optional(),
   name: z.string().min(1, 'Nome do artigo é obrigatório'),
   description: z.string().optional(),
   quantity: z.number().min(1, 'Quantidade mínima é 1'),
@@ -81,10 +80,10 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const TAX_RATES = [
-  { value: 0, label: '0% (Isento)' },
-  { value: 6, label: '6% (IVA6)' },
-  { value: 13, label: '13% (IVA13)' },
-  { value: 23, label: '23% (IVA23)' },
+  { value: 0, label: '0%' },
+  { value: 6, label: '6%' },
+  { value: 13, label: '13%' },
+  { value: 23, label: '23%' },
 ];
 
 interface CreateBudgetModalProps {
@@ -111,7 +110,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       customer_phone: '',
       customer_nif: '',
       items: [
-        { reference: '', name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
+        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
       ],
       discount_value: 0,
       discount_type: 'fixed' as const,
@@ -234,7 +233,6 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       // Serialize items to JSON for pricing_description
       const pricingData = {
         items: values.items.map(item => ({
-          ref: item.reference || '',
           description: item.name,
           details: item.description || '',
           qty: item.quantity,
@@ -530,7 +528,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          append({ reference: '', name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })
+                          append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })
                         }
                       >
                         <Plus className="h-4 w-4 mr-1" />
@@ -542,14 +540,12 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[100px]">Ref.</TableHead>
-                            <TableHead className="w-[180px]">Artigo</TableHead>
-                            <TableHead>Descrição</TableHead>
+                            <TableHead className="min-w-[200px]">Artigo</TableHead>
+                            <TableHead className="min-w-[150px]">Descrição</TableHead>
                             <TableHead className="w-[80px]">Qtd</TableHead>
                             <TableHead className="w-[120px]">Valor (€)</TableHead>
                             <TableHead className="w-[100px]">Imposto</TableHead>
                             <TableHead className="w-[120px] text-right">Subtotal (€)</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -559,19 +555,6 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
                             return (
                               <TableRow key={field.id}>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.reference`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input placeholder="Ref" {...field} />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
                                 <TableCell>
                                   <FormField
                                     control={form.control}
@@ -592,7 +575,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     render={({ field }) => (
                                       <FormItem>
                                         <FormControl>
-                                          <Input placeholder="Detalhes do artigo" {...field} />
+                                          <Input placeholder="Detalh" {...field} />
                                         </FormControl>
                                       </FormItem>
                                     )}
@@ -662,20 +645,21 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     )}
                                   />
                                 </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatCurrency(itemSubtotal)}
-                                </TableCell>
-                                <TableCell>
-                                  {fields.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => remove(index)}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  )}
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <span className="font-medium">{formatCurrency(itemSubtotal)}</span>
+                                    {fields.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => remove(index)}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
