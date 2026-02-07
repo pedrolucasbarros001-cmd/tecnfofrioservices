@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Check, UserPlus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,26 +11,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   Form,
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
-  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -48,11 +36,8 @@ import {
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useTechnicians } from '@/hooks/useTechnicians';
-import { useCreateCustomer } from '@/hooks/useCustomers';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Customer } from '@/types/database';
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Nome do artigo é obrigatório'),
@@ -63,15 +48,6 @@ const itemSchema = z.object({
 });
 
 const formSchema = z.object({
-  customer_name: z.string().min(1, 'Cliente é obrigatório'),
-  customer_phone: z.string().optional(),
-  customer_nif: z.string().optional(),
-  technician_id: z.string().optional(),
-  appliance_type: z.string().optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  fault_description: z.string().optional(),
-  notes: z.string().optional(),
   items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
   discount_value: z.number().optional().default(0),
   discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
@@ -93,22 +69,13 @@ interface CreateBudgetModalProps {
 }
 
 export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudgetModalProps) {
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
-  const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
-  const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
-  const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const { data: technicians = [] } = useTechnicians();
-  const createCustomer = useCreateCustomer();
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [discountValue, setDiscountValue] = useState('');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      customer_name: '',
-      customer_phone: '',
-      customer_nif: '',
       items: [
         { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
       ],
@@ -123,65 +90,6 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   });
 
   const watchItems = form.watch('items');
-  const customerPhone = form.watch('customer_phone');
-  const customerNif = form.watch('customer_nif');
-
-  // Auto-detect customer
-  useEffect(() => {
-    const searchCustomer = async () => {
-      if (selectedCustomer) return;
-      
-      const searchPhone = customerPhone?.replace(/\s/g, '');
-      const searchNif = customerNif?.replace(/\s/g, '');
-      
-      if ((!searchPhone || searchPhone.length < 6) && (!searchNif || searchNif.length < 6)) {
-        setFoundCustomer(null);
-        setShowFoundCustomerBox(false);
-        return;
-      }
-
-      try {
-        let query = supabase.from('customers').select('*');
-        
-        if (searchPhone && searchPhone.length >= 6) {
-          query = query.ilike('phone', `%${searchPhone}%`);
-        } else if (searchNif && searchNif.length >= 6) {
-          query = query.ilike('nif', `%${searchNif}%`);
-        }
-        
-        const { data, error } = await query.limit(1).maybeSingle();
-        
-        if (!error && data) {
-          setFoundCustomer(data);
-          setShowFoundCustomerBox(true);
-        } else {
-          setFoundCustomer(null);
-          setShowFoundCustomerBox(false);
-        }
-      } catch (e) {
-        console.error('Error searching customer:', e);
-      }
-    };
-
-    const debounce = setTimeout(searchCustomer, 500);
-    return () => clearTimeout(debounce);
-  }, [customerPhone, customerNif, selectedCustomer]);
-
-  const handleSelectFoundCustomer = () => {
-    if (!foundCustomer) return;
-    
-    setSelectedCustomer(foundCustomer);
-    form.setValue('customer_name', foundCustomer.name);
-    form.setValue('customer_phone', foundCustomer.phone || '');
-    form.setValue('customer_nif', foundCustomer.nif || '');
-    setShowFoundCustomerBox(false);
-    setFoundCustomer(null);
-  };
-
-  const handleIgnoreFoundCustomer = () => {
-    setShowFoundCustomerBox(false);
-    setFoundCustomer(null);
-  };
 
   // Calculate totals
   const calculateItemSubtotal = (item: typeof watchItems[0]) => {
@@ -196,41 +104,16 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   const subtotal = watchItems.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
   const totalTax = watchItems.reduce((sum, item) => sum + calculateItemTax(item), 0);
   
-  const discountValue = form.watch('discount_value') || 0;
-  const discountType = form.watch('discount_type') || 'fixed';
-  
-  const discountAmount = discountType === 'percentage' 
-    ? subtotal * (discountValue / 100) 
-    : discountValue;
+  const parsedDiscountValue = parseFloat(discountValue.replace(',', '.')) || 0;
+  const discountAmount = discountType === 'percent' 
+    ? subtotal * (parsedDiscountValue / 100) 
+    : parsedDiscountValue;
   
   const total = subtotal - discountAmount + totalTax;
 
   const handleSubmit = async (values: FormValues) => {
-    if (!selectedCustomer && !foundCustomer) {
-      setPendingFormValues(values);
-      setShowCreateCustomerDialog(true);
-      return;
-    }
-
-    await processSubmit(values, selectedCustomer?.id);
-  };
-
-  const processSubmit = async (values: FormValues, customerId?: string) => {
     setIsLoading(true);
     try {
-      let finalCustomerId = customerId;
-
-      // Create customer if needed
-      if (!finalCustomerId && values.customer_name) {
-        const newCustomer = await createCustomer.mutateAsync({
-          name: values.customer_name,
-          phone: values.customer_phone,
-          nif: values.customer_nif,
-        });
-        finalCustomerId = newCustomer.id;
-      }
-
-      // Serialize items to JSON for pricing_description
       const pricingData = {
         items: values.items.map(item => ({
           description: item.name,
@@ -241,16 +124,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         })),
         discount: discountAmount,
         discountType: discountType,
-        discountValue: discountValue,
+        discountValue: parsedDiscountValue,
       };
 
       const { error } = await supabase.from('budgets').insert({
-        customer_id: finalCustomerId || null,
-        appliance_type: values.appliance_type,
-        brand: values.brand,
-        model: values.model,
-        fault_description: values.fault_description,
-        notes: values.notes,
         estimated_labor: subtotal,
         estimated_parts: totalTax,
         estimated_total: total,
@@ -271,20 +148,11 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
     }
   };
 
-  const handleConfirmCreateCustomer = async () => {
-    if (!pendingFormValues) return;
-    setShowCreateCustomerDialog(false);
-    await processSubmit(pendingFormValues);
-    setPendingFormValues(null);
-  };
-
   const handleClose = () => {
     onOpenChange(false);
     form.reset();
-    setSelectedCustomer(null);
-    setFoundCustomer(null);
-    setShowFoundCustomerBox(false);
-    setPendingFormValues(null);
+    setDiscountValue('');
+    setDiscountType('euro');
   };
 
   const formatCurrency = (value: number) => {
@@ -295,464 +163,264 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-            <DialogTitle className="text-xl">Criar Orçamento</DialogTitle>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+          <DialogTitle className="text-xl">Criar Orçamento</DialogTitle>
+        </DialogHeader>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
-                <div className="space-y-6 py-4 pr-4">
-                  {/* Customer Section */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Cliente</h3>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+            <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
+              <div className="space-y-6 py-4 pr-4">
+                {/* Items Table */}
+                <div className="space-y-4">
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="min-w-[200px]">Artigo</TableHead>
+                          <TableHead className="min-w-[150px]">Descrição</TableHead>
+                          <TableHead className="w-[80px]">Qtd</TableHead>
+                          <TableHead className="w-[120px]">Valor (€)</TableHead>
+                          <TableHead className="w-[100px]">Imposto</TableHead>
+                          <TableHead className="w-[140px] text-right">Subtotal (€)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {fields.map((field, index) => {
+                          const item = watchItems[index];
+                          const itemSubtotal = item ? calculateItemSubtotal(item) : 0;
 
-                    {selectedCustomer ? (
-                      <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Check className="h-5 w-5 text-green-600" />
-                          <span className="font-medium text-green-800">
-                            Cliente: {selectedCustomer.name}
-                          </span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCustomer(null);
-                            form.setValue('customer_name', '');
-                            form.setValue('customer_phone', '');
-                            form.setValue('customer_nif', '');
-                          }}
-                        >
-                          Alterar
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        {showFoundCustomerBox && foundCustomer && (
-                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                            <p className="font-medium text-blue-900">
-                              Cliente existente encontrado!
-                            </p>
-                            <p className="text-sm text-blue-800">
-                              Encontrámos um perfil de cliente com estes dados:
-                            </p>
-                            <div className="text-sm text-blue-700 bg-white/50 p-3 rounded">
-                              <p><strong>Nome:</strong> {foundCustomer.name}</p>
-                              <p><strong>Telefone:</strong> {foundCustomer.phone}</p>
-                              {foundCustomer.nif && <p><strong>NIF:</strong> {foundCustomer.nif}</p>}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button type="button" onClick={handleSelectFoundCustomer}>
-                                Associar e Preencher Dados
-                              </Button>
-                              <Button type="button" variant="outline" onClick={handleIgnoreFoundCustomer}>
-                                Criar Novo Cliente
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="customer_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome *</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="customer_phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="customer_nif"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>NIF</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="technician_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Técnico Sugerido</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecionar técnico" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {technicians.map((tech) => (
-                                <SelectItem key={tech.id} value={tech.id}>
-                                  <div className="flex items-center gap-2">
-                                    <div 
-                                      className="w-3 h-3 rounded-full"
-                                      style={{ backgroundColor: tech.color || '#3B82F6' }}
-                                    />
-                                    {tech.profile?.full_name || 'Técnico'}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observação</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Observações gerais sobre o orçamento..."
-                              rows={3}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Appliance Section */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Aparelho</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="appliance_type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tipo de Aparelho</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: Frigorífico" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="brand"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Marca</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: Samsung" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="model"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Modelo</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: RT38K50" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <FormField
-                      control={form.control}
-                      name="fault_description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Descrição da Avaria</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Descreva o problema reportado pelo cliente..."
-                              rows={2}
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Items Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">Artigos do Orçamento</h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })
-                        }
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Adicionar Linha
-                      </Button>
-                    </div>
-
-                    <div className="border rounded-lg overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="min-w-[200px]">Artigo</TableHead>
-                            <TableHead className="min-w-[150px]">Descrição</TableHead>
-                            <TableHead className="w-[80px]">Qtd</TableHead>
-                            <TableHead className="w-[120px]">Valor (€)</TableHead>
-                            <TableHead className="w-[100px]">Imposto</TableHead>
-                            <TableHead className="w-[120px] text-right">Subtotal (€)</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {fields.map((field, index) => {
-                            const item = watchItems[index];
-                            const itemSubtotal = item ? calculateItemSubtotal(item) : 0;
-
-                            return (
-                              <TableRow key={field.id}>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.name`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input placeholder="Ex: Compressor" {...field} />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.description`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input placeholder="Detalh" {...field} />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.quantity`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input
-                                            type="number"
-                                            min={1}
-                                            {...field}
-                                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                          />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.unit_price`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            step={0.01}
-                                            {...field}
-                                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                          />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.tax_rate`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <Select
-                                          value={field.value.toString()}
-                                          onValueChange={(v) => field.onChange(parseInt(v))}
-                                        >
-                                          <FormControl>
-                                            <SelectTrigger>
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                          </FormControl>
-                                          <SelectContent>
-                                            {TAX_RATES.map((rate) => (
-                                              <SelectItem key={rate.value} value={rate.value.toString()}>
-                                                {rate.label}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="font-medium">{formatCurrency(itemSubtotal)}</span>
-                                    {fields.length > 1 && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => remove(index)}
+                          return (
+                            <TableRow key={field.id}>
+                              {/* Artigo */}
+                              <TableCell className="p-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.name`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input 
+                                          placeholder="Ex: Compressor" 
+                                          className="h-9"
+                                          {...field} 
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </TableCell>
+                              
+                              {/* Descrição */}
+                              <TableCell className="p-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.description`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input 
+                                          placeholder="Detalh" 
+                                          className="h-9"
+                                          {...field} 
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </TableCell>
+                              
+                              {/* Qtd */}
+                              <TableCell className="p-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          className="h-9"
+                                          {...field}
+                                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </TableCell>
+                              
+                              {/* Valor (€) */}
+                              <TableCell className="p-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.unit_price`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          step={0.01}
+                                          className="h-9"
+                                          {...field}
+                                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </TableCell>
+                              
+                              {/* Imposto */}
+                              <TableCell className="p-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.tax_rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <Select
+                                        value={field.value.toString()}
+                                        onValueChange={(v) => field.onChange(parseInt(v))}
                                       >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                                        <FormControl>
+                                          <SelectTrigger className="h-9">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {TAX_RATES.map((rate) => (
+                                            <SelectItem key={rate.value} value={rate.value.toString()}>
+                                              {rate.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                  )}
+                                />
+                              </TableCell>
+                              
+                              {/* Subtotal (€) com botão delete integrado */}
+                              <TableCell className="p-2 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <span className="font-medium">{formatCurrency(itemSubtotal)}</span>
+                                  {fields.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => remove(index)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
 
-                  {/* Totals */}
-                  <div className="flex justify-end">
-                    <div className="w-[380px] space-y-2 p-4 bg-muted/50 rounded-lg">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-semibold">{formatCurrency(subtotal)}</span>
-                      </div>
-                      
-                      {/* Discount Field */}
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Desconto:</span>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            className="w-20 h-8 text-right"
-                            value={discountValue}
-                            onChange={(e) => form.setValue('discount_value', parseFloat(e.target.value) || 0)}
-                          />
-                          <Select
-                            value={discountType}
-                            onValueChange={(v) => form.setValue('discount_type', v as 'fixed' | 'percentage')}
+                  {/* Add Line Button */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Linha
+                  </Button>
+                </div>
+
+                {/* Totals Summary - Right Aligned */}
+                <div className="flex justify-end">
+                  <div className="w-full sm:w-[320px] p-4 rounded-lg space-y-3 bg-muted/50 border border-border">
+                    {/* Subtotal */}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal (s/ IVA):</span>
+                      <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                    </div>
+
+                    {/* IVA Total */}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">IVA Total:</span>
+                      <span className="font-semibold">{formatCurrency(totalTax)}</span>
+                    </div>
+
+                    {/* Desconto */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap w-20">
+                        Desconto:
+                      </Label>
+                      <div className="flex-1 flex gap-1">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                        <div className="flex border rounded-md overflow-hidden">
+                          <Button
+                            type="button"
+                            variant={discountType === 'euro' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="h-8 px-2 rounded-none text-xs"
+                            onClick={() => setDiscountType('euro')}
                           >
-                            <SelectTrigger className="w-16 h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fixed">€</SelectItem>
-                              <SelectItem value="percentage">%</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <span className="font-semibold text-destructive w-20 text-right">
-                            -{formatCurrency(discountAmount)}
-                          </span>
+                            €
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={discountType === 'percent' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="h-8 px-2 rounded-none text-xs"
+                            onClick={() => setDiscountType('percent')}
+                          >
+                            %
+                          </Button>
                         </div>
                       </div>
-                      
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">IVA Total:</span>
-                        <span className="font-semibold">{formatCurrency(totalTax)}</span>
-                      </div>
-                      <Separator />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span className="text-primary">{formatCurrency(total)}</span>
-                      </div>
+                      <span className="text-sm font-medium text-destructive w-20 text-right">
+                        -{formatCurrency(discountAmount)}
+                      </span>
+                    </div>
+
+                    <Separator />
+
+                    {/* Total */}
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-base">Total:</span>
+                      <span className="font-bold text-xl text-primary">
+                        {formatCurrency(Math.max(0, total))}
+                      </span>
                     </div>
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
+            </ScrollArea>
 
-              <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
-                <Button type="button" variant="outline" onClick={handleClose}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'A guardar...' : 'Guardar Orçamento'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={showCreateCustomerDialog} onOpenChange={setShowCreateCustomerDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Criar Novo Cliente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cliente não encontrado na base de dados. Deseja criar um novo perfil de cliente com os dados fornecidos?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingFormValues(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCreateCustomer}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Sim, Criar Cliente
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+            <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'A guardar...' : 'Guardar Orçamento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
