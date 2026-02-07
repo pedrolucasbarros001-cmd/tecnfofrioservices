@@ -236,13 +236,14 @@ export function BudgetDetailPanel({
                 </div>
               )}
 
-              {/* Articles Section */}
-              {pricingDetails.items.length > 0 && (
-                <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
-                  <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4" />
-                    Artigos do Orçamento
-                  </h3>
+              {/* Articles Section - sempre visível */}
+              <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
+                <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Artigos do Orçamento
+                </h3>
+                
+                {pricingDetails.items.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
@@ -282,8 +283,12 @@ export function BudgetDetailPanel({
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Orçamento criado sem artigos detalhados. Valor total: {formatCurrency(pricingDetails.total)}
+                  </p>
+                )}
+              </div>
 
               {/* Financial Summary */}
               <div className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 p-4">

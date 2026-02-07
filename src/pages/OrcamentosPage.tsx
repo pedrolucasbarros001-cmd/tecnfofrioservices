@@ -118,6 +118,21 @@ export default function OrcamentosPage() {
     }).format(value);
   };
 
+  const getFirstArticle = (budget: any) => {
+    if (!budget.pricing_description) return null;
+    try {
+      const parsed = JSON.parse(budget.pricing_description);
+      if (parsed.items && parsed.items.length > 0) {
+        return {
+          name: parsed.items[0].description || '-',
+          ref: parsed.items[0].ref || '-',
+          count: parsed.items.length
+        };
+      }
+    } catch { }
+    return null;
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -177,8 +192,9 @@ export default function OrcamentosPage() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Aparelho</TableHead>
-                  <TableHead>Avaria</TableHead>
+                  <TableHead>Artigo</TableHead>
+                  <TableHead>Ref.</TableHead>
+                  <TableHead className="text-center">Qtd</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -187,6 +203,7 @@ export default function OrcamentosPage() {
               <TableBody>
                 {filteredBudgets.map((budget) => {
                   const statusConfig = STATUS_CONFIG[budget.status as keyof typeof STATUS_CONFIG];
+                  const firstArticle = getFirstArticle(budget);
 
                   return (
                     <TableRow
@@ -200,13 +217,18 @@ export default function OrcamentosPage() {
                       <TableCell className="font-medium">
                         {budget.customer?.name || 'Sem cliente'}
                       </TableCell>
-                      <TableCell>
-                        {[budget.appliance_type, budget.brand]
-                          .filter(Boolean)
-                          .join(' ') || '-'}
+                      <TableCell className="max-w-[180px] truncate">
+                        {firstArticle?.name || '-'}
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {budget.fault_description || '-'}
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {firstArticle?.ref || '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {firstArticle ? (
+                          <Badge variant="outline" className="text-xs">
+                            {firstArticle.count} {firstArticle.count === 1 ? 'artigo' : 'artigos'}
+                          </Badge>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-orange-600">
                         {formatCurrency(budget.estimated_total)}
