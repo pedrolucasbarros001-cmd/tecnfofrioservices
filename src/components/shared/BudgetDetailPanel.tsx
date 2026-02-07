@@ -206,22 +206,24 @@ export function BudgetDetailPanel({
                 </div>
               </div>
 
-              {/* Appliance Section */}
-              <div className="rounded-lg border-l-4 border-l-pink-500 bg-pink-50 dark:bg-pink-950/20 p-4">
-                <h3 className="font-semibold text-sm text-pink-700 dark:text-pink-400 mb-3 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Aparelho
-                </h3>
-                <div className="space-y-1 text-sm">
-                  {budget.appliance_type && (
-                    <p className="font-medium text-foreground">{budget.appliance_type}</p>
-                  )}
-                  <div className="flex flex-wrap gap-x-4 text-muted-foreground">
-                    {budget.brand && <span>Marca: {budget.brand}</span>}
-                    {budget.model && <span>Modelo: {budget.model}</span>}
+              {/* Appliance Section - só mostra se tiver dados */}
+              {(budget.appliance_type || budget.brand || budget.model) && (
+                <div className="rounded-lg border-l-4 border-l-pink-500 bg-pink-50 dark:bg-pink-950/20 p-4">
+                  <h3 className="font-semibold text-sm text-pink-700 dark:text-pink-400 mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Aparelho
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    {budget.appliance_type && (
+                      <p className="font-medium text-foreground">{budget.appliance_type}</p>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 text-muted-foreground">
+                      {budget.brand && <span>Marca: {budget.brand}</span>}
+                      {budget.model && <span>Modelo: {budget.model}</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Fault Section */}
               {budget.fault_description && (
