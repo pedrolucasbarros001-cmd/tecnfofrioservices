@@ -1,13 +1,131 @@
 
-# Plano: Alinhar Colunas e Painel Lateral de Orçamentos
+# Plano: Adicionar Botão de Excluir e Garantir Coerência
 
-## Problema Identificado
+## Resumo
 
-### 1. Colunas da tabela não correspondem ao conteúdo
-A tabela mostra "Aparelho" e "Avaria" que estão vazios para orçamentos criados sem esses dados. O conteúdo mais relevante são os **artigos** do `pricing_description`.
+O utilizador solicita:
+1. Adicionar botão de **excluir orçamento** no dropdown de ações
+2. Garantir que o modal de criação está idêntico à imagem
+3. Garantir que o painel de consulta lateral mostra exactamente o que foi registado no modal
 
-### 2. Painel lateral precisa mostrar artigos sempre
-A secção de artigos só aparece quando há dados, mas deveria mostrar uma mensagem informativa para orçamentos antigos.
+## Análise Actual
+
+### Modal de Criação (CreateBudgetModal)
+O modal já está completo com:
+- Secção Cliente (Nome, Telefone, NIF, Técnico Sugerido, Observação)
+- Secção Aparelho (Tipo, Marca, Modelo, Descrição da Avaria)
+- Tabela de Artigos com colunas: Ref. | Artigo | Descrição | Qtd | Valor | Imposto | Subtotal
+- Botão "Adicionar Linha" para adicionar mais artigos
+- Resumo de Totais (Subtotal, IVA, Total)
+
+### Painel Lateral (BudgetDetailPanel)
+Já mostra correctamente:
+- Cliente com dados completos
+- Aparelho (quando preenchido)
+- Descrição da Avaria (quando preenchida)
+- Artigos do Orçamento com tabela
+- Resumo Financeiro
+- Notas/Observações
+
+### O que falta
+Apenas o **botão de excluir** no dropdown de ações da tabela.
+
+---
+
+## Alteração Necessária
+
+### Ficheiro: `src/pages/OrcamentosPage.tsx`
+
+**1. Adicionar import do ícone Trash2:**
+```tsx
+import { Search, Plus, FileText, Check, X, ArrowRight, Trash2 } from 'lucide-react';
+```
+
+**2. Adicionar AlertDialog para confirmação de exclusão:**
+```tsx
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+```
+
+**3. Adicionar estados para controlar a exclusão:**
+```tsx
+const [budgetToDelete, setBudgetToDelete] = useState<any | null>(null);
+const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+```
+
+**4. Adicionar função para excluir:**
+```tsx
+const handleDeleteBudget = async () => {
+  if (!budgetToDelete) return;
+  
+  try {
+    const { error } = await supabase
+      .from('budgets')
+      .delete()
+      .eq('id', budgetToDelete.id);
+
+    if (error) throw error;
+    
+    toast.success('Orçamento excluído com sucesso!');
+    refetch();
+  } catch (error) {
+    console.error('Error deleting budget:', error);
+    toast.error('Erro ao excluir orçamento');
+  } finally {
+    setBudgetToDelete(null);
+    setShowDeleteConfirm(false);
+  }
+};
+```
+
+**5. Adicionar item de menu "Excluir" no dropdown:**
+```tsx
+<DropdownMenuItem
+  className="text-red-600 focus:text-red-600"
+  onClick={(e) => {
+    e.stopPropagation();
+    setBudgetToDelete(budget);
+    setShowDeleteConfirm(true);
+  }}
+>
+  <Trash2 className="h-4 w-4 mr-2" />
+  Excluir
+</DropdownMenuItem>
+```
+
+**6. Adicionar AlertDialog de confirmação:**
+```tsx
+<AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Excluir Orçamento?</AlertDialogTitle>
+      <AlertDialogDescription>
+        Esta ação não pode ser desfeita. O orçamento {budgetToDelete?.code} será 
+        permanentemente removido do sistema.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel onClick={() => setBudgetToDelete(null)}>
+        Cancelar
+      </AlertDialogCancel>
+      <AlertDialogAction 
+        className="bg-red-600 hover:bg-red-700"
+        onClick={handleDeleteBudget}
+      >
+        Excluir
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
 
 ---
 
@@ -15,201 +133,37 @@ A secção de artigos só aparece quando há dados, mas deveria mostrar uma mens
 
 | Ficheiro | Acção |
 |----------|-------|
-| `src/pages/OrcamentosPage.tsx` | Alterar colunas da tabela |
-| `src/components/shared/BudgetDetailPanel.tsx` | Sempre mostrar secção de artigos |
+| `src/pages/OrcamentosPage.tsx` | Adicionar botão excluir e AlertDialog de confirmação |
 
 ---
 
-## Alterações Detalhadas
+## Resultado Visual
 
-### 1. OrcamentosPage.tsx
-
-**Adicionar função helper para extrair artigo:**
-
-```typescript
-// Após formatCurrency
-const getFirstArticle = (budget: any) => {
-  if (!budget.pricing_description) return null;
-  try {
-    const parsed = JSON.parse(budget.pricing_description);
-    if (parsed.items && parsed.items.length > 0) {
-      return {
-        name: parsed.items[0].description || '-',
-        ref: parsed.items[0].ref || '-',
-        count: parsed.items.length
-      };
-    }
-  } catch { }
-  return null;
-};
-```
-
-**Novas colunas do cabeçalho:**
-
-```tsx
-<TableHeader>
-  <TableRow>
-    <TableHead>Código</TableHead>
-    <TableHead>Cliente</TableHead>
-    <TableHead>Artigo</TableHead>
-    <TableHead>Ref.</TableHead>
-    <TableHead className="text-center">Qtd</TableHead>
-    <TableHead className="text-right">Total</TableHead>
-    <TableHead>Estado</TableHead>
-    <TableHead className="text-right">Ações</TableHead>
-  </TableRow>
-</TableHeader>
-```
-
-**Novas células nas linhas:**
-
-```tsx
-{filteredBudgets.map((budget) => {
-  const statusConfig = STATUS_CONFIG[budget.status as keyof typeof STATUS_CONFIG];
-  const firstArticle = getFirstArticle(budget);
-
-  return (
-    <TableRow key={budget.id} ...>
-      <TableCell className="font-mono font-semibold text-primary">
-        {budget.code}
-      </TableCell>
-      <TableCell className="font-medium">
-        {budget.customer?.name || 'Sem cliente'}
-      </TableCell>
-      {/* Artigo - nome do primeiro artigo */}
-      <TableCell className="max-w-[180px] truncate">
-        {firstArticle?.name || '-'}
-      </TableCell>
-      {/* Referência */}
-      <TableCell className="font-mono text-xs text-muted-foreground">
-        {firstArticle?.ref || '-'}
-      </TableCell>
-      {/* Quantidade de artigos */}
-      <TableCell className="text-center">
-        {firstArticle ? (
-          <Badge variant="outline" className="text-xs">
-            {firstArticle.count} {firstArticle.count === 1 ? 'artigo' : 'artigos'}
-          </Badge>
-        ) : '-'}
-      </TableCell>
-      <TableCell className="text-right font-bold text-orange-600">
-        {formatCurrency(budget.estimated_total)}
-      </TableCell>
-      {/* Estado e Ações mantêm-se iguais */}
-    </TableRow>
-  );
-})}
+### Dropdown de Ações (Actualizado):
+```text
+┌──────────────────────────┐
+│ 📄 Ver Detalhes          │
+│ ✓ Aprovar                │  ← só se pendente
+│ ✗ Recusar                │  ← só se pendente
+│ → Converter em Serviço   │  ← só se aprovado
+│──────────────────────────│
+│ 🗑 Excluir (vermelho)    │  ← NOVO
+└──────────────────────────┘
 ```
 
 ---
 
-### 2. BudgetDetailPanel.tsx
+## Nota sobre Coerência
 
-**Sempre mostrar secção de artigos (com fallback para orçamentos antigos):**
+O painel lateral (`BudgetDetailPanel`) já está **100% coerente** com o modal de criação:
 
-Substituir a condição `{pricingDetails.items.length > 0 && (...)}` por:
+| Modal de Criação | Painel de Consulta |
+|------------------|---------------------|
+| Cliente (Nome, Telefone, NIF) | ✅ Secção "Cliente" |
+| Aparelho (Tipo, Marca, Modelo) | ✅ Secção "Aparelho" |
+| Descrição da Avaria | ✅ Secção "Descrição da Avaria" |
+| Artigos (Ref, Artigo, Descrição, Qtd, Valor, IVA) | ✅ Secção "Artigos do Orçamento" |
+| Totais (Subtotal, IVA, Total) | ✅ Secção "Resumo Financeiro" |
+| Observação | ✅ Secção "Notas / Observações" |
 
-```tsx
-{/* Articles Section - sempre visível */}
-<div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
-  <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
-    <ShoppingCart className="h-4 w-4" />
-    Artigos do Orçamento
-  </h3>
-  
-  {pricingDetails.items.length > 0 ? (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-1.5 font-medium">Ref.</th>
-            <th className="text-left py-1.5 font-medium">Descrição</th>
-            <th className="text-center py-1.5 font-medium">Qtd</th>
-            <th className="text-right py-1.5 font-medium">Valor</th>
-            <th className="text-center py-1.5 font-medium">IVA</th>
-            <th className="text-right py-1.5 font-medium">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pricingDetails.items.map((item, index) => {
-            const lineSubtotal = item.qty * item.price;
-            const lineTax = lineSubtotal * (item.tax / 100);
-            const lineTotal = lineSubtotal + lineTax;
-            
-            return (
-              <tr key={index} className="border-b last:border-0">
-                <td className="py-1.5">{item.ref || '-'}</td>
-                <td className="py-1.5">
-                  {item.description}
-                  {item.details && (
-                    <span className="text-muted-foreground block text-[10px]">
-                      {item.details}
-                    </span>
-                  )}
-                </td>
-                <td className="py-1.5 text-center">{item.qty}</td>
-                <td className="py-1.5 text-right">{formatCurrency(item.price)}</td>
-                <td className="py-1.5 text-center">{item.tax}%</td>
-                <td className="py-1.5 text-right font-medium">{formatCurrency(lineTotal)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <p className="text-sm text-muted-foreground italic">
-      Orçamento criado sem artigos detalhados. Valor total: {formatCurrency(pricingDetails.total)}
-    </p>
-  )}
-</div>
-```
-
----
-
-## Comparação Visual
-
-### Tabela ANTES:
-```text
-| Código    | Cliente | Aparelho | Avaria | Total     | Estado   |
-|-----------|---------|----------|--------|-----------|----------|
-| ORC-00003 | Pedro   | -        | -      | 2000,00 € | Pendente |
-```
-
-### Tabela DEPOIS:
-```text
-| Código    | Cliente | Artigo      | Ref.   | Qtd       | Total     | Estado   |
-|-----------|---------|-------------|--------|-----------|-----------|----------|
-| ORC-00003 | Pedro   | Mão de Obra | REF01  | 1 artigo  | 2000,00 € | Pendente |
-```
-
-### Painel Lateral (Orçamento sem artigos detalhados):
-```text
-┌─────────────────────────────────────────────┐
-│ 🛒 Artigos do Orçamento                     │
-│                                             │
-│ Orçamento criado sem artigos detalhados.    │
-│ Valor total: 2000,00 €                      │
-└─────────────────────────────────────────────┘
-```
-
-### Painel Lateral (Orçamento com artigos):
-```text
-┌─────────────────────────────────────────────────────────┐
-│ 🛒 Artigos do Orçamento                                 │
-│                                                         │
-│ Ref.   │ Descrição     │ Qtd │ Valor   │ IVA │ Total   │
-│ REF01  │ Mão de Obra   │  1  │ 2000 €  │ 23% │ 2460 €  │
-│        │ Reparação...  │     │         │     │         │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## Resultado Esperado
-
-1. Colunas da tabela mostram o primeiro artigo, referência e quantidade total de artigos
-2. Painel lateral sempre mostra a secção "Artigos do Orçamento"
-3. Orçamentos antigos (sem `pricing_description`) mostram mensagem informativa
-4. Novos orçamentos mostram tabela completa com todos os artigos
-5. Interface coerente entre modal de criação, tabela e painel de consulta
+O modal de criação já permite adicionar múltiplos artigos através do botão "Adicionar Linha".
