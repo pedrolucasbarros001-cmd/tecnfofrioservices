@@ -1,206 +1,143 @@
 
-# Plano: Corrigir Orçamentos - Guardar Artigos e Funcionalidade de Impressão
+# Plano: Corrigir Exibição de Artigos e Aparelho no Orçamento
 
-## Problema Identificado
+## Problema Diagnosticado
 
-### 1. Dados não são guardados (Aparelho/Artigos vazios)
-Ao criar um orçamento no modal `CreateBudgetModal`, os **itens/artigos detalhados** (referência, nome, descrição, quantidade, valor, IVA) são calculados para obter os totais mas **nunca são guardados** na base de dados.
+Analisei a base de dados e o código, e descobri **dois problemas**:
 
-**Causa:** A tabela `budgets` não tem uma coluna `pricing_description` para armazenar o JSON dos artigos (ao contrário da tabela `services` que tem).
+### 1. Orçamentos antigos sem dados
+Os orçamentos ORC-00001 e ORC-00002 foram criados antes das últimas alterações:
+- `pricing_description` está **null** (não guardava os artigos)
+- `appliance_type`, `brand`, `model` estão **null**
 
-**Resultado:** No painel de detalhes, a secção "Aparelho" aparece vazia porque `appliance_type`, `brand`, `model` são `null`.
-
-### 2. Botão "Imprimir" não funciona
-O botão está presente no `BudgetDetailPanel` mas não executa qualquer acção:
-```tsx
-<Button variant="outline" size="sm">
-  <Printer className="h-4 w-4 mr-2" />
-  Imprimir
-</Button>
-```
-Falta o `onClick` e não existe página de impressão para orçamentos.
+### 2. Formulário não tem campos de Aparelho
+O `CreateBudgetModal` tem os campos `appliance_type`, `brand`, `model` definidos no schema mas **não existem inputs visíveis** no formulário para preenchê-los. Por isso, a secção "Aparelho" fica sempre vazia.
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Parte 1: Adicionar coluna `pricing_description` à tabela budgets
+### Parte 1: Adicionar secção "Aparelho" ao formulário de criação
 
-Nova migração SQL para adicionar a coluna:
-```sql
-ALTER TABLE budgets ADD COLUMN pricing_description TEXT;
-```
+No `CreateBudgetModal`, adicionar uma secção entre "Cliente" e "Artigos" com os campos:
+- Tipo de Aparelho (input texto)
+- Marca (input texto)
+- Modelo (input texto)
+- Descrição da Avaria (textarea - já existe mas está deslocado)
 
-### Parte 2: Guardar artigos no CreateBudgetModal
+### Parte 2: Melhorar exibição no BudgetDetailPanel
 
-Alterar a função `processSubmit` para serializar os items como JSON:
+- Combinar a secção "Aparelho" com os "Artigos do Orçamento" numa apresentação mais coerente
+- Se não houver dados de aparelho, esconder a secção em vez de mostrar em branco
+- Garantir que os artigos são sempre exibidos quando existem
 
-```typescript
-// Antes
-const { error } = await supabase.from('budgets').insert({
-  // ... outros campos
-  estimated_labor: subtotal,
-  estimated_parts: 0,
-  estimated_total: total,
-});
+### Parte 3: Garantir novos orçamentos guardam todos os dados
 
-// Depois
-const pricingData = {
-  items: values.items.map(item => ({
-    ref: item.reference,
-    description: item.name,
-    details: item.description,
-    qty: item.quantity,
-    price: item.unit_price,
-    tax: item.tax_rate,
-  })),
-};
-
-const { error } = await supabase.from('budgets').insert({
-  // ... outros campos
-  estimated_labor: subtotal,
-  estimated_parts: totalTax,
-  estimated_total: total,
-  pricing_description: JSON.stringify(pricingData),
-});
-```
-
-### Parte 3: Exibir artigos no BudgetDetailPanel
-
-Adicionar secção "Artigos" no painel de detalhes que mostra os items do JSON:
-
-```tsx
-{/* Artigos Section - NOVO */}
-{budget.pricing_description && (() => {
-  try {
-    const parsed = JSON.parse(budget.pricing_description);
-    if (parsed.items?.length > 0) {
-      return (
-        <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 p-4">
-          <h3 className="font-semibold text-sm text-purple-700 mb-3">
-            Artigos do Orçamento
-          </h3>
-          <table className="w-full text-sm">
-            {/* Cabeçalho e linhas dos artigos */}
-          </table>
-        </div>
-      );
-    }
-  } catch { /* ignore */ }
-  return null;
-})()}
-```
-
-### Parte 4: Criar página de impressão BudgetPrintPage
-
-Criar novo ficheiro `src/pages/BudgetPrintPage.tsx` baseado no `ServicePrintPage`, adaptado para orçamentos:
-- Usa mesmo layout A4
-- Mostra informação do cliente
-- Mostra tabela de artigos com IVA
-- Mostra totais (Subtotal, IVA, Total)
-- Indica validade do orçamento
-- Inclui termos/condições
-
-### Parte 5: Adicionar rota no App.tsx
-
-```tsx
-// Depois das rotas de impressão existentes
-<Route path="/print/budget/:budgetId" element={<BudgetPrintPage />} />
-```
-
-### Parte 6: Conectar botão "Imprimir" no BudgetDetailPanel
-
-```tsx
-import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
-
-// No botão
-<Button 
-  variant="outline" 
-  size="sm"
-  onClick={() => openInNewTabPreservingQuery(`/print/budget/${budget.id}`)}
->
-  <Printer className="h-4 w-4 mr-2" />
-  Imprimir
-</Button>
-```
+Verificar que o `processSubmit` está a passar correctamente:
+- `appliance_type`
+- `brand`
+- `model`
+- `fault_description`
+- `pricing_description` (JSON dos artigos)
 
 ---
 
-## Ficheiros a Alterar/Criar
+## Ficheiros a Alterar
 
 | Ficheiro | Acção | Descrição |
 |----------|-------|-----------|
-| `supabase/migrations/[timestamp]_add_budget_pricing.sql` | Criar | Adicionar coluna pricing_description |
-| `src/components/modals/CreateBudgetModal.tsx` | Alterar | Guardar items como JSON em pricing_description |
-| `src/components/shared/BudgetDetailPanel.tsx` | Alterar | Exibir artigos + conectar botão imprimir |
-| `src/pages/BudgetPrintPage.tsx` | Criar | Nova página de impressão A4 para orçamentos |
-| `src/App.tsx` | Alterar | Adicionar rota /print/budget/:budgetId |
-| `src/integrations/supabase/types.ts` | Alterar | Adicionar pricing_description ao tipo Budget |
+| `src/components/modals/CreateBudgetModal.tsx` | Alterar | Adicionar campos visíveis para Aparelho |
+| `src/components/shared/BudgetDetailPanel.tsx` | Alterar | Esconder secção Aparelho se vazia, melhorar layout |
 
 ---
 
-## Estrutura do JSON (pricing_description)
+## Alterações Detalhadas
 
-```json
-{
-  "items": [
-    {
-      "ref": "REF001",
-      "description": "Mão de Obra",
-      "details": "Reparação de compressor",
-      "qty": 2,
-      "price": 100.00,
-      "tax": 23
-    }
-  ]
-}
+### CreateBudgetModal.tsx
+
+**Nova secção "Aparelho" após Cliente:**
+
+```tsx
+<Separator />
+
+{/* Appliance Section - NOVO */}
+<div className="space-y-4">
+  <h3 className="font-semibold text-lg">Aparelho</h3>
+  <div className="grid grid-cols-3 gap-4">
+    <FormField
+      control={form.control}
+      name="appliance_type"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Tipo de Aparelho</FormLabel>
+          <FormControl>
+            <Input placeholder="Ex: Frigorífico" {...field} />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="brand"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Marca</FormLabel>
+          <FormControl>
+            <Input placeholder="Ex: Samsung" {...field} />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="model"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Modelo</FormLabel>
+          <FormControl>
+            <Input placeholder="Ex: RT38K50" {...field} />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+  </div>
+  <FormField
+    control={form.control}
+    name="fault_description"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Descrição da Avaria</FormLabel>
+        <FormControl>
+          <Textarea 
+            placeholder="Descreva o problema reportado pelo cliente..."
+            rows={2}
+            {...field} 
+          />
+        </FormControl>
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
----
+### BudgetDetailPanel.tsx
 
-## Layout da Página de Impressão do Orçamento
+**Esconder secções vazias:**
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  [LOGO]    TECNOFRIO           Orçamento: ORC-00001         │
-│            Contactos da empresa          Data: 06/02/2026   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  CLIENTE                                                    │
-│  Nome: Pedro Lucas                                          │
-│  Telefone: 997654765        NIF: 688098542                  │
-│  Morada: ...                                                │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ARTIGOS                                                    │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Ref.  │ Descrição      │ Qtd │ Valor │ IVA │ Total  │   │
-│  ├───────┼────────────────┼─────┼───────┼─────┼────────┤   │
-│  │ REF01 │ Mão de Obra    │  1  │ 2000€ │ 23% │ 2460€  │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                             │
-│                              Subtotal:     2000.00 €        │
-│                              IVA:           460.00 €        │
-│                              ─────────────────────────      │
-│                              TOTAL:        2460.00 €        │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  OBSERVAÇÕES                                                │
-│  [Notas do orçamento]                                       │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  Válido até: [data] | Orçamento sujeito a confirmação       │
-└─────────────────────────────────────────────────────────────┘
+```tsx
+{/* Appliance Section - só mostra se tiver dados */}
+{(budget.appliance_type || budget.brand || budget.model) && (
+  <div className="rounded-lg border-l-4 border-l-pink-500 ...">
+    {/* conteúdo existente */}
+  </div>
+)}
 ```
 
 ---
 
 ## Resultado Esperado
 
-1. ✅ Artigos do orçamento são guardados na BD (coluna pricing_description)
-2. ✅ Painel de detalhes mostra artigos com referência, descrição, qtd, valor e IVA
-3. ✅ Secção "Aparelho" mostra dados correctamente (se preenchidos)
-4. ✅ Botão "Imprimir" abre página de impressão em nova aba
-5. ✅ Página de impressão usa mesmo estilo das fichas de serviço (A4)
-6. ✅ PDF pode ser descarregado
+1. Ao criar um orçamento, o utilizador pode preencher o tipo de aparelho, marca e modelo
+2. A secção "Aparelho" só aparece na ficha de consulta se tiver dados
+3. Os artigos são sempre exibidos correctamente com referência, descrição, quantidade, valor e IVA
+4. Orçamentos antigos continuam a funcionar (mostram apenas o resumo financeiro)
