@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, FileText, Check, X, ArrowRight } from 'lucide-react';
+import { Search, Plus, FileText, Check, X, ArrowRight, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +28,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
 import { ConvertBudgetModal } from '@/components/modals/ConvertBudgetModal';
 import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
@@ -49,6 +59,8 @@ export default function OrcamentosPage() {
   const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
   const [budgetToConvert, setBudgetToConvert] = useState<any | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<any | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: budgets = [], isLoading, refetch } = useQuery({
     queryKey: ['budgets'],
@@ -93,6 +105,28 @@ export default function OrcamentosPage() {
     } catch (error) {
       console.error('Error updating budget:', error);
       toast.error('Erro ao atualizar orçamento');
+    }
+  };
+
+  const handleDeleteBudget = async () => {
+    if (!budgetToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('budgets')
+        .delete()
+        .eq('id', budgetToDelete.id);
+
+      if (error) throw error;
+      
+      toast.success('Orçamento excluído com sucesso!');
+      refetch();
+    } catch (error) {
+      console.error('Error deleting budget:', error);
+      toast.error('Erro ao excluir orçamento');
+    } finally {
+      setBudgetToDelete(null);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -286,6 +320,17 @@ export default function OrcamentosPage() {
                                 Converter em Serviço
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBudgetToDelete(budget);
+                                setShowDeleteConfirm(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -320,6 +365,30 @@ export default function OrcamentosPage() {
         budget={selectedBudget}
         onUpdate={() => refetch()}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Orçamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O orçamento {budgetToDelete?.code} será 
+              permanentemente removido do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBudgetToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteBudget}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

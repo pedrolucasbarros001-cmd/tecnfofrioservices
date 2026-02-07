@@ -74,15 +74,17 @@ const formSchema = z.object({
   fault_description: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
+  discount_value: z.number().optional().default(0),
+  discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 const TAX_RATES = [
-  { value: 0, label: '0%' },
-  { value: 6, label: '6%' },
-  { value: 13, label: '13%' },
-  { value: 23, label: '23%' },
+  { value: 0, label: '0% (Isento)' },
+  { value: 6, label: '6% (IVA6)' },
+  { value: 13, label: '13% (IVA13)' },
+  { value: 23, label: '23% (IVA23)' },
 ];
 
 interface CreateBudgetModalProps {
@@ -111,6 +113,8 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       items: [
         { reference: '', name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
       ],
+      discount_value: 0,
+      discount_type: 'fixed' as const,
     },
   });
 
@@ -192,7 +196,15 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
   const subtotal = watchItems.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
   const totalTax = watchItems.reduce((sum, item) => sum + calculateItemTax(item), 0);
-  const total = subtotal + totalTax;
+  
+  const discountValue = form.watch('discount_value') || 0;
+  const discountType = form.watch('discount_type') || 'fixed';
+  
+  const discountAmount = discountType === 'percentage' 
+    ? subtotal * (discountValue / 100) 
+    : discountValue;
+  
+  const total = subtotal - discountAmount + totalTax;
 
   const handleSubmit = async (values: FormValues) => {
     if (!selectedCustomer && !foundCustomer) {
@@ -229,6 +241,9 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
           price: item.unit_price,
           tax: item.tax_rate,
         })),
+        discount: discountAmount,
+        discountType: discountType,
+        discountValue: discountValue,
       };
 
       const { error } = await supabase.from('budgets').insert({
@@ -672,11 +687,42 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
                   {/* Totals */}
                   <div className="flex justify-end">
-                    <div className="w-[300px] space-y-2 p-4 bg-muted/50 rounded-lg">
+                    <div className="w-[380px] space-y-2 p-4 bg-muted/50 rounded-lg">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal:</span>
                         <span className="font-semibold">{formatCurrency(subtotal)}</span>
                       </div>
+                      
+                      {/* Discount Field */}
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Desconto:</span>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            className="w-20 h-8 text-right"
+                            value={discountValue}
+                            onChange={(e) => form.setValue('discount_value', parseFloat(e.target.value) || 0)}
+                          />
+                          <Select
+                            value={discountType}
+                            onValueChange={(v) => form.setValue('discount_type', v as 'fixed' | 'percentage')}
+                          >
+                            <SelectTrigger className="w-16 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fixed">€</SelectItem>
+                              <SelectItem value="percentage">%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <span className="font-semibold text-destructive w-20 text-right">
+                            -{formatCurrency(discountAmount)}
+                          </span>
+                        </div>
+                      </div>
+                      
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">IVA Total:</span>
                         <span className="font-semibold">{formatCurrency(totalTax)}</span>
@@ -684,7 +730,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                       <Separator />
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total:</span>
-                        <span className="text-purple-600">{formatCurrency(total)}</span>
+                        <span className="text-primary">{formatCurrency(total)}</span>
                       </div>
                     </div>
                   </div>

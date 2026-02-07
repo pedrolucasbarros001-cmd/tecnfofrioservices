@@ -68,7 +68,8 @@ export function BudgetDetailPanel({
         items: [] as BudgetItem[], 
         subtotal: budget?.estimated_labor || 0, 
         iva: budget?.estimated_parts || 0,
-        total: budget?.estimated_total || 0
+        total: budget?.estimated_total || 0,
+        discount: 0
       };
     }
     
@@ -85,11 +86,14 @@ export function BudgetDetailPanel({
           return sum + ((item.qty * item.price) * (item.tax / 100));
         }, 0);
         
+        const discount = parsed.discount || 0;
+        
         return { 
           items, 
           subtotal, 
           iva,
-          total: subtotal + iva
+          discount,
+          total: subtotal - discount + iva
         };
       }
     } catch {
@@ -100,7 +104,8 @@ export function BudgetDetailPanel({
       items: [] as BudgetItem[], 
       subtotal: budget?.estimated_labor || 0, 
       iva: budget?.estimated_parts || 0,
-      total: budget?.estimated_total || 0
+      total: budget?.estimated_total || 0,
+      discount: 0
     };
   }, [budget?.pricing_description, budget?.estimated_labor, budget?.estimated_parts, budget?.estimated_total]);
 
@@ -300,6 +305,14 @@ export function BudgetDetailPanel({
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>{formatCurrency(pricingDetails.subtotal)}</span>
                   </div>
+                  
+                  {pricingDetails.discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Desconto</span>
+                      <span className="text-destructive">-{formatCurrency(pricingDetails.discount)}</span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">IVA</span>
                     <span>{formatCurrency(pricingDetails.iva)}</span>
