@@ -441,6 +441,71 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
                   <Separator />
 
+                  {/* Appliance Section */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Aparelho</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="appliance_type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Aparelho</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Frigorífico" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="brand"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Marca</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Samsung" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="model"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Modelo</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: RT38K50" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="fault_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrição da Avaria</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Descreva o problema reportado pelo cliente..."
+                              rows={2}
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Separator />
+
                   {/* Items Section */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
