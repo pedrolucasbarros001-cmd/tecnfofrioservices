@@ -1,21 +1,39 @@
 
-# Plano: Alinhar Modal de Criação de Orçamento com as Imagens
 
-## Comparação: Modal Actual vs Imagem de Referência
+# Plano: Simplificar Modal de Criação de Orçamento
 
-### Modal Actual
-| Ref. | Artigo | Descrição | Qtd | Valor (€) | Imposto | Subtotal (€) | X |
-|------|--------|-----------|-----|-----------|---------|--------------|---|
-| (input) | (input) | (input) | 1 | 0 | 23% (IVA23) | 0,00 € | 🗑 |
+## Problema Identificado
 
-**8 colunas** - IVA mostra: "23% (IVA23)"
+O modal de criação de orçamento actual contém:
+- **Secção Cliente** (Nome, Telefone, NIF, Técnico Sugerido, Observação)
+- **Secção Aparelho** (Tipo de Aparelho, Marca, Modelo, Descrição da Avaria)
+- **Secção Artigos** (tabela com itens)
 
-### Imagem de Referência (O que o utilizador quer)
-| Artigo | Descrição | Qtd | Valor (€) | Imposto | Subtotal (€) |
-|--------|-----------|-----|-----------|---------|--------------|
-| Ex: Compressor | Detalh | 1 | 0 | 23% ▼ | 0,00 € |
+O utilizador quer que o modal seja **igual às imagens de referência** - focado apenas na **tabela de artigos** com a capacidade de adicionar quantos itens quiser.
 
-**6 colunas** - IVA mostra apenas: "0%", "6%", "13%", "23%"
+---
+
+## Estrutura Desejada (Baseada nas Imagens)
+
+O modal deve ter apenas:
+
+1. **Tabela de Artigos** com colunas:
+   - Artigo
+   - Descrição
+   - Qtd
+   - Valor (€)
+   - Imposto (dropdown: 0%, 6%, 13%, 23%)
+   - Subtotal (€)
+
+2. **Botão "Adicionar Linha"** para adicionar mais artigos
+
+3. **Resumo de Totais**:
+   - Subtotal
+   - Desconto (input + €/%)
+   - IVA Total
+   - Total
+
+4. **Botões**: Cancelar | Guardar Orçamento
 
 ---
 
@@ -25,40 +43,16 @@
 
 | Alteração | Descrição |
 |-----------|-----------|
-| Remover coluna "Ref." | Eliminar campo de referência da tabela |
-| Simplificar labels IVA | Alterar de "23% (IVA23)" para apenas "23%" |
-| Remover coluna do botão delete | Integrar X apenas quando houver mais de 1 linha |
-| Ajustar placeholders | Usar "Ex: Compressor" e "Detalh" como na imagem |
+| Remover secção "Cliente" | Eliminar campos Nome, Telefone, NIF, Técnico, Observação |
+| Remover secção "Aparelho" | Eliminar campos Tipo, Marca, Modelo, Descrição da Avaria |
+| Remover lógica de auto-detecção de cliente | Eliminar useEffect e estados relacionados |
+| Simplificar schema | Remover campos de cliente e aparelho do Zod schema |
+| Manter apenas artigos | Focar o modal apenas na tabela de itens e totais |
 
 ---
 
-## Detalhes Técnicos
+## Novo Schema Simplificado
 
-### 1. Actualizar TAX_RATES (linha 83-88)
-
-**Antes:**
-```typescript
-const TAX_RATES = [
-  { value: 0, label: '0% (Isento)' },
-  { value: 6, label: '6% (IVA6)' },
-  { value: 13, label: '13% (IVA13)' },
-  { value: 23, label: '23% (IVA23)' },
-];
-```
-
-**Depois:**
-```typescript
-const TAX_RATES = [
-  { value: 0, label: '0%' },
-  { value: 6, label: '6%' },
-  { value: 13, label: '13%' },
-  { value: 23, label: '23%' },
-];
-```
-
-### 2. Remover campo "Referência" do item schema e default values
-
-**Linha 57-64 - itemSchema:**
 ```typescript
 const itemSchema = z.object({
   name: z.string().min(1, 'Nome do artigo é obrigatório'),
@@ -67,221 +61,128 @@ const itemSchema = z.object({
   unit_price: z.number().min(0, 'Valor deve ser positivo'),
   tax_rate: z.number(),
 });
-```
 
-**Linha 113 - defaultValues:**
-```typescript
-items: [
-  { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
-],
-```
-
-### 3. Simplificar cabeçalho da tabela (linha 543-553)
-
-**Antes (8 colunas):**
-```tsx
-<TableRow>
-  <TableHead className="w-[100px]">Ref.</TableHead>
-  <TableHead className="w-[180px]">Artigo</TableHead>
-  <TableHead>Descrição</TableHead>
-  <TableHead className="w-[80px]">Qtd</TableHead>
-  <TableHead className="w-[120px]">Valor (€)</TableHead>
-  <TableHead className="w-[100px]">Imposto</TableHead>
-  <TableHead className="w-[120px] text-right">Subtotal (€)</TableHead>
-  <TableHead className="w-[50px]"></TableHead>
-</TableRow>
-```
-
-**Depois (6 colunas):**
-```tsx
-<TableRow>
-  <TableHead className="min-w-[200px]">Artigo</TableHead>
-  <TableHead className="min-w-[150px]">Descrição</TableHead>
-  <TableHead className="w-[80px]">Qtd</TableHead>
-  <TableHead className="w-[120px]">Valor (€)</TableHead>
-  <TableHead className="w-[100px]">Imposto</TableHead>
-  <TableHead className="w-[120px] text-right">Subtotal (€)</TableHead>
-</TableRow>
-```
-
-### 4. Simplificar linhas da tabela (linha 556-681)
-
-Remover célula de Referência e integrar botão de delete na última coluna:
-
-```tsx
-{fields.map((field, index) => {
-  const item = watchItems[index];
-  const itemSubtotal = item ? calculateItemSubtotal(item) : 0;
-
-  return (
-    <TableRow key={field.id}>
-      {/* Artigo */}
-      <TableCell>
-        <FormField
-          control={form.control}
-          name={`items.${index}.name`}
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input placeholder="Ex: Compressor" {...field} />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </TableCell>
-      
-      {/* Descrição */}
-      <TableCell>
-        <FormField
-          control={form.control}
-          name={`items.${index}.description`}
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input placeholder="Detalh" {...field} />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </TableCell>
-      
-      {/* Qtd */}
-      <TableCell>
-        <FormField
-          control={form.control}
-          name={`items.${index}.quantity`}
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={1}
-                  {...field}
-                  onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </TableCell>
-      
-      {/* Valor (€) */}
-      <TableCell>
-        <FormField
-          control={form.control}
-          name={`items.${index}.unit_price`}
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  {...field}
-                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </TableCell>
-      
-      {/* Imposto */}
-      <TableCell>
-        <FormField
-          control={form.control}
-          name={`items.${index}.tax_rate`}
-          render={({ field }) => (
-            <FormItem>
-              <Select
-                value={field.value.toString()}
-                onValueChange={(v) => field.onChange(parseInt(v))}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {TAX_RATES.map((rate) => (
-                    <SelectItem key={rate.value} value={rate.value.toString()}>
-                      {rate.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-      </TableCell>
-      
-      {/* Subtotal (€) com botão delete integrado */}
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-2">
-          <span className="font-medium">{formatCurrency(itemSubtotal)}</span>
-          {fields.length > 1 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => remove(index)}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-})}
-```
-
-### 5. Actualizar append para novo item (linha 533)
-
-```typescript
-onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })}
-```
-
-### 6. Actualizar serialização do pricingData (linha 235-247)
-
-Remover referência da serialização:
-```typescript
-const pricingData = {
-  items: values.items.map(item => ({
-    description: item.name,
-    details: item.description || '',
-    qty: item.quantity,
-    price: item.unit_price,
-    tax: item.tax_rate,
-  })),
-  discount: discountAmount,
-  discountType: discountType,
-  discountValue: discountValue,
-};
+const formSchema = z.object({
+  items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
+  discount_value: z.number().optional().default(0),
+  discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
+});
 ```
 
 ---
 
-## Resultado Visual Final
+## Nova Estrutura do Modal
 
-### Tabela de Artigos (Nova)
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Artigo          │ Descrição │ Qtd │ Valor (€) │ Imposto │ Subtotal (€)      │
+│  Criar Orçamento                                                        [X] │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ Ex: Compressor  │ Detalh    │  1  │     0     │ 23% ▼   │ 0,00 €        🗑  │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ Artigo          │ Descrição │ Qtd │ Valor (€) │ Imposto │ Subtotal   │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │ Ex: Compressor  │ Detalh    │  1  │     0     │ 23% ▼   │ 0,00 €  🗑 │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  [+ Adicionar Linha]                                                        │
+│                                                                             │
+│                                          ┌────────────────────────────────┐ │
+│                                          │ Subtotal:           2.980,00 € │ │
+│                                          │ Desconto: [0] [€▼]    -0,00 € │ │
+│                                          │ IVA Total:            685,40 € │ │
+│                                          │──────────────────────────────│ │
+│                                          │ Total:              3.665,40 € │ │
+│                                          └────────────────────────────────┘ │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                        [Cancelar]  [Guardar Orçamento]      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Dropdown de IVA (Simplificado)
-```text
-┌────────┐
-│ 0%     │
-│ 6%     │
-│ 13%    │
-│ 23%  ✓ │
-└────────┘
+---
+
+## Código a Remover
+
+### 1. Estados a remover (linhas 96-100):
+- `selectedCustomer`
+- `foundCustomer`
+- `showFoundCustomerBox`
+- `showCreateCustomerDialog`
+- `pendingFormValues`
+
+### 2. Campos do schema a remover (linhas 66-74):
+- `customer_name`
+- `customer_phone`
+- `customer_nif`
+- `technician_id`
+- `appliance_type`
+- `brand`
+- `model`
+- `fault_description`
+- `notes`
+
+### 3. useEffect de auto-detecção de cliente (linhas 130-168):
+- Eliminar completamente
+
+### 4. Funções a remover:
+- `handleSelectFoundCustomer` (linhas 170-179)
+- `handleIgnoreFoundCustomer` (linhas 181-184)
+- `handleConfirmCreateCustomer` (linhas 274-279)
+
+### 5. JSX a remover:
+- Secção "Cliente" completa (linhas 309-453)
+- Secção "Aparelho" completa (linhas 457-518)
+- Separadores entre secções
+- AlertDialog de criar cliente (linhas 737-755)
+
+### 6. Imports a remover:
+- `useTechnicians`
+- `useCreateCustomer`
+- `Check`, `UserPlus`
+
+---
+
+## Actualização do Submit
+
+A função `processSubmit` será simplificada para apenas guardar os artigos:
+
+```typescript
+const handleSubmit = async (values: FormValues) => {
+  setIsLoading(true);
+  try {
+    const pricingData = {
+      items: values.items.map(item => ({
+        description: item.name,
+        details: item.description || '',
+        qty: item.quantity,
+        price: item.unit_price,
+        tax: item.tax_rate,
+      })),
+      discount: discountAmount,
+      discountType: discountType,
+      discountValue: discountValue,
+    };
+
+    const { error } = await supabase.from('budgets').insert({
+      estimated_labor: subtotal,
+      estimated_parts: totalTax,
+      estimated_total: total,
+      status: 'pendente',
+      pricing_description: JSON.stringify(pricingData),
+    });
+
+    if (error) throw error;
+
+    toast.success('Orçamento criado com sucesso!');
+    handleClose();
+    onSuccess?.();
+  } catch (error) {
+    console.error('Error creating budget:', error);
+    toast.error('Erro ao criar orçamento');
+  } finally {
+    setIsLoading(false);
+  }
+};
 ```
 
 ---
@@ -290,5 +191,17 @@ const pricingData = {
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/modals/CreateBudgetModal.tsx` | Simplificar tabela: 6 colunas, labels IVA simples |
+| `src/components/modals/CreateBudgetModal.tsx` | Simplificar completamente - remover secções Cliente e Aparelho |
+
+---
+
+## Resultado Final
+
+O modal será focado apenas em:
+- Adicionar artigos/produtos/serviços
+- Definir quantidades, valores e impostos
+- Aplicar descontos
+- Ver totais calculados
+
+Isto alinha-se exactamente com as imagens de referência fornecidas pelo utilizador.
 
