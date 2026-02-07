@@ -2,16 +2,10 @@ import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  FileText,
   Printer,
   Check,
   X,
   ArrowRight,
-  Package,
   ShoppingCart,
 } from 'lucide-react';
 import {
@@ -177,71 +171,7 @@ export function BudgetDetailPanel({
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6">
-              {/* Customer Section */}
-              <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4">
-                <h3 className="font-semibold text-sm text-blue-700 dark:text-blue-400 mb-3 flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Cliente
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium text-foreground">{customer?.name || 'Sem cliente'}</p>
-                  {customer?.phone && (
-                    <p className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-3 w-3" />
-                      {customer.phone}
-                    </p>
-                  )}
-                  {customer?.email && (
-                    <p className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-3 w-3" />
-                      {customer.email}
-                    </p>
-                  )}
-                  {customer?.nif && (
-                    <p className="text-muted-foreground">NIF: {customer.nif}</p>
-                  )}
-                  {customer?.address && (
-                    <p className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {[customer.address, customer.postal_code, customer.city]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Appliance Section - só mostra se tiver dados */}
-              {(budget.appliance_type || budget.brand || budget.model) && (
-                <div className="rounded-lg border-l-4 border-l-pink-500 bg-pink-50 dark:bg-pink-950/20 p-4">
-                  <h3 className="font-semibold text-sm text-pink-700 dark:text-pink-400 mb-3 flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Aparelho
-                  </h3>
-                  <div className="space-y-1 text-sm">
-                    {budget.appliance_type && (
-                      <p className="font-medium text-foreground">{budget.appliance_type}</p>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 text-muted-foreground">
-                      {budget.brand && <span>Marca: {budget.brand}</span>}
-                      {budget.model && <span>Modelo: {budget.model}</span>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Fault Section */}
-              {budget.fault_description && (
-                <div className="rounded-lg border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/20 p-4">
-                  <h3 className="font-semibold text-sm text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Descrição da Avaria
-                  </h3>
-                  <p className="text-sm text-foreground">{budget.fault_description}</p>
-                </div>
-              )}
-
-              {/* Articles Section - sempre visível */}
+              {/* Articles Section */}
               <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
                 <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4" />
@@ -253,12 +183,12 @@ export function BudgetDetailPanel({
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-1.5 font-medium">Ref.</th>
+                          <th className="text-left py-1.5 font-medium">Artigo</th>
                           <th className="text-left py-1.5 font-medium">Descrição</th>
                           <th className="text-center py-1.5 font-medium">Qtd</th>
-                          <th className="text-right py-1.5 font-medium">Valor</th>
-                          <th className="text-center py-1.5 font-medium">IVA</th>
-                          <th className="text-right py-1.5 font-medium">Total</th>
+                          <th className="text-right py-1.5 font-medium">Valor (€)</th>
+                          <th className="text-center py-1.5 font-medium">Imposto</th>
+                          <th className="text-right py-1.5 font-medium">Subtotal (€)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -269,15 +199,8 @@ export function BudgetDetailPanel({
                           
                           return (
                             <tr key={index} className="border-b last:border-0">
-                              <td className="py-1.5">{item.ref || '-'}</td>
-                              <td className="py-1.5">
-                                {item.description}
-                                {item.details && (
-                                  <span className="text-muted-foreground block text-[10px]">
-                                    {item.details}
-                                  </span>
-                                )}
-                              </td>
+                              <td className="py-1.5 font-medium">{item.description}</td>
+                              <td className="py-1.5 text-muted-foreground">{item.details || '-'}</td>
                               <td className="py-1.5 text-center">{item.qty}</td>
                               <td className="py-1.5 text-right">{formatCurrency(item.price)}</td>
                               <td className="py-1.5 text-center">{item.tax}%</td>
@@ -325,22 +248,6 @@ export function BudgetDetailPanel({
                 </div>
               </div>
 
-              {/* Notes */}
-              {budget.notes && (
-                <div className="rounded-lg border-l-4 border-l-slate-400 bg-slate-50 dark:bg-slate-950/20 p-4">
-                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-400 mb-3">
-                    Notas / Observações
-                  </h3>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{budget.notes}</p>
-                </div>
-              )}
-
-              {/* Validity */}
-              {budget.valid_until && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Válido até {format(new Date(budget.valid_until), "d 'de' MMMM 'de' yyyy", { locale: pt })}
-                </p>
-              )}
             </div>
           </ScrollArea>
 
