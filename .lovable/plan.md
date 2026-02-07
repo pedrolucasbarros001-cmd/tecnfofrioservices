@@ -1,189 +1,162 @@
 
-
-# Plano: Simplificar Modal de Criação de Orçamento
+# Plano: Actualizar Painel Lateral de Orçamento
 
 ## Problema Identificado
 
-O modal de criação de orçamento actual contém:
-- **Secção Cliente** (Nome, Telefone, NIF, Técnico Sugerido, Observação)
-- **Secção Aparelho** (Tipo de Aparelho, Marca, Modelo, Descrição da Avaria)
-- **Secção Artigos** (tabela com itens)
+O painel lateral de consulta (`BudgetDetailPanel`) ainda mostra secções que já não existem no modal de criação simplificado:
+- Secção "Cliente" 
+- Secção "Aparelho"
+- Secção "Descrição da Avaria"
+- Secção "Notas / Observações"
+- Coluna "Ref." na tabela de artigos
 
-O utilizador quer que o modal seja **igual às imagens de referência** - focado apenas na **tabela de artigos** com a capacidade de adicionar quantos itens quiser.
+## Estrutura Desejada (Coerente com o Modal)
 
----
+O painel deve mostrar apenas:
 
-## Estrutura Desejada (Baseada nas Imagens)
+1. **Header**
+   - Código do orçamento
+   - Status (badge)
+   - Data de criação
+   - Botão imprimir
 
-O modal deve ter apenas:
-
-1. **Tabela de Artigos** com colunas:
+2. **Tabela de Artigos** (6 colunas):
    - Artigo
    - Descrição
    - Qtd
    - Valor (€)
-   - Imposto (dropdown: 0%, 6%, 13%, 23%)
+   - Imposto
    - Subtotal (€)
 
-2. **Botão "Adicionar Linha"** para adicionar mais artigos
-
-3. **Resumo de Totais**:
-   - Subtotal
-   - Desconto (input + €/%)
+3. **Resumo Financeiro**:
+   - Subtotal (s/ IVA)
+   - Desconto (se aplicável)
    - IVA Total
    - Total
 
-4. **Botões**: Cancelar | Guardar Orçamento
+4. **Acções** (footer)
+   - Aprovar / Recusar (se pendente)
+   - Converter em Serviço (se aprovado)
 
 ---
 
 ## Alterações Necessárias
 
-### Ficheiro: `src/components/modals/CreateBudgetModal.tsx`
+### Ficheiro: `src/components/shared/BudgetDetailPanel.tsx`
 
 | Alteração | Descrição |
 |-----------|-----------|
-| Remover secção "Cliente" | Eliminar campos Nome, Telefone, NIF, Técnico, Observação |
-| Remover secção "Aparelho" | Eliminar campos Tipo, Marca, Modelo, Descrição da Avaria |
-| Remover lógica de auto-detecção de cliente | Eliminar useEffect e estados relacionados |
-| Simplificar schema | Remover campos de cliente e aparelho do Zod schema |
-| Manter apenas artigos | Focar o modal apenas na tabela de itens e totais |
+| Remover secção "Cliente" | Eliminar linhas 180-212 |
+| Remover secção "Aparelho" | Eliminar linhas 214-231 |
+| Remover secção "Descrição da Avaria" | Eliminar linhas 233-242 |
+| Remover secção "Notas" | Eliminar linhas 328-336 |
+| Remover secção "Validade" | Eliminar linhas 338-343 |
+| Actualizar tabela de artigos | Remover coluna "Ref.", usar 6 colunas como no modal |
+| Remover imports não usados | `User`, `Phone`, `Mail`, `MapPin`, `FileText`, `Package` |
 
 ---
 
-## Novo Schema Simplificado
-
-```typescript
-const itemSchema = z.object({
-  name: z.string().min(1, 'Nome do artigo é obrigatório'),
-  description: z.string().optional(),
-  quantity: z.number().min(1, 'Quantidade mínima é 1'),
-  unit_price: z.number().min(0, 'Valor deve ser positivo'),
-  tax_rate: z.number(),
-});
-
-const formSchema = z.object({
-  items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
-  discount_value: z.number().optional().default(0),
-  discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
-});
-```
-
----
-
-## Nova Estrutura do Modal
+## Nova Estrutura do Painel
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Criar Orçamento                                                        [X] │
+│  ORC-001                                              [Pendente] [Imprimir] │
+│  Criado em 3 de Fevereiro de 2025                                           │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
+│  🛒 Artigos do Orçamento                                                    │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │ Artigo          │ Descrição │ Qtd │ Valor (€) │ Imposto │ Subtotal   │  │
+│  │ Artigo     │ Descrição │ Qtd │ Valor  │ Imposto │ Subtotal           │  │
 │  ├───────────────────────────────────────────────────────────────────────┤  │
-│  │ Ex: Compressor  │ Detalh    │  1  │     0     │ 23% ▼   │ 0,00 €  🗑 │  │
+│  │ Compressor │ Detalhe   │  1  │ €500   │ 23%     │ €615,00            │  │
+│  │ Mão-de-Obra│ Instalação│  1  │ €100   │ 23%     │ €123,00            │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
-│  [+ Adicionar Linha]                                                        │
-│                                                                             │
-│                                          ┌────────────────────────────────┐ │
-│                                          │ Subtotal:           2.980,00 € │ │
-│                                          │ Desconto: [0] [€▼]    -0,00 € │ │
-│                                          │ IVA Total:            685,40 € │ │
-│                                          │──────────────────────────────│ │
-│                                          │ Total:              3.665,40 € │ │
-│                                          └────────────────────────────────┘ │
+│  💰 Resumo Financeiro                                                       │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ Subtotal (s/ IVA):                                          €600,00  │  │
+│  │ Desconto:                                                    -€50,00  │  │
+│  │ IVA Total:                                                   €126,50  │  │
+│  │ ─────────────────────────────────────────────────────────────────────│  │
+│  │ Total:                                                       €676,50  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                        [Cancelar]  [Guardar Orçamento]      │
+│                               [Recusar]  [Aprovar]                          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Código a Remover
+## Código a Alterar
 
-### 1. Estados a remover (linhas 96-100):
-- `selectedCustomer`
-- `foundCustomer`
-- `showFoundCustomerBox`
-- `showCreateCustomerDialog`
-- `pendingFormValues`
+### 1. Actualizar imports (linha 4-16)
 
-### 2. Campos do schema a remover (linhas 66-74):
-- `customer_name`
-- `customer_phone`
-- `customer_nif`
-- `technician_id`
-- `appliance_type`
-- `brand`
-- `model`
-- `fault_description`
-- `notes`
+Remover imports não usados:
+```typescript
+import {
+  Printer,
+  Check,
+  X,
+  ArrowRight,
+  ShoppingCart,
+} from 'lucide-react';
+```
 
-### 3. useEffect de auto-detecção de cliente (linhas 130-168):
-- Eliminar completamente
+### 2. Remover secções do JSX (linha 180-343)
 
-### 4. Funções a remover:
-- `handleSelectFoundCustomer` (linhas 170-179)
-- `handleIgnoreFoundCustomer` (linhas 181-184)
-- `handleConfirmCreateCustomer` (linhas 274-279)
+Manter apenas:
+- Secção "Artigos do Orçamento" (actualizada sem coluna Ref.)
+- Secção "Resumo Financeiro"
 
-### 5. JSX a remover:
-- Secção "Cliente" completa (linhas 309-453)
-- Secção "Aparelho" completa (linhas 457-518)
-- Separadores entre secções
-- AlertDialog de criar cliente (linhas 737-755)
+### 3. Actualizar tabela de artigos (linha 253-289)
 
-### 6. Imports a remover:
-- `useTechnicians`
-- `useCreateCustomer`
-- `Check`, `UserPlus`
+Nova estrutura com 6 colunas (sem Ref.):
+```tsx
+<table className="w-full text-xs">
+  <thead>
+    <tr className="border-b">
+      <th className="text-left py-1.5 font-medium">Artigo</th>
+      <th className="text-left py-1.5 font-medium">Descrição</th>
+      <th className="text-center py-1.5 font-medium">Qtd</th>
+      <th className="text-right py-1.5 font-medium">Valor (€)</th>
+      <th className="text-center py-1.5 font-medium">Imposto</th>
+      <th className="text-right py-1.5 font-medium">Subtotal (€)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {pricingDetails.items.map((item, index) => {
+      const lineSubtotal = item.qty * item.price;
+      const lineTax = lineSubtotal * (item.tax / 100);
+      const lineTotal = lineSubtotal + lineTax;
+      
+      return (
+        <tr key={index} className="border-b last:border-0">
+          <td className="py-1.5 font-medium">{item.description}</td>
+          <td className="py-1.5 text-muted-foreground">
+            {item.details || '-'}
+          </td>
+          <td className="py-1.5 text-center">{item.qty}</td>
+          <td className="py-1.5 text-right">{formatCurrency(item.price)}</td>
+          <td className="py-1.5 text-center">{item.tax}%</td>
+          <td className="py-1.5 text-right font-medium">{formatCurrency(lineTotal)}</td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
+```
 
 ---
 
-## Actualização do Submit
+## Resultado Final
 
-A função `processSubmit` será simplificada para apenas guardar os artigos:
+O painel lateral será agora coerente com o modal de criação:
+- Mostra apenas os artigos registados
+- Cálculos de Subtotal, Desconto, IVA e Total
+- Acções de aprovação/recusa/conversão
 
-```typescript
-const handleSubmit = async (values: FormValues) => {
-  setIsLoading(true);
-  try {
-    const pricingData = {
-      items: values.items.map(item => ({
-        description: item.name,
-        details: item.description || '',
-        qty: item.quantity,
-        price: item.unit_price,
-        tax: item.tax_rate,
-      })),
-      discount: discountAmount,
-      discountType: discountType,
-      discountValue: discountValue,
-    };
-
-    const { error } = await supabase.from('budgets').insert({
-      estimated_labor: subtotal,
-      estimated_parts: totalTax,
-      estimated_total: total,
-      status: 'pendente',
-      pricing_description: JSON.stringify(pricingData),
-    });
-
-    if (error) throw error;
-
-    toast.success('Orçamento criado com sucesso!');
-    handleClose();
-    onSuccess?.();
-  } catch (error) {
-    console.error('Error creating budget:', error);
-    toast.error('Erro ao criar orçamento');
-  } finally {
-    setIsLoading(false);
-  }
-};
-```
+Todas as secções removidas (Cliente, Aparelho, Avaria, Notas) deixam de aparecer porque o modal simplificado não regista esses dados.
 
 ---
 
@@ -191,17 +164,4 @@ const handleSubmit = async (values: FormValues) => {
 
 | Ficheiro | Alteração |
 |----------|-----------|
-| `src/components/modals/CreateBudgetModal.tsx` | Simplificar completamente - remover secções Cliente e Aparelho |
-
----
-
-## Resultado Final
-
-O modal será focado apenas em:
-- Adicionar artigos/produtos/serviços
-- Definir quantidades, valores e impostos
-- Aplicar descontos
-- Ver totais calculados
-
-Isto alinha-se exactamente com as imagens de referência fornecidas pelo utilizador.
-
+| `src/components/shared/BudgetDetailPanel.tsx` | Simplificar - remover secções de Cliente, Aparelho, Avaria, Notas |
