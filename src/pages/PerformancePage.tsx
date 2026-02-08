@@ -10,7 +10,7 @@ const STATUS_LABELS: Record<string, string> = {
   por_fazer: 'Aberto',
   em_execucao: 'Em Execução',
   na_oficina: 'Oficina',
-  concluidos: 'Of. Reparados',
+  concluidos: 'Oficina Reparados',
   em_debito: 'Em Débito',
   finalizado: 'Concluídos',
   entregas: 'Entrega',
