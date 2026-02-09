@@ -517,6 +517,89 @@ export type Database = {
           },
         ]
       }
+      service_transfer_requests: {
+        Row: {
+          created_at: string
+          from_technician_id: string
+          id: string
+          message: string | null
+          resolved_at: string | null
+          service_id: string
+          status: string
+          to_technician_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_technician_id: string
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          service_id: string
+          status?: string
+          to_technician_id: string
+        }
+        Update: {
+          created_at?: string
+          from_technician_id?: string
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          service_id?: string
+          status?: string
+          to_technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_transfer_requests_from_technician_id_fkey"
+            columns: ["from_technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_from_technician_id_fkey"
+            columns: ["from_technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_to_technician_id_fkey"
+            columns: ["to_technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_transfer_requests_to_technician_id_fkey"
+            columns: ["to_technician_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["tech_id"]
+          },
+        ]
+      }
       services: {
         Row: {
           amount_paid: number | null

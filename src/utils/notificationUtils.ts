@@ -13,7 +13,11 @@ type NotificationType =
   | 'entrega_agendada' 
   | 'tarefa_tecnico'
   | 'tarefa_secretaria'
-  | 'tarefa_geral';
+  | 'tarefa_geral'
+  | 'transferencia_solicitada'
+  | 'transferencia_aceite'
+  | 'transferencia_recusada'
+  | 'transferencia_aviso';
 
 interface NotificationData {
   user_id: string;
@@ -191,5 +195,106 @@ export async function notifyDeliveryScheduled(
     });
   } catch (error) {
     console.error('Error notifying delivery scheduled:', error);
+  }
+}
+
+/**
+ * Notify when a transfer is requested
+ */
+export async function notifyTransferRequested(
+  serviceId: string,
+  serviceCode: string,
+  toTechnicianUserId: string,
+  fromTechnicianName: string
+): Promise<void> {
+  try {
+    await createNotification({
+      user_id: toTechnicianUserId,
+      notification_type: 'transferencia_solicitada',
+      title: `Pedido de transferência - ${serviceCode}`,
+      message: `${fromTechnicianName} quer transferir o serviço ${serviceCode} para si.`,
+      service_id: serviceId,
+    });
+  } catch (error) {
+    console.error('Error notifying transfer requested:', error);
+  }
+}
+
+/**
+ * Notify when a transfer is accepted
+ */
+export async function notifyTransferAccepted(
+  serviceId: string,
+  serviceCode: string,
+  fromTechnicianUserId: string,
+  toTechnicianName: string
+): Promise<void> {
+  try {
+    await createNotification({
+      user_id: fromTechnicianUserId,
+      notification_type: 'transferencia_aceite',
+      title: `Transferência aceite - ${serviceCode}`,
+      message: `${toTechnicianName} aceitou assumir o serviço ${serviceCode}.`,
+      service_id: serviceId,
+    });
+  } catch (error) {
+    console.error('Error notifying transfer accepted:', error);
+  }
+}
+
+/**
+ * Notify when a transfer is rejected
+ */
+export async function notifyTransferRejected(
+  serviceId: string,
+  serviceCode: string,
+  fromTechnicianUserId: string,
+  toTechnicianName: string
+): Promise<void> {
+  try {
+    await createNotification({
+      user_id: fromTechnicianUserId,
+      notification_type: 'transferencia_recusada',
+      title: `Transferência recusada - ${serviceCode}`,
+      message: `${toTechnicianName} recusou assumir o serviço ${serviceCode}.`,
+      service_id: serviceId,
+    });
+  } catch (error) {
+    console.error('Error notifying transfer rejected:', error);
+  }
+}
+
+/**
+ * Notify admins and secretaries about a transfer
+ */
+export async function notifyTransferToAdmins(
+  serviceId: string,
+  serviceCode: string,
+  fromTechnicianName: string,
+  toTechnicianName: string,
+  accepted: boolean
+): Promise<void> {
+  try {
+    const [owners, secretaries] = await Promise.all([
+      getUsersByRole('dono'),
+      getUsersByRole('secretaria'),
+    ]);
+
+    const recipients = [...new Set([...owners, ...secretaries])];
+    const status = accepted ? 'aceite' : 'recusada';
+
+    const notifications = recipients.map((userId) =>
+      createNotification({
+        user_id: userId,
+        notification_type: 'transferencia_aviso',
+        title: `Transferência ${status} - ${serviceCode}`,
+        message: `${toTechnicianName} ${accepted ? 'aceitou' : 'recusou'} assumir o serviço ${serviceCode} de ${fromTechnicianName}.`,
+        service_id: serviceId,
+      })
+    );
+
+    await Promise.all(notifications);
+  } catch (error) {
+    console.error('Error notifying transfer to admins:', error);
   }
 }

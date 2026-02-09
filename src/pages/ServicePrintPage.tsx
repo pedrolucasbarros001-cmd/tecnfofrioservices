@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, MapPin, Phone, Mail, LogIn } from 'lucide-react';
+import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
@@ -260,30 +260,21 @@ export default function ServicePrintPage() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-1.5 relative z-10">
-          <img 
-            src={tecnofrioLogoFull} 
-            alt="TECNOFRIO" 
-            className="h-10 object-contain"
-          />
+        <div className="flex items-start justify-between mb-1.5 relative z-10">
+          <div className="flex flex-col">
+            <img 
+              src={tecnofrioLogoFull} 
+              alt="TECNOFRIO" 
+              className="h-10 object-contain"
+            />
+            <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+              <p>{COMPANY_INFO.address}</p>
+              <p>{COMPANY_INFO.postalCode} {COMPANY_INFO.city}</p>
+              <p>Tel: {COMPANY_INFO.phone} | {COMPANY_INFO.email}</p>
+            </div>
+          </div>
           <div className="text-right">
             <h1 className="text-lg font-bold">Ficha de Serviço</h1>
-          </div>
-        </div>
-
-        {/* Company Contact Info */}
-        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-1.5 border-y py-1 bg-muted/30">
-          <div className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            <span>{COMPANY_INFO.fullAddress}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Phone className="h-3 w-3" />
-            <span>{COMPANY_INFO.phone}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Mail className="h-3 w-3" />
-            <span>{COMPANY_INFO.email}</span>
           </div>
         </div>
 
@@ -573,20 +564,23 @@ export default function ServicePrintPage() {
           </>
         )}
 
-        <Separator className="my-1" />
-
-        {/* Terms Section */}
-        <section className="bg-amber-50 border border-amber-200 rounded p-1.5 text-xs">
-          <h3 className="font-semibold text-amber-800 mb-0.5 flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            IMPORTANTE - Termos de Guarda
-          </h3>
-          <p className="text-amber-700 leading-tight text-[10px]">
-            Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-            conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-            pela guarda ou danos.
-          </p>
-        </section>
+        {/* Terms Section - Only for workshop services */}
+        {service.service_location === 'oficina' && (
+          <>
+            <Separator className="my-1" />
+            <section className="bg-amber-50 border border-amber-200 rounded p-1.5 text-xs">
+              <h3 className="font-semibold text-amber-800 mb-0.5 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                IMPORTANTE - Termos de Guarda
+              </h3>
+              <p className="text-amber-700 leading-tight text-[10px]">
+                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
+                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                pela guarda ou danos.
+              </p>
+            </section>
+          </>
+        )}
       </div>
     </div>
   );

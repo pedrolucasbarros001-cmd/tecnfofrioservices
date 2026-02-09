@@ -129,12 +129,19 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-3 relative z-10">
-          <img 
-            src={tecnofrioLogoFull} 
-            alt="TECNOFRIO" 
-            style={{ height: '40px', objectFit: 'contain' }}
-          />
+        <div className="flex items-start justify-between mb-3 relative z-10">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <img 
+              src={tecnofrioLogoFull} 
+              alt="TECNOFRIO" 
+              style={{ height: '40px', objectFit: 'contain' }}
+            />
+            <div style={{ marginTop: '4px', fontSize: '10px', color: '#666', lineHeight: 1.3 }}>
+              <p style={{ margin: 0 }}>R. Dom Pedro IV 3 R/C, Bairro da Coxa</p>
+              <p style={{ margin: 0 }}>5300-124 Bragança</p>
+              <p style={{ margin: 0 }}>Tel: 273 332 772 | tecno.frio@sapo.pt</p>
+            </div>
+          </div>
           <div className="text-right">
             <h1 style={{ fontSize: '18px', fontWeight: 'bold' }}>Ficha de Serviço</h1>
           </div>
@@ -428,20 +435,23 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </>
         )}
 
-        <Separator className="my-2" />
-
-        {/* Terms Section */}
-        <section style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '8px', fontSize: '11px' }}>
-          <h3 style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <AlertTriangle style={{ width: '14px', height: '14px' }} />
-            IMPORTANTE - Termos de Guarda
-          </h3>
-          <p style={{ color: '#a16207', lineHeight: '1.4' }}>
-            Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-            conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-            pela guarda ou danos.
-          </p>
-        </section>
+        {/* Terms Section - Only for workshop services */}
+        {service.service_location === 'oficina' && (
+          <>
+            <Separator className="my-2" />
+            <section style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '8px', fontSize: '11px' }}>
+              <h3 style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertTriangle style={{ width: '14px', height: '14px' }} />
+                IMPORTANTE - Termos de Guarda
+              </h3>
+              <p style={{ color: '#a16207', lineHeight: '1.4' }}>
+                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
+                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                pela guarda ou danos.
+              </p>
+            </section>
+          </>
+        )}
 
       </div>
     </div>
@@ -497,12 +507,19 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-3 relative z-10">
-              <img 
-                src={tecnofrioLogoFull} 
-                alt="TECNOFRIO" 
-                className="h-10 object-contain"
-              />
+            <div className="flex items-start justify-between mb-3 relative z-10">
+              <div className="flex flex-col">
+                <img 
+                  src={tecnofrioLogoFull} 
+                  alt="TECNOFRIO" 
+                  className="h-10 object-contain"
+                />
+                <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                  <p>R. Dom Pedro IV 3 R/C, Bairro da Coxa</p>
+                  <p>5300-124 Bragança</p>
+                  <p>Tel: 273 332 772 | tecno.frio@sapo.pt</p>
+                </div>
+              </div>
               <div className="text-right">
                 <h1 className="text-lg font-bold">Ficha de Serviço</h1>
               </div>
@@ -796,20 +813,23 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </>
             )}
 
-            <Separator className="my-2" />
-
-            {/* Terms Section */}
-            <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-              <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
-                IMPORTANTE - Termos de Guarda
-              </h3>
-              <p className="text-amber-700 leading-tight">
-                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-                pela guarda ou danos.
-              </p>
-            </section>
+            {/* Terms Section - Only for workshop services */}
+            {service.service_location === 'oficina' && (
+              <>
+                <Separator className="my-2" />
+                <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                  <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    IMPORTANTE - Termos de Guarda
+                  </h3>
+                  <p className="text-amber-700 leading-tight">
+                    Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
+                    conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                    pela guarda ou danos.
+                  </p>
+                </section>
+              </>
+            )}
 
         </div>
       </DialogContent>
