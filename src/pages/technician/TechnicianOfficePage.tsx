@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Sun, Moon, Sunrise, Play, UserPlus, Package, AlertCircle } from 'lucide-react';
+import { Wrench, Sun, Moon, Sunrise, Play, UserPlus, Package, AlertCircle, ArrowRightLeft } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { WorkshopFlowModals } from '@/components/technician/WorkshopFlowModals';
+import { RequestTransferModal } from '@/components/modals/RequestTransferModal';
 import { useUpdateService } from '@/hooks/useServices';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
@@ -22,6 +23,8 @@ export default function TechnicianOfficePage() {
   const { profile } = useAuth();
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [flowOpen, setFlowOpen] = useState(false);
+  const [transferService, setTransferService] = useState<Service | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const queryClient = useQueryClient();
   const updateService = useUpdateService();
 
@@ -142,16 +145,35 @@ export default function TechnicianOfficePage() {
     const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
     const ShiftIcon = shiftInfo?.icon || Sun;
 
+    const handleTransferClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setTransferService(service);
+      setShowTransferModal(true);
+    };
+
     return (
       <Card
         className={cn(
-          'hover:shadow-md transition-shadow',
+          'hover:shadow-md transition-shadow relative',
           isAvailable 
             ? 'bg-slate-50 border-l-4 border-l-slate-400' 
             : 'bg-orange-50 border-l-4 border-l-orange-500'
         )}
       >
-        <CardContent className="p-4">
+        <CardContent className="p-4 pt-6">
+          {/* Transfer button - only for assigned services */}
+          {!isAvailable && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-1 left-1 h-7 w-7 opacity-60 hover:opacity-100"
+              onClick={handleTransferClick}
+              title="Solicitar transferência"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+            </Button>
+          )}
+          
           <div className="space-y-2">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
@@ -295,6 +317,18 @@ export default function TechnicianOfficePage() {
           isOpen={flowOpen}
           onClose={handleFlowClose}
           onComplete={handleFlowComplete}
+        />
+      )}
+
+      {/* Transfer Request Modal */}
+      {transferService && (
+        <RequestTransferModal
+          service={transferService}
+          open={showTransferModal}
+          onOpenChange={(open) => {
+            setShowTransferModal(open);
+            if (!open) setTransferService(null);
+          }}
         />
       )}
     </div>

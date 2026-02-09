@@ -13,6 +13,7 @@ import {
   ClipboardList,
   CheckCheck,
   X,
+  ArrowRightLeft,
 } from 'lucide-react';
 import {
   Sheet,
@@ -41,6 +42,10 @@ const NOTIFICATION_ICONS: Record<string, { icon: typeof Bell; color: string }> =
   entrega_agendada: { icon: Truck, color: 'text-purple-500' },
   servico_atrasado: { icon: AlertCircle, color: 'text-red-500' },
   tarefa_tecnico: { icon: ClipboardList, color: 'text-cyan-500' },
+  transferencia_solicitada: { icon: ArrowRightLeft, color: 'text-blue-500' },
+  transferencia_aceite: { icon: CheckCheck, color: 'text-green-500' },
+  transferencia_recusada: { icon: X, color: 'text-red-500' },
+  transferencia_aviso: { icon: ArrowRightLeft, color: 'text-orange-500' },
 };
 
 export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps) {

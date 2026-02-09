@@ -287,11 +287,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           signer_name: signerName || service.customer?.name,
         });
 
-        // Update to workshop
+        // Update to workshop - remove technician so it's available for anyone to assume
         await updateService.mutateAsync({
           id: service.id,
-          status: 'na_oficina',
+          status: 'por_fazer',           // Trigger normalizes for workshop without technician
           service_location: 'oficina',
+          technician_id: null,           // Remove technician - service becomes available
+          scheduled_date: null,          // Clear scheduling
+          scheduled_shift: null,
           detected_fault: formData.detectedFault,
         });
 

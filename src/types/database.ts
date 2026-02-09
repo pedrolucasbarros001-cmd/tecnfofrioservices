@@ -51,6 +51,7 @@ export type BudgetStatus = 'pendente' | 'aprovado' | 'recusado' | 'convertido';
 
 export type DeliveryMethod = 'technician_delivery' | 'client_pickup';
 
+export type TransferRequestStatus = 'pendente' | 'aceite' | 'recusado' | 'cancelado';
 export interface Profile {
   id: string;
   user_id: string;
@@ -214,6 +215,17 @@ export interface Notification {
   is_read: boolean;
   service_id: string | null;
   created_at: string;
+}
+
+export interface ServiceTransferRequest {
+  id: string;
+  service_id: string;
+  from_technician_id: string;
+  to_technician_id: string;
+  status: TransferRequestStatus;
+  message: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 // Status labels and colors mapping - Institutional Blue design (text > color)

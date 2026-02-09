@@ -13,7 +13,10 @@ export type ActivityActionType =
   | 'precificacao'
   | 'pagamento'
   | 'entrega'
-  | 'tarefa';
+  | 'tarefa'
+  | 'transferencia_solicitada'
+  | 'transferencia_aceite'
+  | 'transferencia_recusada';
 
 export interface ActivityLogData {
   serviceId?: string;
@@ -241,5 +244,62 @@ export async function logTaskSent(
     description: `${actorName || 'Utilizador'} enviou tarefa para ${recipient}: "${message}"`,
     isPublic: recipientType === 'todos',
     metadata: { recipientType, message },
+  });
+}
+
+/**
+ * Log transfer request
+ */
+export async function logTransferRequested(
+  serviceCode: string,
+  serviceId: string,
+  fromTechnicianName: string,
+  toTechnicianName: string,
+  actorId?: string
+): Promise<void> {
+  await logActivity({
+    serviceId,
+    actorId,
+    actionType: 'transferencia_solicitada',
+    description: `${fromTechnicianName} solicitou transferência de ${serviceCode} para ${toTechnicianName}`,
+    isPublic: true,
+  });
+}
+
+/**
+ * Log transfer accepted
+ */
+export async function logTransferAccepted(
+  serviceCode: string,
+  serviceId: string,
+  fromTechnicianName: string,
+  toTechnicianName: string,
+  actorId?: string
+): Promise<void> {
+  await logActivity({
+    serviceId,
+    actorId,
+    actionType: 'transferencia_aceite',
+    description: `${toTechnicianName} aceitou assumir ${serviceCode} de ${fromTechnicianName}`,
+    isPublic: true,
+  });
+}
+
+/**
+ * Log transfer rejected
+ */
+export async function logTransferRejected(
+  serviceCode: string,
+  serviceId: string,
+  fromTechnicianName: string,
+  toTechnicianName: string,
+  actorId?: string
+): Promise<void> {
+  await logActivity({
+    serviceId,
+    actorId,
+    actionType: 'transferencia_recusada',
+    description: `${toTechnicianName} recusou assumir ${serviceCode} de ${fromTechnicianName}`,
+    isPublic: false,
   });
 }
