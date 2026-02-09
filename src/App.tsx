@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OnboardingProvider } from "@/contexts/OnboardingContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layouts/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "sonner";
 
 // Pages
@@ -81,14 +82,15 @@ function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange={false}>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <GlobalErrorHandler>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthProvider>
+  <ErrorBoundary>
+    <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange={false}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <GlobalErrorHandler>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
               <OnboardingProvider>
                 <Routes>
                   {/* Public routes */}
@@ -208,13 +210,14 @@ const App = () => (
                   {/* Catch-all */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </OnboardingProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </GlobalErrorHandler>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </ThemeProvider>
+                </OnboardingProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </GlobalErrorHandler>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
+  </ErrorBoundary>
 );
 
 export default App;
