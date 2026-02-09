@@ -1,31 +1,26 @@
 
-# Plano: Mover Histórico de Atividades da Oficina para o Dashboard
+# Corrigir Botoes de Aprovar/Recusar que Permanecem Apos Clicar
 
-## Resumo
+## Problema
 
-Remover a secção "Histórico de Atividades" da página `/oficina` (OficinaPage) e adicioná-la na página `/dashboard` (DashboardPage), abaixo dos cards de status. Manter no Monitor TV como está.
+Ao clicar "Aprovar", o status do orcamento e atualizado na base de dados e a lista e re-carregada (`refetch()`), mas o `selectedBudget` no `OrcamentosPage` e uma copia local que nao se atualiza automaticamente. O painel continua a mostrar o objeto antigo com `status: 'pendente'`, mantendo os botoes visiveis.
 
----
+## Solucao
 
-## Alterações
+Atualizar o estado local do `budget` dentro do `BudgetDetailPanel` apos a mutacao bem-sucedida, para que os botoes desaparecam imediatamente sem depender do refetch externo.
 
-### 1. `src/pages/OficinaPage.tsx` - Remover histórico
+## Alteracao
 
-- Remover o import de `useActivityLogs`
-- Remover o import de `formatDistanceToNow` e `pt` (se não usados noutro local)
-- Remover a variável `activityLogs`
-- Remover todo o bloco "Activity History Section" (Card com CardHeader/CardContent, linhas 208-242)
+### `src/components/shared/BudgetDetailPanel.tsx`
 
-### 2. `src/pages/DashboardPage.tsx` - Adicionar histórico
+Na funcao `handleUpdateStatus`, apos a atualizacao ser bem-sucedida, atualizar o objeto `budget` localmente nao e possivel porque e uma prop. Em vez disso, vamos usar um estado local para rastrear o status atualizado.
 
-- Adicionar imports: `useActivityLogs`, `format`, `formatDistanceToNow`, `pt`, `CardHeader`, `CardTitle`
-- Adicionar o hook `useActivityLogs({ limit: 10 })`
-- Adicionar a secção de histórico abaixo do grid de cards, com o mesmo layout que estava na OficinaPage
+**Abordagem:** Adicionar um estado `localStatus` que comeca como `null` e, apos aprovar/recusar, guarda o novo status. O componente usa `localStatus ?? budget.status` para determinar que botoes mostrar.
 
-### Resultado
+### Detalhes Tecnicos
 
-| Página | Histórico |
-|--------|-----------|
-| `/oficina` (admin/secretária) | Removido |
-| `/dashboard` (admin) | Adicionado abaixo dos cards |
-| `/tv-monitor` | Mantido como está |
+1. Adicionar `const [localStatus, setLocalStatus] = useState<string | null>(null)`
+2. Resetar `localStatus` para `null` quando o `budget.id` muda (via `useEffect` ou no render)
+3. Em `handleUpdateStatus`, apos sucesso, chamar `setLocalStatus(newStatus)`
+4. Usar `const effectiveStatus = localStatus ?? budget.status` para o badge e os botoes do footer
+5. Atualizar o `statusConfig` e condicoes do footer para usar `effectiveStatus`
