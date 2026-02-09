@@ -12,9 +12,12 @@ import {
   CheckSquare,
   FileText,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { format, formatDistanceToNow } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
 import type { ServiceStatus } from '@/types/database';
 
@@ -47,6 +50,7 @@ const DASHBOARD_CARDS = [
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { role } = useAuth();
+  const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
   const [stats, setStats] = useState<DashboardStats>({
     por_fazer: 0,
     em_execucao: 0,
@@ -173,6 +177,42 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* Activity History Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5 text-muted-foreground" />
+            Histórico de Atividades
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activityLogs.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-4">
+              Nenhuma atividade recente
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {activityLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-shrink-0 w-16 text-xs text-muted-foreground">
+                    {format(new Date(log.created_at), 'HH:mm')}
+                  </div>
+                  <div className="flex-1 text-sm">
+                    {log.description}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: pt })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
