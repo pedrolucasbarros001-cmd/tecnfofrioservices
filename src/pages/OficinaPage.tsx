@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Wrench, Copy, Monitor, Send, UserPlus, Clock, AlertCircle } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
-import { pt } from 'date-fns/locale';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -10,7 +9,6 @@ import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { SendTaskModal } from '@/components/modals/SendTaskModal';
 import { useServices } from '@/hooks/useServices';
-import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -23,7 +21,6 @@ export default function OficinaPage() {
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
 
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
-  const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
 
   const handleCopyTVLink = () => {
     const url = `${window.location.origin}/tv-monitor`;
@@ -204,42 +201,6 @@ export default function OficinaPage() {
           })
         )}
       </div>
-
-      {/* Activity History Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5 text-muted-foreground" />
-            Histórico de Atividades
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activityLogs.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-4">
-              Nenhuma atividade recente
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {activityLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-shrink-0 w-16 text-xs text-muted-foreground">
-                    {format(new Date(log.created_at), 'HH:mm')}
-                  </div>
-                  <div className="flex-1 text-sm">
-                    {log.description}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: pt })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Modals */}
       <ServiceDetailSheet
