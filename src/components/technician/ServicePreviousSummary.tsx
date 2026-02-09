@@ -8,7 +8,8 @@ import {
   Camera, 
   ChevronDown, 
   ChevronUp,
-  ArrowRight
+  ArrowRight,
+  ZoomIn
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import type { Service, PhotoType } from '@/types/database';
 import { PHOTO_TYPE_LABELS } from '@/types/database';
+import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 
 interface ServicePreviousSummaryProps {
   service: Service;
@@ -43,6 +45,8 @@ export function ServicePreviousSummary({
   className,
 }: ServicePreviousSummaryProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Fetch activity logs for this service
   const { data: activityLogs } = useQuery({
@@ -71,7 +75,7 @@ export function ServicePreviousSummary({
         .select('*')
         .eq('service_id', service.id)
         .order('uploaded_at', { ascending: false })
-        .limit(4);
+        ;
 
       if (error) throw error;
       return data;
@@ -108,6 +112,7 @@ export function ServicePreviousSummary({
   }
 
   return (
+    <>
     <div className={cn('rounded-lg border bg-amber-50 border-amber-200', className)}>
       {/* Header */}
       <div 
@@ -165,7 +170,7 @@ export function ServicePreviousSummary({
             </div>
           )}
 
-          {/* Photos - grouped by type */}
+          {/* Photos - clickable thumbnails */}
           {photos && photos.length > 0 && (
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
@@ -173,13 +178,24 @@ export function ServicePreviousSummary({
                 <span>Fotos ({photos.length})</span>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                {photos.slice(0, 4).map((photo) => (
-                  <div key={photo.id} className="relative">
+                {photos.slice(0, 4).map((photo, index) => (
+                  <button
+                    key={photo.id}
+                    className="relative group rounded-lg overflow-hidden"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGalleryIndex(index);
+                      setGalleryOpen(true);
+                    }}
+                  >
                     <img
                       src={photo.file_url}
                       alt={photo.description || 'Foto do serviço'}
-                      className="w-full h-16 object-cover rounded-lg"
+                      className="w-full h-16 object-cover"
                     />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                     {photo.photo_type && (
                       <Badge 
                         className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] px-1 py-0"
@@ -188,13 +204,20 @@ export function ServicePreviousSummary({
                         {PHOTO_TYPE_LABELS[photo.photo_type as PhotoType] || photo.photo_type}
                       </Badge>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
               {photos.length > 4 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  +{photos.length - 4} mais fotos
-                </p>
+                <button
+                  className="text-xs text-primary mt-1 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGalleryIndex(0);
+                    setGalleryOpen(true);
+                  }}
+                >
+                  +{photos.length - 4} mais fotos — ver todas
+                </button>
               )}
             </div>
           )}
@@ -246,5 +269,16 @@ export function ServicePreviousSummary({
         </div>
       )}
     </div>
+
+      {/* Photo Gallery Modal */}
+      {photos && photos.length > 0 && (
+        <PhotoGalleryModal
+          photos={photos}
+          initialIndex={galleryIndex}
+          open={galleryOpen}
+          onOpenChange={setGalleryOpen}
+        />
+      )}
+    </>
   );
 }
