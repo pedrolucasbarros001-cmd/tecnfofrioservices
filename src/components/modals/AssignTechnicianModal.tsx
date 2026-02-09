@@ -115,30 +115,35 @@ export function AssignTechnicianModal({
       // Get the technician's user_id to send notification and show contextual feedback
       const selectedTech = technicians.find(t => t.id === values.technician_id);
       if (selectedTech?.profile_id) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('user_id, full_name')
-          .eq('id', selectedTech.profile_id)
-          .maybeSingle();
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .eq('id', selectedTech.profile_id)
+            .maybeSingle();
 
-        if (profileData?.user_id) {
-          // Send notification
-          await notifyServiceAssigned(
-            service.id,
-            service.code || 'N/A',
-            profileData.user_id,
-            values.scheduled_date.toISOString().split('T')[0],
-            values.scheduled_shift
-          );
+          if (profileData?.user_id) {
+            // Send notification
+            await notifyServiceAssigned(
+              service.id,
+              service.code || 'N/A',
+              profileData.user_id,
+              values.scheduled_date.toISOString().split('T')[0],
+              values.scheduled_shift
+            );
 
-          // Log activity
-          await logTechnicianAssignment(
-            service.code || 'N/A',
-            service.id,
-            profileData.full_name || 'Técnico',
-            user?.id,
-            profile?.full_name || undefined
-          );
+            // Log activity
+            await logTechnicianAssignment(
+              service.code || 'N/A',
+              service.id,
+              profileData.full_name || 'Técnico',
+              user?.id,
+              profile?.full_name || undefined
+            );
+          }
+        } catch (notificationError) {
+          // Log but don't fail - notification is not critical
+          console.warn('Failed to send notification:', notificationError);
         }
       }
 
@@ -158,6 +163,7 @@ export function AssignTechnicianModal({
       onSuccess?.();
     } catch (error) {
       console.error('Error assigning technician:', error);
+      toast.error('Erro ao atribuir técnico. Por favor, tente novamente.');
     }
   };
 

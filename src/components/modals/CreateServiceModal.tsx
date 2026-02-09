@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -254,6 +255,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       handleClose();
     } catch (error) {
       console.error('Error creating service:', error);
+      toast.error('Erro ao criar serviço. Por favor, tente novamente.');
     }
   };
 
