@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -54,6 +54,12 @@ export function BudgetDetailPanel({
 }: BudgetDetailPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [localStatus, setLocalStatus] = useState<string | null>(null);
+
+  // Reset local status when budget changes
+  useEffect(() => { setLocalStatus(null); }, [budget?.id]);
+
+  const effectiveStatus = localStatus ?? (budget?.status ?? 'pendente');
 
   // Parse pricing_description to extract items
   const pricingDetails = useMemo(() => {
@@ -106,7 +112,7 @@ export function BudgetDetailPanel({
   if (!budget) return null;
 
   const customer = budget.customer;
-  const statusConfig = STATUS_CONFIG[budget.status as keyof typeof STATUS_CONFIG];
+  const statusConfig = STATUS_CONFIG[effectiveStatus as keyof typeof STATUS_CONFIG];
 
   const formatCurrency = (value: number | null) => {
     if (!value && value !== 0) return '€0.00';
@@ -126,6 +132,7 @@ export function BudgetDetailPanel({
 
       if (error) throw error;
       toast.success(`Orçamento ${newStatus === 'aprovado' ? 'aprovado' : 'recusado'}`);
+      setLocalStatus(newStatus);
       onUpdate?.();
     } catch (error) {
       console.error('Error updating budget:', error);
@@ -253,7 +260,7 @@ export function BudgetDetailPanel({
 
           {/* Footer Actions */}
           <div className="flex-shrink-0 border-t p-4 bg-card">
-            {budget.status === 'pendente' && (
+            {effectiveStatus === 'pendente' && (
               <div className="flex gap-3">
                 <Button
                   variant="outline"
@@ -275,7 +282,7 @@ export function BudgetDetailPanel({
               </div>
             )}
 
-            {budget.status === 'aprovado' && !budget.converted_service_id && (
+            {effectiveStatus === 'aprovado' && !budget.converted_service_id && (
               <Button
                 className="w-full"
                 onClick={() => setShowConvertModal(true)}
@@ -286,7 +293,7 @@ export function BudgetDetailPanel({
               </Button>
             )}
 
-            {budget.status === 'convertido' && (
+            {effectiveStatus === 'convertido' && (
               <div className="text-center">
                 <Badge variant="secondary" className="text-sm">
                   Já convertido em serviço
@@ -294,7 +301,7 @@ export function BudgetDetailPanel({
               </div>
             )}
 
-            {budget.status === 'recusado' && (
+            {effectiveStatus === 'recusado' && (
               <div className="text-center">
                 <Badge variant="destructive" className="text-sm">
                   Orçamento recusado
