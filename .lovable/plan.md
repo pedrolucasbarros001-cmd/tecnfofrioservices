@@ -1,166 +1,77 @@
 
+# Correcoes: Orcamento, Etiqueta e Exclusao de Colaboradores
 
-# Importacao de Dados CSV + Paginacao Server-Side
+## 1. Corrigir texto na ficha de orcamento
 
-## Contexto
+**Problema**: Na ficha de impressao do orcamento (`BudgetPrintPage.tsx`), aparece "Descricao do Problema" quando deveria ser "Descricao do Orcamento".
 
-A base de dados esta actualmente vazia (0 clientes, 0 servicos). Os CSVs contem:
-- **Clientes.csv**: 3.369 clientes
-- **Visitas.csv**: 6.887 servicos
-
-O Supabase tem um limite de 1.000 linhas por query, o que significa que mesmo apos importar tudo, so 1.000 registos seriam vistos sem paginacao server-side.
-
----
-
-## Parte 1: Importacao dos Dados via Edge Function
-
-### Mapeamento de Campos
-
-**Clientes.csv para tabela `customers`:**
-
-| CSV | customers |
-|-----|-----------|
-| Empresa | name |
-| Contacto Principal | (ignorado - duplica nome) |
-| E-mail Principal | email |
-| Telefone | phone |
-| Grupos | notes |
-| Data de Criacao | created_at |
-| customer_type | "empresa" se nome contem Lda, Hotel, Restaur, Imobili, Agrupamento, Centro, Junta, Igreja, Paroquial, EPM, GNR etc; senao "particular" |
-
-**Visitas.csv para tabela `services`:**
-
-| CSV | services | Logica |
-|-----|----------|--------|
-| Visita # | code | VIS-006953 vira TF-06953 (manter numeracao) |
-| Assunto | fault_description + appliance_type | Extrair tipo de aparelho do texto (MLR, MLL, Caldeira, Frigorifico, etc) |
-| Para | customer_id | Ligar pelo nome ao cliente importado |
-| Total | final_price | Converter "1.234,56eur" para numero |
-| Data | scheduled_date | |
-| Data de Criacao | created_at | |
-| Estado | status | Mapeamento abaixo |
-| Estado de Pagamento | amount_paid / status | Mapeamento abaixo |
-
-### Mapeamento de Estados (CSV para sistema)
-
-```text
-CSV "Estado"         + CSV "Pagamento"           -> status sistema
----------------------------------------------------------------
-"Aberta"            + qualquer                   -> por_fazer
-"Aceite"            + qualquer                   -> em_execucao
-"Oficina"           + qualquer                   -> na_oficina (location=oficina)
-"Pendente de Peca"  + qualquer                   -> em_espera_de_peca
-"Concluida"         + "Pago"                     -> finalizado (amount_paid = final_price)
-"Concluida"         + "Nao Pago"                 -> em_debito
-"Concluida"         + "Nao Gerou Pagamento"      -> finalizado (final_price = 0)
-"Recusada"          + qualquer                   -> finalizado
-```
-
-### Mapeamento de Tipo de Aparelho (extraido do Assunto)
-
-Abreviaturas comuns detectadas no CSV:
-- **MLR** = Maquina Lavar Roupa
-- **MLL** = Maquina Lavar Loica
-- **MSR** = Maquina Secar Roupa
-- **AC/ACs** = Ar Condicionado
-- Caldeira, Esquentador, Frigorifico, Forno, Placa, Microondas, Arca -- usados directamente
-
-### Implementacao
-
-Criar uma **edge function `import-csv-data`** que:
-1. Recebe os dados dos dois CSVs (enviados como JSON ja parseado pelo frontend)
-2. Primeiro insere todos os clientes em batch (usando upsert por nome para evitar duplicados)
-3. Depois insere todos os servicos, ligando cada um ao customer_id correcto pelo nome
-4. Processa em lotes de 500 para evitar timeouts
-5. Retorna relatorio com totais importados e erros
-
-Criar uma **pagina de importacao temporaria** ou botao no dashboard que:
-1. Le os ficheiros CSV copiados para o projecto
-2. Parseia localmente (no browser)
-3. Envia para a edge function em lotes
+**Solucao**: Alterar o texto na linha 340 de `src/pages/BudgetPrintPage.tsx`:
+- De: `Descrição do Problema`
+- Para: `Descrição do Orçamento`
 
 ---
 
-## Parte 2: Paginacao Server-Side
+## 2. Ajustar tamanho da etiqueta para 29mm x 90mm
 
-### Hook `useCustomers` - Alteracoes
+**Problema**: A etiqueta esta configurada para 102mm x 152mm (4x6 polegadas), mas o tamanho real da etiqueta fisica e 29mm x 90mm. Isto causa uma pagina extra na impressao porque o conteudo excede o papel.
 
-- Adicionar parametros `page` e `pageSize` (default 50)
-- Usar `.range(from, to)` do Supabase para paginar
-- Fazer query separada com `count: 'exact'` para saber o total de registos
-- Retornar `{ data, totalCount, totalPages }`
+**Solucao**: Actualizar TODOS os locais que referenciam o tamanho da etiqueta:
 
-### Hook `useServices` - Alteracoes
+### Ficheiros a alterar:
 
-- Mesmo padrao: `page`, `pageSize`, `.range()`
-- Count exacto para total
-- Manter os filtros existentes (status, location, technicianId)
+**`src/utils/printUtils.ts`** (linha 11):
+- De: `@page { size: 102mm 152mm; margin: 0; }`
+- Para: `@page { size: 29mm 90mm; margin: 0; }`
 
-### Pagina `ClientesPage` - Alteracoes
+**`src/index.css`** - Actualizar todas as dimensoes de tag:
+- `.print-tag-page .print-tag-container`: width 29mm, min-height 90mm
+- `@media print .print-tag-page .print-tag-container`: width/height 29mm x 90mm
+- `@media print .print-tag`: width/height 29mm x 90mm
 
-- Adicionar estado `currentPage`
-- Debounce na pesquisa (server-side search via Supabase `.or()`)
-- Componente de paginacao no fundo da tabela (Anterior / Proxima / numeros de pagina)
-- Badge de contagem mostra "X de Y clientes"
+**`src/pages/ServiceTagPage.tsx`**:
+- Alterar o formato do PDF de `[102, 152]` para `[29, 90]`
+- Reduzir tamanhos de QR code (de 140px para ~60px), logo, fonte e espacamentos para caber em 29x90mm
 
-### Pagina `GeralPage` - Alteracoes
+**`src/components/modals/ServiceTagModal.tsx`**:
+- Alterar o formato do PDF de `[80, 170]` para `[29, 90]`
+- Mesmas reducoes de tamanho no layout do preview
 
-- Mesmo padrao de paginacao
-- Manter filtros de status existentes
-- Paginacao no fundo da tabela
-
-### Pagina `OficinaPage` - Alteracoes
-
-- Mesmo padrao (actualmente carrega todos os servicos com location=oficina)
-
----
-
-## Detalhes Tecnicos
-
-### Edge Function `import-csv-data`
-
-```text
-POST /import-csv-data
-Body: { customers: [...], services: [...] }
-Auth: Apenas dono
-
-Processo:
-1. Validar que o utilizador e "dono"
-2. Inserir clientes em batches de 500 (upsert por nome)
-3. Buscar mapa nome->id de todos os clientes
-4. Processar servicos: mapear estados, extrair aparelho, converter precos
-5. Inserir servicos em batches de 500
-6. Retornar { customersImported, servicesImported, errors }
-```
-
-### Paginacao nos Hooks
-
-A query Supabase mudara de:
-```
-supabase.from('customers').select('*').order(...)
-```
-Para:
-```
-supabase.from('customers').select('*', { count: 'exact' }).order(...).range(from, to)
-```
-
-Isto retorna o count total no header sem precisar de query extra.
-
-### Componente de Paginacao
-
-Reutilizar o componente `Pagination` ja existente em `src/components/ui/pagination.tsx`, adaptando-o com logica de paginas (mostra max 5 botoes de pagina com ellipsis).
+**Redesign do conteudo da etiqueta para 29x90mm** (muito mais pequena):
+- Logo reduzido (h-6 em vez de h-12)
+- QR Code reduzido para ~50px
+- Codigo de servico em texto menor
+- Dados do cliente em fonte compacta (text-[8px])
+- Espacamentos minimos (mb-1 em vez de mb-6)
+- Remover texto do rodape (nao cabe)
 
 ---
 
-## Sequencia de Implementacao
+## 3. Adicionar opcao de excluir perfil de colaborador
 
-1. Copiar CSVs para o projecto
-2. Criar edge function `import-csv-data` com toda a logica de mapeamento
-3. Criar pagina/componente de importacao para disparar o processo
-4. Alterar `useCustomers` com paginacao server-side
-5. Alterar `useServices` com paginacao server-side
-6. Actualizar `ClientesPage` com controlos de paginacao
-7. Actualizar `GeralPage` com controlos de paginacao
-8. Actualizar `OficinaPage` com controlos de paginacao
-9. Testar importacao e paginacao end-to-end
+**Problema**: Actualmente so e possivel desactivar tecnicos. Nao existe opcao para o admin excluir completamente um perfil de colaborador.
 
+**Solucao**:
+
+### Edge Function `delete-user` (nova)
+- Recebe o `user_id` do colaborador a excluir
+- Valida que quem chama e "dono" (admin)
+- Usa o Supabase Admin API para:
+  1. Eliminar registos na tabela `user_roles`
+  2. Eliminar registos na tabela `technicians` (se existir)
+  3. Eliminar o perfil na tabela `profiles`
+  4. Eliminar o utilizador do Supabase Auth via `admin.deleteUser()`
+
+### `ColaboradoresPage.tsx` - Alteracoes:
+- Adicionar botao de excluir (icone Trash2) na coluna de acoes, ao lado do botao de editar
+- Adicionar AlertDialog de confirmacao para exclusao ("Tem a certeza que deseja excluir permanentemente este colaborador?")
+- Impedir exclusao do proprio utilizador logado
+- Chamar a edge function `delete-user` ao confirmar
+
+---
+
+## Sequencia de implementacao
+
+1. Corrigir texto "Descricao do Orcamento" no BudgetPrintPage
+2. Redimensionar etiqueta para 29x90mm (CSS + componentes + PDF)
+3. Criar edge function `delete-user`
+4. Adicionar botao e dialog de exclusao na pagina de colaboradores
