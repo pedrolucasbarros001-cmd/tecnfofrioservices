@@ -4,9 +4,9 @@ import type { Service, ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
 
 // Helper para invalidar TODAS as queries de serviços
-// Garante sincronização entre todas as vistas (geral, agenda técnico, oficina)
 function invalidateAllServiceQueries(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ['services'] });
+  queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
   queryClient.invalidateQueries({ queryKey: ['technician-services'] });
   queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
   queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
@@ -16,6 +16,12 @@ interface UseServicesOptions {
   status?: ServiceStatus | 'all' | 'pending_pricing';
   location?: 'cliente' | 'oficina' | 'all';
   technicianId?: string;
+}
+
+interface UsePaginatedServicesOptions extends UseServicesOptions {
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
 }
 
 export function useServices(options: UseServicesOptions = {}) {
@@ -34,7 +40,6 @@ export function useServices(options: UseServicesOptions = {}) {
         .order('created_at', { ascending: false });
 
       if (status === 'pending_pricing') {
-        // Todos os serviços com pending_pricing=true (independente do status)
         query = query.eq('pending_pricing', true);
       } else if (status !== 'all') {
         query = query.eq('status', status);
@@ -56,25 +61,70 @@ export function useServices(options: UseServicesOptions = {}) {
   });
 }
 
+export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) {
+  const { status = 'all', location = 'all', technicianId, page = 1, pageSize = 50, searchTerm } = options;
+
+  return useQuery({
+    queryKey: ['services-paginated', status, location, technicianId, page, pageSize, searchTerm],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabase
+        .from('services')
+        .select(`
+          *,
+          customer:customers(*),
+          technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (status === 'pending_pricing') {
+        query = query.eq('pending_pricing', true);
+      } else if (status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      if (location !== 'all') {
+        query = query.eq('service_location', location);
+      }
+
+      if (technicianId) {
+        query = query.eq('technician_id', technicianId);
+      }
+
+      if (searchTerm) {
+        query = query.or(`code.ilike.%${searchTerm}%,appliance_type.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,fault_description.ilike.%${searchTerm}%`);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+      return {
+        data: (data as unknown as Service[]) || [],
+        totalCount: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize),
+      };
+    },
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useCreateService() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (serviceData: Partial<Service>) => {
-      // Verificar sessão antes de tentar inserir
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        console.error('Session error:', sessionError);
         throw new Error('Erro ao verificar sessão. Por favor, faça login novamente.');
       }
       
       if (!session) {
-        console.error('No active session - user needs to re-authenticate');
         throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
-      
-      console.log('Creating service with user:', session.user.id);
       
       const { data, error } = await supabase
         .from('services')
@@ -82,10 +132,7 @@ export function useCreateService() {
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase insert error:', error);
-        throw error;
-      }
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
@@ -94,7 +141,7 @@ export function useCreateService() {
     },
     onError: (error: Error) => {
       console.error('Error creating service:', error);
-      if (error.message.includes('Sessão expirada') || error.message.includes('login novamente')) {
+      if (error.message.includes('login novamente')) {
         toast.error(error.message);
       } else {
         toast.error('Erro ao criar serviço');
@@ -120,8 +167,6 @@ export function useUpdateService() {
     },
     onSuccess: ({ skipToast }) => {
       invalidateAllServiceQueries(queryClient);
-      // Only show generic toast if skipToast is not true
-      // Components that provide contextual messages should set skipToast: true
       if (!skipToast) {
         toast.success('Serviço atualizado!');
       }

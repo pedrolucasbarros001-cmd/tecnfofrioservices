@@ -1,47 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateCustomerModal } from '@/components/modals/CreateCustomerModal';
 import { CustomerDetailSheet } from '@/components/shared/CustomerDetailSheet';
-import { useCustomers, useDeleteCustomer } from '@/hooks/useCustomers';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+import { usePaginatedCustomers, useDeleteCustomer } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/database';
 
 export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
-  
-  const { data: customers = [], isLoading } = useCustomers();
-  const deleteCustomer = useDeleteCustomer();
 
-  const filteredCustomers = customers.filter((customer) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      customer.name?.toLowerCase().includes(search) ||
-      customer.email?.toLowerCase().includes(search) ||
-      customer.phone?.includes(search) ||
-      customer.nif?.includes(search)
-    );
+  const PAGE_SIZE = 50;
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: result, isLoading } = usePaginatedCustomers({
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    searchTerm: debouncedSearch || undefined,
   });
+
+  const customers = result?.data || [];
+  const totalCount = result?.totalCount || 0;
+  const totalPages = result?.totalPages || 0;
+
+  const deleteCustomer = useDeleteCustomer();
 
   const handleEdit = (customer: Customer, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -92,7 +96,7 @@ export default function ClientesPage() {
           />
         </div>
         <Badge variant="secondary">
-          {filteredCustomers.length} cliente{filteredCustomers.length !== 1 ? 's' : ''}
+          {totalCount} cliente{totalCount !== 1 ? 's' : ''}
         </Badge>
       </div>
 
@@ -117,7 +121,7 @@ export default function ClientesPage() {
                   A carregar clientes...
                 </TableCell>
               </TableRow>
-            ) : filteredCustomers.length === 0 ? (
+            ) : customers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   {searchTerm
@@ -126,8 +130,8 @@ export default function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCustomers.map((customer) => (
-                <TableRow 
+              customers.map((customer) => (
+                <TableRow
                   key={customer.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleRowClick(customer)}
@@ -140,9 +144,7 @@ export default function ClientesPage() {
                       {customer.customer_type === 'empresa' ? 'Empresa' : 'Final'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {customer.address || '-'}
-                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate">{customer.address || '-'}</TableCell>
                   <TableCell>{customer.postal_code || '-'}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -160,7 +162,7 @@ export default function ClientesPage() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={(e) => handleDelete(customer.id, e)}
                           className="text-destructive"
                         >
@@ -175,6 +177,15 @@ export default function ClientesPage() {
             )}
           </TableBody>
         </Table>
+
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+          itemLabel="cliente"
+        />
       </div>
 
       <CreateCustomerModal

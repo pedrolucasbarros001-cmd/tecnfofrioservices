@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, ChevronDown, MapPin, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,7 +28,8 @@ import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceMod
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
-import { useServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+import { usePaginatedServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,7 +37,19 @@ import { useQuery } from '@tanstack/react-query';
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(searchParams.get('status') as ServiceStatus || 'all');
+  const PAGE_SIZE = 50;
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Current service for actions
   const [currentService, setCurrentService] = useState<Service | null>(null);
@@ -67,11 +80,18 @@ export default function GeralPage() {
   const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
   
   const {
-    data: services = [],
+    data: result,
     isLoading
-  } = useServices({
-    status: effectiveStatus as any
+  } = usePaginatedServices({
+    status: effectiveStatus as any,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    searchTerm: debouncedSearch || undefined,
   });
+
+  const services = result?.data || [];
+  const totalCount = result?.totalCount || 0;
+  const totalPages = result?.totalPages || 0;
   
   // Fetch pending parts for all services (for the thermometer indicator)
   const { data: pendingPartsMap = {} } = useQuery({
@@ -83,7 +103,6 @@ export default function GeralPage() {
         .eq('is_requested', true)
         .eq('arrived', false);
       if (error) throw error;
-      // Group by service_id, taking the earliest estimated_arrival
       const map: Record<string, string | null> = {};
       (data || []).forEach(part => {
         if (!map[part.service_id] || (part.estimated_arrival && (!map[part.service_id] || part.estimated_arrival < map[part.service_id]!))) {
@@ -96,13 +115,10 @@ export default function GeralPage() {
   
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
-  const filteredServices = services.filter(service => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return service.code?.toLowerCase().includes(search) || service.customer?.name?.toLowerCase().includes(search) || service.appliance_type?.toLowerCase().includes(search) || service.brand?.toLowerCase().includes(search);
-  });
+  const filteredServices = services;
   const handleStatusFilter = (status: ServiceStatus | 'all') => {
     setSelectedStatus(status);
+    setCurrentPage(1);
     if (status === 'all') {
       searchParams.delete('status');
     } else {
@@ -380,9 +396,14 @@ export default function GeralPage() {
         </CardContent>
       </Card>
 
-      <p className="text-sm text-muted-foreground">
-        {filteredServices.length} serviço{filteredServices.length !== 1 ? 's' : ''} encontrado{filteredServices.length !== 1 ? 's' : ''}
-      </p>
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        itemLabel="serviço"
+      />
 
       {/* Creation Modals */}
       <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
