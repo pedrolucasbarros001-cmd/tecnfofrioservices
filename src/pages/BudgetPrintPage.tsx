@@ -337,7 +337,7 @@ export default function BudgetPrintPage() {
         {budget.fault_description && (
           <>
             <section className="mb-2">
-              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Descrição do Problema</h2>
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Descrição do Orçamento</h2>
               <p className="text-xs leading-tight">{budget.fault_description}</p>
             </section>
             <Separator className="my-1" />

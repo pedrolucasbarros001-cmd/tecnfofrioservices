@@ -57,7 +57,7 @@ export default function ServiceTagPage() {
       await generatePDF({ 
         element: tagRef.current, 
         filename: `Etiqueta-${service.code}`,
-        format: [102, 152], // 4x6 inches (102mm x 152mm)
+        format: [29, 90],
       });
     } finally {
       setIsGenerating(false);
@@ -144,66 +144,52 @@ export default function ServiceTagPage() {
         </div>
       </div>
 
-      {/* Tag Content - 4x6 inches (102mm x 152mm) */}
+      {/* Tag Content - 29mm x 90mm */}
       <div ref={tagRef} className="print-tag-container">
-       {/* Top accent bar - THICKER */}
-       <div className="h-3 bg-primary -mx-[4mm] -mt-[4mm]" />
+       {/* Top accent bar */}
+       <div className="h-1 bg-primary -mx-[2mm] -mt-[2mm]" />
        
        {/* Logo */}
-       <div className="flex justify-center mt-6 mb-6">
+       <div className="flex justify-center mt-1 mb-1">
          <img 
            src={tecnofrioLogoFull} 
            alt="TECNOFRIO" 
-           className="h-12 object-contain"
+           className="h-4 object-contain"
          />
        </div>
  
-       {/* QR Code - LARGER */}
-       {/* QR Code - LARGER */}
-       <div className="flex justify-center mb-6">
-         <div className="p-3 bg-background border rounded-lg">
-           <QRCodeSVG 
-             value={qrUrl} 
-             size={140} 
-             level="H"
-             includeMargin={false}
-           />
-         </div>
+       {/* QR Code */}
+       <div className="flex justify-center mb-1">
+         <QRCodeSVG 
+           value={qrUrl} 
+           size={55} 
+           level="M"
+           includeMargin={false}
+         />
        </div>
  
-       {/* Service Code - Large */}
-       <div className="text-center mb-6">
-         <p className="text-3xl font-bold font-mono tracking-wide">
+       {/* Service Code */}
+       <div className="text-center mb-1">
+         <p className="text-[10px] font-bold font-mono tracking-wide">
            {service.code}
          </p>
        </div>
  
-       {/* Customer Info - INLINE format */}
-       <div className="space-y-2 text-base px-2">
-         <p>
-           <span className="text-muted-foreground italic">Cliente:</span>{' '}
+       {/* Customer Info - compact */}
+       <div className="space-y-0 text-[7px] leading-tight">
+         <p className="truncate">
+           <span className="text-muted-foreground">Cl:</span>{' '}
            <span className="font-medium">{service.customer?.name || 'N/A'}</span>
          </p>
-         <p>
-           <span className="text-muted-foreground italic">Equipamento:</span>{' '}
+         <p className="truncate">
+           <span className="text-muted-foreground">Eq:</span>{' '}
            <span className="font-medium">{service.appliance_type || 'N/A'}</span>
          </p>
          <p>
-           <span className="text-muted-foreground italic">Telefone:</span>{' '}
+           <span className="text-muted-foreground">Tel:</span>{' '}
            <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
          </p>
        </div>
- 
-       {/* Footer text - SIMPLE */}
-       <div className="mt-6 text-center">
-         <p className="text-sm text-muted-foreground">
-           Leia o QR Code para ver detalhes e histórico online
-         </p>
-       </div>
- 
-       {/* Bottom line */}
-       {/* Bottom line */}
-       <div className="mt-4 border-t border-border" />
       </div>
     </div>
   );

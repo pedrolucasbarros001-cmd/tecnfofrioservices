@@ -33,7 +33,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
       await generatePDF({ 
         element: tagRef.current, 
         filename: `Etiqueta-${service.code}`,
-        format: [80, 170],
+        format: [29, 90],
         margin: 0
       });
     } finally {
@@ -52,66 +52,52 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>
 
-         {/* Tag content - preview on screen - matching reference image */}
-         <div ref={tagRef} className="print-tag border rounded-lg p-4 bg-white">
-           {/* Top accent bar - THICKER */}
-           <div className="h-3 bg-primary -mx-4 -mt-4 rounded-t-lg" />
+         {/* Tag content - preview (29mm x 90mm scale) */}
+         <div ref={tagRef} className="print-tag border rounded-lg p-2 bg-white mx-auto" style={{ width: '29mm', minHeight: '90mm' }}>
+           {/* Top accent bar */}
+           <div className="h-1 bg-primary -mx-2 -mt-2 rounded-t-lg" />
            
            {/* Logo */}
-           <div className="flex justify-center mt-6 mb-6">
+           <div className="flex justify-center mt-1 mb-1">
              <img 
                src={tecnofrioLogoFull} 
                alt="TECNOFRIO" 
-               className="h-12 object-contain"
+               className="h-4 object-contain"
              />
            </div>
            
-           {/* QR Code - LARGER */}
-           {/* QR Code - LARGER */}
-           <div className="flex justify-center mb-6">
-             <div className="p-3 bg-background border rounded-lg">
-               <QRCodeSVG
-                 value={qrData}
-                 size={140}
-                 level="H"
-                 includeMargin={false}
-               />
-             </div>
+           {/* QR Code */}
+           <div className="flex justify-center mb-1">
+             <QRCodeSVG
+               value={qrData}
+               size={55}
+               level="M"
+               includeMargin={false}
+             />
            </div>
            
-           {/* Service Code - Large */}
-           <div className="text-center mb-6">
-             <p className="text-3xl font-mono font-bold tracking-wide text-foreground">
+           {/* Service Code */}
+           <div className="text-center mb-1">
+             <p className="text-[10px] font-mono font-bold tracking-wide text-foreground">
                {service.code}
              </p>
            </div>
            
-           {/* Customer Info - INLINE format */}
-           <div className="space-y-2 text-base px-2">
-             <p>
-               <span className="text-muted-foreground italic">Cliente:</span>{' '}
+           {/* Customer Info - compact */}
+           <div className="space-y-0 text-[7px] leading-tight">
+             <p className="truncate">
+               <span className="text-muted-foreground">Cl:</span>{' '}
                <span className="font-medium text-foreground">{service.customer?.name || 'N/A'}</span>
              </p>
-             <p>
-               <span className="text-muted-foreground italic">Equipamento:</span>{' '}
+             <p className="truncate">
+               <span className="text-muted-foreground">Eq:</span>{' '}
                <span className="font-medium text-foreground">{service.appliance_type || 'N/A'}</span>
              </p>
              <p>
-               <span className="text-muted-foreground italic">Telefone:</span>{' '}
+               <span className="text-muted-foreground">Tel:</span>{' '}
                <span className="font-medium text-foreground">{service.customer?.phone || 'N/A'}</span>
              </p>
            </div>
-           
-           {/* Footer text - SIMPLE */}
-           <div className="mt-6 text-center">
-             <p className="text-sm text-muted-foreground">
-               Leia o QR Code para ver detalhes e histórico online
-             </p>
-           </div>
-           
-           {/* Bottom line */}
-           {/* Bottom line */}
-           <div className="mt-4 border-t border-border" />
          </div>
 
           <DialogFooter className="gap-2 no-print">
