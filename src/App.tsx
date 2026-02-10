@@ -38,6 +38,7 @@ import BudgetPrintPage from "@/pages/BudgetPrintPage";
 import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
+import ImportPage from "@/pages/ImportPage";
 
 const queryClient = new QueryClient();
 
@@ -129,6 +130,11 @@ const App = () => (
                     <Route path="/performance" element={
                       <ProtectedRoute allowedRoles={['dono']}>
                         <PerformancePage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/importar" element={
+                      <ProtectedRoute allowedRoles={['dono']}>
+                        <ImportPage />
                       </ProtectedRoute>
                     } />
                     
