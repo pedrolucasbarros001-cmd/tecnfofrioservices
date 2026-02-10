@@ -361,7 +361,7 @@
   border-radius: 0.25rem;
 }
 
-/* ========== Tag Print Page (4x6 inches = 102mm x 152mm) ========== */
+/* ========== Tag Print Page (29mm x 90mm) ========== */
 .print-tag-page {
   min-height: 100vh;
   background: hsl(var(--muted));
@@ -381,14 +381,14 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   margin-bottom: 1.5rem;
   width: 100%;
-  max-width: 300px;
+  max-width: 200px;
 }
 
 .print-tag-page .print-tag-container {
-  width: 102mm;
-  min-height: 152mm;
+  width: 29mm;
+  min-height: 90mm;
   background: white;
-  padding: 4mm;
+  padding: 2mm;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   border-radius: 0.25rem;
   box-sizing: border-box;
@@ -481,7 +481,7 @@
     border-radius: 0 !important;
   }
 
-  /* ========== TAG PRINT PAGE (4x6 inches = 102mm x 152mm) ========== */
+  /* ========== TAG PRINT PAGE (29mm x 90mm) ========== */
   .print-tag-page {
     background: white !important;
     padding: 0 !important;
@@ -493,12 +493,12 @@
   }
   
   .print-tag-page .print-tag-container {
-    width: 102mm !important;
-    height: 152mm !important;
-    min-height: 152mm !important;
+    width: 29mm !important;
+    height: 90mm !important;
+    min-height: 90mm !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding: 4mm !important;
+    padding: 2mm !important;
     border-radius: 0 !important;
   }
 
@@ -565,21 +565,21 @@
     background-color: #f9fafb !important;
   }
 
-  /* ========== TAG (4x6 inches = 102mm x 152mm) ========== */
+  /* ========== TAG (29mm x 90mm) ========== */
   body.print-type-tag {
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Tag container - fixed size for 4x6 inches (102mm x 152mm) */
+  /* Tag container - fixed size for 29mm x 90mm */
   .print-tag {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 102mm !important;
-    height: 152mm !important;
+    width: 29mm !important;
+    height: 90mm !important;
     margin: 0 !important;
-    padding: 4mm !important;
+    padding: 2mm !important;
     background: white !important;
     border: none !important;
     border-radius: 0 !important;

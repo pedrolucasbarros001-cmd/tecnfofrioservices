@@ -8,7 +8,7 @@ type PrintType = 'sheet' | 'tag';
 // Page configurations for each print type
 const PAGE_CONFIGS: Record<PrintType, string> = {
   sheet: '@page { size: A4 portrait; margin: 0; }',
-  tag: '@page { size: 102mm 152mm; margin: 0; }', // 4x6 inches
+  tag: '@page { size: 29mm 90mm; margin: 0; }', // 29mm x 90mm label
 };
 
 let injectedStyleElement: HTMLStyleElement | null = null;

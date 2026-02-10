@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Users, Plus, Pencil, Power, Search } from 'lucide-react';
+import { Users, Plus, Pencil, Power, Search, Trash2, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AppRole } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserWithRole {
   id: string;
@@ -84,8 +85,12 @@ export default function ColaboradoresPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [userToDeactivate, setUserToDeactivate] = useState<UserWithRole | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const { user: currentUser } = useAuth();
 
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['collaborators'],
@@ -312,6 +317,18 @@ export default function ColaboradoresPage() {
                               />
                             </Button>
                           )}
+                          {user.user_id !== currentUser?.id && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setUserToDelete(user);
+                                setShowDeleteDialog(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -355,6 +372,57 @@ export default function ColaboradoresPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmToggleActive}>
               Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Colaborador Permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem a certeza que deseja excluir permanentemente <strong>{userToDelete?.full_name || 'este utilizador'}</strong>? Esta ação não pode ser revertida. Todos os dados de perfil serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+              onClick={async () => {
+                if (!userToDelete) return;
+                setIsDeleting(true);
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const res = await fetch(
+                    `https://flialeqlwrtfnonxtsnx.supabase.co/functions/v1/delete-user`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`,
+                      },
+                      body: JSON.stringify({ user_id: userToDelete.user_id }),
+                    }
+                  );
+                  const result = await res.json();
+                  if (!res.ok) throw new Error(result.error || 'Erro ao excluir');
+                  toast.success('Colaborador excluído com sucesso');
+                  refetch();
+                } catch (error: any) {
+                  console.error('Delete user error:', error);
+                  toast.error(error.message || 'Erro ao excluir colaborador');
+                } finally {
+                  setIsDeleting(false);
+                  setShowDeleteDialog(false);
+                  setUserToDelete(null);
+                }
+              }}
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Excluir Permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
