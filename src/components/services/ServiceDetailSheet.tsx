@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   DollarSign,
   ClipboardList,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -51,6 +52,7 @@ import { PartArrivedModal } from '@/components/modals/PartArrivedModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
+import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
@@ -171,6 +173,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
+  const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -493,6 +496,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 title="Detalhes do Serviço" 
                 bgColor="bg-pink-50"
                 borderColor="border-l-pink-500"
+                action={role === 'dono' ? (
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowEditDetailsModal(true)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                ) : undefined}
               >
                 <div className="flex items-center gap-2 mb-2">
                   {service.service_type === 'instalacao' ? (
@@ -951,6 +959,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         service={service}
       />
 
+      <EditServiceDetailsModal
+        open={showEditDetailsModal}
+        onOpenChange={setShowEditDetailsModal}
+        service={service}
+        onSuccess={handleModalSuccess}
+      />
+
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -981,18 +996,22 @@ interface SectionProps {
   bgColor: string;
   borderColor: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }
 
-function Section({ title, bgColor, borderColor, children }: SectionProps) {
+function Section({ title, bgColor, borderColor, children, action }: SectionProps) {
   return (
     <div className={cn(
       "rounded-lg p-4 border-l-4",
       bgColor,
       borderColor
     )}>
-      <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide mb-3">
-        {title}
-      </h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+          {title}
+        </h4>
+        {action}
+      </div>
       {children}
     </div>
   );

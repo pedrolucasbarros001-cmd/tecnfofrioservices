@@ -7,6 +7,7 @@ import {
   X,
   ArrowRight,
   ShoppingCart,
+  Pencil,
 } from 'lucide-react';
 import {
   Sheet,
@@ -19,9 +20,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { ConvertBudgetModal } from '@/components/modals/ConvertBudgetModal';
+import { EditBudgetDetailsModal } from '@/components/modals/EditBudgetDetailsModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BudgetItem {
   ref?: string;
@@ -54,7 +57,9 @@ export function BudgetDetailPanel({
 }: BudgetDetailPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [localStatus, setLocalStatus] = useState<string | null>(null);
+  const { role } = useAuth();
 
   // Reset local status when budget changes
   useEffect(() => { setLocalStatus(null); }, [budget?.id]);
@@ -180,10 +185,17 @@ export function BudgetDetailPanel({
             <div className="p-6 space-y-6">
               {/* Articles Section */}
               <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
-                <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  Artigos do Orçamento
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4" />
+                    Artigos do Orçamento
+                  </h3>
+                  {role === 'dono' && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowEditBudgetModal(true)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
                 
                 {pricingDetails.items.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -318,6 +330,13 @@ export function BudgetDetailPanel({
         onOpenChange={setShowConvertModal}
         budget={budget}
         onSuccess={handleConvertSuccess}
+      />
+
+      <EditBudgetDetailsModal
+        open={showEditBudgetModal}
+        onOpenChange={setShowEditBudgetModal}
+        budget={budget}
+        onSuccess={() => { onUpdate?.(); }}
       />
     </>
   );
