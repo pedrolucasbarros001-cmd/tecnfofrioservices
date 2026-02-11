@@ -45,11 +45,14 @@ export default function PerformancePage() {
     const instalacoes = techServices.filter((s) => getServiceType(s) === 'instalacoes');
     const reparacoes = techServices.filter((s) => getServiceType(s) === 'reparacoes');
 
-    const chartData = [
-      { name: 'Entregas', value: entregas.length, color: '#10b981' },
-      { name: 'Instalações', value: instalacoes.length, color: '#f59e0b' },
-      { name: 'Reparações', value: reparacoes.length, color: '#3b82f6' },
-    ].filter((item) => item.value > 0);
+    const hasData = techServices.length > 0;
+    const chartData = hasData
+      ? [
+          { name: 'Entregas', value: entregas.length, color: '#10b981' },
+          { name: 'Instalações', value: instalacoes.length, color: '#f59e0b' },
+          { name: 'Reparações', value: reparacoes.length, color: '#3b82f6' },
+        ].filter((item) => item.value > 0)
+      : [{ name: 'Sem serviços', value: 1, color: 'hsl(var(--muted))' }];
 
     return {
       services: techServices,
@@ -58,6 +61,7 @@ export default function PerformancePage() {
       reparacoes,
       chartData,
       total: techServices.length,
+      isEmpty: !hasData,
     };
   };
 
@@ -94,12 +98,10 @@ export default function PerformancePage() {
     }
   };
 
-  const techniciansWithData = technicians
-    .map((tech) => ({
-      ...tech,
-      data: getTechnicianData(tech.id),
-    }))
-    .filter((tech) => tech.data.total > 0);
+  const techniciansWithData = technicians.map((tech) => ({
+    ...tech,
+    data: getTechnicianData(tech.id),
+  }));
 
   return (
     <div className="p-6 space-y-6">
@@ -150,88 +152,94 @@ export default function PerformancePage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Pie Chart */}
                 <div className="h-[200px]">
-                  {tech.data.chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={tech.data.chartData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {tech.data.chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      Sem dados
-                    </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={tech.data.chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={tech.data.isEmpty ? 0 : 2}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {tech.data.chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} opacity={tech.data.isEmpty ? 0.3 : 1} />
+                        ))}
+                      </Pie>
+                      {!tech.data.isEmpty && <Tooltip />}
+                      {!tech.data.isEmpty && <Legend />}
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {tech.data.isEmpty && (
+                    <p className="text-xs text-muted-foreground text-center -mt-4">Sem serviços</p>
                   )}
                 </div>
 
                 {/* Services List */}
                 <div className="lg:col-span-2 space-y-2 max-h-[300px] overflow-y-auto">
-                  {tech.data.services.slice(0, 10).map((service) => {
-                    const serviceType = getServiceType(service);
-                    return (
-                      <div
-                        key={service.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${getServiceColor(serviceType)}`}>
-                            {getServiceIcon(serviceType)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-semibold text-primary">
-                                {service.code}
-                              </span>
-                              <Badge variant="secondary" className="text-xs">
-                                {getServiceLabel(serviceType)}
+                  {tech.data.isEmpty ? (
+                    <div className="flex items-center justify-center h-full min-h-[100px] text-muted-foreground text-sm">
+                      Nenhum serviço atribuído
+                    </div>
+                  ) : (
+                    <>
+                      {tech.data.services.slice(0, 10).map((service) => {
+                        const serviceType = getServiceType(service);
+                        return (
+                          <div
+                            key={service.id}
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${getServiceColor(serviceType)}`}>
+                                {getServiceIcon(serviceType)}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-semibold text-primary">
+                                    {service.code}
+                                  </span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {getServiceLabel(serviceType)}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm">{service.customer?.name || 'Cliente'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {service.appliance_type}
+                                  {service.fault_description && ` - ${service.fault_description}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              {service.scheduled_date && (
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(service.scheduled_date).toLocaleDateString('pt-PT')}
+                                </p>
+                              )}
+                              <Badge
+                                variant="outline"
+                                className={
+                                  service.status === 'concluidos' || service.status === 'finalizado'
+                                    ? 'border-green-500 text-green-700'
+                                    : service.status === 'em_debito'
+                                    ? 'border-orange-500 text-orange-700'
+                                    : 'border-blue-500 text-blue-700'
+                                }
+                              >
+                                {STATUS_LABELS[service.status] || service.status}
                               </Badge>
                             </div>
-                            <p className="text-sm">{service.customer?.name || 'Cliente'}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {service.appliance_type}
-                              {service.fault_description && ` - ${service.fault_description}`}
-                            </p>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          {service.scheduled_date && (
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(service.scheduled_date).toLocaleDateString('pt-PT')}
-                            </p>
-                          )}
-                          <Badge
-                            variant="outline"
-                            className={
-                              service.status === 'concluidos' || service.status === 'finalizado'
-                                ? 'border-green-500 text-green-700'
-                                : service.status === 'em_debito'
-                                ? 'border-orange-500 text-orange-700'
-                                : 'border-blue-500 text-blue-700'
-                            }
-                          >
-                            {STATUS_LABELS[service.status] || service.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {tech.data.services.length > 10 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      +{tech.data.services.length - 10} serviços adicionais
-                    </p>
+                        );
+                      })}
+                      {tech.data.services.length > 10 && (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          +{tech.data.services.length - 10} serviços adicionais
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -240,13 +248,9 @@ export default function PerformancePage() {
         ))}
       </div>
 
-      {techniciansWithData.length === 0 && (
+      {technicians.length === 0 && (
         <Card className="p-12">
-          <p className="text-center text-muted-foreground">
-            {technicians.length === 0
-              ? 'Nenhum técnico cadastrado'
-              : 'Nenhum técnico com serviços atribuídos'}
-          </p>
+          <p className="text-center text-muted-foreground">Nenhum técnico cadastrado</p>
         </Card>
       )}
     </div>
