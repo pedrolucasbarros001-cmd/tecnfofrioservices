@@ -1,77 +1,57 @@
 
-# Correcoes: Orcamento, Etiqueta e Exclusao de Colaboradores
+# Absorver Artigos do Orcamento para Detalhes do Servico na Conversao
 
-## 1. Corrigir texto na ficha de orcamento
+## Problema
 
-**Problema**: Na ficha de impressao do orcamento (`BudgetPrintPage.tsx`), aparece "Descricao do Problema" quando deveria ser "Descricao do Orcamento".
+Quando um orcamento e convertido em servico, os campos `appliance_type`, `brand`, `model` e `fault_description` do servico ficam vazios. Isto acontece porque o orcamento nao guarda esses campos directamente -- a informacao relevante esta dentro do `pricing_description` (JSON com artigos: `description` e `details`).
 
-**Solucao**: Alterar o texto na linha 340 de `src/pages/BudgetPrintPage.tsx`:
-- De: `Descrição do Problema`
-- Para: `Descrição do Orçamento`
+## Solucao
 
----
+Alterar o `ConvertBudgetModal` para extrair automaticamente o conteudo dos artigos do orcamento e preencher os campos do servico:
 
-## 2. Ajustar tamanho da etiqueta para 29mm x 90mm
+- **`appliance_type`**: Primeiro artigo (`description`) do orcamento (ex: "Maquina Lavar Roupa")
+- **`fault_description`**: Concatenacao de todos os artigos e suas descricoes detalhadas (`details`), formando uma descricao completa do servico
+- **`notes`**: Manter as notas do orcamento se existirem
+- **`pricing_description`**: Copiar o JSON completo para o servico, para manter o detalhe financeiro
 
-**Problema**: A etiqueta esta configurada para 102mm x 152mm (4x6 polegadas), mas o tamanho real da etiqueta fisica e 29mm x 90mm. Isto causa uma pagina extra na impressao porque o conteudo excede o papel.
+O modal mantem o design actual (tipo + local + info do orcamento) sem acrescentar passos adicionais.
 
-**Solucao**: Actualizar TODOS os locais que referenciam o tamanho da etiqueta:
+## Alteracoes
 
-### Ficheiros a alterar:
+### `src/components/modals/ConvertBudgetModal.tsx`
 
-**`src/utils/printUtils.ts`** (linha 11):
-- De: `@page { size: 102mm 152mm; margin: 0; }`
-- Para: `@page { size: 29mm 90mm; margin: 0; }`
+1. Adicionar funcao `extractBudgetDetails(budget)` que:
+   - Faz parse do `pricing_description` JSON
+   - Extrai o `description` do primeiro item como `appliance_type`
+   - Concatena todos os items no formato "Artigo: descricao detalhada" como `fault_description`
+   - Retorna `{ appliance_type, fault_description, pricing_description }`
 
-**`src/index.css`** - Actualizar todas as dimensoes de tag:
-- `.print-tag-page .print-tag-container`: width 29mm, min-height 90mm
-- `@media print .print-tag-page .print-tag-container`: width/height 29mm x 90mm
-- `@media print .print-tag`: width/height 29mm x 90mm
+2. Actualizar o `handleConvert` para usar os valores extraidos no insert:
 
-**`src/pages/ServiceTagPage.tsx`**:
-- Alterar o formato do PDF de `[102, 152]` para `[29, 90]`
-- Reduzir tamanhos de QR code (de 140px para ~60px), logo, fonte e espacamentos para caber em 29x90mm
+```text
+Antes:
+  appliance_type: budget.appliance_type      // sempre null
+  fault_description: budget.fault_description // sempre null
 
-**`src/components/modals/ServiceTagModal.tsx`**:
-- Alterar o formato do PDF de `[80, 170]` para `[29, 90]`
-- Mesmas reducoes de tamanho no layout do preview
+Depois:
+  appliance_type: extracted.appliance_type    // "Maquina Lavar Roupa"
+  fault_description: extracted.fault_description  // "MLR Bosch: Reparacao motor..."
+  pricing_description: budget.pricing_description // JSON completo dos artigos
+```
 
-**Redesign do conteudo da etiqueta para 29x90mm** (muito mais pequena):
-- Logo reduzido (h-6 em vez de h-12)
-- QR Code reduzido para ~50px
-- Codigo de servico em texto menor
-- Dados do cliente em fonte compacta (text-[8px])
-- Espacamentos minimos (mb-1 em vez de mb-6)
-- Remover texto do rodape (nao cabe)
+### Exemplo pratico
 
----
+Orcamento com 2 artigos:
+- Artigo: "Maquina Lavar Roupa" | Descricao: "Reparacao do motor principal"
+- Artigo: "Peca de substituicao" | Descricao: "Rolamento frontal"
 
-## 3. Adicionar opcao de excluir perfil de colaborador
+Resultado no servico:
+- `appliance_type`: "Maquina Lavar Roupa"
+- `fault_description`: "Maquina Lavar Roupa - Reparacao do motor principal; Peca de substituicao - Rolamento frontal"
+- `pricing_description`: (JSON completo copiado)
 
-**Problema**: Actualmente so e possivel desactivar tecnicos. Nao existe opcao para o admin excluir completamente um perfil de colaborador.
+## Impacto
 
-**Solucao**:
-
-### Edge Function `delete-user` (nova)
-- Recebe o `user_id` do colaborador a excluir
-- Valida que quem chama e "dono" (admin)
-- Usa o Supabase Admin API para:
-  1. Eliminar registos na tabela `user_roles`
-  2. Eliminar registos na tabela `technicians` (se existir)
-  3. Eliminar o perfil na tabela `profiles`
-  4. Eliminar o utilizador do Supabase Auth via `admin.deleteUser()`
-
-### `ColaboradoresPage.tsx` - Alteracoes:
-- Adicionar botao de excluir (icone Trash2) na coluna de acoes, ao lado do botao de editar
-- Adicionar AlertDialog de confirmacao para exclusao ("Tem a certeza que deseja excluir permanentemente este colaborador?")
-- Impedir exclusao do proprio utilizador logado
-- Chamar a edge function `delete-user` ao confirmar
-
----
-
-## Sequencia de implementacao
-
-1. Corrigir texto "Descricao do Orcamento" no BudgetPrintPage
-2. Redimensionar etiqueta para 29x90mm (CSS + componentes + PDF)
-3. Criar edge function `delete-user`
-4. Adicionar botao e dialog de exclusao na pagina de colaboradores
+- A ficha de consulta do servico passa a mostrar o tipo de aparelho e a descricao
+- A ficha de impressao passa a ter os detalhes preenchidos
+- Nenhuma alteracao no fluxo do utilizador -- o modal continua igual, apenas o mapeamento interno melhora
