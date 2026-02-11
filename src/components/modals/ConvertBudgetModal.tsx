@@ -68,21 +68,50 @@ export function ConvertBudgetModal({
   const [serviceLocation, setServiceLocation] = useState<ServiceLocation>('oficina');
   const [isLoading, setIsLoading] = useState(false);
 
+  const extractBudgetDetails = (budget: any) => {
+    let applianceType = budget.appliance_type || null;
+    let faultDescription = budget.fault_description || null;
+
+    try {
+      const items = budget.pricing_description
+        ? JSON.parse(budget.pricing_description)
+        : [];
+
+      if (Array.isArray(items) && items.length > 0) {
+        applianceType = items[0]?.description || applianceType;
+        faultDescription = items
+          .map((item: any) => {
+            const desc = item.description || '';
+            const details = item.details || '';
+            return details ? `${desc} - ${details}` : desc;
+          })
+          .filter(Boolean)
+          .join('; ');
+      }
+    } catch {
+      // pricing_description not valid JSON, keep fallback values
+    }
+
+    return { applianceType, faultDescription };
+  };
+
   const handleConvert = async () => {
     if (!budget) return;
 
     setIsLoading(true);
     try {
-      // Create service from budget with selected type and location
+      const { applianceType, faultDescription } = extractBudgetDetails(budget);
+
       const { data: service, error: serviceError } = await supabase
         .from('services')
         .insert({
           customer_id: budget.customer_id,
-          appliance_type: budget.appliance_type,
+          appliance_type: applianceType,
           brand: budget.brand,
           model: budget.model,
-          fault_description: budget.fault_description,
+          fault_description: faultDescription,
           notes: budget.notes,
+          pricing_description: budget.pricing_description,
           service_type: serviceType,
           status: 'por_fazer',
           service_location: serviceLocation,
