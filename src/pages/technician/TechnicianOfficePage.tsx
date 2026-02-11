@@ -252,7 +252,7 @@ export default function TechnicianOfficePage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-y-auto">
+    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-y-auto" data-tour="oficina-tecnico">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500">

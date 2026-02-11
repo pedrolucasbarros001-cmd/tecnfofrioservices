@@ -157,7 +157,7 @@ export default function ServicosPage() {
     const serviceConfig = getServiceConfig(service);
     
     return (
-      <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)}>
+      <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)} data-tour="service-cards">
         <CardContent className="p-4">
           <div className="space-y-3">
             {/* Header: Code + Badge */}
@@ -252,7 +252,7 @@ export default function ServicosPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-hidden">
+    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-hidden" data-tour="servicos-agenda">
       {/* Header with Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">

@@ -211,7 +211,7 @@ export default function GeralPage() {
   };
   return <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="geral-header">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gestão Geral</h1>
           <p className="text-muted-foreground">Gerir todos os serviços</p>
@@ -219,7 +219,7 @@ export default function GeralPage() {
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="shrink-0">
+            <Button className="shrink-0" data-tour="new-service-btn">
               Novo Serviço
               <ChevronDown className="h-4 w-4 ml-2" />
             </Button>
@@ -240,7 +240,7 @@ export default function GeralPage() {
 
       {/* Search */}
       <div className="flex gap-4">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-md" data-tour="search-bar">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Pesquisar por código, cliente, equipamento..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
         </div>
@@ -253,7 +253,7 @@ export default function GeralPage() {
       {selectedStatus === 'all' && <WeeklyAgenda services={services} onServiceClick={handleServiceClick} />}
 
       {/* Services Table */}
-      <Card>
+      <Card data-tour="services-table">
         <CardContent className="p-0">
           {isLoading ? <div className="text-center py-12 text-muted-foreground">
               A carregar serviços...

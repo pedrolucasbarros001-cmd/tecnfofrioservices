@@ -130,7 +130,7 @@ export default function PreferenciasPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Preferências</h1>
+      <h1 className="text-2xl font-bold" data-tour="preferencias-header">Preferências</h1>
 
       {/* Appearance Card */}
       <Card>

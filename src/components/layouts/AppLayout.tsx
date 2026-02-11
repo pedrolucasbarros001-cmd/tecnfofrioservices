@@ -8,7 +8,7 @@ import { OwnerSidebar } from './OwnerSidebar';
 import { SecretarySidebar } from './SecretarySidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { GuidedTour } from '@/components/onboarding/GuidedTour';
 import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +70,7 @@ export function AppLayout() {
             size="icon"
             className="relative h-9 w-9 rounded-full"
             onClick={() => setShowNotifications(true)}
+            data-tour="notifications-btn"
           >
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
@@ -90,8 +91,8 @@ export function AppLayout() {
         onOpenChange={setShowNotifications}
       />
 
-      {/* Onboarding Modal */}
-      {isOnboardingOpen && <OnboardingModal />}
+      {/* Guided Tour */}
+      {isOnboardingOpen && <GuidedTour />}
     </SidebarProvider>
   );
 }

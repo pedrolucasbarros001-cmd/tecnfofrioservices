@@ -58,7 +58,7 @@ export default function SecretaryDebitoPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
+      <div data-tour="debito-header">
         <h1 className="text-2xl font-bold tracking-tight">Em Débito</h1>
         <p className="text-muted-foreground">
           Serviços com pagamento pendente
