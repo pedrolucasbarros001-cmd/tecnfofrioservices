@@ -1029,7 +1029,7 @@ export type Database = {
       is_tecnico: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "dono" | "secretaria" | "tecnico"
+      app_role: "dono" | "secretaria" | "tecnico" | "monitor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1157,7 +1157,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["dono", "secretaria", "tecnico"],
+      app_role: ["dono", "secretaria", "tecnico", "monitor"],
     },
   },
 } as const
