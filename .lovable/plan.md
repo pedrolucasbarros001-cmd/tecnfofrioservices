@@ -1,57 +1,50 @@
 
-# Absorver Artigos do Orcamento para Detalhes do Servico na Conversao
+
+# Corrigir Extraccao de Artigos do Orcamento
 
 ## Problema
 
-Quando um orcamento e convertido em servico, os campos `appliance_type`, `brand`, `model` e `fault_description` do servico ficam vazios. Isto acontece porque o orcamento nao guarda esses campos directamente -- a informacao relevante esta dentro do `pricing_description` (JSON com artigos: `description` e `details`).
+O `pricing_description` do orcamento tem esta estrutura:
 
-## Solucao
+```text
+{
+  "items": [
+    { "description": "compressor", "details": "um novo", "qty": 1, "price": 340, "tax": 23 }
+  ],
+  "discount": 0,
+  "discountType": "euro",
+  "discountValue": 0
+}
+```
 
-Alterar o `ConvertBudgetModal` para extrair automaticamente o conteudo dos artigos do orcamento e preencher os campos do servico:
+O codigo actual faz `JSON.parse(budget.pricing_description)` e depois verifica `Array.isArray(items)`. Como o resultado e um **objecto** (e nao um array), a verificacao falha e a extraccao nunca acontece -- os campos ficam sempre `null`.
 
-- **`appliance_type`**: Primeiro artigo (`description`) do orcamento (ex: "Maquina Lavar Roupa")
-- **`fault_description`**: Concatenacao de todos os artigos e suas descricoes detalhadas (`details`), formando uma descricao completa do servico
-- **`notes`**: Manter as notas do orcamento se existirem
-- **`pricing_description`**: Copiar o JSON completo para o servico, para manter o detalhe financeiro
+## Correcao
 
-O modal mantem o design actual (tipo + local + info do orcamento) sem acrescentar passos adicionais.
+### `src/components/modals/ConvertBudgetModal.tsx` (linha 76-80)
 
-## Alteracoes
-
-### `src/components/modals/ConvertBudgetModal.tsx`
-
-1. Adicionar funcao `extractBudgetDetails(budget)` que:
-   - Faz parse do `pricing_description` JSON
-   - Extrai o `description` do primeiro item como `appliance_type`
-   - Concatena todos os items no formato "Artigo: descricao detalhada" como `fault_description`
-   - Retorna `{ appliance_type, fault_description, pricing_description }`
-
-2. Actualizar o `handleConvert` para usar os valores extraidos no insert:
+Alterar o parse para aceder ao campo `.items` do objecto:
 
 ```text
 Antes:
-  appliance_type: budget.appliance_type      // sempre null
-  fault_description: budget.fault_description // sempre null
+  const items = budget.pricing_description
+    ? JSON.parse(budget.pricing_description)
+    : [];
+  if (Array.isArray(items) && items.length > 0) {
 
 Depois:
-  appliance_type: extracted.appliance_type    // "Maquina Lavar Roupa"
-  fault_description: extracted.fault_description  // "MLR Bosch: Reparacao motor..."
-  pricing_description: budget.pricing_description // JSON completo dos artigos
+  const parsed = budget.pricing_description
+    ? JSON.parse(budget.pricing_description)
+    : {};
+  const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+  if (items.length > 0) {
 ```
 
-### Exemplo pratico
+Isto cobre ambos os formatos possiveis:
+- Formato actual: `{ items: [...] }` -- acede a `parsed.items`
+- Formato legado (array directo): `[...]` -- usa o array directamente
 
-Orcamento com 2 artigos:
-- Artigo: "Maquina Lavar Roupa" | Descricao: "Reparacao do motor principal"
-- Artigo: "Peca de substituicao" | Descricao: "Rolamento frontal"
+## Servico existente TF-00002
 
-Resultado no servico:
-- `appliance_type`: "Maquina Lavar Roupa"
-- `fault_description`: "Maquina Lavar Roupa - Reparacao do motor principal; Peca de substituicao - Rolamento frontal"
-- `pricing_description`: (JSON completo copiado)
+O servico TF-00002 ja foi criado com campos vazios. Apos a correcao, novas conversoes funcionarao correctamente. Para corrigir o TF-00002 existente, seria necessario reconverter ou editar manualmente.
 
-## Impacto
-
-- A ficha de consulta do servico passa a mostrar o tipo de aparelho e a descricao
-- A ficha de impressao passa a ter os detalhes preenchidos
-- Nenhuma alteracao no fluxo do utilizador -- o modal continua igual, apenas o mapeamento interno melhora
