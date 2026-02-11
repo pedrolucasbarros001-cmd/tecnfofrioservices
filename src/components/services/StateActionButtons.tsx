@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Trash2,
   CalendarClock,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +42,7 @@ interface StateActionButtonsProps {
   onContactClient?: () => void;
   onDelete?: () => void;
   onReschedule?: () => void;
+  onEditDetails?: () => void;
 }
 
 interface ActionConfig {
@@ -66,6 +68,7 @@ export function StateActionButtons({
   onContactClient,
   onDelete,
   onReschedule,
+  onEditDetails,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
   const isDono = role === 'dono';
@@ -291,6 +294,12 @@ export function StateActionButtons({
           {isDono && (
             <>
               <DropdownMenuSeparator />
+              {onEditDetails && (
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditDetails(); }}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar Detalhes
+                </DropdownMenuItem>
+              )}
               {onForceState && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onForceState(); }} className="text-amber-600">
                   <AlertTriangle className="h-4 w-4 mr-2" />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, FileText, Check, X, ArrowRight, Trash2 } from 'lucide-react';
+import { Search, Plus, FileText, Check, X, ArrowRight, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
 import { ConvertBudgetModal } from '@/components/modals/ConvertBudgetModal';
+import { EditBudgetDetailsModal } from '@/components/modals/EditBudgetDetailsModal';
 import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -61,6 +62,8 @@ export default function OrcamentosPage() {
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<any | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
+  const [budgetToEdit, setBudgetToEdit] = useState<any | null>(null);
 
   const { data: budgets = [], isLoading, refetch } = useQuery({
     queryKey: ['budgets'],
@@ -292,6 +295,16 @@ export default function OrcamentosPage() {
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setBudgetToEdit(budget);
+                                    setShowEditBudgetModal(true);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Editar Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     handleUpdateStatus(budget.id, 'aprovado');
                                   }}
                                 >
@@ -364,6 +377,14 @@ export default function OrcamentosPage() {
         onOpenChange={setShowDetailPanel}
         budget={selectedBudget}
         onUpdate={() => refetch()}
+      />
+
+      {/* Edit Budget Details Modal */}
+      <EditBudgetDetailsModal
+        open={showEditBudgetModal}
+        onOpenChange={setShowEditBudgetModal}
+        budget={budgetToEdit}
+        onSuccess={() => refetch()}
       />
 
       {/* Delete Confirmation Dialog */}
