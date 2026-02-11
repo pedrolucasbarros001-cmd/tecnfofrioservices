@@ -244,6 +244,7 @@ export const ONBOARDING_CONTENT: Record<AppRole, OnboardingStepContent[]> = {
   dono: DONO_STEPS,
   secretaria: SECRETARIA_STEPS,
   tecnico: TECNICO_STEPS,
+  monitor: [],
 };
 
 export function getOnboardingSteps(role: AppRole | null): OnboardingStepContent[] {

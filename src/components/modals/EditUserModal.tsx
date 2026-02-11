@@ -43,7 +43,7 @@ import { AppRole } from '@/types/database';
 const formSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório'),
   phone: z.string().optional(),
-  role: z.enum(['dono', 'secretaria', 'tecnico']),
+  role: z.enum(['dono', 'secretaria', 'tecnico', 'monitor']),
   specialization: z.string().optional(),
 });
 

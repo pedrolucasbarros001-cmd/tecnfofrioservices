@@ -183,6 +183,8 @@ export function getDefaultRouteForRole(role: AppRole | null): string {
       return '/geral';
     case 'tecnico':
       return '/servicos';
+    case 'monitor':
+      return '/tv-monitor';
     default:
       return '/login';
   }

@@ -1,6 +1,6 @@
 // TECNOFRIO Database Types
 
-export type AppRole = 'dono' | 'secretaria' | 'tecnico';
+export type AppRole = 'dono' | 'secretaria' | 'tecnico' | 'monitor';
 
 export type ServiceType = 'reparacao' | 'instalacao' | 'entrega' | 'manutencao';
 
