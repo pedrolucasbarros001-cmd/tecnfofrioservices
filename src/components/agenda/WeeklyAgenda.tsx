@@ -108,7 +108,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
 
   return (
     <>
-      <div className="bg-card rounded-xl border shadow-sm">
+      <div className="bg-card rounded-xl border shadow-sm" data-tour="weekly-agenda">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">

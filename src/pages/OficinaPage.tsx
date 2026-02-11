@@ -55,7 +55,7 @@ export default function OficinaPage() {
       </div>
 
       {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-tour="oficina-cards">
         {isLoading ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">
             A carregar serviços...

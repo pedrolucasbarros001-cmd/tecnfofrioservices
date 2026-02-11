@@ -110,7 +110,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Technicians Grid */}
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="performance-cards">
         {techniciansWithData.map((tech) => (
           <Card key={tech.id} className="overflow-hidden">
             <CardHeader className="pb-4">

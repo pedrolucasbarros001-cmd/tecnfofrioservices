@@ -181,7 +181,7 @@ export default function ColaboradoresPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="colaboradores-header">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gestão de Utilizadores</h1>
           <p className="text-muted-foreground">Gerir acessos e colaboradores</p>

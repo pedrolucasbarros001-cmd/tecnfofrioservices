@@ -145,7 +145,7 @@ export default function PerfilPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Perfil</h1>
+      <h1 className="text-2xl font-bold" data-tour="perfil-header">Perfil</h1>
 
       {/* Profile Card */}
       <Card>
