@@ -73,11 +73,12 @@ export function ConvertBudgetModal({
     let faultDescription = budget.fault_description || null;
 
     try {
-      const items = budget.pricing_description
+      const parsed = budget.pricing_description
         ? JSON.parse(budget.pricing_description)
-        : [];
+        : {};
+      const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
 
-      if (Array.isArray(items) && items.length > 0) {
+      if (items.length > 0) {
         applianceType = items[0]?.description || applianceType;
         faultDescription = items
           .map((item: any) => {
