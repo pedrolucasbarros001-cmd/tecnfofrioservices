@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wrench, Copy, Monitor, Send, UserPlus, Clock, AlertCircle } from 'lucide-react';
+import { Wrench, Send, UserPlus, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,6 @@ import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal
 import { SendTaskModal } from '@/components/modals/SendTaskModal';
 import { useServices } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function OficinaPage() {
@@ -21,16 +20,6 @@ export default function OficinaPage() {
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
 
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
-
-  const handleCopyTVLink = () => {
-    const url = `${window.location.origin}/tv-monitor`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copiado para a área de transferência!');
-  };
-
-  const handleOpenMonitor = () => {
-    window.open('/tv-monitor', '_blank');
-  };
 
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);
@@ -61,14 +50,6 @@ export default function OficinaPage() {
           <Button variant="outline" onClick={() => setShowTaskModal(true)}>
             <Send className="h-4 w-4 mr-2" />
             Enviar Tarefa
-          </Button>
-          <Button variant="outline" onClick={handleCopyTVLink}>
-            <Copy className="h-4 w-4 mr-2" />
-            Copiar Link TV
-          </Button>
-          <Button onClick={handleOpenMonitor} className="bg-purple-600 hover:bg-purple-700">
-            <Monitor className="h-4 w-4 mr-2" />
-            Abrir Monitor
           </Button>
         </div>
       </div>

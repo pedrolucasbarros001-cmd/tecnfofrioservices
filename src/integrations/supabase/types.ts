@@ -1025,6 +1025,7 @@ export type Database = {
         Returns: boolean
       }
       is_dono: { Args: { _user_id: string }; Returns: boolean }
+      is_monitor: { Args: { _user_id: string }; Returns: boolean }
       is_secretaria: { Args: { _user_id: string }; Returns: boolean }
       is_tecnico: { Args: { _user_id: string }; Returns: boolean }
     }

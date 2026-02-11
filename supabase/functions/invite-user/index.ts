@@ -9,7 +9,7 @@ interface CreateUserRequest {
   email: string;
   full_name: string;
   password: string;
-  role: 'dono' | 'secretaria' | 'tecnico';
+  role: 'dono' | 'secretaria' | 'tecnico' | 'monitor';
   phone?: string;
   specialization?: string;
 }
