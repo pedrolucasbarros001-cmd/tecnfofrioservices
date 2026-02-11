@@ -1,117 +1,58 @@
 
 
-# Editar Detalhes do Servico e Orcamento (Apenas Admin)
+# Adicionar "Editar Detalhes" nos Menus de 3 Pontos
 
 ## Resumo
 
-Criar um modal de edicao de detalhes reutilizavel para o admin (dono) poder editar os campos de equipamento e descricao tanto nos servicos como nos orcamentos. O botao "Editar Detalhes" aparece apenas para utilizadores com role `dono`.
+Adicionar a opcao "Editar Detalhes" no menu de accoes (3 pontos) tanto dos servicos como dos orcamentos, restrito ao admin (dono). Para orcamentos, so aparece antes de aprovar (status `pendente`).
 
 ## Alteracoes
 
-### 1. Novo componente: `src/components/modals/EditServiceDetailsModal.tsx`
+### 1. `src/components/services/StateActionButtons.tsx`
 
-Modal com formulario para editar os seguintes campos de um servico:
+- Adicionar nova prop `onEditDetails?: () => void`
+- No dropdown, adicionar item "Editar Detalhes" com icone Pencil, visivel apenas para `isDono`, antes do separador de accoes perigosas
 
-| Campo | Tipo |
-|-------|------|
-| Tipo de Aparelho (appliance_type) | Input |
-| Marca (brand) | Input |
-| Modelo (model) | Input |
-| N. Serie (serial_number) | Input |
-| Descricao da Avaria (fault_description) | Textarea |
-| Notas (notes) | Textarea |
-
-- Pre-preenche todos os campos com os valores actuais do servico
-- Ao guardar, faz update na tabela `services` via Supabase
-- Chama `onSuccess` para refrescar os dados
-
-### 2. Novo componente: `src/components/modals/EditBudgetDetailsModal.tsx`
-
-Modal para editar os artigos de um orcamento (reutilizando a mesma estrutura do `CreateBudgetModal`):
-
-| Campo | Tipo |
-|-------|------|
-| Artigos (pricing_description items) | Tabela editavel com artigo, descricao, qtd, valor, imposto |
-| Desconto | Input |
-| Notas (notes) | Textarea |
-
-- Pre-preenche com os artigos existentes do `pricing_description` JSON
-- Ao guardar, actualiza `pricing_description`, `estimated_labor`, `estimated_parts`, `estimated_total` e `notes` na tabela `budgets`
-
-### 3. Integrar no `ServiceDetailSheet.tsx`
+### 2. `src/pages/GeralPage.tsx`
 
 - Adicionar estado `showEditDetailsModal`
-- Na seccao "Detalhes do Servico" (linha ~492), adicionar um botao de edicao (icone Pencil) visivel apenas quando `role === 'dono'`
-- Renderizar o `EditServiceDetailsModal` com os dados do servico actual
+- Adicionar handler `handleEditDetails(service)`
+- Passar `onEditDetails` ao `StateActionButtons`
+- Importar e renderizar `EditServiceDetailsModal` com o servico actual
 
-### 4. Integrar no `BudgetDetailPanel.tsx`
+### 3. `src/pages/OrcamentosPage.tsx`
 
-- Adicionar estado `showEditBudgetModal`
-- No header ou na seccao de artigos, adicionar botao "Editar" visivel apenas quando `role === 'dono'`
-- Renderizar o `EditBudgetDetailsModal` com os dados do orcamento actual
+- Adicionar estado `showEditBudgetModal` e `budgetToEdit`
+- No dropdown de accoes de cada orcamento, adicionar "Editar Detalhes" com icone Pencil, visivel apenas quando `budget.status === 'pendente'`
+- Importar e renderizar `EditBudgetDetailsModal`
 
 ## Detalhes tecnicos
 
-### EditServiceDetailsModal
+### StateActionButtons - novo item no dropdown
 
 ```text
-Props:
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  service: Service
-  onSuccess: () => void
-
-Campos do formulario:
-  appliance_type (Input, obrigatorio)
-  brand (Input)
-  model (Input)
-  serial_number (Input)
-  fault_description (Textarea)
-  notes (Textarea)
-
-Ao guardar:
-  supabase.from('services').update({...}).eq('id', service.id)
+Posicao: antes do DropdownMenuSeparator das accoes de dono
+Condicao: isDono && onEditDetails
+Icone: Pencil
+Label: "Editar Detalhes"
 ```
 
-### EditBudgetDetailsModal
+### GeralPage - integracao
 
 ```text
-Props:
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  budget: any
-  onSuccess: () => void
-
-Logica:
-  - Parse do pricing_description JSON para preencher a tabela de artigos
-  - Permite adicionar/remover artigos
-  - Recalcula subtotal, IVA, desconto e total
-  - Ao guardar: supabase.from('budgets').update({
-      pricing_description: JSON.stringify(pricingData),
-      estimated_labor: subtotal,
-      estimated_parts: totalTax,
-      estimated_total: total,
-      notes: notes
-    }).eq('id', budget.id)
+Novo estado: showEditDetailsModal (boolean)
+Handler: handleEditDetails -> setCurrentService + setShowEditDetailsModal(true)
+Prop passada: onEditDetails={() => handleEditDetails(service)}
+Modal renderizado junto dos outros modais de gestao
 ```
 
-### Verificacao de role
+### OrcamentosPage - integracao
 
-Ambos os botoes de edicao usam `useAuth()` e so aparecem quando `role === 'dono'`. As RLS policies ja estao configuradas correctamente -- apenas `dono` pode fazer UPDATE em budgets e services.
+```text
+Novo estado: showEditBudgetModal (boolean), budgetToEdit (any)
+Condicao no dropdown: budget.status === 'pendente'
+Icone: Pencil
+Label: "Editar Detalhes"
+Modal: EditBudgetDetailsModal com budget={budgetToEdit}
+```
 
-### Botao na UI
-
-No ServiceDetailSheet, na seccao "Detalhes do Servico":
-- Botao com icone Pencil ao lado do titulo da seccao
-- Apenas visivel para role `dono`
-
-No BudgetDetailPanel, na seccao "Artigos do Orcamento":
-- Botao com icone Pencil ao lado do titulo
-- Apenas visivel para role `dono`
-
-## Sequencia de implementacao
-
-1. Criar `EditServiceDetailsModal` (campos simples de equipamento)
-2. Criar `EditBudgetDetailsModal` (tabela de artigos editavel)
-3. Integrar botao no `ServiceDetailSheet` (seccao Detalhes do Servico)
-4. Integrar botao no `BudgetDetailPanel` (seccao Artigos)
