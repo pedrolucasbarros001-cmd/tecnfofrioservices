@@ -9,10 +9,9 @@ interface HighlightRect {
 
 interface GuidedTourOverlayProps {
   targetRect: HighlightRect | null;
-  onClick?: () => void;
 }
 
-export function GuidedTourOverlay({ targetRect, onClick }: GuidedTourOverlayProps) {
+export function GuidedTourOverlay({ targetRect }: GuidedTourOverlayProps) {
   const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   useEffect(() => {
@@ -25,13 +24,12 @@ export function GuidedTourOverlay({ targetRect, onClick }: GuidedTourOverlayProp
   const pad = 8;
   const radius = 8;
 
-  // If no target, render full overlay (no cutout)
+  // If no target, render full overlay (no cutout) — no onClick, tour only closes via buttons/Escape
   if (!targetRect) {
     return (
       <div
         className="fixed inset-0 z-[9998] transition-opacity duration-300"
         style={{ backgroundColor: 'rgba(0,0,0,0.65)', pointerEvents: 'auto' }}
-        onClick={onClick}
       />
     );
   }
@@ -66,13 +64,13 @@ export function GuidedTourOverlay({ targetRect, onClick }: GuidedTourOverlayProp
       className="fixed inset-0 z-[9998] transition-all duration-300"
       width={w}
       height={h}
-      style={{ pointerEvents: 'auto' }}
-      onClick={onClick}
+      style={{ pointerEvents: 'none' }}
     >
       <path
         d={path}
         fill="rgba(0,0,0,0.65)"
         fillRule="evenodd"
+        style={{ pointerEvents: 'auto' }}
       />
     </svg>
   );

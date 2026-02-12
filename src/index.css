@@ -611,3 +611,32 @@
     visibility: visible !important;
   }
 }
+
+/* ======================================
+   Tour Guiado — Elevação de modais Radix
+   Quando o tour está activo, modais/sheets/dialogs
+   Radix ficam ACIMA do overlay do tour (z-9998)
+   ====================================== */
+body.tour-active [data-radix-dialog-overlay],
+body.tour-active [role="dialog"][data-state="open"]::before {
+  z-index: 10000 !important;
+}
+
+body.tour-active [data-radix-dialog-content],
+body.tour-active [role="dialog"][data-state="open"] {
+  z-index: 10001 !important;
+}
+
+/* Vaul drawer (used by shadcn Drawer) */
+body.tour-active [vaul-overlay] {
+  z-index: 10000 !important;
+}
+
+body.tour-active [vaul-drawer] {
+  z-index: 10001 !important;
+}
+
+/* Sheet overlay and content */
+body.tour-active .fixed[data-state="open"][role="dialog"] {
+  z-index: 10001 !important;
+}

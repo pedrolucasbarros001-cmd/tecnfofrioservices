@@ -31,7 +31,7 @@ function computePosition(targetRect: TargetRect, tooltipW: number, tooltipH: num
   const gap = 16;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const pad = 8; // overlay padding
+  const pad = 8;
 
   const tTop = targetRect.top - pad;
   const tLeft = targetRect.left - pad;
@@ -43,7 +43,6 @@ function computePosition(targetRect: TargetRect, tooltipW: number, tooltipH: num
   const spaceRight = vw - (tLeft + tWidth);
   const spaceLeft = tLeft;
 
-  // Preference: bottom > right > left > top
   let pos: Position = 'bottom';
   if (spaceBelow >= tooltipH + gap) {
     pos = 'bottom';
@@ -54,7 +53,7 @@ function computePosition(targetRect: TargetRect, tooltipW: number, tooltipH: num
   } else if (spaceAbove >= tooltipH + gap) {
     pos = 'top';
   } else {
-    pos = 'bottom'; // fallback
+    pos = 'bottom';
   }
 
   let top = 0;
@@ -79,7 +78,6 @@ function computePosition(targetRect: TargetRect, tooltipW: number, tooltipH: num
       break;
   }
 
-  // Clamp to viewport
   left = Math.max(12, Math.min(left, vw - tooltipW - 12));
   top = Math.max(12, Math.min(top, vh - tooltipH - 12));
 
@@ -100,9 +98,9 @@ export function GuidedTourTooltip({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({});
   const [isVisible, setIsVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
-    // Small delay for animation
     const timer = setTimeout(() => setIsVisible(true), 50);
     return () => {
       clearTimeout(timer);
@@ -111,8 +109,28 @@ export function GuidedTourTooltip({
   }, [currentStep]);
 
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
     const updatePosition = () => {
       if (!tooltipRef.current) return;
+
+      // Mobile with spotlight: bottom sheet
+      if (isMobile && targetRect) {
+        setStyle({
+          position: 'fixed',
+          bottom: '0px',
+          left: '0px',
+          right: '0px',
+          top: 'auto',
+          transform: 'none',
+          zIndex: 9999,
+        });
+        return;
+      }
 
       const tooltipW = tooltipRef.current.offsetWidth;
       const tooltipH = tooltipRef.current.offsetHeight;
@@ -138,23 +156,26 @@ export function GuidedTourTooltip({
       }
     };
 
-    // Run after render
     requestAnimationFrame(updatePosition);
     window.addEventListener('resize', updatePosition);
     return () => window.removeEventListener('resize', updatePosition);
-  }, [targetRect, currentStep]);
+  }, [targetRect, currentStep, isMobile]);
 
   const Icon = step.fallbackIcon;
   const isWelcomeOrFinal = step.id.includes('welcome') || step.id.includes('final');
   const isCentralCard = !targetRect;
+  const isMobileBottomSheet = isMobile && targetRect;
 
   return (
     <div
       ref={tooltipRef}
       style={style}
       className={cn(
-        'w-[90vw] max-w-[420px] bg-background rounded-xl shadow-2xl border border-border/50 overflow-hidden transition-all duration-300',
+        'bg-background shadow-2xl border border-border/50 overflow-hidden transition-all duration-300',
         isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95',
+        isMobileBottomSheet
+          ? 'w-full max-h-[60vh] overflow-y-auto rounded-t-xl'
+          : 'w-[90vw] max-w-[420px] rounded-xl',
       )}
       onClick={(e) => e.stopPropagation()}
     >
@@ -187,7 +208,11 @@ export function GuidedTourTooltip({
       )}
 
       {/* Content */}
-      <div className={cn('px-5 pt-4 pb-2', isCentralCard ? '' : 'pt-5')}>
+      <div className={cn(
+        'pb-2',
+        isMobileBottomSheet ? 'px-4 pt-4' : 'px-5 pt-4',
+        isCentralCard ? '' : isMobileBottomSheet ? 'pt-4' : 'pt-5',
+      )}>
         {/* Step indicator for spotlight mode */}
         {!isCentralCard && (
           <div className="flex items-center gap-2 mb-2">
@@ -216,7 +241,10 @@ export function GuidedTourTooltip({
 
         {/* Bullet points */}
         {step.details.length > 0 && (
-          <ul className="mt-3 space-y-1.5 max-h-[180px] overflow-y-auto">
+          <ul className={cn(
+            'mt-3 space-y-1.5 overflow-y-auto',
+            isMobileBottomSheet ? 'max-h-[120px]' : 'max-h-[180px]',
+          )}>
             {step.details.map((detail, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
@@ -228,19 +256,22 @@ export function GuidedTourTooltip({
       </div>
 
       {/* Progress */}
-      <div className="px-5 py-2">
+      <div className={cn('py-2', isMobileBottomSheet ? 'px-4' : 'px-5')}>
         <OnboardingProgress current={currentStep} total={totalSteps} />
       </div>
 
       {/* Actions */}
-      <div className="px-5 pb-4 flex items-center justify-between gap-3">
+      <div className={cn(
+        'pb-4 flex items-center justify-between gap-3',
+        isMobileBottomSheet ? 'px-4 pb-[max(1rem,env(safe-area-inset-bottom))]' : 'px-5',
+      )}>
         <div className="flex-1">
           {isFirst ? (
             <Button
               variant="ghost"
               size="sm"
               onClick={onSkip}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground min-h-[44px]"
             >
               Saltar guia
             </Button>
@@ -249,7 +280,7 @@ export function GuidedTourTooltip({
               variant="ghost"
               size="sm"
               onClick={onPrev}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground min-h-[44px]"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
@@ -257,7 +288,7 @@ export function GuidedTourTooltip({
           )}
         </div>
         <div className="flex-1 flex justify-end">
-          <Button onClick={onNext} size="sm" className="min-w-[120px]">
+          <Button onClick={onNext} size="sm" className="min-w-[120px] min-h-[44px]">
             {isLast ? (
               'Começar a usar'
             ) : (

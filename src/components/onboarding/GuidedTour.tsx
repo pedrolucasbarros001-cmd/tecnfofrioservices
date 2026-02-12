@@ -31,13 +31,13 @@ export function GuidedTour() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
 
-  // Lock body scroll when tour is open
+  // Add/remove tour-active class on body for modal z-index elevation
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.classList.add('tour-active');
     }
     return () => {
-      document.body.style.overflow = '';
+      document.body.classList.remove('tour-active');
     };
   }, [isOpen]);
 
@@ -183,10 +183,7 @@ export function GuidedTour() {
 
   return (
     <>
-      <GuidedTourOverlay
-        targetRect={targetRect}
-        onClick={closeOnboarding}
-      />
+      <GuidedTourOverlay targetRect={targetRect} />
       <GuidedTourTooltip
         step={currentStepContent}
         currentStep={currentStep}
