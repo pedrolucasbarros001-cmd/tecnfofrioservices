@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle, DollarSign } from 'lucide-react';
+import { Wrench, Clock, AlertCircle, RefreshCw, User, Activity, Play, Building2, Package, CheckCircle, DollarSign, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
@@ -194,6 +195,12 @@ function ServiceCard({ service }: { service: TVMonitorService }) {
 export default function TVMonitorPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   // Update clock every second
   useEffect(() => {
@@ -367,7 +374,16 @@ export default function TVMonitorPage() {
             <span className="text-slate-300">FRIO</span>
             {' - Sistema de Gestão'}
           </span>
-          <span>{services.length} serviço{services.length !== 1 ? 's' : ''} na oficina</span>
+          <div className="flex items-center gap-3">
+            <span>{services.length} serviço{services.length !== 1 ? 's' : ''} na oficina</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sair</span>
+            </button>
+          </div>
         </div>
       </footer>
     </div>

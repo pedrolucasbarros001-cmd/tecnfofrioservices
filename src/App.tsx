@@ -97,7 +97,7 @@ const App = () => (
                   {/* Public routes */}
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/tv-monitor" element={
-                    <ProtectedRoute allowedRoles={['monitor', 'dono', 'secretaria']}>
+                    <ProtectedRoute allowedRoles={['monitor']}>
                       <TVMonitorPage />
                     </ProtectedRoute>
                   } />
