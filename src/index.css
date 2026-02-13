@@ -386,7 +386,7 @@
 
 .print-tag-page .print-tag-container {
   width: 29mm;
-  min-height: 90mm;
+  /* height adjusts to content */
   background: white;
   padding: 2mm;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
@@ -494,8 +494,8 @@
   
   .print-tag-page .print-tag-container {
     width: 29mm !important;
-    height: 90mm !important;
-    min-height: 90mm !important;
+    height: auto !important;
+    min-height: auto !important;
     box-shadow: none !important;
     margin: 0 !important;
     padding: 2mm !important;
@@ -577,7 +577,7 @@
     visibility: visible !important;
     position: static !important;
     width: 29mm !important;
-    height: 90mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 2mm !important;
     background: white !important;

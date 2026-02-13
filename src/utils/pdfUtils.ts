@@ -8,6 +8,7 @@ interface GeneratePDFOptions {
   format?: PDFFormat;
   orientation?: 'portrait' | 'landscape';
   margin?: number;
+  autoHeight?: boolean;
 }
 
 /**
@@ -18,7 +19,8 @@ export async function generatePDF({
   filename, 
   format = 'a4',
   orientation = 'portrait',
-  margin = 10
+  margin = 10,
+  autoHeight = false
 }: GeneratePDFOptions): Promise<void> {
   // Create a temporary container offscreen
   const container = document.createElement('div');
@@ -63,9 +65,13 @@ export async function generatePDF({
   document.body.appendChild(container);
 
   try {
-    // Configure html2pdf options
-    // Note: jsPDF format expects string or array, we use 'any' to bypass strict typing
-    const jsPDFFormat: unknown = format === 'a4' ? 'a4' : format;
+    // For custom formats with autoHeight, measure actual content height
+    let finalFormat: unknown = format === 'a4' ? 'a4' : format;
+    if (autoHeight && Array.isArray(format)) {
+      const contentHeightPx = clone.offsetHeight;
+      const contentHeightMM = Math.ceil((contentHeightPx / 96) * 25.4) + (margin * 2);
+      finalFormat = [format[0], contentHeightMM];
+    }
     
     const options = {
       margin: margin,
@@ -77,11 +83,11 @@ export async function generatePDF({
         logging: false,
         scrollY: 0,
         scrollX: 0,
-        windowWidth: format === 'a4' ? 794 : (format[0] / 25.4) * 96, // Convert mm to px (96 DPI)
+        windowWidth: format === 'a4' ? 794 : ((Array.isArray(format) ? format[0] : 210) / 25.4) * 96,
       },
       jsPDF: { 
         unit: 'mm', 
-        format: jsPDFFormat, 
+        format: finalFormat, 
         orientation: orientation 
       },
       pagebreak: { mode: 'avoid-all' }
