@@ -34,7 +34,8 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
         element: tagRef.current, 
         filename: `Etiqueta-${service.code}`,
         format: [29, 90],
-        margin: 0
+        margin: 0,
+        autoHeight: true
       });
     } finally {
       setIsGenerating(false);
@@ -53,7 +54,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           </DialogHeader>
 
          {/* Tag content - preview (29mm x 90mm scale) */}
-         <div ref={tagRef} className="print-tag border rounded-lg p-2 bg-white mx-auto" style={{ width: '29mm', minHeight: '90mm' }}>
+         <div ref={tagRef} className="print-tag border rounded-lg p-2 bg-white mx-auto" style={{ width: '29mm' }}>
            {/* Top accent bar */}
            <div className="h-1 bg-primary -mx-2 -mt-2 rounded-t-lg" />
            
