@@ -1,39 +1,75 @@
 
 
-# Corrigir Acesso ao Monitor + Botao de Logout
+# Corrigir Etiqueta 29mm x 90mm — Eliminar Espaco em Branco
 
 ## Problema
 
-1. A rota `/tv-monitor` permite acesso a `['monitor', 'dono', 'secretaria']` -- qualquer utilizador com esses cargos consegue ver o monitor, o que nao deveria acontecer. Apenas a conta `monitor` deve aceder.
-2. Na pagina do monitor nao existe botao de logout, obrigando o utilizador a limpar cookies manualmente para sair.
+O container da etiqueta tem `min-height: 90mm` no preview e `height: 90mm` no CSS de impressao, mas o conteudo real (logo + QR + codigo + dados do cliente) ocupa apenas ~35mm. O restante ~55mm e espaco em branco puro que sai na impressora como papel desperdicado ou pagina extra.
+
+O mesmo problema existe no PDF gerado: o formato e definido como `[29, 90]` (29mm x 90mm), criando um PDF com pagina de 90mm de altura mesmo que o conteudo seja muito mais curto.
 
 ## Solucao
 
-### 1. Restringir acesso apenas ao role `monitor`
+Mudar a abordagem: em vez de forcar altura fixa de 90mm, usar **altura automatica** (ajustada ao conteudo). Para o PDF, medir a altura real do conteudo e usar esse valor como tamanho da pagina.
 
-**Ficheiro**: `src/App.tsx` (linha 100)
+### 1. CSS do preview — Remover min-height
 
-Alterar `allowedRoles` de `['monitor', 'dono', 'secretaria']` para apenas `['monitor']`.
+**Ficheiro**: `src/index.css`
 
-Resultado: se um `dono` ou `secretaria` tentar aceder a `/tv-monitor`, o `ProtectedRoute` redireciona automaticamente para a pagina correcta do seu cargo (dashboard, geral, etc.).
+Na classe `.print-tag-page .print-tag-container` (linha 387-395):
+- Remover `min-height: 90mm`
+- O container ajusta-se automaticamente ao conteudo
 
-### 2. Adicionar botao de logout na pagina do monitor
+### 2. CSS de impressao — Altura automatica
 
-**Ficheiro**: `src/pages/TVMonitorPage.tsx`
+**Ficheiro**: `src/index.css`
 
-Adicionar um botao pequeno e discreto no canto inferior direito do footer (na barra de marca), ao lado do texto "TECNOFRIO - Sistema de Gestao":
+Na regra `@media print` para `.print-tag-page .print-tag-container` (linha 495-503):
+- Mudar `height: 90mm` para `height: auto`
+- Mudar `min-height: 90mm` para `min-height: auto`
 
-- Icone `LogOut` do Lucide (tamanho pequeno, 14px)
-- Texto "Sair" em tamanho xs
-- Estilo discreto: texto slate-500, hover slate-300
-- Ao clicar: chama `supabase.auth.signOut()` e redireciona para `/login`
+Na regra `.print-tag` (linha 575-588):
+- Mudar `height: 90mm` para `height: auto`
 
-O botao fica integrado no footer existente sem perturbar o layout do monitor.
+### 3. ServiceTagModal.tsx — Remover min-height inline
 
-### Ficheiros a alterar
+**Ficheiro**: `src/components/modals/ServiceTagModal.tsx`
+
+Na div da etiqueta (linha 56):
+- Remover `minHeight: '90mm'` do style inline
+- Manter apenas `width: '29mm'`
+
+### 4. pdfUtils.ts — Medir altura real do conteudo para o PDF
+
+**Ficheiro**: `src/utils/pdfUtils.ts`
+
+Na funcao `generatePDF`, quando o formato e um array `[width, height]`:
+- Medir a altura real do clone renderizado usando `clone.offsetHeight`
+- Converter de pixels para mm: `heightMM = (heightPx / 96) * 25.4`
+- Usar a altura medida em vez da altura fixa passada como parametro
+- Isto garante que o PDF tem exactamente o tamanho do conteudo, sem espaco em branco
+
+Adicionar parametro opcional `autoHeight?: boolean` (default `true` para tags) que activa este comportamento.
+
+### 5. printUtils.ts — @page dinamico
+
+**Ficheiro**: `src/utils/printUtils.ts`
+
+Manter o `@page { size: 29mm 90mm }` pois e o tamanho do papel fisico na impressora termica. O conteudo preenche apenas o necessario e a impressora de rolo corta naturalmente. Se o utilizador usa impressora termica de rolo, o tamanho da pagina deve corresponder ao rolo; se usa impressora normal, a altura automatica no CSS ja resolve.
+
+Nota: para impressoras de rolo termico, manter 29mm x 90mm como tamanho de papel e correcto. O problema real e no PDF e no preview.
+
+### Resumo das alteracoes
 
 | Ficheiro | Alteracao |
 |----------|-----------|
-| `src/App.tsx` | Mudar allowedRoles para `['monitor']` |
-| `src/pages/TVMonitorPage.tsx` | Importar LogOut, useNavigate, supabase; adicionar botao de logout no footer |
+| `src/index.css` | Remover min-height/height fixos de 90mm nos containers de tag |
+| `src/components/modals/ServiceTagModal.tsx` | Remover `minHeight: '90mm'` do style inline |
+| `src/utils/pdfUtils.ts` | Medir altura real do conteudo e usar como formato do PDF |
+
+### Resultado esperado
+
+- Preview: etiqueta mostra apenas o conteudo, sem espaco em branco abaixo
+- PDF: pagina com exactamente o tamanho do conteudo (29mm x ~35mm)
+- Impressao: no papel fisico de 29mm x 90mm, o conteudo aparece no topo e a impressora de rolo corta no fim do papel
 
