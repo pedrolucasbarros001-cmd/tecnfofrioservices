@@ -58,7 +58,7 @@ export default function ServiceTagPage() {
         element: tagRef.current, 
         filename: `Etiqueta-${service.code}`,
         format: [29, 90],
-        autoHeight: true
+        margin: 0
       });
     } finally {
       setIsGenerating(false);
