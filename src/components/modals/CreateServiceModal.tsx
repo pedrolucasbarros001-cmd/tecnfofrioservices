@@ -253,9 +253,14 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       });
 
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating service:', error);
-      toast.error('Erro ao criar serviço. Por favor, tente novamente.');
+      const msg = error?.message || String(error);
+      if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('login novamente') || msg.includes('not authenticated')) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        toast.error('Erro ao criar serviço. Por favor, tente novamente.');
+      }
     }
   };
 

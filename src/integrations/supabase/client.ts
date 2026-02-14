@@ -15,3 +15,40 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+/**
+ * Ensures the current session has a valid (non-expired) token.
+ * If the token expires within 60 seconds, forces a refresh.
+ * Throws a clear error if no session or refresh fails.
+ */
+export async function ensureValidSession() {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error || !data.session) {
+    throw new Error('Sessão expirada. Por favor, faça login novamente.');
+  }
+
+  const tokenExp = data.session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+
+  if (tokenExp && tokenExp - now < 60) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshed.session) {
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+    return refreshed.session;
+  }
+
+  return data.session;
+}
+
+/**
+ * Checks if an error is related to RLS/session issues.
+ */
+export function isSessionOrRlsError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('row-level security') ||
+    msg.includes('JWT') ||
+    msg.includes('login novamente') ||
+    msg.includes('not authenticated');
+}

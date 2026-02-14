@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -232,8 +233,14 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
       });
 
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating delivery:', error);
+      const msg = error?.message || String(error);
+      if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('login novamente') || msg.includes('not authenticated')) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        toast.error('Erro ao criar entrega. Por favor, tente novamente.');
+      }
     }
   };
 
