@@ -1,37 +1,93 @@
 
 
-# Etiqueta 29mm x 90mm — Tamanho Fixo Exacto
+# Corrigir Falhas na Criacao de Servicos e Conversao de Orcamentos
 
-## Problema
+## Problema Identificado
 
-A alteracao anterior removeu a altura fixa de 90mm e activou `autoHeight`, fazendo a etiqueta encolher para o tamanho do conteudo (~35mm). O utilizador quer exactamente **29mm x 90mm** porque e o tamanho fisico da etiqueta na impressora.
+Existem **3 causas raiz** que provocam as falhas:
+
+### Causa 1: ConvertBudgetModal nao verifica sessao
+O modal de conversao de orcamento (`ConvertBudgetModal.tsx`) faz `supabase.from('services').insert()` **directamente**, sem verificar se a sessao esta activa. Se o token JWT expirou (mesmo com auto-refresh), o INSERT falha por violacao de RLS (apenas `dono` e `secretaria` podem inserir servicos).
+
+### Causa 2: getSession() nao garante token valido
+O `useCreateService` usa `supabase.auth.getSession()` para verificar sessao, mas esta funcao retorna o **token em cache** sem validar com o servidor. Se o token expirou e o auto-refresh ainda nao correu, a sessao parece valida mas o INSERT falha.
+
+### Causa 3: Erros nao tratados causam crash (tela branca)
+Quando um Select, Calendar ou outro componente Radix gera erro durante interaccao (ex: seleccionar tecnico, data), o erro propaga-se sem ser capturado, activando o ErrorBoundary e mostrando a tela de "Ocorreu um erro" com opcao de recarregar.
 
 ## Solucao
 
-Reverter para altura fixa de 90mm em todos os pontos:
+### 1. Criar funcao helper para sessao segura
 
-### 1. ServiceTagModal.tsx
+**Ficheiro**: `src/integrations/supabase/client.ts`
 
-- Repor `style={{ width: '29mm', minHeight: '90mm' }}` na div da etiqueta (linha 57)
-- Remover `autoHeight: true` da chamada `generatePDF` (linha 38)
+Adicionar funcao `ensureValidSession()` que:
+- Chama `supabase.auth.getSession()` para obter sessao em cache
+- Se nao ha sessao, lanca erro imediato
+- Se ha sessao, verifica se o token expira em menos de 60 segundos
+- Se sim, forca `supabase.auth.refreshSession()` para obter token novo
+- Retorna a sessao validada ou lanca erro claro
 
-### 2. ServiceTagPage.tsx
+```text
+ensureValidSession()
+  |
+  +-- getSession() -> null? -> throw "Sessao expirada"
+  |
+  +-- token expira em < 60s?
+       |-- Sim -> refreshSession() -> sucesso? -> retorna sessao
+       |                            -> falha? -> throw "Sessao expirada"
+       |-- Nao -> retorna sessao (token ainda valido)
+```
 
-- Remover `autoHeight: true` da chamada `generatePDF`
+### 2. Usar sessao segura em todas as mutacoes
 
-### 3. pdfUtils.ts
+**Ficheiros**: `src/hooks/useServices.ts`, `src/hooks/useCustomers.ts`
 
-- Nenhuma alteracao necessaria — o formato `[29, 90]` ja e passado; sem `autoHeight: true`, usa o valor fixo
+Substituir `supabase.auth.getSession()` por `ensureValidSession()` em:
+- `useCreateService`
+- `useCreateCustomer`
 
-### 4. index.css
+Isto garante que o token e valido antes de cada INSERT.
 
-- Repor `min-height: 90mm` em `.print-tag-page .print-tag-container`
-- Repor `height: 90mm` e `min-height: 90mm` na regra `@media print` para `.print-tag-page .print-tag-container`
-- Repor `height: 90mm` na regra `.print-tag` dentro de `@media print`
+### 3. Corrigir ConvertBudgetModal
 
-### Resultado
+**Ficheiro**: `src/components/modals/ConvertBudgetModal.tsx`
 
-- Preview no modal: etiqueta com 29mm x 90mm
-- PDF gerado: pagina exactamente 29mm x 90mm
-- Impressao: sai no tamanho correcto da etiqueta fisica
+- Adicionar verificacao de sessao com `ensureValidSession()` antes do INSERT
+- Melhorar error handling para mostrar mensagem especifica se sessao expirou
+- Adicionar guard contra duplo-clique (verificar `isLoading` no inicio)
+
+### 4. Proteger modais contra crashes
+
+**Ficheiros**: `src/components/modals/CreateServiceModal.tsx`, `src/components/modals/CreateInstallationModal.tsx`, `src/components/modals/CreateDeliveryModal.tsx`
+
+- Envolver `processSubmit` com try/catch robusto que captura erros de RLS e sessao
+- Adicionar tratamento especifico para erro "row-level security" -> mostra toast "Sessao expirada, faca login novamente"
+- Adicionar `disabled` no botao submit enquanto `isPending` para evitar duplo-clique
+
+### 5. Proteger AssignTechnicianModal contra crash
+
+**Ficheiro**: `src/components/modals/AssignTechnicianModal.tsx`
+
+- Envolver `handleSubmit` com try/catch mais granular
+- Se erro de notificacao/log ja e capturado (OK), mas se erro no `updateService.mutateAsync` causar crash, capturar e mostrar toast
+
+## Resumo das alteracoes
+
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `src/integrations/supabase/client.ts` | Adicionar `ensureValidSession()` |
+| `src/hooks/useServices.ts` | Usar `ensureValidSession()` em `useCreateService` e `useUpdateService` |
+| `src/hooks/useCustomers.ts` | Usar `ensureValidSession()` em `useCreateCustomer` |
+| `src/components/modals/ConvertBudgetModal.tsx` | Adicionar verificacao de sessao + guard duplo-clique |
+| `src/components/modals/CreateServiceModal.tsx` | Melhorar error handling com deteccao de erro RLS |
+| `src/components/modals/CreateInstallationModal.tsx` | Melhorar error handling com deteccao de erro RLS |
+| `src/components/modals/CreateDeliveryModal.tsx` | Melhorar error handling com deteccao de erro RLS |
+
+## Resultado esperado
+
+- Criacao de servico: funciona sempre que o utilizador esta autenticado
+- Conversao de orcamento: funciona sem falha
+- Seleccao de tecnico/data: nunca mais causa crash/tela branca
+- Se sessao expirar: mensagem clara "Sessao expirada, faca login novamente" em vez de erro generico
 
