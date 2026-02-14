@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
 import type { Service, ServiceStatus } from '@/types/database';
 import { toast } from 'sonner';
 
@@ -116,15 +116,7 @@ export function useCreateService() {
 
   return useMutation({
     mutationFn: async (serviceData: Partial<Service>) => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        throw new Error('Erro ao verificar sessão. Por favor, faça login novamente.');
-      }
-      
-      if (!session) {
-        throw new Error('Sessão expirada. Por favor, faça login novamente.');
-      }
+      await ensureValidSession();
       
       const { data, error } = await supabase
         .from('services')
@@ -141,8 +133,8 @@ export function useCreateService() {
     },
     onError: (error: Error) => {
       console.error('Error creating service:', error);
-      if (error.message.includes('login novamente')) {
-        toast.error(error.message);
+      if (isSessionOrRlsError(error)) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
       } else {
         toast.error('Erro ao criar serviço');
       }

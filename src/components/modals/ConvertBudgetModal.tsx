@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -97,10 +97,11 @@ export function ConvertBudgetModal({
   };
 
   const handleConvert = async () => {
-    if (!budget) return;
+    if (!budget || isLoading) return;
 
     setIsLoading(true);
     try {
+      await ensureValidSession();
       const { applianceType, faultDescription } = extractBudgetDetails(budget);
 
       const { data: service, error: serviceError } = await supabase
@@ -140,7 +141,11 @@ export function ConvertBudgetModal({
       onOpenChange(false);
     } catch (error) {
       console.error('Error converting budget:', error);
-      toast.error('Erro ao converter orçamento');
+      if (isSessionOrRlsError(error)) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        toast.error('Erro ao converter orçamento');
+      }
     } finally {
       setIsLoading(false);
     }
