@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { notifyPartRequested } from '@/utils/notificationUtils';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import type { Service } from '@/types/database';
 
 interface RequestPartModalProps {
@@ -100,7 +101,7 @@ export function RequestPartModal({
       resetForm();
     } catch (error) {
       console.error('Error requesting part:', error);
-      toast.error('Erro ao solicitar peça');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -128,6 +129,7 @@ export function RequestPartModal({
             <Package className="h-5 w-5 text-yellow-600" />
             Solicitar Peça
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.</p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

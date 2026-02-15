@@ -30,6 +30,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 
 const formSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório'),
@@ -118,12 +119,12 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
         role: values.role,
       });
 
-      toast.success('Utilizador criado com sucesso!');
+      toast.success('Utilizador criado! Credenciais disponíveis abaixo.');
       form.reset();
       onSuccess?.();
     } catch (error: any) {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'Erro ao criar utilizador');
+      toast.error(humanizeError(error));
     } finally {
       setIsLoading(false);
     }
@@ -196,6 +197,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Criar Utilizador</DialogTitle>
+          <p className="text-sm text-muted-foreground">Este perfil terá acesso ao sistema de acordo com o nível selecionado.</p>
         </DialogHeader>
 
         <Form {...form}>

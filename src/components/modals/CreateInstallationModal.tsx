@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import {
   Dialog,
   DialogContent,
@@ -235,12 +236,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
       handleClose();
     } catch (error: any) {
       console.error('Error creating installation:', error);
-      const msg = error?.message || String(error);
-      if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('login novamente') || msg.includes('not authenticated')) {
-        toast.error('Sessão expirada. Por favor, faça login novamente.');
-      } else {
-        toast.error('Erro ao criar instalação. Por favor, tente novamente.');
-      }
+      toast.error(humanizeError(error));
     }
   };
 
@@ -266,6 +262,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Nova Instalação</DialogTitle>
+            <p className="text-sm text-muted-foreground">O técnico receberá os detalhes para realizar a instalação no local indicado.</p>
           </DialogHeader>
 
           <Form {...form}>

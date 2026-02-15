@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUpdateService } from '@/hooks/useServices';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import type { Service } from '@/types/database';
 
 interface DeliveryManagementModalProps {
@@ -41,7 +42,7 @@ export function DeliveryManagementModal({
       onOpenChange(false);
     } catch (error) {
       console.error('Error setting client pickup:', error);
-      toast.error('Erro ao definir recolha');
+      toast.error(humanizeError(error));
     }
   };
 
@@ -58,6 +59,7 @@ export function DeliveryManagementModal({
             <Truck className="h-5 w-5 text-teal-600" />
             Opções de Entrega
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Escolha como o equipamento será devolvido ao cliente.</p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

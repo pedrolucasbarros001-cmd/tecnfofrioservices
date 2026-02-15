@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { addBusinessDays } from '@/utils/dateUtils';
 import type { Service, ServicePart } from '@/types/database';
@@ -106,7 +107,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
       onOpenChange(false);
     } catch (error) {
       console.error('Error confirming part order:', error);
-      toast.error('Erro ao registar pedido de peça');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -124,6 +125,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             <Package className="h-5 w-5 text-primary" />
             Registar Pedido de Peça
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Confirme os detalhes do pedido. A previsão de chegada serve como termómetro de urgência.</p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

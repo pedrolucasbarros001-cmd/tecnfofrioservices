@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import {
   Dialog,
   DialogContent,
@@ -255,12 +256,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       handleClose();
     } catch (error: any) {
       console.error('Error creating service:', error);
-      const msg = error?.message || String(error);
-      if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('login novamente') || msg.includes('not authenticated')) {
-        toast.error('Sessão expirada. Por favor, faça login novamente.');
-      } else {
-        toast.error('Erro ao criar serviço. Por favor, tente novamente.');
-      }
+      toast.error(humanizeError(error));
     }
   };
 
@@ -289,6 +285,11 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
             <DialogTitle className="text-xl">
               {step === 'location' ? 'Tipo de Serviço' : 'Criar Novo Serviço'}
             </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {step === 'location'
+                ? "Se o aparelho já foi deixado na oficina, selecione 'Deixou na Oficina'. Caso contrário, o técnico fará uma visita ao cliente."
+                : 'Preencha os dados do cliente e do equipamento. Campos com * são obrigatórios.'}
+            </p>
           </DialogHeader>
 
           {step === 'location' ? (

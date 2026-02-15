@@ -33,6 +33,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import type { Service } from '@/types/database';
 
 interface RescheduleServiceModalProps {
@@ -111,12 +112,12 @@ export function RescheduleServiceModal({
 
       await updateService.mutateAsync(updateData as any);
 
-      toast.success('Serviço reagendado com sucesso!');
+      toast.success('Serviço reagendado! O técnico será notificado.');
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       console.error('Error rescheduling service:', error);
-      toast.error('Erro ao reagendar serviço');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -132,6 +133,7 @@ export function RescheduleServiceModal({
             <CalendarIcon className="h-5 w-5" />
             Reagendar Serviço - {service.code}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Selecione nova data e turno. O técnico será notificado da alteração.</p>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">

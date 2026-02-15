@@ -61,7 +61,7 @@ export default function SecretaryDebitoPage() {
       <div data-tour="debito-header">
         <h1 className="text-2xl font-bold tracking-tight">Em Débito</h1>
         <p className="text-muted-foreground">
-          Serviços com pagamento pendente
+          Serviços com preço definido e saldo pendente.
         </p>
       </div>
 
