@@ -1,93 +1,124 @@
 
 
-# Corrigir Falhas na Criacao de Servicos e Conversao de Orcamentos
+# Sistema de UX Inteligente — Narrativa Humana nos Modais
 
-## Problema Identificado
+## Visao Geral
 
-Existem **3 causas raiz** que provocam as falhas:
+Transformar todos os modais, mensagens de erro e toasts do TECNOFRIO num sistema autoexplicativo e didactico, seguindo o padrao: **titulo claro + subtexto contextual + erros educativos + confirmacoes seguras**.
 
-### Causa 1: ConvertBudgetModal nao verifica sessao
-O modal de conversao de orcamento (`ConvertBudgetModal.tsx`) faz `supabase.from('services').insert()` **directamente**, sem verificar se a sessao esta activa. Se o token JWT expirou (mesmo com auto-refresh), o INSERT falha por violacao de RLS (apenas `dono` e `secretaria` podem inserir servicos).
+## O Que Muda
 
-### Causa 2: getSession() nao garante token valido
-O `useCreateService` usa `supabase.auth.getSession()` para verificar sessao, mas esta funcao retorna o **token em cache** sem validar com o servidor. Se o token expirou e o auto-refresh ainda nao correu, a sessao parece valida mas o INSERT falha.
+### 1. Subtextos Explicativos em Todos os Modais
 
-### Causa 3: Erros nao tratados causam crash (tela branca)
-Quando um Select, Calendar ou outro componente Radix gera erro durante interaccao (ex: seleccionar tecnico, data), o erro propaga-se sem ser capturado, activando o ErrorBoundary e mostrando a tela de "Ocorreu um erro" com opcao de recarregar.
+Adicionar `DialogDescription` (ou `<p>` subtexto) abaixo do titulo de cada modal, explicando o contexto da accao.
 
-## Solucao
+| Modal | Titulo Actual | Subtexto a Adicionar |
+|-------|--------------|---------------------|
+| ServiceTypeSelector | "Escolha o Tipo de Servico" | "O tipo de servico define o fluxo que sera seguido pelo tecnico." |
+| CreateServiceModal (location step) | "Tipo de Servico" | "Se o aparelho ja foi deixado na oficina, selecione 'Deixou na Oficina'. Caso contrario, o tecnico fara uma visita ao cliente." |
+| CreateServiceModal (form step) | "Criar Novo Servico" | "Preencha os dados do cliente e do equipamento. Campos com * sao obrigatorios." |
+| CreateInstallationModal | titulo actual | "O tecnico recebera os detalhes para realizar a instalacao no local indicado." |
+| CreateDeliveryModal | titulo actual | "Esta entrega sera atribuida a um tecnico para levar o equipamento ao cliente." |
+| SetPriceModal | "Definir Preco" | "O preco definido aqui sera utilizado para controlo financeiro e cobranca." |
+| RegisterPaymentModal | "Registar Pagamento" | "Este valor sera abatido do saldo em aberto do servico." |
+| RequestPartModal | "Solicitar Peca" | "Ao confirmar, o pedido ficara disponivel para o Dono registar oficialmente a encomenda." |
+| ConfirmPartOrderModal | "Registar Pedido de Peca" | "Confirme os detalhes do pedido. A previsao de chegada serve como termometro de urgencia." |
+| AssignTechnicianModal | titulo actual | "O tecnico selecionado recebera uma notificacao com os detalhes do servico." |
+| ForceStateModal | "Mudar Status" | Ja tem (manter) |
+| DeliveryManagementModal | "Opcoes de Entrega" | "Escolha como o equipamento sera devolvido ao cliente." |
+| CreateUserModal | "Criar Utilizador" | "Este perfil tera acesso ao sistema de acordo com o nivel selecionado." |
+| CreateCustomerModal | "Novo Cliente" / "Editar Cliente" | "Os dados do cliente serao associados aos servicos criados." |
+| ConvertBudgetModal | titulo actual | "Ao converter, sera criado um servico com os dados deste orcamento." |
+| RescheduleServiceModal | titulo actual | "Selecione nova data e turno. O tecnico sera notificado da alteracao." |
 
-### 1. Criar funcao helper para sessao segura
+**Ficheiros afectados**: Todos os 16+ modais listados acima.
 
-**Ficheiro**: `src/integrations/supabase/client.ts`
+### 2. Erros Educativos (Substituir Mensagens Genericas)
 
-Adicionar funcao `ensureValidSession()` que:
-- Chama `supabase.auth.getSession()` para obter sessao em cache
-- Se nao ha sessao, lanca erro imediato
-- Se ha sessao, verifica se o token expira em menos de 60 segundos
-- Se sim, forca `supabase.auth.refreshSession()` para obter token novo
-- Retorna a sessao validada ou lanca erro claro
+Criar um utilitario central `src/utils/errorMessages.ts` com funcoes que convertem erros tecnicos em mensagens humanas:
 
 ```text
-ensureValidSession()
-  |
-  +-- getSession() -> null? -> throw "Sessao expirada"
-  |
-  +-- token expira em < 60s?
-       |-- Sim -> refreshSession() -> sucesso? -> retorna sessao
-       |                            -> falha? -> throw "Sessao expirada"
-       |-- Nao -> retorna sessao (token ainda valido)
+Mapeamento de erros:
+
+"row-level security" / "JWT" / "not authenticated"
+  -> "Sessao expirada. Por favor, faca login novamente."
+
+"duplicate key" / "already exists" (email)
+  -> "Ja existe uma conta com este email. Cada perfil precisa de um email unico."
+
+"violates not-null constraint"
+  -> "Alguns campos obrigatorios nao foram preenchidos."
+
+"Invalid date" / "required_error" em datas
+  -> "A data selecionada e invalida. Verifique se escolheu uma data futura valida."
+
+Erro generico
+  -> "Ocorreu um problema. Por favor, tente novamente ou contacte o suporte."
 ```
 
-### 2. Usar sessao segura em todas as mutacoes
+**Ficheiros afectados**: Novo `src/utils/errorMessages.ts` + actualizacao de todos os `toast.error()` nos modais e hooks.
 
-**Ficheiros**: `src/hooks/useServices.ts`, `src/hooks/useCustomers.ts`
+### 3. Toasts de Sucesso Mais Claros
 
-Substituir `supabase.auth.getSession()` por `ensureValidSession()` em:
-- `useCreateService`
-- `useCreateCustomer`
+Auditar e padronizar todos os `toast.success()` para serem curtos, directos e humanos. A maioria ja esta boa gracas ao `feedbackMessages.ts`, mas uniformizar os restantes:
 
-Isto garante que o token e valido antes de cada INSERT.
+| Actual | Melhorado |
+|--------|-----------|
+| "Utilizador criado com sucesso!" | "Utilizador criado! Credenciais disponiveis abaixo." |
+| "Erro ao definir recolha" | "Nao foi possivel definir a recolha. Tente novamente." |
+| "Erro ao solicitar peca" | "Nao foi possivel solicitar a peca. Verifique a ligacao e tente novamente." |
 
-### 3. Corrigir ConvertBudgetModal
+**Ficheiros afectados**: Modais e hooks onde ha `toast.success` / `toast.error`.
 
-**Ficheiro**: `src/components/modals/ConvertBudgetModal.tsx`
+### 4. Subtextos de Pagina (Micro-textos Educativos)
 
-- Adicionar verificacao de sessao com `ensureValidSession()` antes do INSERT
-- Melhorar error handling para mostrar mensagem especifica se sessao expirou
-- Adicionar guard contra duplo-clique (verificar `isLoading` no inicio)
+Adicionar subtextos discretos nas paginas principais:
 
-### 4. Proteger modais contra crashes
+| Pagina | Subtexto |
+|--------|----------|
+| OficinaPage | "Servicos com equipamentos fisicamente na oficina." |
+| SecretaryDebitoPage | "Servicos com preco definido e saldo pendente." |
+| ServicosPage (filtro "aguardando peca") | "Servicos que dependem de chegada de peca para continuar." |
 
-**Ficheiros**: `src/components/modals/CreateServiceModal.tsx`, `src/components/modals/CreateInstallationModal.tsx`, `src/components/modals/CreateDeliveryModal.tsx`
+**Ficheiros afectados**: `OficinaPage.tsx`, `SecretaryDebitoPage.tsx`, `ServicosPage.tsx`.
 
-- Envolver `processSubmit` com try/catch robusto que captura erros de RLS e sessao
-- Adicionar tratamento especifico para erro "row-level security" -> mostra toast "Sessao expirada, faca login novamente"
-- Adicionar `disabled` no botao submit enquanto `isPending` para evitar duplo-clique
+## Detalhe Tecnico
 
-### 5. Proteger AssignTechnicianModal contra crash
+### Estrutura do errorMessages.ts
 
-**Ficheiro**: `src/components/modals/AssignTechnicianModal.tsx`
+```text
+export function humanizeError(error: unknown): string
+  - Recebe qualquer erro
+  - Verifica message contra padroes conhecidos
+  - Retorna mensagem humana em portugues
 
-- Envolver `handleSubmit` com try/catch mais granular
-- Se erro de notificacao/log ja e capturado (OK), mas se erro no `updateService.mutateAsync` causar crash, capturar e mostrar toast
+export function isSessionError(error: unknown): boolean
+  - Reutiliza logica existente de isSessionOrRlsError
 
-## Resumo das alteracoes
+export function getFieldValidationMessage(fieldName: string): string
+  - Retorna mensagem especifica por campo
+```
 
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `src/integrations/supabase/client.ts` | Adicionar `ensureValidSession()` |
-| `src/hooks/useServices.ts` | Usar `ensureValidSession()` em `useCreateService` e `useUpdateService` |
-| `src/hooks/useCustomers.ts` | Usar `ensureValidSession()` em `useCreateCustomer` |
-| `src/components/modals/ConvertBudgetModal.tsx` | Adicionar verificacao de sessao + guard duplo-clique |
-| `src/components/modals/CreateServiceModal.tsx` | Melhorar error handling com deteccao de erro RLS |
-| `src/components/modals/CreateInstallationModal.tsx` | Melhorar error handling com deteccao de erro RLS |
-| `src/components/modals/CreateDeliveryModal.tsx` | Melhorar error handling com deteccao de erro RLS |
+### Padrao de Alteracao por Modal
 
-## Resultado esperado
+Cada modal recebe apenas 2 alteracoes minimas:
+1. Adicionar `<p className="text-sm text-muted-foreground">` ou `DialogDescription` apos o `DialogTitle`
+2. Substituir `toast.error('Erro ao...')` por `toast.error(humanizeError(error))`
 
-- Criacao de servico: funciona sempre que o utilizador esta autenticado
-- Conversao de orcamento: funciona sem falha
-- Seleccao de tecnico/data: nunca mais causa crash/tela branca
-- Se sessao expirar: mensagem clara "Sessao expirada, faca login novamente" em vez de erro generico
+### Ordem de Implementacao
+
+1. Criar `src/utils/errorMessages.ts`
+2. Actualizar modais de criacao (ServiceTypeSelector, CreateServiceModal, CreateInstallationModal, CreateDeliveryModal)
+3. Actualizar modais de accao (SetPriceModal, RegisterPaymentModal, RequestPartModal, ConfirmPartOrderModal)
+4. Actualizar modais de gestao (AssignTechnicianModal, DeliveryManagementModal, ForceStateModal, RescheduleServiceModal)
+5. Actualizar modais de utilizadores/clientes (CreateUserModal, CreateCustomerModal, EditUserModal)
+6. Actualizar ConvertBudgetModal
+7. Adicionar subtextos de pagina
+
+### Resultado
+
+- Todos os modais: titulo + subtexto contextual
+- Todos os erros: mensagens humanas e orientativas
+- Todos os toasts: curtos, directos, sem linguagem tecnica
+- Zero alteracoes de logica ou fluxo — apenas texto e UX
 
