@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import {
   Dialog,
   DialogContent,
@@ -235,12 +236,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
       handleClose();
     } catch (error: any) {
       console.error('Error creating delivery:', error);
-      const msg = error?.message || String(error);
-      if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('login novamente') || msg.includes('not authenticated')) {
-        toast.error('Sessão expirada. Por favor, faça login novamente.');
-      } else {
-        toast.error('Erro ao criar entrega. Por favor, tente novamente.');
-      }
+      toast.error(humanizeError(error));
     }
   };
 
@@ -266,6 +262,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Nova Entrega Direta</DialogTitle>
+            <p className="text-sm text-muted-foreground">Esta entrega será atribuída a um técnico para levar o equipamento ao cliente.</p>
           </DialogHeader>
 
           <Form {...form}>

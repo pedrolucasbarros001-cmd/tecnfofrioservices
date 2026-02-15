@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession } from '@/integrations/supabase/client';
+import { humanizeError } from '@/utils/errorMessages';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -136,16 +137,12 @@ export function ConvertBudgetModal({
 
       if (updateError) throw updateError;
 
-      toast.success('Orçamento convertido em serviço com sucesso!');
+      toast.success('Orçamento convertido! Serviço criado com sucesso.');
       onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Error converting budget:', error);
-      if (isSessionOrRlsError(error)) {
-        toast.error('Sessão expirada. Por favor, faça login novamente.');
-      } else {
-        toast.error('Erro ao converter orçamento');
-      }
+      toast.error(humanizeError(error));
     } finally {
       setIsLoading(false);
     }
@@ -158,6 +155,7 @@ export function ConvertBudgetModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl">Converter Orçamento em Serviço</DialogTitle>
+          <p className="text-sm text-muted-foreground">Ao converter, será criado um serviço com os dados deste orçamento.</p>
         </DialogHeader>
 
         <div className="space-y-6 py-4">

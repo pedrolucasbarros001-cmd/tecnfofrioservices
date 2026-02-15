@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import { AppRole } from '@/types/database';
 
 const formSchema = z.object({
@@ -195,12 +196,12 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
           .eq('id', technicianData.id);
       }
 
-      toast.success('Utilizador atualizado com sucesso');
+      toast.success('Perfil atualizado com sucesso.');
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('Erro ao atualizar utilizador');
+      toast.error(humanizeError(error));
     } finally {
       setIsLoading(false);
     }
@@ -218,6 +219,7 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Editar Utilizador</DialogTitle>
+            <p className="text-sm text-muted-foreground">Altere os dados do perfil. O nível de acesso define as permissões no sistema.</p>
           </DialogHeader>
 
           <Form {...form}>

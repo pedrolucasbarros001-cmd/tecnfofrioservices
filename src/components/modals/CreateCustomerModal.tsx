@@ -110,6 +110,7 @@ export function CreateCustomerModal({
           <DialogTitle className="text-xl">
             {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Os dados do cliente serão associados aos serviços criados.</p>
         </DialogHeader>
 
         <Form {...form}>

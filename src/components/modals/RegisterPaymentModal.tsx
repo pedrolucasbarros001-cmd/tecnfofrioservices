@@ -24,6 +24,7 @@ import { logPayment } from '@/utils/activityLogUtils';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import type { Service, PaymentMethod } from '@/types/database';
 
 interface RegisterPaymentModalProps {
@@ -115,7 +116,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       resetForm();
     } catch (error) {
       console.error('Error registering payment:', error);
-      toast.error('Erro ao registar pagamento');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -140,6 +141,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
           <DialogTitle className="text-xl font-semibold">
             Registar Pagamento - {service?.code}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">Este valor será abatido do saldo em aberto do serviço.</p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

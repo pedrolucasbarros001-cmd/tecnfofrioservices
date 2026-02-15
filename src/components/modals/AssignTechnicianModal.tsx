@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import {
   Dialog,
   DialogContent,
@@ -163,7 +164,7 @@ export function AssignTechnicianModal({
       onSuccess?.();
     } catch (error) {
       console.error('Error assigning technician:', error);
-      toast.error('Erro ao atribuir técnico. Por favor, tente novamente.');
+      toast.error(humanizeError(error));
     }
   };
 
@@ -174,6 +175,7 @@ export function AssignTechnicianModal({
       <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Atribuir Técnico - {service.code}</DialogTitle>
+          <p className="text-sm text-muted-foreground">O técnico selecionado receberá uma notificação com os detalhes do serviço.</p>
         </DialogHeader>
 
         <Form {...form}>

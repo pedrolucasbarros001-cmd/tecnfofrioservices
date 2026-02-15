@@ -42,7 +42,7 @@ export default function OficinaPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Oficina</h1>
-            <p className="text-muted-foreground">Serviços atualmente na oficina</p>
+            <p className="text-muted-foreground">Serviços com equipamentos fisicamente na oficina.</p>
           </div>
         </div>
 

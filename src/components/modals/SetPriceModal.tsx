@@ -257,6 +257,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               </Badge>
             )}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">O preço definido aqui será utilizado para controlo financeiro e cobrança.</p>
         </DialogHeader>
 
         <Form {...form}>
