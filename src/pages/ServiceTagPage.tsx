@@ -79,7 +79,7 @@ export default function ServiceTagPage() {
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
 
       const pdf = new jsPDF({
-        orientation: "landscape", // Landscape is correct for 62mm wide x 29mm high
+        orientation: "landscape",
         unit: "mm",
         format: [62, 29],
       });
@@ -129,7 +129,7 @@ export default function ServiceTagPage() {
       <style>{`
         @media print {
           @page {
-            size: 62mm 29mm; /* More robust for Brother drivers than adding 'landscape' */
+            size: 62mm 29mm;
             margin: 0;
           }
           .no-print {
@@ -142,7 +142,7 @@ export default function ServiceTagPage() {
           }
         }
         .tag-preview-wrapper {
-          padding: 60px 0;
+          padding: 40px 0;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -163,23 +163,7 @@ export default function ServiceTagPage() {
         }
         .preview-border {
           box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-          border: 1px solid #e2e8f0;
-        }
-        @media print {
-          .tag-preview-wrapper {
-            padding: 0;
-            background: white;
-            display: block;
-          }
-          .print-tag-container {
-            margin: 0;
-            position: fixed;
-            top: 0;
-            left: 0;
-            border: none;
-            width: 62mm;
-            height: 29mm;
-          }
+          border: 1px solid #cbd5e1;
         }
       `}</style>
 
@@ -199,37 +183,35 @@ export default function ServiceTagPage() {
 
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
-          {/* Blue Top Bar */}
-          <div className="w-full h-[2mm] bg-[#0047AB] shrink-0" />
+          {/* Linha Azul no Topo - Largura total 62mm */}
+          <div className="w-full h-[1.5mm] bg-[#0047AB] shrink-0" />
 
-          {/* Main Content Area: Horizontal Layout */}
-          <div className="flex-1 flex w-full p-[1.5mm] overflow-hidden">
-            {/* Left Column: QR and Code */}
-            <div className="flex flex-col items-center justify-center w-[20mm] shrink-0 border-r border-slate-100 pr-[1.5mm]">
-              <QRCodeSVG value={qrUrl} size={54} level="M" includeMargin={false} />
-              <p className="text-[9px] font-bold font-mono text-[#0047AB] mt-1 text-center truncate w-full">
-                {service.code}
-              </p>
+          {/* Área Principal de Conteúdo - Flex Row para ser Horizontal */}
+          <div className="flex flex-row flex-1 p-[1.5mm] gap-[2mm] items-center overflow-hidden">
+            {/* Coluna Esquerda: QR Code e Código TF */}
+            <div className="flex flex-col items-center shrink-0 border-r border-slate-100 pr-[1.5mm] justify-center">
+              <QRCodeSVG value={qrUrl} size={55} level="M" includeMargin={false} />
+              <p className="text-[10px] font-bold font-mono text-[#0047AB] mt-0.5 text-center">{service.code}</p>
             </div>
 
-            {/* Right Column: Logo and Details */}
-            <div className="flex-1 flex flex-col justify-between pl-[2mm] min-w-0">
-              <div className="flex justify-between items-start mb-1">
-                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[4.5mm] object-contain" />
+            {/* Coluna Direita: Logo e Detalhes Harmonizados */}
+            <div className="flex flex-col justify-between flex-1 h-full min-w-0 py-[0.5mm]">
+              <div className="flex justify-start">
+                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[5.5mm] object-contain" />
               </div>
 
-              {/* Details List */}
-              <div className="text-[8.5px] leading-[1.2] text-black">
-                <div className="flex gap-1 overflow-hidden">
-                  <span className="font-bold shrink-0">Cl:</span>
+              {/* Lista de Detalhes - Ocupando o espaço restante */}
+              <div className="text-[9px] leading-tight text-black flex flex-col gap-0.5">
+                <div className="flex truncate">
+                  <span className="font-bold mr-1 shrink-0">Cl:</span>
                   <span className="truncate">{service.customer?.name || "---"}</span>
                 </div>
-                <div className="flex gap-1 overflow-hidden">
-                  <span className="font-bold shrink-0">Eq:</span>
+                <div className="flex truncate">
+                  <span className="font-bold mr-1 shrink-0">Eq:</span>
                   <span className="truncate">{service.appliance_type || "---"}</span>
                 </div>
-                <div className="flex gap-1 overflow-hidden">
-                  <span className="font-bold shrink-0">Tel:</span>
+                <div className="flex truncate">
+                  <span className="font-bold mr-1 shrink-0">Tel:</span>
                   <span className="truncate">{service.customer?.phone || "---"}</span>
                 </div>
               </div>
