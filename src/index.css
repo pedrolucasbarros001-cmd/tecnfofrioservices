@@ -21,7 +21,7 @@
        TECNOFRIO Institutional Blue Palette
        Primary: #2B4F84 (HSL: 214 50% 34%)
        ============================================= */
-    
+
     /* Background - Subtle blue tint for cohesion */
     --background: 214 30% 98%;
     --foreground: 214 50% 15%;
@@ -95,9 +95,12 @@
     --sidebar: 0 0% 100%;
 
     /* Fonts */
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-    --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-    --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --font-sans:
+      "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      "Noto Sans", sans-serif;
+    --font-serif: "Lora", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-mono:
+      "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
     /* Soft shadows - Professional, not cartoon */
     --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
@@ -346,7 +349,7 @@
   background: hsl(var(--card));
   padding: 1rem;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
   width: 100%;
   max-width: 210mm;
@@ -357,11 +360,11 @@
   min-height: 297mm;
   background: white;
   padding: 10mm;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   border-radius: 0.25rem;
 }
 
-/* ========== Tag Print Page (29mm x 90mm) ========== */
+/* ========== Tag Print Page (62mm x 29mm) ========== */
 .print-tag-page {
   min-height: 100vh;
   background: hsl(var(--muted));
@@ -378,25 +381,25 @@
   background: hsl(var(--card));
   padding: 1rem;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
   width: 100%;
   max-width: 200px;
 }
 
 .print-tag-page .print-tag-container {
-  width: 29mm;
-  min-height: 90mm;
+  width: 62mm;
+  height: 29mm;
   background: white;
-  padding: 2mm;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 1.5mm;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   border-radius: 0.25rem;
   box-sizing: border-box;
 }
 
 /* ======================================
    PRINT STYLES - Unified System
-   Supports: A4 Sheet (via modal) & 4x6 Tag (102x152mm via dedicated page)
+   Supports: A4 Sheet (via modal) & Tag (62x29mm)
    ====================================== */
 
 /* Screen: Hide print-only content */
@@ -467,11 +470,11 @@
     padding: 0 !important;
     min-height: auto !important;
   }
-  
+
   .print-page .print-controls {
     display: none !important;
   }
-  
+
   .print-page .print-sheet {
     width: 100% !important;
     min-height: auto !important;
@@ -481,24 +484,23 @@
     border-radius: 0 !important;
   }
 
-  /* ========== TAG PRINT PAGE (29mm x 90mm) ========== */
+  /* ========== TAG PRINT PAGE (62mm x 29mm) ========== */
   .print-tag-page {
     background: white !important;
     padding: 0 !important;
     min-height: auto !important;
   }
-  
+
   .print-tag-page .print-controls {
     display: none !important;
   }
-  
+
   .print-tag-page .print-tag-container {
-    width: 29mm !important;
-    height: 90mm !important;
-    min-height: 90mm !important;
+    width: 62mm !important;
+    height: 29mm !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding: 2mm !important;
+    padding: 1.5mm !important;
     border-radius: 0 !important;
   }
 
@@ -565,21 +567,21 @@
     background-color: #f9fafb !important;
   }
 
-  /* ========== TAG (29mm x 90mm) ========== */
+  /* ========== TAG (62mm x 29mm) ========== */
   body.print-type-tag {
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Tag container - fixed size for 29mm x 90mm */
+  /* Tag container - fixed size for 62mm x 29mm */
   .print-tag {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 29mm !important;
-    height: 90mm !important;
+    width: 62mm !important;
+    height: 29mm !important;
     margin: 0 !important;
-    padding: 2mm !important;
+    padding: 1.5mm !important;
     background: white !important;
     border: none !important;
     border-radius: 0 !important;
@@ -614,8 +616,6 @@
 
 /* ======================================
    Tour Guiado — Elevação de modais Radix
-   Quando o tour está activo, modais/sheets/dialogs
-   Radix ficam ACIMA do overlay do tour (z-9998)
    ====================================== */
 body.tour-active [data-radix-dialog-overlay],
 body.tour-active [role="dialog"][data-state="open"]::before {
