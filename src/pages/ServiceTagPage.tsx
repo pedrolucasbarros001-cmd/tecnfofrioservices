@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { Download, Loader2, Printer, ArrowLeft, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { supabase } from "@/integrations/supabase/client";
 import type { Service, Customer } from "@/types/database";
 import tecnofrioLogoFull from "@/assets/tecnofrio-logo-full.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePrintSessionBridge } from "@/hooks/usePrintSessionBridge";
-import { generatePDF } from "@/utils/pdfUtils";
 
 export default function ServiceTagPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -59,11 +60,12 @@ export default function ServiceTagPage() {
 
     setIsGenerating(true);
     try {
-      await generatePDF({
-        element: tagRef.current,
-        filename: `Etiqueta-${service.code}.pdf`,
-        format: { unit: "mm", size: [62, 29], orientation: "landscape" },
+      const canvas = await html2canvas(tagRef.current, {
         scale: 4,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: 1200, // Normalize across all computers
         onclone: (clonedDoc) => {
           const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
           if (el) {
@@ -73,6 +75,17 @@ export default function ServiceTagPage() {
           }
         },
       });
+
+      const imgData = canvas.toDataURL("image/jpeg", 1.0);
+
+      const pdf = new jsPDF({
+        orientation: "landscape", // Landscape is correct for 62mm wide x 29mm high
+        unit: "mm",
+        format: [62, 29],
+      });
+
+      pdf.addImage(imgData, "JPEG", 0, 0, 62, 29, undefined, "FAST");
+      pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
     } finally {
