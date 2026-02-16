@@ -64,6 +64,7 @@ const formSchema = z.object({
   customer_name: z.string().optional(),
   customer_phone: z.string().optional(),
   customer_nif: z.string().optional(),
+  customer_email: z.string().email('Email inválido').optional().or(z.literal('')),
   // Artigos
   items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
   discount_value: z.number().optional().default(0),
@@ -105,6 +106,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       customer_name: '',
       customer_phone: '',
       customer_nif: '',
+      customer_email: '',
       items: [
         { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
       ],
@@ -189,6 +191,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
     form.setValue('customer_name', foundCustomer.name);
     form.setValue('customer_phone', foundCustomer.phone || '');
     form.setValue('customer_nif', foundCustomer.nif || '');
+    form.setValue('customer_email', foundCustomer.email || '');
     setShowFoundCustomerBox(false);
     setFoundCustomer(null);
   };
@@ -257,6 +260,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         name: pendingFormValues.customer_name || '',
         phone: pendingFormValues.customer_phone,
         nif: pendingFormValues.customer_nif,
+        email: pendingFormValues.customer_email,
       });
       
       await processSubmit(pendingFormValues, newCustomer.id);
@@ -360,7 +364,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
                     {/* Campos de input (se não houver cliente selecionado) */}
                     {!selectedCustomer && (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <FormField
                           control={form.control}
                           name="customer_name"
@@ -390,6 +394,17 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                             <FormItem>
                               <FormControl>
                                 <Input placeholder="NIF" className="h-9" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="customer_email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input placeholder="Email" type="email" className="h-9" {...field} />
                               </FormControl>
                             </FormItem>
                           )}

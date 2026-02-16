@@ -29,7 +29,7 @@ export async function generatePDF({
     left: -9999px;
     top: 0;
     width: ${format === 'a4' ? '210mm' : `${format[0]}mm`};
-    min-height: ${format === 'a4' ? '297mm' : `${format[1]}mm`};
+    ${format === 'a4' ? 'min-height: 297mm;' : 'height: auto;'}
     background: white;
     overflow: visible;
     z-index: -1;
@@ -67,7 +67,8 @@ export async function generatePDF({
   try {
     // For custom formats with autoHeight, measure actual content height
     let finalFormat: unknown = format === 'a4' ? 'a4' : format;
-    if (autoHeight && Array.isArray(format)) {
+    // Auto-height for custom formats: measure real content height
+    if (Array.isArray(format) && (autoHeight || format !== undefined)) {
       const contentHeightPx = clone.offsetHeight;
       const contentHeightMM = Math.ceil((contentHeightPx / 96) * 25.4) + (margin * 2);
       finalFormat = [format[0], contentHeightMM];
