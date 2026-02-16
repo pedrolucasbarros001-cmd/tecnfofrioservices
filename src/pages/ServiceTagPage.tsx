@@ -154,8 +154,10 @@ export default function ServiceTagPage() {
           overflow: hidden;
           position: relative;
           color: black;
-          border: 1px dotted #ccc;
           margin: 0;
+        }
+        .preview-border {
+          border: 1px dotted #ccc;
         }
         @media print {
           .tag-preview-wrapper {
@@ -190,36 +192,36 @@ export default function ServiceTagPage() {
       </div>
 
       <div className="tag-preview-wrapper">
-        <div ref={tagRef} className="print-tag-container">
+        <div ref={tagRef} className="print-tag-container" style={{ margin: 0, border: "none" }}>
           {/* Blue Top Bar */}
           <div className="w-full h-[1.5mm] bg-[#0047AB] mb-1 shrink-0" />
 
           {/* Logo */}
-          <div className="w-full flex justify-center mb-1.5 px-0.5 shrink-0">
-            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3.5 object-contain" />
+          <div className="w-full flex justify-center mb-1 px-1 shrink-0">
+            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3 object-contain" />
           </div>
 
           {/* QR Code */}
           <div className="mb-1 shrink-0">
-            <QRCodeSVG value={qrUrl} size={58} level="M" includeMargin={false} />
+            <QRCodeSVG value={qrUrl} size={52} level="M" includeMargin={false} />
           </div>
 
           {/* Service Code */}
-          <div className="text-center mb-auto pt-0.5 shrink-0">
-            <p className="text-[13px] font-bold font-mono text-[#0047AB] leading-tight">{service.code}</p>
+          <div className="text-center mb-1 shrink-0">
+            <p className="text-[12px] font-bold font-mono text-[#0047AB] leading-none">{service.code}</p>
           </div>
 
-          {/* Details - Anchored to bottom like the image */}
-          <div className="w-full text-[8.2px] leading-[1.1] text-black px-1 pb-1 flex flex-col gap-0.5 mt-auto">
-            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
-              <strong>Cl:</strong> {service.customer?.name || "---"}
-            </p>
-            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
-              <strong>Eq:</strong> {service.appliance_type || "---"}
-            </p>
-            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
-              <strong>Tel:</strong> {service.customer?.phone || "---"}
-            </p>
+          {/* Details - Stacked for better visibility and PDF compatibility (Avoids flex-wrap issues) */}
+          <div className="w-full text-[7.5px] leading-[1.1] text-black px-1 pb-1 mt-auto">
+            <div className="mb-0.5">
+              <span className="font-bold">Cl:</span> {service.customer?.name || "---"}
+            </div>
+            <div className="mb-0.5">
+              <span className="font-bold">Eq:</span> {service.appliance_type || "---"}
+            </div>
+            <div>
+              <span className="font-bold">Tel:</span> {service.customer?.phone || "---"}
+            </div>
           </div>
         </div>
       </div>
