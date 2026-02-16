@@ -4,13 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { Download, Loader2, Printer, ArrowLeft, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
 import { supabase } from "@/integrations/supabase/client";
 import type { Service, Customer } from "@/types/database";
 import tecnofrioLogoFull from "@/assets/tecnofrio-logo-full.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePrintSessionBridge } from "@/hooks/usePrintSessionBridge";
+import html2pdf from "html2pdf.js";
 
 export default function ServiceTagPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -60,32 +59,26 @@ export default function ServiceTagPage() {
 
     setIsGenerating(true);
     try {
-      // Create canvas with high scale for crisp text
-      const canvas = await html2canvas(tagRef.current, {
-        scale: 4,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Ensure the cloned element is visible for capture
-          const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
-          if (el) {
-            el.style.margin = "0";
-            el.style.position = "static";
-          }
+      const opt = {
+        margin: 0,
+        filename: `Etiqueta-${service.code}.pdf`,
+        image: { type: "jpeg", quality: 1.0 },
+        html2canvas: {
+          scale: 4,
+          useCORS: true,
+          letterRendering: true,
+          scrollX: 0,
+          scrollY: 0,
         },
-      });
+        jsPDF: {
+          unit: "mm",
+          format: [29, 62],
+          orientation: "portrait",
+        },
+      };
 
-      const imgData = canvas.toDataURL("image/png", 1.0);
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [29, 62], // 29mm wide, 62mm high
-      });
-
-      pdf.addImage(imgData, "PNG", 0, 0, 29, 62);
-      pdf.save(`Etiqueta-${service.code}.pdf`);
+      // @ts-ignore
+      await html2pdf().from(tagRef.current).set(opt).save();
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
     } finally {
@@ -141,12 +134,18 @@ export default function ServiceTagPage() {
             background: white !important;
           }
         }
+        .tag-preview-wrapper {
+          padding: 40px 0;
+          display: flex;
+          justify-content: center;
+          background: #f8fafc;
+          min-height: calc(100vh - 73px);
+        }
         .print-tag-container {
           width: 29mm;
           height: 62mm;
           padding: 1.5mm 1mm;
           background: white;
-          margin: 40px auto;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
@@ -156,8 +155,14 @@ export default function ServiceTagPage() {
           position: relative;
           color: black;
           border: 1px dotted #ccc;
+          margin: 0;
         }
         @media print {
+          .tag-preview-wrapper {
+            padding: 0;
+            background: white;
+            display: block;
+          }
           .print-tag-container {
             margin: 0;
             position: fixed;
@@ -184,36 +189,38 @@ export default function ServiceTagPage() {
         </Button>
       </div>
 
-      <div ref={tagRef} className="print-tag-container">
-        {/* Blue Top Bar */}
-        <div className="w-full h-[1.5mm] bg-[#0047AB] mb-1" />
+      <div className="tag-preview-wrapper">
+        <div ref={tagRef} className="print-tag-container">
+          {/* Blue Top Bar */}
+          <div className="w-full h-[1.5mm] bg-[#0047AB] mb-1 shrink-0" />
 
-        {/* Logo */}
-        <div className="w-full flex justify-center mb-1.5 px-0.5">
-          <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3.5 object-contain" />
-        </div>
+          {/* Logo */}
+          <div className="w-full flex justify-center mb-1.5 px-0.5 shrink-0">
+            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3.5 object-contain" />
+          </div>
 
-        {/* QR Code */}
-        <div className="mb-2">
-          <QRCodeSVG value={qrUrl} size={58} level="M" includeMargin={false} />
-        </div>
+          {/* QR Code */}
+          <div className="mb-1 shrink-0">
+            <QRCodeSVG value={qrUrl} size={58} level="M" includeMargin={false} />
+          </div>
 
-        {/* Service Code */}
-        <div className="text-center mb-auto pt-0.5">
-          <p className="text-[13px] font-bold font-mono text-[#0047AB] leading-tight">{service.code}</p>
-        </div>
+          {/* Service Code */}
+          <div className="text-center mb-auto pt-0.5 shrink-0">
+            <p className="text-[13px] font-bold font-mono text-[#0047AB] leading-tight">{service.code}</p>
+          </div>
 
-        {/* Details - Anchored to bottom like the image */}
-        <div className="w-full text-[8px] leading-[1.1] text-black px-1 pb-1 flex flex-col gap-0.5">
-          <p className="overflow-hidden">
-            <strong>Cl:</strong> {service.customer?.name || "---"}
-          </p>
-          <p className="overflow-hidden">
-            <strong>Eq:</strong> {service.appliance_type || "---"}
-          </p>
-          <p className="overflow-hidden">
-            <strong>Tel:</strong> {service.customer?.phone || "---"}
-          </p>
+          {/* Details - Anchored to bottom like the image */}
+          <div className="w-full text-[8.2px] leading-[1.1] text-black px-1 pb-1 flex flex-col gap-0.5 mt-auto">
+            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
+              <strong>Cl:</strong> {service.customer?.name || "---"}
+            </p>
+            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
+              <strong>Eq:</strong> {service.appliance_type || "---"}
+            </p>
+            <p className="overflow-hidden whitespace-nowrap text-ellipsis">
+              <strong>Tel:</strong> {service.customer?.phone || "---"}
+            </p>
+          </div>
         </div>
       </div>
     </div>
