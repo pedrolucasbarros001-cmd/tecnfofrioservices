@@ -66,6 +66,7 @@ export default function ServiceTagPage() {
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
+        windowWidth: 1200, // Important: Pinning window width for consistent layout across computers
         onclone: (clonedDoc) => {
           // Robustly clean the cloned element to stay within bounds
           const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
@@ -191,18 +192,18 @@ export default function ServiceTagPage() {
       </div>
 
       <div className="tag-preview-wrapper">
-        <div ref={tagRef} className="print-tag-container" style={{ margin: 0, border: "none" }}>
+        <div ref={tagRef} className="print-tag-container preview-border" style={{ margin: 0, border: "none" }}>
           {/* Blue Top Bar */}
           <div className="w-full h-[1.5mm] bg-[#0047AB] mb-1 shrink-0" />
 
           {/* Logo */}
           <div className="w-full flex justify-center mb-1 px-1 shrink-0">
-            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3 object-contain" />
+            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[3.2mm] object-contain" />
           </div>
 
           {/* QR Code */}
-          <div className="mb-1 shrink-0">
-            <QRCodeSVG value={qrUrl} size={52} level="M" includeMargin={false} />
+          <div className="mb-1 shrink-0 bg-white">
+            <QRCodeSVG value={qrUrl} size={48} level="M" includeMargin={false} />
           </div>
 
           {/* Service Code */}
@@ -210,7 +211,7 @@ export default function ServiceTagPage() {
             <p className="text-[12px] font-bold font-mono text-[#0047AB] leading-none">{service.code}</p>
           </div>
 
-          {/* Details - Zero censoring, full visibility with wrapping */}
+          {/* Details - Absolute visibility, no clipping */}
           <div className="w-full text-[7.2px] leading-[1.05] text-black px-1 pb-1 mt-auto text-wrap-fix">
             <div className="mb-0.5">
               <span className="font-bold">Cl:</span> {service.customer?.name || "---"}
