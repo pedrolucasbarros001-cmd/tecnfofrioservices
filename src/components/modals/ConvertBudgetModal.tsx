@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Wrench, Settings, Package, MapPin, Building2 } from 'lucide-react';
+import { Wrench, Settings, Package, MapPin, Building2, CalendarIcon, UserCheck } from 'lucide-react';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -10,8 +12,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { supabase, ensureValidSession } from '@/integrations/supabase/client';
 import { humanizeError } from '@/utils/errorMessages';
+import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -67,7 +83,12 @@ export function ConvertBudgetModal({
 }: ConvertBudgetModalProps) {
   const [serviceType, setServiceType] = useState<ServiceType>('reparacao');
   const [serviceLocation, setServiceLocation] = useState<ServiceLocation>('oficina');
+  const [technicianId, setTechnicianId] = useState<string>('');
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
+  const [scheduledShift, setScheduledShift] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const { data: technicians = [] } = useTechnicians(true);
 
   const extractBudgetDetails = (budget: any) => {
     let applianceType = budget.appliance_type || null;
@@ -100,10 +121,22 @@ export function ConvertBudgetModal({
   const handleConvert = async () => {
     if (!budget || isLoading) return;
 
+    // Validation: if technician selected, date and shift are required
+    if (technicianId && (!scheduledDate || !scheduledShift)) {
+      toast.warning('Ao atribuir um técnico, a data e o turno são obrigatórios.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await ensureValidSession();
       const { applianceType, faultDescription } = extractBudgetDetails(budget);
+
+      // Determine status based on location and technician
+      let status = 'por_fazer';
+      if (serviceLocation === 'oficina' && technicianId) {
+        status = 'na_oficina';
+      }
 
       const { data: service, error: serviceError } = await supabase
         .from('services')
@@ -116,10 +149,13 @@ export function ConvertBudgetModal({
           notes: budget.notes,
           pricing_description: budget.pricing_description,
           service_type: serviceType,
-          status: 'por_fazer',
+          status,
           service_location: serviceLocation,
           final_price: budget.estimated_total,
           is_installation: serviceType === 'instalacao',
+          technician_id: technicianId || null,
+          scheduled_date: scheduledDate ? format(scheduledDate, 'yyyy-MM-dd') : null,
+          scheduled_shift: scheduledShift || null,
         })
         .select()
         .single();
@@ -139,7 +175,7 @@ export function ConvertBudgetModal({
 
       toast.success('Orçamento convertido! Serviço criado com sucesso.');
       onSuccess?.();
-      onOpenChange(false);
+      handleClose();
     } catch (error) {
       console.error('Error converting budget:', error);
       toast.error(humanizeError(error));
@@ -148,10 +184,19 @@ export function ConvertBudgetModal({
     }
   };
 
+  const handleClose = () => {
+    onOpenChange(false);
+    setTechnicianId('');
+    setScheduledDate(undefined);
+    setScheduledShift('');
+    setServiceType('reparacao');
+    setServiceLocation('oficina');
+  };
+
   if (!budget) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl">Converter Orçamento em Serviço</DialogTitle>
@@ -216,6 +261,83 @@ export function ConvertBudgetModal({
             </RadioGroup>
           </div>
 
+          {/* Technician + Scheduling Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Atribuir Técnico (Opcional)</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ao atribuir um técnico, o serviço será agendado na agenda dele.
+            </p>
+
+            <Select value={technicianId} onValueChange={(val) => {
+              setTechnicianId(val === '__none__' ? '' : val);
+              if (val === '__none__') {
+                setScheduledDate(undefined);
+                setScheduledShift('');
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sem técnico atribuído" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sem técnico</SelectItem>
+                {technicians.map((tech) => (
+                  <SelectItem key={tech.id} value={tech.id}>
+                    {tech.profile?.full_name || tech.profile?.email || 'Técnico'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Date + Shift (only if technician selected) */}
+            {technicianId && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Data *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !scheduledDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : 'Selecionar'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={scheduledDate}
+                        onSelect={setScheduledDate}
+                        locale={pt}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Turno *</Label>
+                  <Select value={scheduledShift} onValueChange={setScheduledShift}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manha">Manhã</SelectItem>
+                      <SelectItem value="tarde">Tarde</SelectItem>
+                      <SelectItem value="noite">Noite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Budget Info */}
           <div className="rounded-lg bg-muted/50 p-4 text-sm">
             <p className="text-muted-foreground">
@@ -231,7 +353,7 @@ export function ConvertBudgetModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancelar
           </Button>
           <Button onClick={handleConvert} disabled={isLoading}>
