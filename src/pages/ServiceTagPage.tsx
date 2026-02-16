@@ -62,8 +62,8 @@ export default function ServiceTagPage() {
       await generatePDF({
         element: tagRef.current,
         filename: `Etiqueta-${service.code}`,
-        format: [29, 62],
-        orientation: "portrait",
+        format: [62, 29],
+        orientation: "landscape",
         margin: 0,
       });
     } finally {
@@ -107,7 +107,7 @@ export default function ServiceTagPage() {
       <style>{`
         @media print {
           @page {
-            size: 29mm 62mm;
+            size: 62mm 29mm;
             margin: 0;
           }
           .no-print {
@@ -121,15 +121,16 @@ export default function ServiceTagPage() {
           }
         }
         .print-tag-container {
-          width: 29mm;
-          min-height: 61.5mm; /* Slightly smaller to avoid page break */
+          width: 62mm;
+          height: 29mm;
           padding: 1mm 2mm;
           background: white;
           margin: 40px auto;
           box-sizing: border-box;
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
           align-items: center;
+          justify-content: space-between;
           overflow: hidden;
           position: relative;
           color: black;
@@ -142,8 +143,8 @@ export default function ServiceTagPage() {
             top: 0;
             left: 0;
             border: none;
-            width: 29mm;
-            height: 62mm;
+            width: 62mm;
+            height: 29mm;
           }
         }
       `}</style>
@@ -156,38 +157,38 @@ export default function ServiceTagPage() {
         <Button size="sm" variant="outline" onClick={handlePrint}>
           <Printer className="h-4 w-4 mr-2" /> Imprimir
         </Button>
+        <Button size="sm" onClick={handleDownloadPDF} disabled={isGenerating}>
+          {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          {isGenerating ? "A gerar..." : "Baixar PDF"}
+        </Button>
       </div>
 
       <div ref={tagRef} className="print-tag-container">
-        {/* Blue Top Bar */}
-        <div className="absolute top-0 left-0 w-full h-[2mm] bg-[#0047AB]" />
+        {/* Left Side: Logo and Details */}
+        <div className="flex flex-col justify-between h-full min-w-0 pr-1 flex-1 py-0.5">
+          <div className="flex flex-col gap-0.5">
+            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3.5 object-contain self-start" />
+            <p className="text-[11px] font-bold font-mono text-[#0047AB] leading-tight">{service.code}</p>
+          </div>
 
-        {/* Logo */}
-        <div className="pt-[3mm] mb-2">
-          <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-4 object-contain" />
+          <div className="text-[7.5px] leading-tight text-black space-y-0.5 truncate">
+            <p className="truncate">
+              <strong>Cl:</strong> {service.customer?.name || "---"}
+            </p>
+            <p className="truncate">
+              <strong>Eq:</strong> {service.appliance_type || "---"}
+            </p>
+            <p className="truncate">
+              <strong>Tel:</strong> {service.customer?.phone || "---"}
+            </p>
+          </div>
         </div>
 
-        {/* QR Code */}
-        <div className="mb-2">
-          <QRCodeSVG value={qrUrl} size={60} level="M" includeMargin={false} />
-        </div>
-
-        {/* Service Code */}
-        <div className="text-center mb-1">
-          <p className="text-[14px] font-bold font-mono text-[#0047AB]">{service.code}</p>
-        </div>
-
-        {/* Details */}
-        <div className="w-full text-[8.5px] leading-[1.2] text-black space-y-0.5 px-0.5 mt-auto pb-1">
-          <p className="truncate">
-            <strong>Cl:</strong> {service.customer?.name || "---"}
-          </p>
-          <p className="truncate">
-            <strong>Eq:</strong> {service.appliance_type || "---"}
-          </p>
-          <p className="truncate">
-            <strong>Tel:</strong> {service.customer?.phone || "---"}
-          </p>
+        {/* Right Side: QR Code */}
+        <div className="flex items-center justify-center pl-1 h-full">
+          <div className="bg-white p-0.5 border border-slate-100 rounded">
+            <QRCodeSVG value={qrUrl} size={68} level="M" includeMargin={false} />
+          </div>
         </div>
       </div>
     </div>
