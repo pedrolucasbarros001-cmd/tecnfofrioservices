@@ -79,7 +79,7 @@ export default function ServiceTagPage() {
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
 
       const pdf = new jsPDF({
-        orientation: "landscape",
+        orientation: "landscape", // Landscape is correct for 62mm wide x 29mm high
         unit: "mm",
         format: [62, 29],
       });
@@ -183,24 +183,23 @@ export default function ServiceTagPage() {
 
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
-          {/* Linha Azul no Topo - Largura total 62mm */}
+          {/* Top Blue Line */}
           <div className="w-full h-[1.5mm] bg-[#0047AB] shrink-0" />
 
-          {/* Área Principal de Conteúdo - Flex Row para ser Horizontal */}
-          <div className="flex flex-row flex-1 p-[1.5mm] gap-[2mm] items-center overflow-hidden">
-            {/* Coluna Esquerda: QR Code e Código TF */}
-            <div className="flex flex-col items-center shrink-0 border-r border-slate-100 pr-[1.5mm] justify-center">
+          {/* Combined Content Area */}
+          <div className="flex flex-row flex-1 p-[1.5mm] gap-[2mm] items-center">
+            {/* Left: QR + Code */}
+            <div className="flex flex-col items-center shrink-0 border-r border-slate-100 pr-[1.5mm]">
               <QRCodeSVG value={qrUrl} size={55} level="M" includeMargin={false} />
-              <p className="text-[10px] font-bold font-mono text-[#0047AB] mt-0.5 text-center">{service.code}</p>
+              <p className="text-[10px] font-bold font-mono text-[#0047AB] mt-0.5">{service.code}</p>
             </div>
 
-            {/* Coluna Direita: Logo e Detalhes Harmonizados */}
-            <div className="flex flex-col justify-between flex-1 h-full min-w-0 py-[0.5mm]">
+            {/* Right: Logo + Details (Harmonious & Close) */}
+            <div className="flex flex-col justify-between flex-1 h-full min-w-0">
               <div className="flex justify-start">
-                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[5.5mm] object-contain" />
+                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[5mm] object-contain" />
               </div>
 
-              {/* Lista de Detalhes - Ocupando o espaço restante */}
               <div className="text-[9px] leading-tight text-black flex flex-col gap-0.5">
                 <div className="flex truncate">
                   <span className="font-bold mr-1 shrink-0">Cl:</span>
