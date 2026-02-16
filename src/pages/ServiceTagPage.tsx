@@ -17,23 +17,19 @@ export default function ServiceTagPage() {
   const tagRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Session bridge for new tab authentication
-  const { isSettling: sessionSettling, sessionRestored } = usePrintSessionBridge();
-
-  // Auth state from context
+  const { isSettling: sessionSettling } = usePrintSessionBridge();
   const { isAuthenticated, loading: authLoading } = useAuth();
 
-  // Fetch service data with customer - ONLY after auth is confirmed
   const { data: service, isLoading, error } = useQuery({
     queryKey: ['service-tag-print', serviceId],
     queryFn: async () => {
       if (!serviceId) throw new Error('ID não fornecido');
       const { data, error } = await supabase
         .from('services')
-        .select(`
+        .select(\`
           *,
           customer:customers(*)
-        `)
+        \`)
         .eq('id', serviceId)
         .single();
       if (error) throw error;
@@ -42,8 +38,7 @@ export default function ServiceTagPage() {
     enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
-  // QR points to internal history page (requires login) - for technician use
-  const qrUrl = `${window.location.origin}/service-detail/${serviceId}`;
+  const qrUrl = \`\${window.location.origin}/service-detail/\${serviceId}\`;
 
   const handlePrint = () => {
     window.print();
@@ -51,54 +46,40 @@ export default function ServiceTagPage() {
 
   const handleDownloadPDF = async () => {
     if (!tagRef.current || !service) return;
-    
     setIsGenerating(true);
     try {
       await generatePDF({ 
         element: tagRef.current, 
-        filename: `Etiqueta-${service.code}`,
-        format: [29, 90],
+        filename: \`Etiqueta-\${service.code}\`,
+        format: [29, 62], // Formato atualizado para 62x29
         margin: 0,
-        autoHeight: true
+        autoHeight: false
       });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Combined loading state: auth settling + session bridge + query loading
-  const isLoadingState = authLoading || sessionSettling || isLoading;
-  
-  // If session bridge is done and we're still not authenticated, show login prompt
-  const showLoginPrompt = !sessionSettling && !authLoading && !isAuthenticated;
-  
-  if (showLoginPrompt) {
+  if (!sessionSettling && !authLoading && !isAuthenticated) {
     return (
       <div className="print-tag-page">
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
           <LogIn className="h-12 w-12 text-muted-foreground" />
-          <p className="text-muted-foreground text-center">
-            Sessão não encontrada nesta aba.
-          </p>
-          <Link to={`/login?redirect=/print/tag/${serviceId}`}>
-            <Button>
-              <LogIn className="h-4 w-4 mr-2" />
-              Fazer Login
-            </Button>
+          <p className="text-muted-foreground text-center">Sessão não encontrada nesta aba.</p>
+          <Link to={\`/login?redirect=/print/tag/\${serviceId}\`}>
+            <Button><LogIn className="h-4 w-4 mr-2" />Fazer Login</Button>
           </Link>
         </div>
       </div>
     );
   }
   
-  if (isLoadingState) {
+  if (authLoading || sessionSettling || isLoading) {
     return (
       <div className="print-tag-page">
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-muted-foreground">
-            {sessionSettling ? 'A verificar sessão...' : authLoading ? 'A autenticar...' : 'A carregar etiqueta...'}
-          </span>
+          <span className="ml-2 text-muted-foreground">A carregar...</span>
         </div>
       </div>
     );
@@ -107,12 +88,6 @@ export default function ServiceTagPage() {
   if (error || !service) {
     return (
       <div className="print-tag-page">
-        <div className="print-controls no-print">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-        </div>
         <div className="flex items-center justify-center min-h-[50vh]">
           <p className="text-muted-foreground">Serviço não encontrado</p>
         </div>
@@ -121,77 +96,93 @@ export default function ServiceTagPage() {
   }
 
   return (
-    <div className="print-tag-page">
-      {/* Controls - hidden in print */}
-      <div className="print-controls no-print">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
+    <div className="print-tag-page pb-10">
+      <style>{\`
+        @media print {
+          @page {
+            size: 62mm 29mm;
+            margin: 0;
+          }
+          .no-print {
+            display: none !important;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          .print-tag-page {
+            padding: 0;
+            margin: 0;
+          }
+        }
+
+        .print-tag-container {
+          width: 62mm;
+          height: 29mm;
+          padding: 1.5mm 3mm;
+          background: white;
+          margin: 20px auto;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          overflow: hidden;
+          position: relative;
+          border: 1px dashed #ccc;
+          color: black;
+        }
+
+        @media print {
+          .print-tag-container {
+            border: none;
+            margin: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+          }
+        }
+      \`}</style>
+
+      <div className="print-controls no-print p-4 bg-muted/30 border-b mb-6">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir
+            <Button size="sm" variant="outline" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" /> Imprimir
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGenerating}>
-              {isGenerating ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              {isGenerating ? 'A gerar...' : 'Baixar PDF'}
+            <Button size="sm" onClick={handleDownloadPDF} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              PDF
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Tag Content - 29mm x 90mm */}
-      <div ref={tagRef} className="print-tag-container">
-       {/* Top accent bar */}
-       <div className="h-1 bg-primary -mx-[2mm] -mt-[2mm]" />
-       
-       {/* Logo */}
-       <div className="flex justify-center mt-1 mb-1">
-         <img 
-           src={tecnofrioLogoFull} 
-           alt="TECNOFRIO" 
-           className="h-4 object-contain"
-         />
-       </div>
- 
-       {/* QR Code */}
-       <div className="flex justify-center mb-1">
-         <QRCodeSVG 
-           value={qrUrl} 
-           size={55} 
-           level="M"
-           includeMargin={false}
-         />
-       </div>
- 
-       {/* Service Code */}
-       <div className="text-center mb-1">
-         <p className="text-[10px] font-bold font-mono tracking-wide">
-           {service.code}
-         </p>
-       </div>
- 
-       {/* Customer Info - compact */}
-       <div className="space-y-0 text-[7px] leading-tight">
-         <p className="truncate">
-           <span className="text-muted-foreground">Cl:</span>{' '}
-           <span className="font-medium">{service.customer?.name || 'N/A'}</span>
-         </p>
-         <p className="truncate">
-           <span className="text-muted-foreground">Eq:</span>{' '}
-           <span className="font-medium">{service.appliance_type || 'N/A'}</span>
-         </p>
-         <p>
-           <span className="text-muted-foreground">Tel:</span>{' '}
-           <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
-         </p>
-       </div>
+      <div ref={tagRef} className="print-tag-container text-black">
+        <div className="h-0.5 bg-blue-600 -mx-[3mm] -mt-[1.5mm] mb-1" />
+        
+        <div className="flex items-start justify-between h-full py-0.5">
+          <div className="flex-1 flex flex-col h-full min-w-0 pr-2">
+            <div className="mb-1">
+              <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-3 object-contain mb-0.5" />
+              <p className="text-[10px] font-bold font-mono tracking-tighter">{service.code}</p>
+            </div>
+            
+            <div className="space-y-0.5 text-[7px] leading-[1.1] text-black">
+              <p className="truncate"><strong>Cl:</strong> {service.customer?.name || 'N/A'}</p>
+              <p className="truncate"><strong>Eq:</strong> {service.appliance_type || 'N/A'}</p>
+              <p className="truncate"><strong>Hora:</strong> {service.scheduled_shift || 'A confirmar'}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center pt-1">
+            <QRCodeSVG value={qrUrl} size={48} level="M" includeMargin={false} />
+            <p className="text-[5px] mt-1 text-gray-500 uppercase font-bold">Tecnofrio</p>
+          </div>
+        </div>
       </div>
     </div>
   );
