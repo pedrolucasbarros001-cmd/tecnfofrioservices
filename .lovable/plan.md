@@ -1,124 +1,65 @@
 
+# Tres Melhorias: Conversao com Tecnico, Email no Orcamento, PDF da Etiqueta
 
-# Sistema de UX Inteligente — Narrativa Humana nos Modais
+## 1. ConvertBudgetModal — Atribuir Tecnico e Agendar
 
-## Visao Geral
+Adicionar ao modal de conversao de orcamento campos opcionais para:
 
-Transformar todos os modais, mensagens de erro e toasts do TECNOFRIO num sistema autoexplicativo e didactico, seguindo o padrao: **titulo claro + subtexto contextual + erros educativos + confirmacoes seguras**.
+- **Tecnico Responsavel**: Select com lista de tecnicos activos (usando `useTechnicians`)
+- **Data Agendada**: Calendar Popover (aparece apenas se tecnico selecionado)
+- **Turno**: Select com opcoes Manha/Tarde/Noite (aparece apenas se tecnico selecionado)
 
-## O Que Muda
+Regras:
+- Se tecnico for selecionado, data e turno tornam-se obrigatorios (validacao com toast de aviso)
+- Status do servico criado: oficina + tecnico = `na_oficina`, caso contrario = `por_fazer`
+- Dados `technician_id`, `scheduled_date`, `scheduled_shift` incluidos no INSERT
 
-### 1. Subtextos Explicativos em Todos os Modais
+Nova seccao visual inserida entre "Local do Servico" e "Budget Info", com subtexto: "Ao atribuir um tecnico, o servico sera agendado na agenda dele."
 
-Adicionar `DialogDescription` (ou `<p>` subtexto) abaixo do titulo de cada modal, explicando o contexto da accao.
+**Ficheiro**: `src/components/modals/ConvertBudgetModal.tsx`
 
-| Modal | Titulo Actual | Subtexto a Adicionar |
-|-------|--------------|---------------------|
-| ServiceTypeSelector | "Escolha o Tipo de Servico" | "O tipo de servico define o fluxo que sera seguido pelo tecnico." |
-| CreateServiceModal (location step) | "Tipo de Servico" | "Se o aparelho ja foi deixado na oficina, selecione 'Deixou na Oficina'. Caso contrario, o tecnico fara uma visita ao cliente." |
-| CreateServiceModal (form step) | "Criar Novo Servico" | "Preencha os dados do cliente e do equipamento. Campos com * sao obrigatorios." |
-| CreateInstallationModal | titulo actual | "O tecnico recebera os detalhes para realizar a instalacao no local indicado." |
-| CreateDeliveryModal | titulo actual | "Esta entrega sera atribuida a um tecnico para levar o equipamento ao cliente." |
-| SetPriceModal | "Definir Preco" | "O preco definido aqui sera utilizado para controlo financeiro e cobranca." |
-| RegisterPaymentModal | "Registar Pagamento" | "Este valor sera abatido do saldo em aberto do servico." |
-| RequestPartModal | "Solicitar Peca" | "Ao confirmar, o pedido ficara disponivel para o Dono registar oficialmente a encomenda." |
-| ConfirmPartOrderModal | "Registar Pedido de Peca" | "Confirme os detalhes do pedido. A previsao de chegada serve como termometro de urgencia." |
-| AssignTechnicianModal | titulo actual | "O tecnico selecionado recebera uma notificacao com os detalhes do servico." |
-| ForceStateModal | "Mudar Status" | Ja tem (manter) |
-| DeliveryManagementModal | "Opcoes de Entrega" | "Escolha como o equipamento sera devolvido ao cliente." |
-| CreateUserModal | "Criar Utilizador" | "Este perfil tera acesso ao sistema de acordo com o nivel selecionado." |
-| CreateCustomerModal | "Novo Cliente" / "Editar Cliente" | "Os dados do cliente serao associados aos servicos criados." |
-| ConvertBudgetModal | titulo actual | "Ao converter, sera criado um servico com os dados deste orcamento." |
-| RescheduleServiceModal | titulo actual | "Selecione nova data e turno. O tecnico sera notificado da alteracao." |
+---
 
-**Ficheiros afectados**: Todos os 16+ modais listados acima.
+## 2. CreateBudgetModal — Campo de Email
 
-### 2. Erros Educativos (Substituir Mensagens Genericas)
+Adicionar campo `customer_email` na seccao "Dados do Cliente" do modal de criacao de orcamento.
 
-Criar um utilitario central `src/utils/errorMessages.ts` com funcoes que convertem erros tecnicos em mensagens humanas:
+- Novo campo no schema zod: `customer_email: z.string().email().optional().or(z.literal(''))`
+- Novo input na grid de 3 colunas (passa para grid de 4 colunas ou 2 linhas de 2 colunas)
+- Ao criar cliente novo via `handleConfirmCreateCustomer`, passar o email como parametro
+- Auto-preencher email quando cliente existente e detectado e associado
 
-```text
-Mapeamento de erros:
+**Ficheiro**: `src/components/modals/CreateBudgetModal.tsx`
 
-"row-level security" / "JWT" / "not authenticated"
-  -> "Sessao expirada. Por favor, faca login novamente."
+---
 
-"duplicate key" / "already exists" (email)
-  -> "Ja existe uma conta com este email. Cada perfil precisa de um email unico."
+## 3. PDF da Etiqueta — Eliminar Espaco em Branco e Folha Extra
 
-"violates not-null constraint"
-  -> "Alguns campos obrigatorios nao foram preenchidos."
+O problema actual: o PDF da etiqueta (29mm x 90mm) gera uma folha com muito espaco branco abaixo do conteudo, e por vezes uma segunda folha completamente em branco.
 
-"Invalid date" / "required_error" em datas
-  -> "A data selecionada e invalida. Verifique se escolheu uma data futura valida."
+Causa raiz:
+- O container offscreen usa `min-height: 90mm` que forca espaco vazio mesmo que o conteudo real seja menor
+- O `jsPDF` cria pagina de 90mm mas o conteudo renderizado pelo html2canvas pode ultrapassar ligeiramente, criando uma segunda pagina
 
-Erro generico
-  -> "Ocorreu um problema. Por favor, tente novamente ou contacte o suporte."
-```
+Solucao em `src/utils/pdfUtils.ts`:
+- Activar `autoHeight` por defeito para formatos custom (nao-A4): medir a altura real do clone com `offsetHeight`, converter para mm, e usar essa altura exacta como formato do PDF
+- Remover `min-height` do container offscreen para formatos custom — usar apenas `height: auto`
+- Isto garante que o PDF tem exactamente o tamanho do conteudo, sem espaco branco nem folha extra
 
-**Ficheiros afectados**: Novo `src/utils/errorMessages.ts` + actualizacao de todos os `toast.error()` nos modais e hooks.
+Solucao nos chamadores:
+- `ServiceTagModal.tsx` e `ServiceTagPage.tsx`: passar `autoHeight: true` na chamada a `generatePDF`
+- Remover `minHeight: '90mm'` do div `ref={tagRef}` no ServiceTagModal para que o conteudo defina a altura natural
 
-### 3. Toasts de Sucesso Mais Claros
+**Ficheiros**: `src/utils/pdfUtils.ts`, `src/components/modals/ServiceTagModal.tsx`, `src/pages/ServiceTagPage.tsx`
 
-Auditar e padronizar todos os `toast.success()` para serem curtos, directos e humanos. A maioria ja esta boa gracas ao `feedbackMessages.ts`, mas uniformizar os restantes:
+---
 
-| Actual | Melhorado |
-|--------|-----------|
-| "Utilizador criado com sucesso!" | "Utilizador criado! Credenciais disponiveis abaixo." |
-| "Erro ao definir recolha" | "Nao foi possivel definir a recolha. Tente novamente." |
-| "Erro ao solicitar peca" | "Nao foi possivel solicitar a peca. Verifique a ligacao e tente novamente." |
+## Resumo de Ficheiros
 
-**Ficheiros afectados**: Modais e hooks onde ha `toast.success` / `toast.error`.
-
-### 4. Subtextos de Pagina (Micro-textos Educativos)
-
-Adicionar subtextos discretos nas paginas principais:
-
-| Pagina | Subtexto |
-|--------|----------|
-| OficinaPage | "Servicos com equipamentos fisicamente na oficina." |
-| SecretaryDebitoPage | "Servicos com preco definido e saldo pendente." |
-| ServicosPage (filtro "aguardando peca") | "Servicos que dependem de chegada de peca para continuar." |
-
-**Ficheiros afectados**: `OficinaPage.tsx`, `SecretaryDebitoPage.tsx`, `ServicosPage.tsx`.
-
-## Detalhe Tecnico
-
-### Estrutura do errorMessages.ts
-
-```text
-export function humanizeError(error: unknown): string
-  - Recebe qualquer erro
-  - Verifica message contra padroes conhecidos
-  - Retorna mensagem humana em portugues
-
-export function isSessionError(error: unknown): boolean
-  - Reutiliza logica existente de isSessionOrRlsError
-
-export function getFieldValidationMessage(fieldName: string): string
-  - Retorna mensagem especifica por campo
-```
-
-### Padrao de Alteracao por Modal
-
-Cada modal recebe apenas 2 alteracoes minimas:
-1. Adicionar `<p className="text-sm text-muted-foreground">` ou `DialogDescription` apos o `DialogTitle`
-2. Substituir `toast.error('Erro ao...')` por `toast.error(humanizeError(error))`
-
-### Ordem de Implementacao
-
-1. Criar `src/utils/errorMessages.ts`
-2. Actualizar modais de criacao (ServiceTypeSelector, CreateServiceModal, CreateInstallationModal, CreateDeliveryModal)
-3. Actualizar modais de accao (SetPriceModal, RegisterPaymentModal, RequestPartModal, ConfirmPartOrderModal)
-4. Actualizar modais de gestao (AssignTechnicianModal, DeliveryManagementModal, ForceStateModal, RescheduleServiceModal)
-5. Actualizar modais de utilizadores/clientes (CreateUserModal, CreateCustomerModal, EditUserModal)
-6. Actualizar ConvertBudgetModal
-7. Adicionar subtextos de pagina
-
-### Resultado
-
-- Todos os modais: titulo + subtexto contextual
-- Todos os erros: mensagens humanas e orientativas
-- Todos os toasts: curtos, directos, sem linguagem tecnica
-- Zero alteracoes de logica ou fluxo — apenas texto e UX
-
+| Ficheiro | Alteracao |
+|----------|-----------|
+| `src/components/modals/ConvertBudgetModal.tsx` | Adicionar Select tecnico + Calendar data + Select turno |
+| `src/components/modals/CreateBudgetModal.tsx` | Adicionar campo email na seccao de cliente |
+| `src/utils/pdfUtils.ts` | Usar autoHeight por defeito em formatos custom, remover min-height |
+| `src/components/modals/ServiceTagModal.tsx` | Passar autoHeight, remover minHeight do div |
+| `src/pages/ServiceTagPage.tsx` | Passar autoHeight na chamada generatePDF |
