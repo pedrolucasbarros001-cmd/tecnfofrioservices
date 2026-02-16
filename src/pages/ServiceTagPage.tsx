@@ -60,15 +60,13 @@ export default function ServiceTagPage() {
 
     setIsGenerating(true);
     try {
-      // Create high-res canvas (scale 5 for maximum crispness)
       const canvas = await html2canvas(tagRef.current, {
-        scale: 5,
+        scale: 4,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
-        windowWidth: 1200, // Important: Pinning window width for consistent layout across computers
+        windowWidth: 1200, // Normalize across all computers
         onclone: (clonedDoc) => {
-          // Robustly clean the cloned element to stay within bounds
           const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
           if (el) {
             el.style.margin = "0";
@@ -81,13 +79,12 @@ export default function ServiceTagPage() {
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
 
       const pdf = new jsPDF({
-        orientation: "portrait",
+        orientation: "landscape", // Landscape is correct for 62mm wide x 29mm high
         unit: "mm",
-        format: [29, 62], // Exact label size
+        format: [62, 29],
       });
 
-      // Cover exactly the PDF page
-      pdf.addImage(imgData, "JPEG", 0, 0, 29, 62);
+      pdf.addImage(imgData, "JPEG", 0, 0, 62, 29, undefined, "FAST");
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
@@ -128,11 +125,11 @@ export default function ServiceTagPage() {
   }
 
   return (
-    <div className="print-tag-page min-h-screen bg-slate-50 print:bg-white">
+    <div className="print-tag-page min-h-screen bg-slate-50 print:bg-white text-black">
       <style>{`
         @media print {
           @page {
-            size: 29mm 62mm;
+            size: 62mm 29mm; /* More robust for Brother drivers than adding 'landscape' */
             margin: 0;
           }
           .no-print {
@@ -145,35 +142,44 @@ export default function ServiceTagPage() {
           }
         }
         .tag-preview-wrapper {
-          padding: 40px 0;
+          padding: 60px 0;
           display: flex;
           justify-content: center;
-          background: #f8fafc;
+          align-items: center;
+          background: #f1f5f9;
           min-height: calc(100vh - 73px);
         }
         .print-tag-container {
-          width: 29mm;
-          height: 62mm;
-          padding: 1.5mm 1mm;
+          width: 62mm;
+          height: 29mm;
           background: white;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          overflow: hidden; /* Necessary for print, logic handles capture overflow */
+          overflow: hidden;
           position: relative;
-          color: black;
           margin: 0;
+          padding: 0;
         }
         .preview-border {
-          border: 1px dotted #ccc;
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+          border: 1px solid #e2e8f0;
         }
-        /* Remove clipping/ellipsis for maximum visibility */
-        .text-wrap-fix {
-          white-space: normal !important;
-          overflow: visible !important;
-          word-break: break-all;
+        @media print {
+          .tag-preview-wrapper {
+            padding: 0;
+            background: white;
+            display: block;
+          }
+          .print-tag-container {
+            margin: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            border: none;
+            width: 62mm;
+            height: 29mm;
+          }
         }
       `}</style>
 
@@ -192,35 +198,41 @@ export default function ServiceTagPage() {
       </div>
 
       <div className="tag-preview-wrapper">
-        <div ref={tagRef} className="print-tag-container preview-border" style={{ margin: 0, border: "none" }}>
+        <div ref={tagRef} className="print-tag-container preview-border">
           {/* Blue Top Bar */}
-          <div className="w-full h-[1.5mm] bg-[#0047AB] mb-1 shrink-0" />
+          <div className="w-full h-[2mm] bg-[#0047AB] shrink-0" />
 
-          {/* Logo */}
-          <div className="w-full flex justify-center mb-1 px-1 shrink-0">
-            <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[3.2mm] object-contain" />
-          </div>
-
-          {/* QR Code */}
-          <div className="mb-1 shrink-0 bg-white">
-            <QRCodeSVG value={qrUrl} size={48} level="M" includeMargin={false} />
-          </div>
-
-          {/* Service Code */}
-          <div className="text-center mb-1 shrink-0">
-            <p className="text-[12px] font-bold font-mono text-[#0047AB] leading-none">{service.code}</p>
-          </div>
-
-          {/* Details - Absolute visibility, no clipping */}
-          <div className="w-full text-[7.2px] leading-[1.05] text-black px-1 pb-1 mt-auto text-wrap-fix">
-            <div className="mb-0.5">
-              <span className="font-bold">Cl:</span> {service.customer?.name || "---"}
+          {/* Main Content Area: Horizontal Layout */}
+          <div className="flex-1 flex w-full p-[1.5mm] overflow-hidden">
+            {/* Left Column: QR and Code */}
+            <div className="flex flex-col items-center justify-center w-[20mm] shrink-0 border-r border-slate-100 pr-[1.5mm]">
+              <QRCodeSVG value={qrUrl} size={54} level="M" includeMargin={false} />
+              <p className="text-[9px] font-bold font-mono text-[#0047AB] mt-1 text-center truncate w-full">
+                {service.code}
+              </p>
             </div>
-            <div className="mb-0.5">
-              <span className="font-bold">Eq:</span> {service.appliance_type || "---"}
-            </div>
-            <div>
-              <span className="font-bold">Tel:</span> {service.customer?.phone || "---"}
+
+            {/* Right Column: Logo and Details */}
+            <div className="flex-1 flex flex-col justify-between pl-[2mm] min-w-0">
+              <div className="flex justify-between items-start mb-1">
+                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[4.5mm] object-contain" />
+              </div>
+
+              {/* Details List */}
+              <div className="text-[8.5px] leading-[1.2] text-black">
+                <div className="flex gap-1 overflow-hidden">
+                  <span className="font-bold shrink-0">Cl:</span>
+                  <span className="truncate">{service.customer?.name || "---"}</span>
+                </div>
+                <div className="flex gap-1 overflow-hidden">
+                  <span className="font-bold shrink-0">Eq:</span>
+                  <span className="truncate">{service.appliance_type || "---"}</span>
+                </div>
+                <div className="flex gap-1 overflow-hidden">
+                  <span className="font-bold shrink-0">Tel:</span>
+                  <span className="truncate">{service.customer?.phone || "---"}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
