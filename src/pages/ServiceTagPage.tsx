@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { Download, Loader2, Printer, ArrowLeft, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { supabase } from "@/integrations/supabase/client";
 import type { Service, Customer } from "@/types/database";
 import tecnofrioLogoFull from "@/assets/tecnofrio-logo-full.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePrintSessionBridge } from "@/hooks/usePrintSessionBridge";
-import html2pdf from "html2pdf.js";
 
 export default function ServiceTagPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -59,26 +60,34 @@ export default function ServiceTagPage() {
 
     setIsGenerating(true);
     try {
-      const opt = {
-        margin: 0,
-        filename: `Etiqueta-${service.code}.pdf`,
-        image: { type: "jpeg", quality: 1.0 },
-        html2canvas: {
-          scale: 4,
-          useCORS: true,
-          letterRendering: true,
-          scrollX: 0,
-          scrollY: 0,
+      // Create high-res canvas (scale 5 for maximum crispness)
+      const canvas = await html2canvas(tagRef.current, {
+        scale: 5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Robustly clean the cloned element to stay within bounds
+          const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
+          if (el) {
+            el.style.margin = "0";
+            el.style.position = "static";
+            el.style.border = "none";
+          }
         },
-        jsPDF: {
-          unit: "mm",
-          format: [29, 62],
-          orientation: "portrait",
-        },
-      };
+      });
 
-      // @ts-ignore
-      await html2pdf().from(tagRef.current).set(opt).save();
+      const imgData = canvas.toDataURL("image/jpeg", 1.0);
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [29, 62], // Exact label size
+      });
+
+      // Cover exactly the PDF page
+      pdf.addImage(imgData, "JPEG", 0, 0, 29, 62);
+      pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
     } finally {
@@ -151,7 +160,7 @@ export default function ServiceTagPage() {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          overflow: hidden;
+          overflow: hidden; /* Necessary for print, logic handles capture overflow */
           position: relative;
           color: black;
           margin: 0;
@@ -159,21 +168,11 @@ export default function ServiceTagPage() {
         .preview-border {
           border: 1px dotted #ccc;
         }
-        @media print {
-          .tag-preview-wrapper {
-            padding: 0;
-            background: white;
-            display: block;
-          }
-          .print-tag-container {
-            margin: 0;
-            position: fixed;
-            top: 0;
-            left: 0;
-            border: none;
-            width: 29mm;
-            height: 62mm;
-          }
+        /* Remove clipping/ellipsis for maximum visibility */
+        .text-wrap-fix {
+          white-space: normal !important;
+          overflow: visible !important;
+          word-break: break-all;
         }
       `}</style>
 
@@ -211,8 +210,8 @@ export default function ServiceTagPage() {
             <p className="text-[12px] font-bold font-mono text-[#0047AB] leading-none">{service.code}</p>
           </div>
 
-          {/* Details - Stacked for better visibility and PDF compatibility (Avoids flex-wrap issues) */}
-          <div className="w-full text-[7.5px] leading-[1.1] text-black px-1 pb-1 mt-auto">
+          {/* Details - Zero censoring, full visibility with wrapping */}
+          <div className="w-full text-[7.2px] leading-[1.05] text-black px-1 pb-1 mt-auto text-wrap-fix">
             <div className="mb-0.5">
               <span className="font-bold">Cl:</span> {service.customer?.name || "---"}
             </div>
