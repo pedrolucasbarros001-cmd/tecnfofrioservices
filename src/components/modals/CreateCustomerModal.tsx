@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -62,16 +63,43 @@ export function CreateCustomerModal({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: customer?.name || '',
-      nif: customer?.nif || '',
-      phone: customer?.phone || '',
-      email: customer?.email || '',
-      address: customer?.address || '',
-      postal_code: customer?.postal_code || '',
-      city: customer?.city || '',
-      customer_type: (customer?.customer_type as 'particular' | 'empresa') || 'particular',
+      name: '',
+      nif: '',
+      phone: '',
+      email: '',
+      address: '',
+      postal_code: '',
+      city: '',
+      customer_type: 'particular',
     },
   });
+
+  // Reset form with customer data when editing
+  useEffect(() => {
+    if (open && customer) {
+      form.reset({
+        name: customer.name || '',
+        nif: customer.nif || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        address: customer.address || '',
+        postal_code: customer.postal_code || '',
+        city: customer.city || '',
+        customer_type: (customer.customer_type as 'particular' | 'empresa') || 'particular',
+      });
+    } else if (open && !customer) {
+      form.reset({
+        name: '',
+        nif: '',
+        phone: '',
+        email: '',
+        address: '',
+        postal_code: '',
+        city: '',
+        customer_type: 'particular',
+      });
+    }
+  }, [open, customer, form]);
 
   const handleSubmit = async (values: FormValues) => {
     try {

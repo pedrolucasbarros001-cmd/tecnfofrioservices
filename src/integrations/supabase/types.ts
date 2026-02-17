@@ -69,6 +69,53 @@ export type Database = {
           },
         ]
       }
+      budget_items: {
+        Row: {
+          article: string
+          budget_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          quantity: number
+          subtotal: number
+          tax_rate: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          article: string
+          budget_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          quantity?: number
+          subtotal?: number
+          tax_rate?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          article?: string
+          budget_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          quantity?: number
+          subtotal?: number
+          tax_rate?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_items_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           appliance_type: string | null
@@ -77,6 +124,8 @@ export type Database = {
           converted_service_id: string | null
           created_at: string
           customer_id: string | null
+          discount: number | null
+          discount_type: string | null
           estimated_labor: number | null
           estimated_parts: number | null
           estimated_total: number | null
@@ -86,6 +135,8 @@ export type Database = {
           notes: string | null
           pricing_description: string | null
           status: string | null
+          subtotal: number | null
+          tax_total: number | null
           updated_at: string
           valid_until: string | null
         }
@@ -96,6 +147,8 @@ export type Database = {
           converted_service_id?: string | null
           created_at?: string
           customer_id?: string | null
+          discount?: number | null
+          discount_type?: string | null
           estimated_labor?: number | null
           estimated_parts?: number | null
           estimated_total?: number | null
@@ -105,6 +158,8 @@ export type Database = {
           notes?: string | null
           pricing_description?: string | null
           status?: string | null
+          subtotal?: number | null
+          tax_total?: number | null
           updated_at?: string
           valid_until?: string | null
         }
@@ -115,6 +170,8 @@ export type Database = {
           converted_service_id?: string | null
           created_at?: string
           customer_id?: string | null
+          discount?: number | null
+          discount_type?: string | null
           estimated_labor?: number | null
           estimated_parts?: number | null
           estimated_total?: number | null
@@ -124,6 +181,8 @@ export type Database = {
           notes?: string | null
           pricing_description?: string | null
           status?: string | null
+          subtotal?: number | null
+          tax_total?: number | null
           updated_at?: string
           valid_until?: string | null
         }

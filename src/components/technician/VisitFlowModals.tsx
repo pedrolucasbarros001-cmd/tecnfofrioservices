@@ -35,6 +35,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { logWorkshopPickup, logPartRequest, logServiceCompletion } from '@/utils/activityLogUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { humanizeError } from '@/utils/errorMessages';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
@@ -344,7 +345,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
       onComplete();
     } catch (error) {
       console.error('Error completing visit:', error);
-      toast.error('Erro ao concluir visita');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -1052,6 +1053,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600"
               onClick={handlePecasUsadasConfirm}
+              disabled={formData.usedParts && !formData.usedPartsList.some(p => p.name.trim().length > 0)}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>

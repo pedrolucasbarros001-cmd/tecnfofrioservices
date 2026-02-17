@@ -464,6 +464,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
               onClick={() => setCurrentStep('pedir_peca')}
+              disabled={formData.usedParts && formData.usedPartsList.length === 0}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>

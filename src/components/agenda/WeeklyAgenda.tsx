@@ -27,12 +27,13 @@ interface WeeklyAgendaProps {
   onServiceClick: (service: Service) => void;
 }
 
-const SHIFT_ORDER = ['manha', 'tarde', 'noite'] as const;
-
-const SHIFT_LABELS: Record<string, string> = {
-  manha: 'Manhã',
-  tarde: 'Tarde',
-  noite: 'Noite',
+// Helper to display shift/time values
+const formatShiftLabel = (shift: string | null | undefined): string => {
+  if (!shift) return 'Sem hora';
+  if (shift === 'manha') return 'Manhã';
+  if (shift === 'tarde') return 'Tarde';
+  if (shift === 'noite') return 'Noite';
+  return shift; // Already a time like "10:00"
 };
 
 type ViewMode = 'week' | 'month';
@@ -82,16 +83,14 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
     });
   };
 
-  const getServicesGroupedByShift = (date: Date) => {
+  const getServicesSortedByTime = (date: Date) => {
     const dayServices = getServicesForDay(date);
-    const grouped: Record<string, Service[]> = {};
-    
-    SHIFT_ORDER.forEach(shift => {
-      grouped[shift] = dayServices.filter(s => s.scheduled_shift === shift);
+    // Sort by scheduled_shift (time string) ascending, nulls last
+    return dayServices.sort((a, b) => {
+      const aTime = a.scheduled_shift || 'zzz';
+      const bTime = b.scheduled_shift || 'zzz';
+      return aTime.localeCompare(bTime);
     });
-    grouped['sem_turno'] = dayServices.filter(s => !s.scheduled_shift);
-    
-    return grouped;
   };
 
   const isToday = (date: Date) => isSameDay(date, new Date());
@@ -149,7 +148,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
           <div className="grid grid-cols-7 divide-x">
             {daysOfWeek.map((day) => {
               const dayServices = getServicesForDay(day);
-              const groupedServices = getServicesGroupedByShift(day);
+              const sortedServices = getServicesSortedByTime(day);
               const hasServices = dayServices.length > 0;
               
               return (
@@ -184,46 +183,25 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                     )}
                   </div>
 
-                  {/* Services by Shift */}
-                  <div className="space-y-2">
-                    {SHIFT_ORDER.map(shift => {
-                      const shiftServices = groupedServices[shift];
-                      if (!shiftServices || shiftServices.length === 0) return null;
-                      
-                      return (
-                        <div key={shift}>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
-                            {SHIFT_LABELS[shift]}
+                  {/* Services sorted by time */}
+                  <div className="space-y-1">
+                    {sortedServices.slice(0, 5).map(service => (
+                      <div key={service.id}>
+                        {service.scheduled_shift && (
+                          <p className="text-[9px] text-muted-foreground mb-0.5">
+                            {formatShiftLabel(service.scheduled_shift)}
                           </p>
-                          <div className="space-y-1">
-                            {shiftServices.slice(0, 3).map(service => (
-                              <ServiceCard 
-                                key={service.id} 
-                                service={service} 
-                                onClick={() => onServiceClick(service)}
-                              />
-                            ))}
-                            {shiftServices.length > 3 && (
-                              <p className="text-xs text-muted-foreground text-center">
-                                +{shiftServices.length - 3} mais
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Services without shift */}
-                    {groupedServices['sem_turno']?.length > 0 && (
-                      <div className="space-y-1">
-                        {groupedServices['sem_turno'].map(service => (
-                          <ServiceCard 
-                            key={service.id} 
-                            service={service} 
-                            onClick={() => onServiceClick(service)}
-                          />
-                        ))}
+                        )}
+                        <ServiceCard 
+                          service={service} 
+                          onClick={() => onServiceClick(service)}
+                        />
                       </div>
+                    ))}
+                    {sortedServices.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        +{sortedServices.length - 5} mais
+                      </p>
                     )}
                     
                     {/* Empty state */}

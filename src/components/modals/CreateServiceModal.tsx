@@ -87,7 +87,7 @@ const formSchema = z.object({
   // Schedule
   technician_id: z.string().optional(),
   scheduled_date: z.date().optional(),
-  scheduled_shift: z.enum(['manha', 'tarde', 'noite']).optional(),
+  scheduled_shift: z.string().optional(),
   
   // Notes
   notes: z.string().optional(),
@@ -244,7 +244,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         service_location: values.service_location,
         technician_id: values.technician_id || null,
         scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
-        scheduled_shift: values.scheduled_shift,
+        scheduled_shift: (values.scheduled_shift as any) || null,
         notes: values.notes,
         service_type: 'reparacao',
         status: initialStatus,
@@ -466,7 +466,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                             <FormItem>
                               <FormLabel>Morada</FormLabel>
                               <FormControl>
-                                <Input placeholder="Morada completa" {...field} disabled={!!selectedCustomer} />
+                                <Input placeholder="Morada completa" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -479,7 +479,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                             <FormItem>
                               <FormLabel>Código Postal</FormLabel>
                               <FormControl>
-                                <Input placeholder="0000-000" {...field} disabled={!!selectedCustomer} />
+                                <Input placeholder="0000-000" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -683,19 +683,10 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                         name="scheduled_shift"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Turno</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecionar" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="manha">Manhã</SelectItem>
-                                <SelectItem value="tarde">Tarde</SelectItem>
-                                <SelectItem value="noite">Noite</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Hora</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}

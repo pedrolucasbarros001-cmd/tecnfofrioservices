@@ -85,11 +85,18 @@ export function ForceStateModal({ service, open, onOpenChange }: ForceStateModal
     const oldStatus = service.status as ServiceStatus;
 
     try {
-      await updateService.mutateAsync({
+      const updatePayload: any = {
         id: service.id,
         status: selectedStatus,
         skipToast: true,
-      });
+      };
+
+      // Auto-set service_location when forcing to workshop status
+      if (selectedStatus === 'na_oficina') {
+        updatePayload.service_location = 'oficina';
+      }
+
+      await updateService.mutateAsync(updatePayload);
 
       // Show warning toast with transition details
       const oldLabel = SERVICE_STATUS_CONFIG[oldStatus]?.label || oldStatus;

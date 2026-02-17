@@ -380,7 +380,7 @@ export function CameraCapture({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="relative aspect-[4/3] bg-black overflow-hidden">
+        <div className="relative aspect-[4/3] max-h-[50vh] bg-black overflow-hidden">
           {/* Hidden file inputs */}
           <input
             ref={cameraInputRef}

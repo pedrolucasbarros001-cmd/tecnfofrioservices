@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Calendar, UserPlus, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -39,11 +40,7 @@ interface PartArrivedModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const SHIFTS: { value: ScheduledShift; label: string }[] = [
-  { value: 'manha', label: 'Manhã (08:00 - 12:00)' },
-  { value: 'tarde', label: 'Tarde (14:00 - 18:00)' },
-  { value: 'noite', label: 'Noite (18:00 - 22:00)' },
-];
+// Removed SHIFTS constant - replaced by time input
 
 export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedModalProps) {
   const [technicianId, setTechnicianId] = useState<string>('');
@@ -124,7 +121,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         status: previousStatus as any,
         technician_id: technicianId,
         scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
-        scheduled_shift: scheduledShift as ScheduledShift,
+        scheduled_shift: (scheduledShift as any) || null,
         notes: notes ? `${service.notes || ''}\n[Peça chegou] ${notes}`.trim() : service.notes,
         last_status_before_part_request: null, // Clear the saved status
         skipToast: true,
@@ -245,24 +242,17 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
             </Popover>
           </div>
 
-          {/* Shift Selection */}
+          {/* Time Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Turno *
+              Hora
             </Label>
-            <Select value={scheduledShift} onValueChange={setScheduledShift}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o turno" />
-              </SelectTrigger>
-              <SelectContent>
-                {SHIFTS.map((shift) => (
-                  <SelectItem key={shift.value} value={shift.value}>
-                    {shift.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              type="time"
+              value={scheduledShift}
+              onChange={(e) => setScheduledShift(e.target.value)}
+            />
           </div>
 
           {/* Notes (optional) */}

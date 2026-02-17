@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import {
@@ -50,9 +51,7 @@ import type { Service, ServiceStatus } from '@/types/database';
 const formSchema = z.object({
   technician_id: z.string().min(1, 'Selecione um técnico'),
   scheduled_date: z.date({ required_error: 'Selecione uma data' }),
-  scheduled_shift: z.enum(['manha', 'tarde', 'noite'], {
-    required_error: 'Selecione um turno',
-  }),
+  scheduled_shift: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -79,7 +78,7 @@ export function AssignTechnicianModal({
     defaultValues: {
       technician_id: service?.technician_id || '',
       scheduled_date: service?.scheduled_date ? new Date(service.scheduled_date) : undefined,
-      scheduled_shift: (service?.scheduled_shift as 'manha' | 'tarde' | 'noite') || undefined,
+      scheduled_shift: service?.scheduled_shift || '',
     },
   });
 
@@ -108,7 +107,7 @@ export function AssignTechnicianModal({
         id: service.id,
         technician_id: values.technician_id,
         scheduled_date: values.scheduled_date.toISOString().split('T')[0],
-        scheduled_shift: values.scheduled_shift,
+        scheduled_shift: (values.scheduled_shift as any) || null,
         ...(newStatus && { status: newStatus }),
         skipToast: true, // We'll show contextual message below
       });
@@ -154,9 +153,8 @@ export function AssignTechnicianModal({
         toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
       } else {
         const dateStr = format(values.scheduled_date, "dd/MM", { locale: pt });
-        const shiftLabel = values.scheduled_shift === 'manha' ? 'manhã' : 
-                           values.scheduled_shift === 'tarde' ? 'tarde' : 'noite';
-        toast.success(`${techName} agendado para ${dateStr}, ${shiftLabel}.`);
+        const timeLabel = values.scheduled_shift || 'sem hora';
+        toast.success(`${techName} agendado para ${dateStr}, ${timeLabel}.`);
       }
 
       onOpenChange(false);
@@ -264,32 +262,9 @@ export function AssignTechnicianModal({
               name="scheduled_shift"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Turno *</FormLabel>
+                  <FormLabel>Hora</FormLabel>
                   <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="manha" id="manha" />
-                        <Label htmlFor="manha" className="cursor-pointer">
-                          Manhã
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="tarde" id="tarde" />
-                        <Label htmlFor="tarde" className="cursor-pointer">
-                          Tarde
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="noite" id="noite" />
-                        <Label htmlFor="noite" className="cursor-pointer">
-                          Noite
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                    <Input type="time" value={field.value || ''} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
