@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Wrench, Settings, Package, MapPin, Building2, CalendarIcon, UserCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -86,6 +87,8 @@ export function ConvertBudgetModal({
   const [technicianId, setTechnicianId] = useState<string>('');
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
   const [scheduledShift, setScheduledShift] = useState<string>('');
+  const [serviceAddress, setServiceAddress] = useState<string>('');
+  const [servicePostalCode, setServicePostalCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   const { data: technicians = [] } = useTechnicians(true);
@@ -132,9 +135,12 @@ export function ConvertBudgetModal({
       await ensureValidSession();
       const { applianceType, faultDescription } = extractBudgetDetails(budget);
 
+      // For non-reparacao, location is always cliente
+      const finalLocation = serviceType !== 'reparacao' ? 'cliente' : serviceLocation;
+
       // Determine status based on location and technician
       let status = 'por_fazer';
-      if (serviceLocation === 'oficina' && technicianId) {
+      if (finalLocation === 'oficina' && technicianId) {
         status = 'na_oficina';
       }
 
@@ -150,12 +156,14 @@ export function ConvertBudgetModal({
           pricing_description: budget.pricing_description,
           service_type: serviceType,
           status,
-          service_location: serviceLocation,
+          service_location: finalLocation,
           final_price: budget.estimated_total,
           is_installation: serviceType === 'instalacao',
           technician_id: technicianId || null,
           scheduled_date: scheduledDate ? format(scheduledDate, 'yyyy-MM-dd') : null,
           scheduled_shift: scheduledShift || null,
+          service_address: serviceAddress || null,
+          service_postal_code: servicePostalCode || null,
         })
         .select()
         .single();
@@ -189,6 +197,8 @@ export function ConvertBudgetModal({
     setTechnicianId('');
     setScheduledDate(undefined);
     setScheduledShift('');
+    setServiceAddress('');
+    setServicePostalCode('');
     setServiceType('reparacao');
     setServiceLocation('oficina');
   };
@@ -235,31 +245,55 @@ export function ConvertBudgetModal({
             </RadioGroup>
           </div>
 
-          {/* Service Location Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Local do Serviço</Label>
-            <RadioGroup
-              value={serviceLocation}
-              onValueChange={(value) => setServiceLocation(value as ServiceLocation)}
-              className="grid grid-cols-2 gap-3"
-            >
-              {SERVICE_LOCATIONS.map((location) => (
-                <label
-                  key={location.value}
-                  className={cn(
-                    "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                    serviceLocation === location.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <RadioGroupItem value={location.value} id={location.value} />
-                  <location.icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">{location.label}</span>
-                </label>
-              ))}
-            </RadioGroup>
-          </div>
+          {/* Service Location Selection - only for reparacao */}
+          {serviceType === 'reparacao' && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Local do Serviço</Label>
+              <RadioGroup
+                value={serviceLocation}
+                onValueChange={(value) => setServiceLocation(value as ServiceLocation)}
+                className="grid grid-cols-2 gap-3"
+              >
+                {SERVICE_LOCATIONS.map((location) => (
+                  <label
+                    key={location.value}
+                    className={cn(
+                      "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                      serviceLocation === location.value
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <RadioGroupItem value={location.value} id={location.value} />
+                    <location.icon className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">{location.label}</span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
+
+          {/* Address fields for non-reparacao or cliente location */}
+          {(serviceType !== 'reparacao' || serviceLocation === 'cliente') && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Morada</Label>
+                <Input
+                  placeholder="Morada do serviço"
+                  value={serviceAddress}
+                  onChange={(e) => setServiceAddress(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Código Postal</Label>
+                <Input
+                  placeholder="0000-000"
+                  value={servicePostalCode}
+                  onChange={(e) => setServicePostalCode(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Technician + Scheduling Section */}
           <div className="space-y-3">
@@ -322,17 +356,12 @@ export function ConvertBudgetModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Turno *</Label>
-                  <Select value={scheduledShift} onValueChange={setScheduledShift}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Turno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manha">Manhã</SelectItem>
-                      <SelectItem value="tarde">Tarde</SelectItem>
-                      <SelectItem value="noite">Noite</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs text-muted-foreground">Hora</Label>
+                  <Input
+                    type="time"
+                    value={scheduledShift}
+                    onChange={(e) => setScheduledShift(e.target.value)}
+                  />
                 </div>
               </div>
             )}

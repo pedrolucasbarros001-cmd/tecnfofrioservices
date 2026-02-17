@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon, User } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -47,9 +48,7 @@ const formSchema = z.object({
   change_technician: z.boolean(),
   technician_id: z.string().optional(),
   scheduled_date: z.date({ required_error: 'Selecione uma data' }),
-  scheduled_shift: z.enum(['manha', 'tarde', 'noite'], {
-    required_error: 'Selecione um turno',
-  }),
+  scheduled_shift: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -85,7 +84,7 @@ export function RescheduleServiceModal({
         scheduled_date: service.scheduled_date 
           ? new Date(service.scheduled_date) 
           : undefined,
-        scheduled_shift: (service.scheduled_shift as 'manha' | 'tarde' | 'noite') || undefined,
+        scheduled_shift: service.scheduled_shift || '',
       });
     }
   }, [service, open, form]);
@@ -102,7 +101,7 @@ export function RescheduleServiceModal({
       const updateData: Record<string, unknown> = {
         id: service.id,
         scheduled_date: values.scheduled_date.toISOString().split('T')[0],
-        scheduled_shift: values.scheduled_shift,
+        scheduled_shift: values.scheduled_shift || null,
       };
 
       // Only update technician if checkbox is checked and a new technician is selected
@@ -233,30 +232,14 @@ export function RescheduleServiceModal({
             )}
           </div>
 
-          {/* New Shift */}
-          <div className="space-y-3">
-            <Label>Novo Turno *</Label>
-            <RadioGroup
-              value={form.watch('scheduled_shift')}
-              onValueChange={(value: 'manha' | 'tarde' | 'noite') => form.setValue('scheduled_shift', value)}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="manha" id="manha" />
-                <Label htmlFor="manha" className="cursor-pointer">Manhã</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="tarde" id="tarde" />
-                <Label htmlFor="tarde" className="cursor-pointer">Tarde</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="noite" id="noite" />
-                <Label htmlFor="noite" className="cursor-pointer">Noite</Label>
-              </div>
-            </RadioGroup>
-            {form.formState.errors.scheduled_shift && (
-              <p className="text-sm text-destructive">{form.formState.errors.scheduled_shift.message}</p>
-            )}
+          {/* New Time */}
+          <div className="space-y-2">
+            <Label>Nova Hora</Label>
+            <Input
+              type="time"
+              value={form.watch('scheduled_shift') || ''}
+              onChange={(e) => form.setValue('scheduled_shift', e.target.value)}
+            />
           </div>
 
           <DialogFooter>

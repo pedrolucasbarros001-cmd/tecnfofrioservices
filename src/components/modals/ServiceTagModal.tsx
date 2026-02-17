@@ -56,7 +56,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
          {/* Tag content - preview (29mm x 90mm scale) */}
          <div ref={tagRef} className="print-tag border rounded-lg p-2 bg-white mx-auto" style={{ width: '29mm' }}>
            {/* Top accent bar */}
-           <div className="h-1 bg-primary -mx-2 -mt-2 rounded-t-lg" />
+           <div className="h-1 -mx-2 -mt-2 rounded-t-lg" style={{ backgroundColor: 'hsl(var(--primary))' }} />
            
            {/* Logo */}
            <div className="flex justify-center mt-1 mb-1">
@@ -79,7 +79,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
            
            {/* Service Code */}
            <div className="text-center mb-1">
-             <p className="text-[10px] font-mono font-bold tracking-wide text-foreground">
+             <p className="text-[10px] font-mono font-bold tracking-wide" style={{ color: '#000' }}>
                {service.code}
              </p>
            </div>
@@ -87,16 +87,16 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
            {/* Customer Info - compact */}
            <div className="space-y-0 text-[7px] leading-tight">
              <p className="truncate">
-               <span className="text-muted-foreground">Cl:</span>{' '}
-               <span className="font-medium text-foreground">{service.customer?.name || 'N/A'}</span>
+               <span style={{ color: '#6b7280' }}>Cl:</span>{' '}
+               <span className="font-medium" style={{ color: '#000' }}>{service.customer?.name || 'N/A'}</span>
              </p>
              <p className="truncate">
-               <span className="text-muted-foreground">Eq:</span>{' '}
-               <span className="font-medium text-foreground">{service.appliance_type || 'N/A'}</span>
+               <span style={{ color: '#6b7280' }}>Eq:</span>{' '}
+               <span className="font-medium" style={{ color: '#000' }}>{service.appliance_type || 'N/A'}</span>
              </p>
              <p>
-               <span className="text-muted-foreground">Tel:</span>{' '}
-               <span className="font-medium text-foreground">{service.customer?.phone || 'N/A'}</span>
+               <span style={{ color: '#6b7280' }}>Tel:</span>{' '}
+               <span className="font-medium" style={{ color: '#000' }}>{service.customer?.phone || 'N/A'}</span>
              </p>
            </div>
          </div>
