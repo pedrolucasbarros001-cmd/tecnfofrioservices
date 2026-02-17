@@ -1,15 +1,26 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
-import { ArrowLeft, Loader2, Phone, MapPin, Wrench, Clock, Camera, FileSignature, Package, Printer } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
-import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import type { Service, Customer, ServicePart, ServiceSignature, ServicePhoto } from '@/types/database';
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { pt } from "date-fns/locale";
+import {
+  ArrowLeft,
+  Loader2,
+  Phone,
+  MapPin,
+  Wrench,
+  Clock,
+  Camera,
+  FileSignature,
+  Package,
+  Printer,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { SERVICE_STATUS_CONFIG } from "@/types/database";
+import type { Service, Customer, ServicePart, ServiceSignature, ServicePhoto } from "@/types/database";
 
 // Activity log type (from Supabase)
 interface ActivityLog {
@@ -21,10 +32,13 @@ interface ActivityLog {
   is_public: boolean | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  actor?: {
+    full_name: string | null;
+  } | null;
 }
-import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
-import { useAuth } from '@/contexts/AuthContext';
-import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+import tecnofrioLogoFull from "@/assets/tecnofrio-logo-full.png";
+import { useAuth } from "@/contexts/AuthContext";
+import { openInNewTabPreservingQuery } from "@/utils/openInNewTab";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -32,17 +46,23 @@ export default function ServiceDetailPage() {
   const { isAuthenticated, loading: authLoading, role } = useAuth();
 
   // Fetch service with customer
-  const { data: service, isLoading: loadingService, error } = useQuery({
-    queryKey: ['service-detail-internal', serviceId],
+  const {
+    data: service,
+    isLoading: loadingService,
+    error,
+  } = useQuery({
+    queryKey: ["service-detail-internal", serviceId],
     queryFn: async () => {
       if (!serviceId) return null;
       const { data, error } = await supabase
-        .from('services')
-        .select(`
+        .from("services")
+        .select(
+          `
           *,
           customer:customers(*)
-        `)
-        .eq('id', serviceId)
+        `,
+        )
+        .eq("id", serviceId)
         .single();
       if (error) throw error;
       return data as Service & { customer: Customer };
@@ -52,14 +72,19 @@ export default function ServiceDetailPage() {
 
   // Fetch activity logs
   const { data: activityLogs = [] } = useQuery({
-    queryKey: ['service-activity-logs', serviceId],
+    queryKey: ["service-activity-logs", serviceId],
     queryFn: async () => {
       if (!serviceId) return [];
       const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .eq('service_id', serviceId)
-        .order('created_at', { ascending: false });
+        .from("activity_logs")
+        .select(
+          `
+          *,
+          actor:profiles!activity_logs_actor_id_fkey(full_name)
+        `,
+        )
+        .eq("service_id", serviceId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ActivityLog[];
     },
@@ -68,14 +93,14 @@ export default function ServiceDetailPage() {
 
   // Fetch parts
   const { data: parts = [] } = useQuery({
-    queryKey: ['service-parts-detail', serviceId],
+    queryKey: ["service-parts-detail", serviceId],
     queryFn: async () => {
       if (!serviceId) return [];
       const { data, error } = await supabase
-        .from('service_parts')
-        .select('*')
-        .eq('service_id', serviceId)
-        .order('created_at', { ascending: true });
+        .from("service_parts")
+        .select("*")
+        .eq("service_id", serviceId)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data as ServicePart[];
     },
@@ -84,14 +109,14 @@ export default function ServiceDetailPage() {
 
   // Fetch photos
   const { data: photos = [] } = useQuery({
-    queryKey: ['service-photos-detail', serviceId],
+    queryKey: ["service-photos-detail", serviceId],
     queryFn: async () => {
       if (!serviceId) return [];
       const { data, error } = await supabase
-        .from('service_photos')
-        .select('*')
-        .eq('service_id', serviceId)
-        .order('uploaded_at', { ascending: false });
+        .from("service_photos")
+        .select("*")
+        .eq("service_id", serviceId)
+        .order("uploaded_at", { ascending: false });
       if (error) throw error;
       return data as ServicePhoto[];
     },
@@ -100,14 +125,14 @@ export default function ServiceDetailPage() {
 
   // Fetch signatures
   const { data: signatures = [] } = useQuery({
-    queryKey: ['service-signatures-detail', serviceId],
+    queryKey: ["service-signatures-detail", serviceId],
     queryFn: async () => {
       if (!serviceId) return [];
       const { data, error } = await supabase
-        .from('service_signatures')
-        .select('*')
-        .eq('service_id', serviceId)
-        .order('signed_at', { ascending: true });
+        .from("service_signatures")
+        .select("*")
+        .eq("service_id", serviceId)
+        .order("signed_at", { ascending: true });
       if (error) throw error;
       return data as ServiceSignature[];
     },
@@ -120,9 +145,7 @@ export default function ServiceDetailPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">
-            {authLoading ? 'A verificar sessão...' : 'A carregar serviço...'}
-          </p>
+          <p className="text-muted-foreground">{authLoading ? "A verificar sessão..." : "A carregar serviço..."}</p>
         </div>
       </div>
     );
@@ -141,16 +164,21 @@ export default function ServiceDetailPage() {
   }
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-  const usedParts = parts.filter(p => !p.is_requested);
-  const requestedParts = parts.filter(p => p.is_requested);
+  const usedParts = parts.filter((p) => !p.is_requested);
+  const requestedParts = parts.filter((p) => p.is_requested);
 
   const getSignatureLabel = (type: string | null) => {
     switch (type) {
-      case 'recolha': return 'Recolha';
-      case 'entrega': return 'Entrega';
-      case 'visita': return 'Visita';
-      case 'pedido_peca': return 'Pedido Peça';
-      default: return 'Assinatura';
+      case "recolha":
+        return "Recolha";
+      case "entrega":
+        return "Entrega";
+      case "visita":
+        return "Visita";
+      case "pedido_peca":
+        return "Pedido Peça";
+      default:
+        return "Assinatura";
     }
   };
 
@@ -164,9 +192,9 @@ export default function ServiceDetailPage() {
             Voltar
           </Button>
           <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-8" />
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => openInNewTabPreservingQuery(`/print/service/${serviceId}`)}
           >
             <Printer className="h-4 w-4 mr-2" />
@@ -181,10 +209,7 @@ export default function ServiceDetailPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl font-mono">{service.code}</CardTitle>
-              <Badge 
-                style={{ backgroundColor: statusConfig?.color || '#888' }}
-                className="text-white"
-              >
+              <Badge style={{ backgroundColor: statusConfig?.color || "#888" }} className="text-white">
                 {statusConfig?.label || service.status}
               </Badge>
             </div>
@@ -205,11 +230,11 @@ export default function ServiceDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div>
               <span className="text-muted-foreground">Nome: </span>
-              <span className="font-medium">{service.customer?.name || 'N/A'}</span>
+              <span className="font-medium">{service.customer?.name || "N/A"}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Telefone: </span>
-              <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
+              <span className="font-medium">{service.customer?.phone || "N/A"}</span>
             </div>
             {service.customer?.email && (
               <div>
@@ -223,7 +248,7 @@ export default function ServiceDetailPage() {
                 <span className="font-medium">
                   {[service.customer?.address, service.customer?.postal_code, service.customer?.city]
                     .filter(Boolean)
-                    .join(', ')}
+                    .join(", ")}
                 </span>
               </div>
             )}
@@ -242,15 +267,15 @@ export default function ServiceDetailPage() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="text-muted-foreground">Tipo: </span>
-                <span className="font-medium">{service.appliance_type || 'N/A'}</span>
+                <span className="font-medium">{service.appliance_type || "N/A"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Marca: </span>
-                <span className="font-medium">{service.brand || 'N/A'}</span>
+                <span className="font-medium">{service.brand || "N/A"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Modelo: </span>
-                <span className="font-medium">{service.model || 'N/A'}</span>
+                <span className="font-medium">{service.model || "N/A"}</span>
               </div>
               {service.serial_number && (
                 <div>
@@ -262,7 +287,7 @@ export default function ServiceDetailPage() {
             <Separator />
             <div>
               <span className="text-muted-foreground">Avaria reportada: </span>
-              <span className="font-medium">{service.fault_description || 'N/A'}</span>
+              <span className="font-medium">{service.fault_description || "N/A"}</span>
             </div>
             {service.detected_fault && (
               <div>
@@ -296,9 +321,16 @@ export default function ServiceDetailPage() {
                   <div key={log.id} className="flex gap-3 text-sm border-l-2 border-muted pl-3">
                     <div className="flex-1">
                       <p className="font-medium">{log.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
-                      </p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+                        </p>
+                        {log.actor?.full_name && (
+                          <p className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                            Por: {log.actor.full_name}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -323,8 +355,10 @@ export default function ServiceDetailPage() {
                     <p className="text-xs text-muted-foreground mb-1">Utilizadas:</p>
                     {usedParts.map((part) => (
                       <div key={part.id} className="flex justify-between text-sm py-1 border-b last:border-0">
-                        <span>{part.part_name} {part.quantity && part.quantity > 1 ? `(x${part.quantity})` : ''}</span>
-                        <span className="text-muted-foreground">{part.part_code || '-'}</span>
+                        <span>
+                          {part.part_name} {part.quantity && part.quantity > 1 ? `(x${part.quantity})` : ""}
+                        </span>
+                        <span className="text-muted-foreground">{part.part_code || "-"}</span>
                       </div>
                     ))}
                   </div>
@@ -335,8 +369,8 @@ export default function ServiceDetailPage() {
                     {requestedParts.map((part) => (
                       <div key={part.id} className="flex justify-between text-sm py-1 border-b last:border-0">
                         <span>{part.part_name}</span>
-                        <Badge variant={part.arrived ? 'default' : 'secondary'} className="text-xs">
-                          {part.arrived ? 'Chegou' : 'A aguardar'}
+                        <Badge variant={part.arrived ? "default" : "secondary"} className="text-xs">
+                          {part.arrived ? "Chegou" : "A aguardar"}
                         </Badge>
                       </div>
                     ))}
@@ -368,7 +402,7 @@ export default function ServiceDetailPage() {
                   >
                     <img
                       src={photo.file_url}
-                      alt={photo.description || 'Foto do serviço'}
+                      alt={photo.description || "Foto do serviço"}
                       className="w-full h-full object-cover"
                     />
                   </a>
@@ -394,13 +428,13 @@ export default function ServiceDetailPage() {
                     <div className="aspect-[3/2] bg-muted rounded overflow-hidden mb-2">
                       <img
                         src={sig.file_url}
-                        alt={`Assinatura de ${sig.signer_name || 'Cliente'}`}
+                        alt={`Assinatura de ${sig.signer_name || "Cliente"}`}
                         className="w-full h-full object-contain"
                       />
                     </div>
                     <p className="text-xs font-medium">{getSignatureLabel(sig.signature_type)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {sig.signer_name || 'Cliente'} - {format(new Date(sig.signed_at), "dd/MM/yyyy", { locale: pt })}
+                      {sig.signer_name || "Cliente"} - {format(new Date(sig.signed_at), "dd/MM/yyyy", { locale: pt })}
                     </p>
                   </div>
                 ))}
