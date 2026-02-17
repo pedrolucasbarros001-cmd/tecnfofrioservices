@@ -80,13 +80,13 @@ export default function ServiceDetailPage() {
         .select(
           `
           *,
-          actor:profiles!activity_logs_actor_id_fkey(full_name)
+          actor:profiles(full_name)
         `,
         )
         .eq("service_id", serviceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as ActivityLog[];
+      return data as unknown as ActivityLog[];
     },
     enabled: !!serviceId && isAuthenticated && !authLoading,
   });
