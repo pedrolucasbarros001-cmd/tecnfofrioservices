@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +35,7 @@ export default function ClientesPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const { data: result, isLoading } = usePaginatedCustomers({
+  const { data: result, isLoading, error } = usePaginatedCustomers({
     page: currentPage,
     pageSize: PAGE_SIZE,
     searchTerm: debouncedSearch || undefined,
@@ -44,6 +44,22 @@ export default function ClientesPage() {
   const customers = result?.data || [];
   const totalCount = result?.totalCount || 0;
   const totalPages = result?.totalPages || 0;
+
+  if (error) {
+    const message = (error as Error).message || 'Erro ao carregar clientes.';
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+            <p className="text-muted-foreground mb-4">{message}</p>
+            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const deleteCustomer = useDeleteCustomer();
 

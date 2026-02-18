@@ -13,6 +13,8 @@ export function useCustomers(searchTerm?: string) {
   return useQuery({
     queryKey: ['customers', searchTerm],
     queryFn: async () => {
+      await ensureValidSession();
+
       let query = supabase
         .from('customers')
         .select('*')
@@ -28,6 +30,10 @@ export function useCustomers(searchTerm?: string) {
       if (error) throw error;
       return (data as Customer[]) || [];
     },
+    onError: (err: unknown) => {
+      console.error('Error fetching customers:', err);
+      toast.error('Erro ao carregar clientes.');
+    },
   });
 }
 
@@ -35,6 +41,8 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
   return useQuery({
     queryKey: ['customers-paginated', page, pageSize, searchTerm],
     queryFn: async () => {
+      await ensureValidSession();
+
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -59,6 +67,10 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
       };
     },
     placeholderData: (prev) => prev,
+    onError: (err: unknown) => {
+      console.error('Error fetching paginated customers:', err);
+      toast.error('Erro ao carregar clientes.');
+    },
   });
 }
 

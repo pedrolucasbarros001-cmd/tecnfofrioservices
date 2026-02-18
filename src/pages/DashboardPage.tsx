@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   ClipboardList,
   Play,
@@ -82,14 +83,20 @@ export default function DashboardPage() {
         .from('services')
         .select('status, pending_pricing, final_price, amount_paid, is_warranty');
 
-      if (servicesError) throw servicesError;
+      if (servicesError) {
+        console.error('Error fetching services for dashboard:', servicesError);
+        throw servicesError;
+      }
 
       // Fetch budgets count
       const { count: budgetsCount, error: budgetsError } = await supabase
         .from('budgets')
         .select('*', { count: 'exact', head: true });
 
-      if (budgetsError) throw budgetsError;
+      if (budgetsError) {
+        console.error('Error fetching budgets count:', budgetsError);
+        throw budgetsError;
+      }
 
       const counts: DashboardStats = {
         por_fazer: 0,
@@ -129,6 +136,7 @@ export default function DashboardPage() {
       setStats(counts);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      toast.error('Não foi possível carregar o dashboard.');
     } finally {
       setLoading(false);
     }
@@ -160,7 +168,14 @@ export default function DashboardPage() {
                   ? "bg-[hsl(207,74%,63%)] border-[hsl(207,65%,53%)] shadow-md ring-1 ring-[hsl(207,80%,73%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
                   : "bg-[hsl(207,55%,42%)] border-[hsl(207,50%,35%)] hover:bg-[hsl(207,55%,47%)]"
               )}
-              onClick={() => navigate(card.route)}
+              onClick={() => {
+                try {
+                  navigate(card.route);
+                } catch (err) {
+                  console.error('Navigation error:', err);
+                  toast.error('Não foi possível ir para a página pretendida.');
+                }
+              }}
             >
               <CardContent className="p-4 h-[120px] flex flex-col justify-between">
                 <div className="flex items-start justify-between">

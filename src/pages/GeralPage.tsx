@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ChevronDown, MapPin, Calendar } from 'lucide-react';
+import { Search, ChevronDown, MapPin, Calendar, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
@@ -82,7 +82,8 @@ export default function GeralPage() {
   
   const {
     data: result,
-    isLoading
+    isLoading,
+    error,
   } = usePaginatedServices({
     status: effectiveStatus as any,
     page: currentPage,
@@ -93,6 +94,25 @@ export default function GeralPage() {
   const services = result?.data || [];
   const totalCount = result?.totalCount || 0;
   const totalPages = result?.totalPages || 0;
+
+  // if query failed, show user-friendly error instead of letting the global error
+  // boundary take us down (which would display the big crash screen). this keeps
+  // the app responsive and gives the user a chance to retry.
+  if (error) {
+    const message = (error as Error).message || 'Erro ao carregar serviços.';
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+            <p className="text-muted-foreground mb-4">{message}</p>
+            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   // Fetch pending parts for all services (for the thermometer indicator)
   const { data: pendingPartsMap = {} } = useQuery({
