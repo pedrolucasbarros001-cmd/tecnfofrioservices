@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Search, Eye, MessageSquarePlus, Filter, Camera, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { History, Search, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,26 +10,13 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { TechnicianServiceSheet } from '@/components/technician/TechnicianServiceSheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
-import { logActivity } from '@/utils/activityLogUtils';
-import { CameraCapture } from '@/components/shared/CameraCapture';
 import type { Service } from '@/types/database';
 
 export default function TechnicianHistoryPage() {
-    const { profile, user } = useAuth();
-    const queryClient = useQueryClient();
+    const { profile } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [showDetailSheet, setShowDetailSheet] = useState(false);
-    const [showNoteDialog, setShowNoteDialog] = useState(false);
-    const [newNote, setNewNote] = useState('');
-    const [isSubmittingNote, setIsSubmittingNote] = useState(false);
-
-    // Photo upload state
-    const [showCamera, setShowCamera] = useState(false);
-    const [photoFile, setPhotoFile] = useState<string | null>(null);
 
     // Fetch technician's complete history
     const { data: services = [], isLoading } = useQuery({
@@ -73,66 +59,6 @@ export default function TechnicianHistoryPage() {
         setShowDetailSheet(true);
     };
 
-    const handleOpenNoteDialog = (service: Service, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedService(service);
-        setNewNote('');
-        setPhotoFile(null);
-        setShowNoteDialog(true);
-    };
-
-    const handlePhotoCapture = (imageData: string) => {
-        setPhotoFile(imageData);
-        setShowCamera(false);
-    };
-
-    const handleRemovePhoto = () => {
-        setPhotoFile(null);
-    };
-
-    const handleAddNote = async () => {
-        if (!selectedService || (!newNote.trim() && !photoFile)) return;
-
-        setIsSubmittingNote(true);
-        try {
-            let noteText = newNote.trim();
-
-            // Upload photo if exists
-            if (photoFile) {
-                const { error: photoError } = await supabase.from('service_photos').insert({
-                    service_id: selectedService.id,
-                    photo_type: 'visita', // Generic type for observation photos
-                    file_url: photoFile,
-                    description: 'Foto anexada à observação',
-                    uploaded_by: user?.id
-                });
-
-                if (photoError) throw photoError;
-
-                noteText += ' (Foto anexada)';
-                queryClient.invalidateQueries({ queryKey: ['service-photos', selectedService.id] });
-            }
-
-            await logActivity({
-                serviceId: selectedService.id,
-                actorId: user?.id,
-                actionType: 'nota_adicionada',
-                description: `Observação do técnico: ${noteText}`,
-                isPublic: true,
-            });
-
-            toast.success('Observação adicionada com sucesso!');
-            setShowNoteDialog(false);
-            setPhotoFile(null);
-            queryClient.invalidateQueries({ queryKey: ['activity-logs', selectedService.id] });
-        } catch (error) {
-            console.error('Error adding note:', error);
-            toast.error('Erro ao adicionar observação');
-        } finally {
-            setIsSubmittingNote(false);
-        }
-    };
-
     const getStatusBadge = (status: string) => {
         const statusMap: Record<string, { label: string; className: string }> = {
             por_fazer: { label: 'Pendente', className: 'bg-slate-100 text-slate-700' },
@@ -162,10 +88,7 @@ export default function TechnicianHistoryPage() {
                 </Badge>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-                Ao abrir a ficha de um serviço verá apenas informações básicas e fotos –
-                não há ações administrativas como emissão de etiquetas ou alteração de
-                valores. Essa visão simplificada é pensada para técnicos, evitando
-                distrações.
+                Clique num serviço para ver detalhes, fotos e adicionar observações ao histórico.
             </p>
 
             {/* Search and Filter */}
@@ -197,40 +120,29 @@ export default function TechnicianHistoryPage() {
                     {filteredServices.map((service) => (
                         <Card
                             key={service.id}
-                            className="hover:shadow-md transition-shadow cursor-pointer"
+                            className="hover:shadow-md transition-shadow cursor-pointer active:scale-[0.99] transition-transform"
                             onClick={() => handleViewDetail(service)}
                         >
                             <CardContent className="p-4">
                                 <div className="flex flex-col gap-3">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <span className="font-mono font-bold text-primary text-sm">{service.code}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono font-bold text-primary text-sm">{service.code}</span>
+                                                <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                                            </div>
                                             <h3 className="font-bold text-base mt-0.5">{service.customer?.name || 'Cliente'}</h3>
                                         </div>
                                         {getStatusBadge(service.status || 'por_fazer')}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                        <div className="text-muted-foreground">
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/30 p-2 rounded-md">
+                                        <div className="text-muted-foreground truncate">
                                             {service.appliance_type} {service.brand}
                                         </div>
                                         <div className="text-right text-muted-foreground">
                                             {service.created_at ? format(parseISO(service.created_at), "dd/MM/yyyy", { locale: pt }) : '-'}
                                         </div>
-                                    </div>
-
-                                    <div className="flex gap-2 pt-1">
-                                        <Button variant="outline" size="sm" className="flex-1 h-9 text-xs" onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleViewDetail(service);
-                                        }}>
-                                            <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                            Ver Ficha
-                                        </Button>
-                                        <Button variant="outline" size="sm" className="flex-1 h-9 text-xs" onClick={(e) => handleOpenNoteDialog(service, e)}>
-                                            <MessageSquarePlus className="h-3.5 w-3.5 mr-1.5" />
-                                            Observação
-                                        </Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -247,65 +159,6 @@ export default function TechnicianHistoryPage() {
                     onOpenChange={setShowDetailSheet}
                 />
             )}
-
-            {/* Add Note Dialog */}
-            <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Adicionar Observação</DialogTitle>
-                        <p className="text-sm text-muted-foreground">
-                            Adicione uma observação ao serviço {selectedService?.code}. Esta nota ficará registada no histórico de atividade.
-                        </p>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <Textarea
-                            placeholder="Escreva aqui a sua observação..."
-                            value={newNote}
-                            onChange={(e) => setNewNote(e.target.value)}
-                            rows={4}
-                        />
-
-                        {photoFile ? (
-                            <div className="relative rounded-lg overflow-hidden border">
-                                <img src={photoFile} alt="Preview" className="w-full h-48 object-cover" />
-                                <Button
-                                    variant="destructive"
-                                    size="icon"
-                                    className="absolute top-2 right-2 h-8 w-8"
-                                    onClick={handleRemovePhoto}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                className="w-full h-24 flex flex-col gap-2 border-dashed"
-                                onClick={() => setShowCamera(true)}
-                            >
-                                <Camera className="h-8 w-8 text-muted-foreground" />
-                                <span className="text-muted-foreground">Adicionar Foto (Opcional)</span>
-                            </Button>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowNoteDialog(false)}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleAddNote} disabled={isSubmittingNote || (!newNote.trim() && !photoFile)}>
-                            {isSubmittingNote ? 'A guardar...' : 'Guardar Observação'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <CameraCapture
-                open={showCamera}
-                onOpenChange={setShowCamera}
-                onCapture={handlePhotoCapture}
-                title="Foto da Observação"
-            />
         </div>
     );
 }
-
