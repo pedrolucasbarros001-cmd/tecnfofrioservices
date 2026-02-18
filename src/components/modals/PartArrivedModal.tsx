@@ -112,8 +112,16 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         await Promise.all(updatePromises);
       }
 
-      // Restore to previous status or default to na_oficina (workshop services)
-      const previousStatus = service.last_status_before_part_request || 'na_oficina';
+      // Restore to previous status or default based on location
+      let previousStatus = service.last_status_before_part_request;
+
+      if (!previousStatus) {
+        // Fallback if no previous status saved
+        previousStatus = service.service_location === 'cliente' ? 'por_fazer' : 'na_oficina';
+      } else if (service.service_location === 'cliente' && previousStatus === 'na_oficina') {
+        // Correction: if somehow a client service saved 'na_oficina' as previous, force 'por_fazer'
+        previousStatus = 'por_fazer';
+      }
 
       // Update service with technician, schedule, and restored status
       await updateService.mutateAsync({
