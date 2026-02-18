@@ -35,12 +35,7 @@ export default function ServiceTagPage() {
       if (!serviceId) throw new Error("ID não fornecido");
       const { data, error } = await supabase
         .from("services")
-        .select(
-          `
-          *,
-          customer:customers(*)
-        `,
-        )
+        .select(`*, customer:customers(*)`)
         .eq("id", serviceId)
         .single();
       if (error) throw error;
@@ -65,26 +60,25 @@ export default function ServiceTagPage() {
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
-        windowWidth: 1200, // Normalize across all computers
         onclone: (clonedDoc) => {
           const el = clonedDoc.querySelector(".print-tag-container") as HTMLElement;
           if (el) {
             el.style.margin = "0";
             el.style.position = "static";
             el.style.border = "none";
+            el.style.boxShadow = "none";
           }
         },
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
+      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
-        orientation: "landscape", // Landscape is correct for 62mm wide x 29mm high
+        orientation: "portrait",
         unit: "mm",
-        format: [62, 29],
+        format: [62, 90],
       });
-
-      pdf.addImage(imgData, "JPEG", 0, 0, 62, 29, undefined, "FAST");
+      const canvasHeight = (canvas.height / canvas.width) * 62;
+      pdf.addImage(imgData, "PNG", 0, 0, 62, canvasHeight);
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
@@ -124,12 +118,19 @@ export default function ServiceTagPage() {
     );
   }
 
+  const details = [
+    { label: "Cl", value: service.customer?.name },
+    { label: "Tel", value: service.customer?.phone },
+    { label: "Eq", value: service.appliance_type },
+    { label: "Av", value: service.detected_fault || service.fault_description },
+  ].filter(d => !!d.value);
+
   return (
     <div className="print-tag-page min-h-screen bg-slate-50 print:bg-white text-black">
       <style>{`
         @media print {
           @page {
-            size: 62mm 29mm;
+            size: 62mm 90mm;
             margin: 0;
           }
           .no-print {
@@ -145,21 +146,24 @@ export default function ServiceTagPage() {
           padding: 40px 0;
           display: flex;
           justify-content: center;
-          align-items: center;
+          align-items: flex-start;
           background: #f1f5f9;
           min-height: calc(100vh - 73px);
         }
         .print-tag-container {
           width: 62mm;
-          height: 29mm;
+          height: auto;
+          min-height: 90mm;
           background: white;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
+          align-items: center;
           overflow: hidden;
           position: relative;
           margin: 0;
           padding: 0;
+          font-family: Arial, Helvetica, sans-serif;
         }
         .preview-border {
           box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -183,39 +187,52 @@ export default function ServiceTagPage() {
 
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
-          {/* Top Blue Line */}
-          <div className="w-full h-[1.5mm] bg-[#0047AB] shrink-0" />
+          {/* Top blue bar */}
+          <div style={{ width: '100%', height: '5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
-          {/* Combined Content Area */}
-          <div className="flex flex-row flex-1 p-[1.5mm] gap-[2mm] items-center">
-            {/* Left: QR + Code */}
-            <div className="flex flex-col items-center shrink-0 border-r border-slate-100 pr-[1.5mm]">
-              <QRCodeSVG value={qrUrl} size={55} level="M" includeMargin={false} />
-              <p className="text-[10px] font-bold font-mono text-[#0047AB] mt-0.5">{service.code}</p>
-            </div>
-
-            {/* Right: Logo + Details (Harmonious & Close) */}
-            <div className="flex flex-col justify-between flex-1 h-full min-w-0">
-              <div className="flex justify-start">
-                <img src={tecnofrioLogoFull} alt="TECNOFRIO" className="h-[5mm] object-contain" />
-              </div>
-
-              <div className="text-[9px] leading-tight text-black flex flex-col gap-0.5">
-                <div className="flex truncate">
-                  <span className="font-bold mr-1 shrink-0">Cl:</span>
-                  <span className="truncate">{service.customer?.name || "---"}</span>
-                </div>
-                <div className="flex truncate">
-                  <span className="font-bold mr-1 shrink-0">Eq:</span>
-                  <span className="truncate">{service.appliance_type || "---"}</span>
-                </div>
-                <div className="flex truncate">
-                  <span className="font-bold mr-1 shrink-0">Tel:</span>
-                  <span className="truncate">{service.customer?.phone || "---"}</span>
-                </div>
-              </div>
-            </div>
+          {/* Logo */}
+          <div style={{ padding: '3mm 4mm 2mm', display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={tecnofrioLogoFull}
+              alt="TECNOFRIO"
+              style={{ height: '8mm', objectFit: 'contain' }}
+            />
           </div>
+
+          {/* QR Code */}
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0 2mm' }}>
+            <QRCodeSVG value={qrUrl} size={120} level="M" includeMargin={false} />
+          </div>
+
+          {/* Service Code */}
+          <div style={{ textAlign: 'center', padding: '2mm 4mm 1mm' }}>
+            <p style={{
+              fontSize: '14px',
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              color: '#2B4F84',
+              letterSpacing: '1px',
+              margin: 0,
+            }}>
+              {service.code}
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div style={{ width: 'calc(100% - 8mm)', height: '0.5px', backgroundColor: '#e5e7eb', margin: '1mm 4mm' }} />
+
+          {/* Details */}
+          <div style={{ padding: '1mm 4mm 2mm', width: '100%', boxSizing: 'border-box', flex: 1 }}>
+            {details.map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', gap: '2px', marginBottom: '1mm', lineHeight: '1.3' }}>
+                <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '12px' }}>{label}:</span>
+                <span style={{ fontSize: '9px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom blue bar */}
+          <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
         </div>
       </div>
     </div>
