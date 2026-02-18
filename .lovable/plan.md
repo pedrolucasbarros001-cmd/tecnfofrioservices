@@ -1,111 +1,105 @@
 
-# Redesign da Etiqueta: Portrait 62mm x 90mm para Brother QL-700
+# Plano de Correções — Etiqueta, Impressão e Criação de Serviço
 
-## Problema Raiz — Por Que Aparecem Múltiplas Folhas
+## Problemas Identificados e Raiz de Cada Um
 
-A impressora Brother QL-700 tem a fita de **62mm de largura** instalada ("62mm Fita contínua"). O sistema estava a enviar `@page { size: 29mm 90mm }` (29mm largura), mas a impressora espera 62mm de largura. O conflito de dimensões faz o driver dividir o conteúdo em múltiplas páginas.
+### Problema 1 — Etiqueta com dados censurados no PDF
 
-A correção obrigatória é usar **62mm de largura** em todos os lugares — tanto no layout HTML como no CSS de impressão e no PDF.
+**Causa identificada**: O `ServiceTagModal` tem layout portrait (62mm × 90mm) correto, usa `html2canvas` + `jsPDF` corretamente, e as cores são todas hex fixas (`#000000`, `#2B4F84`). O layout está bem. O problema é que ao renderizar o `ref={tagRef}` (que está dentro do `Dialog`), o `html2canvas` captura o elemento "tal como aparece" — se o Dialog tiver overflow ou clip, o conteúdo pode aparecer cortado ou os elementos com `overflow: hidden` ficam em branco.
 
-## Novo Layout Solicitado (Portrait "em pé")
+**Solução**: Usar o `onclone` callback do `html2canvas` para ajustar o clone antes da captura:
+- Remover qualquer `overflow: hidden` do clone
+- Garantir que o clone está posicionado fora do viewport com largura/altura explícitas
+- Usar `windowWidth` e `windowHeight` para dar contexto correto ao renderizador
+
+### Problema 2 — Brother QL-700 gera múltiplas folhas
+
+**Causa identificada**: O `printServiceTag()` em `printUtils.ts` injeta `@page { size: 62mm 90mm }` (correto), mas quando o utilizador clica "Imprimir" no modal, o `print()` imprime **toda a página**, não apenas a etiqueta. A CSS em `index.css` tem regras para esconder `#root` e mostrar apenas portais Radix, mas o elemento `.print-tag` está dentro do portal do Dialog. O problema é que o Dialog do Radix tem containers adicionais com padding/margin que fazem o conteúdo ultrapassar os 90mm e o driver da impressora divide em múltiplas folhas.
+
+**Solução**:
+- Criar um portal de impressão dedicado: quando o utilizador clica "Imprimir", clonar o elemento da etiqueta para um `div.print-portal` fora do Dialog, fazer `window.print()`, e limpar depois
+- Ou simplificar: abrir a página dedicada `/print/tag/:id` numa nova aba ao clicar "Imprimir" (essa página tem o CSS de impressão correto e isolado)
+
+**Decisão**: A abordagem mais robusta e simples é mudar o botão "Imprimir" para abrir a `ServiceTagPage` numa nova aba via `window.open('/print/tag/:id', '_blank')`. Esta página já tem o CSS `@page { size: 62mm 90mm }` inline e o conteúdo completamente isolado.
+
+### Problema 3 — "+ Novo Serviço" no perfil de cliente não oferece tipo de serviço
+
+**Causa identificada**: Em `CustomerDetailSheet.tsx` (linha 446), o estado inicial é `step: 'location'` e o formulário vai direto para "Visita ou Oficina" (que são apenas para Reparação). O `service_type` está hardcoded como `'reparacao'` na linha 490. Não existe um step inicial para selecionar Reparação vs. Instalação vs. Entrega.
+
+**Solução**: Adicionar step `'type'` antes do `'location'`:
+- Mostrar 3 opções: **Reparação** (icon Wrench), **Instalação** (icon Settings), **Entrega Direta** (icon Package)
+- Se **Reparação**: vai para step `'location'` (Visita/Oficina) como hoje
+- Se **Instalação** ou **Entrega**: vai direto para `'form'` com `service_type` definido, e adiciona campos de morada (`service_address`, `service_postal_code`, `service_city`) editáveis (não herdados automaticamente do cliente)
+
+O step inicial `setStep('location')` passa a `setStep('type')`.
+
+### Problema 4 — Erro ao criar serviço
+
+**Causas identificadas no código**:
+1. `warranty_covered: z.boolean()` está no schema Zod (linha 429) e é renderizado no formulário (linha 688-704), mas **não existe como coluna na tabela `services`**. Está a ser passado implicitamente no objeto dos `values` mas o Supabase ignora colunas desconhecidas... no entanto pode causar erro de tipo.
+2. `scheduled_shift: z.enum(['manha', 'tarde', 'noite'])` ainda usa o enum antigo enquanto a aplicação migrou para hora livre (`HH:MM`). Se o valor for vazio ou não corresponder ao enum, causa falha de validação.
+3. O `handleSubmit` não exibe o erro real — usa `console.error` mas não mostra toast com a mensagem de erro.
+4. O `useCreateService` hook mostra toast genérico "Erro ao criar serviço" sem detalhes.
+
+**Soluções**:
+- Remover `warranty_covered` do schema Zod e do payload enviado ao Supabase (usar a lógica existente de `pending_pricing` e `final_price` que já funciona)
+- Mudar `scheduled_shift` de `z.enum(['manha', 'tarde', 'noite'])` para `z.string().optional()`
+- Substituir o Select de turno por `<Input type="time" />` (consistente com o resto da aplicação)
+- Adicionar `toast.error(error instanceof Error ? error.message : 'Erro ao criar serviço')` no catch do `handleSubmit`
+
+---
+
+## Ficheiros a Alterar
+
+| Ficheiro | O que muda |
+|---|---|
+| `src/components/modals/ServiceTagModal.tsx` | Botão "Imprimir" abre nova aba em `/print/tag/:id`; fix `html2canvas` com `onclone` |
+| `src/components/shared/CustomerDetailSheet.tsx` | Adicionar step `'type'` (Reparação / Instalação / Entrega); fix schema Zod; fix `scheduled_shift`; fix payload; add toast de erro |
+
+---
+
+## Detalhe Técnico — Step de Tipo de Serviço
 
 ```text
-┌──────────────────────────┐  62mm largura
-│ ████████████████████████ │  barra azul topo
-│                          │
-│   [Logo TECNOFRIO]       │  logo centrado
-│                          │
-│      ┌────────┐          │
-│      │  QR    │          │  QR centrado
-│      │  CODE  │          │
-│      └────────┘          │
-│                          │
-│  TF-00001                │  código grande, centrado
-│                          │
-│  Cl: José Fernando       │  dados compactos
-│  Tel: 961 440 779        │
-│  Eq: MLR                 │
-│  Av: Não arrefece        │  NOVO: avaria
-│                          │
-│ ████████████████████████ │  barra azul fundo
-└──────────────────────────┘
+Step 1: 'type'
+┌────────────┐  ┌────────────┐  ┌────────────┐
+│ Reparação  │  │ Instalação │  │  Entrega   │
+│   Wrench   │  │  Settings  │  │  Package   │
+└────────────┘  └────────────┘  └────────────┘
+      ↓                ↓               ↓
+Step 2: 'location'   Step 2: 'form'  Step 2: 'form'
+(Visita/Oficina)    (com morada)    (com morada)
+      ↓                ↓               ↓
+Step 3: 'form'      Criar serviço   Criar serviço
 ```
 
-## Alterações Necessárias
+Para instalação/entrega, os campos de morada (`service_address`, `service_postal_code`, `service_city`) são editáveis e podem ser pré-preenchidos com os dados do cliente mas modificáveis. O campo `fault_description` muda o label para "Observações" em entregas.
 
-### 1. `src/components/modals/ServiceTagModal.tsx`
+## Detalhe Técnico — Fix do Botão Imprimir na Etiqueta
 
-Redesenhar completamente o div com `ref={tagRef}`:
-- Dimensões: `width: 62mm` (portrait, a altura cresce com o conteúdo)
-- Layout vertical: barra azul → logo centrado → QR centrado (tamanho maior, ~160px) → código do serviço centrado com fonte mono bold → dados em lista limpa abaixo
-- Adicionar campo **Avaria** (`service.detected_fault`) ao conteúdo
-- Todas as cores como hex fixo (`#2B4F84`, `#000`, `#4b5563`) — sem CSS variables
-- Fonte aumentada para legibilidade real em etiqueta física
-- Chamar `generatePDF` com `format: [62, 90]`, `orientation: 'portrait'`
-- Usar `html2canvas` diretamente (como o `ServiceTagPage`) em vez de `html2pdf.js` para evitar o problema de cores invisíveis. A abordagem `html2canvas` → `jsPDF` captura os estilos computados reais, resolvendo o problema de censura de dados.
+Mudar de `printServiceTag()` (imprime toda a página com o Dialog aberto) para:
 
-### 2. `src/pages/ServiceTagPage.tsx`
-
-Aplicar o mesmo redesign portrait à página dedicada:
-- Alterar `.print-tag-container` para `width: 62mm; height: auto; min-height: 90mm`
-- Alterar `@page` para `size: 62mm 90mm` (portrait)
-- Alterar `jsPDF` para `format: [62, 90], orientation: 'portrait'`
-- Adicionar campo **Avaria** (`service.detected_fault`)
-- Mesmo layout vertical centralizado: logo → QR → código → dados
-
-### 3. `src/utils/printUtils.ts`
-
-Alterar `PAGE_CONFIGS.tag`:
 ```
-// ANTES (errado — não corresponde à fita de 62mm)
-tag: '@page { size: 29mm 90mm; margin: 0; }'
-
-// DEPOIS (correto para Brother QL-700 com fita de 62mm)
-tag: '@page { size: 62mm 90mm; margin: 0; }'
+window.open(`/print/tag/${service.id}`, '_blank');
 ```
 
-### 4. `src/index.css`
+Isto aproveita a `ServiceTagPage` que já tem o CSS `@page { size: 62mm 90mm }` inline correto, o conteúdo completamente isolado, e funciona com a Brother QL-700.
 
-Atualizar todas as referências de dimensões da etiqueta de `29mm x 90mm` / `62mm x 29mm` para o novo portrait `62mm x 90mm`:
+## Detalhe Técnico — Fix do html2canvas no Modal
 
-- `.print-tag-page .print-tag-container`: `width: 62mm; height: auto; min-height: 90mm`
-- `@media print .print-tag-page .print-tag-container`: `width: 62mm !important; height: auto !important; min-height: 90mm !important`
-- `.print-tag`: `width: 62mm !important; height: auto !important`
-- Atualizar comentários de `62mm x 29mm` para `62mm x 90mm`
+Adicionar `onclone` ao `html2canvas`:
 
-## Estratégia para Dados Não Censurados no PDF
-
-O problema de "censura" (texto invisível) ocorre porque `html2pdf.js` clona o DOM para um container offscreen onde as CSS variables (`hsl(var(--primary))`) não resolvem.
-
-**Solução**: Usar `html2canvas` + `jsPDF` diretamente (mesma abordagem do `ServiceTagPage`), em vez do `html2pdf.js`. O `html2canvas` captura os estilos computados renderizados no ecrã — incluindo as cores resolvidas — então o texto aparece sempre visível.
-
-No `ServiceTagModal.tsx`, substituir a chamada a `generatePDF` por:
-```
+```ts
 const canvas = await html2canvas(tagRef.current, {
   scale: 4,
   useCORS: true,
   backgroundColor: '#ffffff',
   logging: false,
+  onclone: (_doc, el) => {
+    el.style.overflow = 'visible';
+    el.style.position = 'relative';
+  },
 });
-const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 90] });
-const canvasHeight = (canvas.height / canvas.width) * 62;
-pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 62, canvasHeight);
-pdf.save(`Etiqueta-${service.code}.pdf`);
 ```
-Isto elimina completamente o problema de cores invisíveis.
 
-## Resumo de Ficheiros
-
-| Ficheiro | Alteração |
-|----------|-----------|
-| `src/components/modals/ServiceTagModal.tsx` | Redesenho portrait 62mm, html2canvas+jsPDF, avaria |
-| `src/pages/ServiceTagPage.tsx` | Redesenho portrait 62mm, @page correto, avaria |
-| `src/utils/printUtils.ts` | @page size: 62mm 90mm |
-| `src/index.css` | Dimensões portrait em todos os seletores .print-tag |
-
-## Compatibilidade Brother QL-700
-
-- Fita instalada: **62mm contínua**
-- Tamanho da página: `62mm x 90mm` portrait
-- A altura de 90mm é compatível com o modo "continuous tape" — o driver corta automaticamente no comprimento definido
-- O conteúdo vertical (portrait) ocupa a largura total da fita de 62mm, sem rotação
+Isto garante que o clone não tem clipping que tornaria o texto invisível.
