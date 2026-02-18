@@ -6,30 +6,30 @@ export type ServiceType = 'reparacao' | 'instalacao' | 'entrega' | 'manutencao';
 
 export type ServiceLocation = 'cliente' | 'oficina' | 'entregue';
 
-export type ServiceStatus = 
-  | 'por_fazer' 
-  | 'em_execucao' 
-  | 'na_oficina' 
+export type ServiceStatus =
+  | 'por_fazer'
+  | 'em_execucao'
+  | 'na_oficina'
   | 'para_pedir_peca'
-  | 'em_espera_de_peca' 
-  | 'a_precificar' 
-  | 'concluidos' 
-  | 'em_debito' 
+  | 'em_espera_de_peca'
+  | 'a_precificar'
+  | 'concluidos'
+  | 'em_debito'
   | 'finalizado';
 
-export type ScheduledShift = 'manha' | 'tarde' | 'noite';
+export type ScheduledShift = 'manha' | 'tarde' | 'noite' | string;
 
 export type PaymentMethod = 'dinheiro' | 'multibanco' | 'transferencia' | 'mbway';
 
-export type PhotoType = 
+export type PhotoType =
   | 'visita'       // Genérica (legado)
   | 'aparelho'     // Foto geral do aparelho
   | 'etiqueta'     // Etiqueta/placa do aparelho
   | 'estado'       // Estado físico (amassados, danos)
-  | 'oficina' 
-  | 'entrega' 
-  | 'instalacao' 
-  | 'antes' 
+  | 'oficina'
+  | 'entrega'
+  | 'instalacao'
+  | 'antes'
   | 'depois';
 
 // Photo type labels for display
@@ -229,8 +229,8 @@ export interface ServiceTransferRequest {
 }
 
 // Status labels and colors mapping - Institutional Blue design (text > color)
-export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, { 
-  label: string; 
+export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, {
+  label: string;
   color: string;
   intensity: 'dim' | 'normal' | 'active';
 }> = {

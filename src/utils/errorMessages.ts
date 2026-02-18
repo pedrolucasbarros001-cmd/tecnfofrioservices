@@ -8,6 +8,9 @@ export function humanizeError(error: unknown): string {
 
   // Session / auth errors
   if (isSessionOrRlsError(error)) {
+    if (msg.includes('row-level security') || msg.includes('permission denied')) {
+      return 'Não tem permissão para realizar esta ação. Verifique o seu cargo (dono/secretária).';
+    }
     return 'Sessão expirada. Por favor, faça login novamente.';
   }
 
@@ -26,9 +29,13 @@ export function humanizeError(error: unknown): string {
     return 'Um dos registos selecionados já não existe. Atualize a página e tente novamente.';
   }
 
-  // Invalid date
+  // Invalid date/constraint
   if (msg.includes('Invalid date') || msg.includes('invalid input syntax for type date')) {
     return 'A data selecionada é inválida. Verifique se escolheu uma data válida.';
+  }
+
+  if (msg.includes('check constraint') || msg.includes('violates check constraint')) {
+    return 'O formato de algum campo (turno/horário) não é aceite pelo sistema.';
   }
 
   // Network errors
