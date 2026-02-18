@@ -56,6 +56,8 @@ import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { logServiceCreation } from '@/utils/activityLogUtils';
 import type { Customer } from '@/types/database';
 
 const formSchema = z.object({

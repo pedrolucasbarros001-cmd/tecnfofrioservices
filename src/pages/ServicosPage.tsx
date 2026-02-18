@@ -18,7 +18,7 @@ type FlowType = 'visit' | 'installation' | 'delivery' | null;
 
 export default function ServicosPage() {
   const { profile } = useAuth();
-  
+
   // Current date state for daily navigation
   const [currentDate, setCurrentDate] = useState(() => new Date());
 
@@ -27,7 +27,7 @@ export default function ServicosPage() {
   const [activeFlow, setActiveFlow] = useState<FlowType>(null);
 
   // Use React Query for proper caching and refetch
-  const { data: services = [], isLoading: loading, refetch } = useQuery({
+  const { data: services = [], isLoading: loading, refetch, error } = useQuery({
     queryKey: ['technician-services', profile?.id],
     queryFn: async () => {
       if (!profile) return [];
@@ -94,7 +94,7 @@ export default function ServicosPage() {
   const handleStartFlow = (service: Service, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedService(service);
-    
+
     if (service.service_type === 'entrega') {
       setActiveFlow('delivery');
     } else if (service.service_type === 'instalacao') {
@@ -118,7 +118,7 @@ export default function ServicosPage() {
   // Get button config based on service type
   const getServiceConfig = (service: Service) => {
     if (service.service_type === 'entrega') {
-      return { 
+      return {
         badgeColor: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
         badgeLabel: 'Entrega',
         cardBorder: 'border-l-green-500',
@@ -126,7 +126,7 @@ export default function ServicosPage() {
       };
     }
     if (service.service_type === 'instalacao') {
-      return { 
+      return {
         badgeColor: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
         badgeLabel: 'Instalação',
         cardBorder: 'border-l-yellow-500',
@@ -134,7 +134,7 @@ export default function ServicosPage() {
       };
     }
     // Default: Visita (blue)
-    return { 
+    return {
       badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
       badgeLabel: 'Visita',
       cardBorder: 'border-l-blue-500',
@@ -144,7 +144,7 @@ export default function ServicosPage() {
 
   const ServiceCard = ({ service }: { service: Service }) => {
     const serviceConfig = getServiceConfig(service);
-    
+
     return (
       <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)} data-tour="service-cards">
         <CardContent className="p-4">
@@ -215,18 +215,18 @@ export default function ServicosPage() {
           <CalendarDays className="h-6 w-6 text-primary" />
           <h1 className="text-xl md:text-2xl font-bold tracking-tight">Agenda</h1>
         </div>
-        
+
         {/* Day Navigation */}
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             className="h-9 w-9"
             onClick={goToPrevious}
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          
+
           <Button
             variant={isToday ? "default" : "outline"}
             onClick={goToToday}
@@ -234,9 +234,9 @@ export default function ServicosPage() {
           >
             {format(currentDate, "EEEE, d 'de' MMMM", { locale: pt })}
           </Button>
-          
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             size="icon"
             className="h-9 w-9"
             onClick={goToNext}
