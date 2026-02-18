@@ -90,17 +90,13 @@ export default function ClientesPage() {
   return (
     <ErrorBoundary
       fallback={
-        <div className="p-6">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-              <h2 className="text-lg font-semibold mb-2">Ocorreu um erro</h2>
-              <p className="text-muted-foreground mb-4">
-                Algo deu errado ao carregar a página. Tente recarregar.
-              </p>
-              <Button onClick={() => window.location.reload()}>Recarregar</Button>
-            </CardContent>
-          </Card>
+        <div className="p-6 text-center">
+          <div className="text-destructive text-4xl mb-4">⚠️</div>
+          <h2 className="text-lg font-semibold mb-2">Ocorreu um erro</h2>
+          <p className="text-muted-foreground mb-4">
+            Algo deu errado ao carregar a página. Tente recarregar.
+          </p>
+          <Button onClick={() => window.location.reload()}>Recarregar</Button>
         </div>
       }
     >
