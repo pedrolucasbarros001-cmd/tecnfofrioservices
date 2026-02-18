@@ -121,13 +121,13 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               {/* Service Details */}
               <div style={{ padding: '1mm 4mm 2mm', width: '100%', boxSizing: 'border-box' }}>
                 {[
-                  { label: 'Cl', value: service.customer?.name },
-                  { label: 'Tel', value: service.customer?.phone },
-                  { label: 'Eq', value: service.appliance_type },
-                  { label: 'Av', value: service.detected_fault || service.fault_description },
+                  { label: 'Cliente', value: service.customer?.name },
+                  { label: 'Telefone', value: service.customer?.phone },
+                  { label: 'Equipamento', value: service.appliance_type },
+                  { label: 'Descrição', value: service.detected_fault || service.fault_description },
                 ].map(({ label, value }) => value ? (
-                  <div key={label} style={{ display: 'flex', gap: '2px', marginBottom: '1mm', lineHeight: '1.3' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '12px' }}>{label}:</span>
+                  <div key={label} style={{ display: 'flex', gap: '4px', marginBottom: '1mm', lineHeight: '1.3' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '60px' }}>{label}:</span>
                     <span style={{ fontSize: '9px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
                   </div>
                 ) : null)}

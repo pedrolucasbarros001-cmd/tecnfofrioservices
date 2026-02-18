@@ -50,11 +50,11 @@ interface CreateCustomerModalProps {
   onSuccess?: (customer: Customer) => void;
 }
 
-export function CreateCustomerModal({ 
-  open, 
-  onOpenChange, 
+export function CreateCustomerModal({
+  open,
+  onOpenChange,
   customer,
-  onSuccess 
+  onSuccess
 }: CreateCustomerModalProps) {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
@@ -104,7 +104,7 @@ export function CreateCustomerModal({
   const handleSubmit = async (values: FormValues) => {
     try {
       let result: Customer;
-      
+
       if (isEditing && customer) {
         result = await updateCustomer.mutateAsync({
           id: customer.id,
@@ -117,8 +117,9 @@ export function CreateCustomerModal({
           email: values.email || null,
         });
       }
-      
+
       onSuccess?.(result);
+      // Close modal first
       onOpenChange(false);
       form.reset();
     } catch (error) {
@@ -145,125 +146,125 @@ export function CreateCustomerModal({
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
             <ScrollArea className="flex-1 px-6">
               <div className="grid grid-cols-2 gap-4 py-4 pr-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Nome *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome completo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="nif"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>NIF</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Contribuinte" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customer_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Nome *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                        <Input placeholder="Nome completo" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="particular">Particular</SelectItem>
-                        <SelectItem value="empresa">Empresa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Telefone" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="nif"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>NIF</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Contribuinte" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Email" type="email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="customer_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="particular">Particular</SelectItem>
+                          <SelectItem value="empresa">Empresa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Morada</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Morada completa" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Telefone" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="postal_code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Código Postal</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0000-000" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Email" type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cidade</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Cidade" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Morada</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Morada completa" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="postal_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Código Postal</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0000-000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cidade</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Cidade" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </ScrollArea>
 
@@ -271,12 +272,12 @@ export function CreateCustomerModal({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createCustomer.isPending || updateCustomer.isPending}
               >
-                {createCustomer.isPending || updateCustomer.isPending 
-                  ? 'A guardar...' 
+                {createCustomer.isPending || updateCustomer.isPending
+                  ? 'A guardar...'
                   : isEditing ? 'Guardar Alterações' : 'Criar Cliente'}
               </Button>
             </DialogFooter>

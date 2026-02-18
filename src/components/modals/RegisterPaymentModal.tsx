@@ -25,7 +25,7 @@ import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
-import type { Service, PaymentMethod } from '@/types/database';
+import type { Service, PaymentMethod, ServiceStatus } from '@/types/database';
 
 interface RegisterPaymentModalProps {
   service: Service | null;
@@ -87,12 +87,29 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
       if (paymentError) throw paymentError;
 
-      // Update service amount_paid only (status is operational, debt is financial)
+      // Update service amount_paid
       const newAmountPaid = amountPaid + paymentValue;
+
+      // Determine if status should change (only if fully paid)
+      // Use a small epsilon for float comparison safety, though currency should be robust
+      const isPaidInFull = newAmountPaid >= (finalPrice - 0.01);
+
+      let newStatus: ServiceStatus | undefined;
+
+      if (isPaidInFull) {
+        // If paid in full, move to next stage depending on location
+        const isWorkshop = service.service_location === 'oficina';
+        if (isWorkshop) {
+          newStatus = 'concluidos'; // Ready for delivery/pickup
+        } else {
+          newStatus = 'finalizado'; // Done on site
+        }
+      }
 
       await updateService.mutateAsync({
         id: service.id,
         amount_paid: newAmountPaid,
+        ...(newStatus && { status: newStatus }),
         skipToast: true, // Contextual message below
       });
 
@@ -106,7 +123,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-      
+
       // Contextual feedback message
       if (newBalance > 0) {
         toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);
@@ -193,7 +210,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
           {/* Payment Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Valor a Pagar (€) *</Label>
+            <Label htmlFor="amount">Valor deste Pagamento (€) *</Label>
             <Input
               id="amount"
               type="text"

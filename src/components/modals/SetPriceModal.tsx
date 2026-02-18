@@ -21,11 +21,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { logPricingSet } from '@/utils/activityLogUtils';
 import { toast } from 'sonner';
 import type { Service, ServiceStatus } from '@/types/database';
-import { 
-  PriceLineItems, 
-  LineItem, 
+import {
+  PriceLineItems,
+  LineItem,
   DEFAULT_LINE_ITEM,
-  calculateTotals 
+  calculateTotals
 } from '@/components/pricing/PriceLineItems';
 import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
 
@@ -67,7 +67,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [adjustment, setAdjustment] = useState('');
   const [warrantyCoversAll, setWarrantyCoversAll] = useState(false);
-  
+
   const updateService = useUpdateService();
   const { user, profile } = useAuth();
 
@@ -154,7 +154,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
       // Set adjustment
       setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
-      
+
       // If warranty service, default to covered
       setWarrantyCoversAll(isWarrantyService);
     }
@@ -185,14 +185,16 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     // Determine new status
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
     const currentStatus = service.status as ServiceStatus;
-    
+
     let newStatus: ServiceStatus | undefined;
-    
+
     if (currentStatus === 'a_precificar') {
-      if (warrantyCoversAll || !isClientLocation) {
-        newStatus = 'concluidos';
+      if (warrantyCoversAll) {
+        // Warranty: Skip payment flow, go to concluded/finished
+        newStatus = isClientLocation ? 'finalizado' : 'concluidos';
       } else {
-        newStatus = 'finalizado';
+        // Not Warranty: Go to Debit for payment collection
+        newStatus = 'em_debito';
       }
     }
 
@@ -221,10 +223,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     if (warrantyCoversAll) {
       toast.success('Garantia aplicada! Serviço sem custo para o cliente.');
     } else {
-      const nextStep = service.service_location === 'oficina' 
-        ? 'Pronto para entrega.' 
-        : 'Serviço concluído.';
-      toast.success(`Preço definido: €${finalPrice.toFixed(2)}. ${nextStep}`);
+      toast.success(`Preço definido: €${finalPrice.toFixed(2)}. Serviço em débito para cobrança.`);
     }
 
     onOpenChange(false);
@@ -294,9 +293,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                 )}
 
                 {/* Line Items Table */}
-                <PriceLineItems 
-                  form={form} 
-                  fieldName="items" 
+                <PriceLineItems
+                  form={form}
+                  fieldName="items"
                   disabled={warrantyCoversAll}
                 />
 
@@ -327,8 +326,8 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                 disabled={updateService.isPending}
                 className={warrantyCoversAll ? 'bg-green-600 hover:bg-green-700' : ''}
               >
-                {updateService.isPending 
-                  ? 'A confirmar...' 
+                {updateService.isPending
+                  ? 'A confirmar...'
                   : (warrantyCoversAll ? 'Confirmar Garantia' : 'Confirmar Preço')
                 }
               </Button>
