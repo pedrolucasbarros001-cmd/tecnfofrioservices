@@ -94,34 +94,35 @@ export default function ClientesPage() {
           onSuccess={handleCreateSuccess}
         />
 
-        <CustomerDetailSheet          <div>
+        <div className="flex items-center justify-between">
+          <div>
             <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
-        <p className="text-muted-foreground">Gerir clientes do sistema</p>
-      </div>
-      <Button className="shrink-0" onClick={() => setShowModal(true)}>
-        <Plus className="h-4 w-4 mr-2" />
-        Criar Cliente
-      </Button>
-    </div>
+            <p className="text-muted-foreground">Gerir clientes do sistema</p>
+          </div>
+          <Button className="shrink-0" onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Criar Cliente
+          </Button>
+        </div>
 
-        {/* Search + Counter */ }
-  <div className="flex items-center gap-4">
-    <div className="relative flex-1 max-w-md">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
-        placeholder="Pesquisar por nome, email, telefone..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="pl-10"
-      />
-    </div>
-    <Badge variant="secondary">
-      {totalCount} cliente{totalCount !== 1 ? 's' : ''}
-    </Badge>
-  </div>
+        {/* Search + Counter */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por nome, email, telefone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Badge variant="secondary">
+            {totalCount} cliente{totalCount !== 1 ? 's' : ''}
+          </Badge>
+        </div>
 
 
-  {/* Table */ }
+        {/* Table */}
         <div className="border rounded-lg">
 
           <Table>
