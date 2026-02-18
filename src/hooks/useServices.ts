@@ -102,9 +102,8 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
           const { data: matchingCustomers, error: customerError } = await supabase
             .from('customers')
             .select('id')
-            .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-            .is('deleted_at', null);
-          
+            .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+
           if (!customerError && matchingCustomers) {
             customerIds = matchingCustomers.map(c => c.id);
           }
@@ -112,7 +111,7 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
           // If customer search fails, continue with service field search only
           console.warn('Error searching customers:', err);
         }
-        
+
         // Helper function to build a fresh query with all filters
         const buildFilteredQuery = () => {
           let query = supabase
@@ -139,14 +138,14 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
 
           return query;
         };
-        
+
         // Query 1: Services matching searchTerm in service fields
         let serviceFieldsQuery = buildFilteredQuery()
           .or(`code.ilike.%${searchTerm}%,appliance_type.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,fault_description.ilike.%${searchTerm}%`);
-        
+
         const { data: servicesByFields, error: error1 } = await serviceFieldsQuery;
         if (error1) throw error1;
-        
+
         // Query 2: Services with matching customer_id (if any customers matched)
         let servicesByCustomer: Service[] = [];
         if (customerIds.length > 0) {
@@ -155,15 +154,15 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
           if (error2) throw error2;
           servicesByCustomer = (servicesByCustomerData as unknown as Service[]) || [];
         }
-        
+
         // Combine and deduplicate results
         const serviceMap = new Map<string, Service>();
         (servicesByFields || []).forEach(s => serviceMap.set(s.id, s as Service));
         servicesByCustomer.forEach(s => serviceMap.set(s.id, s));
-        
+
         allServices = Array.from(serviceMap.values());
         totalCount = allServices.length;
-        
+
         // Sort combined results
         allServices.sort((a, b) => {
           // Sort by scheduled_date first
@@ -172,19 +171,19 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
             if (dateDiff !== 0) return dateDiff;
           } else if (a.scheduled_date) return -1;
           else if (b.scheduled_date) return 1;
-          
+
           // Then by scheduled_shift
           if (a.scheduled_shift && b.scheduled_shift) {
             const shiftOrder = { manha: 1, tarde: 2, noite: 3 };
-            const shiftDiff = (shiftOrder[a.scheduled_shift as keyof typeof shiftOrder] || 0) - 
-                             (shiftOrder[b.scheduled_shift as keyof typeof shiftOrder] || 0);
+            const shiftDiff = (shiftOrder[a.scheduled_shift as keyof typeof shiftOrder] || 0) -
+              (shiftOrder[b.scheduled_shift as keyof typeof shiftOrder] || 0);
             if (shiftDiff !== 0) return shiftDiff;
           }
-          
+
           // Finally by created_at
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
-        
+
         // Apply pagination
         const from = (page - 1) * pageSize;
         const to = from + pageSize;
@@ -193,7 +192,7 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         // No search term - use simple pagination
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
-        
+
         // Rebuild query with count
         let paginatedQuery = supabase
           .from('services')
@@ -220,10 +219,10 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         if (technicianId) {
           paginatedQuery = paginatedQuery.eq('technician_id', technicianId);
         }
-        
+
         const { data, error, count } = await paginatedQuery;
         if (error) throw error;
-        
+
         allServices = (data as unknown as Service[]) || [];
         totalCount = count || 0;
       }

@@ -16,7 +16,6 @@ export function useCustomers(searchTerm?: string) {
       let query = supabase
         .from('customers')
         .select('*')
-        .is('deleted_at', null)
         .order('name', { ascending: true });
 
       if (searchTerm) {
@@ -24,8 +23,6 @@ export function useCustomers(searchTerm?: string) {
       }
 
       const { data, error } = await query;
-
-      if (error) throw error;
       return (data as Customer[]) || [];
     },
   });
@@ -41,13 +38,11 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
       // Build base query
       let countQuery = supabase
         .from('customers')
-        .select('*', { count: 'exact', head: true })
-        .is('deleted_at', null);
+        .select('*', { count: 'exact', head: true });
 
       let dataQuery = supabase
         .from('customers')
         .select('*')
-        .is('deleted_at', null)
         .order('name', { ascending: true })
         .range(from, to);
 
@@ -84,7 +79,8 @@ export function useCustomerSearch() {
 
       const { data, error } = await supabase
         .from('customers')
-        .select('*')        .is('deleted_at', null)        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%`)
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%`)
         .limit(10);
 
       if (error) throw error;
@@ -99,7 +95,7 @@ export function useCreateCustomer() {
   return useMutation({
     mutationFn: async (customerData: Partial<Customer>) => {
       await ensureValidSession();
-      
+
       const { data, error } = await supabase
         .from('customers')
         .insert(customerData as any)
@@ -157,19 +153,13 @@ export function useDeleteCustomer() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // perform soft-delete by setting deleted_at, fallback to hard-delete if necessary
+      // Hard delete as the schema doesn't support soft delete (no deleted_at column)
       const { error } = await supabase
         .from('customers')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', id);
-      if (error) {
-        // if update failed for some reason, try hard delete as last resort
-        const { error: hardError } = await supabase
-          .from('customers')
-          .delete()
-          .eq('id', id);
-        if (hardError) throw hardError;
-      }
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
