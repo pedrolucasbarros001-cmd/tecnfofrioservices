@@ -37,6 +37,8 @@ export function useServices(options: UseServicesOptions = {}) {
           customer:customers(*),
           technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
         `)
+        .order('scheduled_date', { ascending: true, nullsFirst: false })
+        .order('scheduled_shift', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (status === 'pending_pricing') {
@@ -77,6 +79,8 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
           customer:customers(*),
           technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
         `, { count: 'exact' })
+        .order('scheduled_date', { ascending: true, nullsFirst: false })
+        .order('scheduled_shift', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -117,7 +121,7 @@ export function useCreateService() {
   return useMutation({
     mutationFn: async (serviceData: Partial<Service>) => {
       await ensureValidSession();
-      
+
       const { data, error } = await supabase
         .from('services')
         .insert(serviceData as any)

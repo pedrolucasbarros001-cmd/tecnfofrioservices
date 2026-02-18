@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Calendar, 
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
   Wrench,
   AlertCircle,
   Shield,
@@ -158,7 +158,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const { role } = useAuth();
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
-  
+
   // Modal states
   // showTagModal removed - using dedicated page instead
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -343,19 +343,19 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 {(() => {
                   const progressSteps = getServiceProgressSteps(service);
                   const currentStatus = service.status as ServiceStatus;
-                  
+
                   return (
                     <div className="flex items-center justify-between overflow-x-auto pb-2 gap-1">
                       {progressSteps.map((step, index) => {
                         const isCompleted = step.statuses.includes(currentStatus);
-                        const isCurrent = step.statuses.includes(currentStatus) && 
+                        const isCurrent = step.statuses.includes(currentStatus) &&
                           !progressSteps[index + 1]?.statuses.includes(currentStatus);
-                        
+
                         return (
                           <div key={step.label} className="flex flex-col items-center min-w-[60px] relative flex-1">
                             {/* Connector line */}
                             {index > 0 && (
-                              <div 
+                              <div
                                 className={cn(
                                   "absolute top-4 right-1/2 w-full h-0.5 -translate-y-1/2",
                                   isCompleted ? "bg-primary" : "bg-muted-foreground/20"
@@ -363,13 +363,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                 style={{ width: 'calc(100% + 8px)', right: '50%' }}
                               />
                             )}
-                            
-                            <div 
+
+                            <div
                               className={cn(
                                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all relative z-10",
                                 isCurrent ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/20" :
-                                isCompleted ? "bg-primary/80 text-primary-foreground" :
-                                "bg-muted-foreground/20 text-muted-foreground"
+                                  isCompleted ? "bg-primary/80 text-primary-foreground" :
+                                    "bg-muted-foreground/20 text-muted-foreground"
                               )}
                             >
                               {index + 1}
@@ -392,7 +392,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               <div className="flex gap-2 flex-wrap">
                 {/* Estado principal - sempre primeiro */}
                 <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                
+
                 {/* Tipo de serviço */}
                 {service.service_type === 'instalacao' && (
                   <Badge className="bg-yellow-500 text-black">
@@ -418,7 +418,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     Visita
                   </Badge>
                 )}
-                
+
                 {/* Tags complementares - NÃO duplicar estado */}
                 {service.is_urgent && (
                   <Badge variant="destructive" className="animate-pulse">
@@ -432,27 +432,27 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     Garantia
                   </Badge>
                 )}
-                
+
                 {/* A Precificar - só se estado não for a_precificar */}
                 {service.pending_pricing && service.status !== 'a_precificar' && (
                   <Badge className="bg-yellow-500 text-black">
                     A Precificar
                   </Badge>
                 )}
-                
+
                 {/* Em Débito - indica débito coexistente */}
-                {service.status !== 'em_debito' && 
-                 (service.final_price || 0) > 0 && 
-                 (service.amount_paid || 0) < (service.final_price || 0) && (
-                  <Badge className="bg-red-500 text-white">
-                    Em Débito
-                  </Badge>
-                )}
+                {service.status !== 'em_debito' &&
+                  (service.final_price || 0) > 0 &&
+                  (service.amount_paid || 0) < (service.final_price || 0) && (
+                    <Badge className="bg-red-500 text-white">
+                      Em Débito
+                    </Badge>
+                  )}
               </div>
 
               {/* Customer Info */}
-              <Section 
-                title="Cliente" 
+              <Section
+                title="Cliente"
                 bgColor="bg-blue-50"
                 borderColor="border-l-blue-500"
               >
@@ -492,8 +492,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               </Section>
 
               {/* Equipment Info */}
-              <Section 
-                title="Detalhes do Serviço" 
+              <Section
+                title="Detalhes do Serviço"
                 bgColor="bg-pink-50"
                 borderColor="border-l-pink-500"
                 action={role === 'dono' ? (
@@ -525,14 +525,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     </p>
                   )}
                 </div>
-                
+
                 {service.fault_description && (
                   <div className="mt-3 p-3 bg-white rounded-lg border">
                     <p className="text-xs text-muted-foreground uppercase mb-1">Avaria Reportada</p>
                     <p className="text-sm">{service.fault_description}</p>
                   </div>
                 )}
-                
+
                 {service.detected_fault && (
                   <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
                     <p className="text-xs text-amber-600 uppercase mb-1">Avaria Detectada</p>
@@ -549,8 +549,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               </Section>
 
               {/* Schedule Info */}
-              <Section 
-                title="Agendamento" 
+              <Section
+                title="Agendamento"
                 bgColor="bg-green-50"
                 borderColor="border-l-green-500"
               >
@@ -558,22 +558,24 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {service.scheduled_date 
+                      {service.scheduled_date
                         ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt })
                         : 'Não agendado'}
                     </span>
                   </div>
                   {service.scheduled_shift && (
                     <Badge variant="secondary" className="capitalize">
-                      {service.scheduled_shift === 'manha' ? 'Manhã' : 
-                       service.scheduled_shift === 'tarde' ? 'Tarde' : 'Noite'}
+                      {service.scheduled_shift === 'manha' ? 'Manhã' :
+                        service.scheduled_shift === 'tarde' ? 'Tarde' :
+                          service.scheduled_shift === 'noite' ? 'Noite' :
+                            service.scheduled_shift}
                     </Badge>
                   )}
                 </div>
-                
+
                 {service.technician?.profile && (
                   <div className="flex items-center gap-3 mt-3">
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium"
                       style={{ backgroundColor: service.technician.color || '#3B82F6' }}
                     >
@@ -589,8 +591,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Pricing - Enhanced financial section */}
               {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
-                <Section 
-                  title="Informação Financeira" 
+                <Section
+                  title="Informação Financeira"
                   bgColor="bg-emerald-50"
                   borderColor="border-l-emerald-500"
                 >
@@ -647,8 +649,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               )}
 
               {/* History */}
-              <Section 
-                title="Histórico" 
+              <Section
+                title="Histórico"
                 bgColor="bg-gray-50"
                 borderColor="border-l-gray-400"
               >
@@ -668,8 +670,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Parts Used / Requested */}
               {serviceParts.length > 0 && (
-                <Section 
-                  title="Peças Utilizadas/Solicitadas" 
+                <Section
+                  title="Peças Utilizadas/Solicitadas"
                   bgColor="bg-yellow-50"
                   borderColor="border-l-yellow-500"
                 >
@@ -714,8 +716,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Payment History - Only for dono/secretaria */}
               {(role === 'dono' || role === 'secretaria') && servicePayments.length > 0 && (
-                <Section 
-                  title="Histórico de Pagamentos" 
+                <Section
+                  title="Histórico de Pagamentos"
                   bgColor="bg-teal-50"
                   borderColor="border-l-teal-500"
                 >
@@ -751,8 +753,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Service Photos */}
               {servicePhotos.length > 0 && (
-                <Section 
-                  title="Fotos do Serviço" 
+                <Section
+                  title="Fotos do Serviço"
                   bgColor="bg-indigo-50"
                   borderColor="border-l-indigo-500"
                 >
@@ -760,9 +762,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     {servicePhotos.map((photo) => (
                       <div key={photo.id} className="relative">
                         <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
-                          <img 
-                            src={photo.file_url} 
-                            alt={photo.description || 'Foto do serviço'} 
+                          <img
+                            src={photo.file_url}
+                            alt={photo.description || 'Foto do serviço'}
                             className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -781,8 +783,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Service Signatures */}
               {serviceSignatures.length > 0 && (
-                <Section 
-                  title="Assinaturas do Cliente" 
+                <Section
+                  title="Assinaturas do Cliente"
                   bgColor="bg-violet-50"
                   borderColor="border-l-violet-500"
                 >
@@ -790,9 +792,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     {serviceSignatures.map((sig) => (
                       <div key={sig.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border">
                         <a href={sig.file_url} target="_blank" rel="noopener noreferrer">
-                          <img 
-                            src={sig.file_url} 
-                            alt="Assinatura" 
+                          <img
+                            src={sig.file_url}
+                            alt="Assinatura"
                             className="w-24 h-14 object-contain border rounded bg-gray-50 hover:opacity-80 transition-opacity cursor-pointer"
                           />
                         </a>
@@ -816,8 +818,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Activity History Timeline */}
               {activityLogs.length > 0 && (
-                <Section 
-                  title="Histórico de Atividades" 
+                <Section
+                  title="Histórico de Atividades"
                   bgColor="bg-slate-50"
                   borderColor="border-l-slate-500"
                 >
@@ -831,8 +833,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Notes */}
               {service.notes && (
-                <Section 
-                  title="Observações" 
+                <Section
+                  title="Observações"
                   bgColor="bg-slate-50"
                   borderColor="border-l-slate-400"
                 >
@@ -847,7 +849,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             <StateActionButtons
               service={service}
               onAssignTechnician={() => setShowAssignModal(true)}
-              onViewDetails={() => {}}
+              onViewDetails={() => { }}
               onStartExecution={role === 'tecnico' ? handleStartExecution : undefined}
               onSetPrice={role === 'dono' ? () => setShowSetPriceModal(true) : undefined}
               onRegisterPayment={(role === 'dono' || role === 'secretaria') ? () => setShowPaymentModal(true) : undefined}
@@ -972,7 +974,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Serviço</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem a certeza que deseja eliminar o serviço {service.code}? 
+              Tem a certeza que deseja eliminar o serviço {service.code}?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1043,10 +1045,10 @@ interface ActivityLogItemProps {
 }
 
 function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
-  const config = ACTION_TYPE_CONFIG[log.action_type] || { 
-    icon: Clock, 
-    bgColor: 'bg-gray-100', 
-    iconColor: 'text-gray-600' 
+  const config = ACTION_TYPE_CONFIG[log.action_type] || {
+    icon: Clock,
+    bgColor: 'bg-gray-100',
+    iconColor: 'text-gray-600'
   };
   const Icon = config.icon;
 

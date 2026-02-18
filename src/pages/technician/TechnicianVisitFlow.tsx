@@ -88,10 +88,16 @@ export default function TechnicianVisitFlow() {
         id: service.id,
         status: 'em_execucao',
       });
-      setCurrentStep('arrived');
-      setShowCamera(true);
+      if (service.detected_fault) {
+        setCurrentStep('working');
+        toast.info('Diagnóstico anterior detectado. Foto de chegada opcional.');
+      } else {
+        setCurrentStep('arrived');
+        setShowCamera(true);
+      }
     } catch (error) {
       console.error('Error updating arrival:', error);
+      toast.error('Erro ao registar chegada');
     }
   };
 
@@ -166,7 +172,7 @@ export default function TechnicianVisitFlow() {
 
       setShowSignature(false);
       setCurrentStep('completed');
-      
+
       setTimeout(() => navigate('/servicos'), 2000);
     } catch (error) {
       console.error('Error completing visit:', error);
@@ -225,7 +231,7 @@ export default function TechnicianVisitFlow() {
               <p className="font-medium">{service.customer?.phone || 'N/A'}</p>
             </div>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <MapPin className="h-4 w-4" />

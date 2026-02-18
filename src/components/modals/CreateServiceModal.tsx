@@ -67,28 +67,28 @@ const formSchema = z.object({
   customer_address: z.string().optional(),
   customer_postal_code: z.string().optional(),
   customer_city: z.string().optional(),
-  
+
   // Equipment
   appliance_type: z.string().min(1, 'Tipo de aparelho é obrigatório'),
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
   fault_description: z.string().min(1, 'Avaria é obrigatória'),
-  
+
   // Options
   is_warranty: z.boolean().default(false),
   warranty_brand: z.string().optional(),
   warranty_process_number: z.string().optional(),
   is_urgent: z.boolean().default(false),
-  
+
   // Location
   service_location: z.enum(['cliente', 'oficina']),
-  
+
   // Schedule
   technician_id: z.string().optional(),
   scheduled_date: z.date().optional(),
   scheduled_shift: z.string().optional(),
-  
+
   // Notes
   notes: z.string().optional(),
 });
@@ -107,7 +107,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
-  
+
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
   const createService = useCreateService();
@@ -135,10 +135,10 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   useEffect(() => {
     const searchCustomer = async () => {
       if (selectedCustomer) return; // Already associated
-      
+
       const searchPhone = customerPhone?.replace(/\s/g, '');
       const searchNif = customerNif?.replace(/\s/g, '');
-      
+
       if ((!searchPhone || searchPhone.length < 6) && (!searchNif || searchNif.length < 6)) {
         setFoundCustomer(null);
         setShowFoundCustomerBox(false);
@@ -147,15 +147,15 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
 
       try {
         let query = supabase.from('customers').select('*');
-        
+
         if (searchPhone && searchPhone.length >= 6) {
           query = query.ilike('phone', `%${searchPhone}%`);
         } else if (searchNif && searchNif.length >= 6) {
           query = query.ilike('nif', `%${searchNif}%`);
         }
-        
+
         const { data, error } = await query.limit(1).maybeSingle();
-        
+
         if (!error && data) {
           setFoundCustomer(data);
           setShowFoundCustomerBox(true);
@@ -174,7 +174,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
 
   const handleSelectFoundCustomer = () => {
     if (!foundCustomer) return;
-    
+
     setSelectedCustomer(foundCustomer);
     form.setValue('customer_name', foundCustomer.name);
     form.setValue('customer_nif', foundCustomer.nif || '');
@@ -206,7 +206,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const processSubmit = async (values: FormValues, customerId?: string) => {
     try {
       let finalCustomerId = customerId;
-      
+
       // Create customer if needed
       if (!finalCustomerId) {
         const newCustomer = await createCustomer.mutateAsync({
@@ -309,7 +309,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                   <p className="text-sm text-blue-700/70 mt-1">Serviço no local do cliente</p>
                 </div>
               </button>
-              
+
               <button
                 onClick={() => {
                   form.setValue('service_location', 'oficina');
@@ -340,9 +340,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                             Cliente selecionado: {selectedCustomer.name}
                           </span>
                         </div>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
+                        <Button
+                          type="button"
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedCustomer(null);
@@ -456,8 +456,8 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
 
-                    {/* Row 3: Morada + Código Postal (only for visit) */}
-                    {serviceLocation === 'cliente' && (
+                    {/* Row 3: Morada + Código Postal */}
+                    {(true) && (
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
@@ -526,10 +526,10 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                         <FormItem>
                           <FormLabel>Avaria *</FormLabel>
                           <FormControl>
-                            <Textarea 
-                              placeholder="Descreva o problema reportado pelo cliente..." 
+                            <Textarea
+                              placeholder="Descreva o problema reportado pelo cliente..."
                               className="min-h-[80px]"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -620,7 +620,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                               {technicians.map((tech) => (
                                 <SelectItem key={tech.id} value={tech.id}>
                                   <div className="flex items-center gap-2">
-                                    <div 
+                                    <div
                                       className="w-3 h-3 rounded-full"
                                       style={{ backgroundColor: tech.color || '#3B82F6' }}
                                     />
@@ -699,8 +699,8 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>
                     Voltar
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createService.isPending || createCustomer.isPending}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >

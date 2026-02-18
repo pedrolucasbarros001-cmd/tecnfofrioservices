@@ -57,6 +57,7 @@ const itemSchema = z.object({
   quantity: z.number().min(1, 'Quantidade mínima é 1'),
   unit_price: z.number().min(0, 'Valor deve ser positivo'),
   tax_rate: z.number(),
+  type: z.enum(['part', 'labor']).default('part'),
 });
 
 const formSchema = z.object({
@@ -90,7 +91,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   const [isLoading, setIsLoading] = useState(false);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [discountValue, setDiscountValue] = useState('');
-  
+
   // Customer states
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
@@ -108,7 +109,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       customer_nif: '',
       customer_email: '',
       items: [
-        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 },
+        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'part' },
       ],
       discount_value: 0,
       discount_type: 'fixed' as const,
@@ -128,10 +129,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   useEffect(() => {
     const searchCustomer = async () => {
       if (selectedCustomer) return;
-      
+
       const searchPhone = customerPhone?.replace(/\s/g, '');
       const searchNif = customerNif?.replace(/\s/g, '');
-      
+
       if ((!searchPhone || searchPhone.length < 6) && (!searchNif || searchNif.length < 6)) {
         setFoundCustomer(null);
         setShowFoundCustomerBox(false);
@@ -140,15 +141,15 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
       try {
         let query = supabase.from('customers').select('*');
-        
+
         if (searchPhone && searchPhone.length >= 6) {
           query = query.ilike('phone', `%${searchPhone}%`);
         } else if (searchNif && searchNif.length >= 6) {
           query = query.ilike('nif', `%${searchNif}%`);
         }
-        
+
         const { data, error } = await query.limit(1).maybeSingle();
-        
+
         if (!error && data) {
           setFoundCustomer(data as Customer);
           setShowFoundCustomerBox(true);
@@ -177,12 +178,12 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
 
   const subtotal = watchItems.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
   const totalTax = watchItems.reduce((sum, item) => sum + calculateItemTax(item), 0);
-  
+
   const parsedDiscountValue = parseFloat(discountValue.replace(',', '.')) || 0;
-  const discountAmount = discountType === 'percent' 
-    ? subtotal * (parsedDiscountValue / 100) 
+  const discountAmount = discountType === 'percent'
+    ? subtotal * (parsedDiscountValue / 100)
     : parsedDiscountValue;
-  
+
   const total = subtotal - discountAmount + totalTax;
 
   const handleSelectFoundCustomer = () => {
@@ -211,16 +212,25 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
           qty: item.quantity,
           price: item.unit_price,
           tax: item.tax_rate,
+          type: item.type,
         })),
         discount: discountAmount,
         discountType: discountType,
         discountValue: parsedDiscountValue,
       };
 
+      const partsTotal = values.items
+        .filter(item => item.type === 'part')
+        .reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
+      const laborTotal = values.items
+        .filter(item => item.type === 'labor')
+        .reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
       const { error } = await supabase.from('budgets').insert({
         customer_id: customerId || null,
-        estimated_labor: subtotal,
-        estimated_parts: totalTax,
+        estimated_labor: laborTotal,
+        estimated_parts: partsTotal,
         estimated_total: total,
         status: 'pendente',
         pricing_description: JSON.stringify(pricingData),
@@ -254,7 +264,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   const handleConfirmCreateCustomer = async () => {
     if (!pendingFormValues) return;
     setShowCreateCustomerDialog(false);
-    
+
     try {
       const newCustomer = await createCustomer.mutateAsync({
         name: pendingFormValues.customer_name || '',
@@ -262,13 +272,13 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         nif: pendingFormValues.customer_nif,
         email: pendingFormValues.customer_email,
       });
-      
+
       await processSubmit(pendingFormValues, newCustomer.id);
     } catch (error) {
       console.error('Error creating customer:', error);
       toast.error('Erro ao criar cliente');
     }
-    
+
     setPendingFormValues(null);
   };
 
@@ -309,14 +319,14 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
               <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
                 <div className="space-y-6 py-4 pr-4">
-                  
+
                   {/* Dados do Cliente (Opcional) */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="h-4 w-4" />
                       <span>Dados do Cliente (Opcional)</span>
                     </div>
-                    
+
                     {/* Cliente já selecionado */}
                     {selectedCustomer && (
                       <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg">
@@ -326,9 +336,9 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                             Cliente: {selectedCustomer.name}
                           </span>
                         </div>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
+                        <Button
+                          type="button"
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedCustomer(null);
@@ -424,6 +434,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                             <TableHead className="min-w-[200px]">Artigo</TableHead>
                             <TableHead className="min-w-[150px]">Descrição</TableHead>
                             <TableHead className="w-[80px]">Qtd</TableHead>
+                            <TableHead className="w-[110px]">Tipo</TableHead>
                             <TableHead className="w-[120px]">Valor (€)</TableHead>
                             <TableHead className="w-[100px]">Imposto</TableHead>
                             <TableHead className="w-[140px] text-right">Subtotal (€)</TableHead>
@@ -444,17 +455,17 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     render={({ field }) => (
                                       <FormItem>
                                         <FormControl>
-                                          <Input 
-                                            placeholder="Ex: Compressor" 
+                                          <Input
+                                            placeholder="Ex: Compressor"
                                             className="h-9"
-                                            {...field} 
+                                            {...field}
                                           />
                                         </FormControl>
                                       </FormItem>
                                     )}
                                   />
                                 </TableCell>
-                                
+
                                 {/* Descrição */}
                                 <TableCell className="p-2">
                                   <FormField
@@ -463,17 +474,17 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     render={({ field }) => (
                                       <FormItem>
                                         <FormControl>
-                                          <Input 
-                                            placeholder="Detalhe" 
+                                          <Input
+                                            placeholder="Detalhe"
                                             className="h-9"
-                                            {...field} 
+                                            {...field}
                                           />
                                         </FormControl>
                                       </FormItem>
                                     )}
                                   />
                                 </TableCell>
-                                
+
                                 {/* Qtd */}
                                 <TableCell className="p-2">
                                   <FormField
@@ -494,7 +505,33 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     )}
                                   />
                                 </TableCell>
-                                
+
+                                {/* Tipo */}
+                                <TableCell className="p-2">
+                                  <FormField
+                                    control={form.control}
+                                    name={`items.${index}.type`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <Select
+                                          value={field.value}
+                                          onValueChange={field.onChange}
+                                        >
+                                          <FormControl>
+                                            <SelectTrigger className="h-9">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="part">Peça</SelectItem>
+                                            <SelectItem value="labor">Mão de Obra</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </TableCell>
+
                                 {/* Valor (€) */}
                                 <TableCell className="p-2">
                                   <FormField
@@ -516,7 +553,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     )}
                                   />
                                 </TableCell>
-                                
+
                                 {/* Imposto */}
                                 <TableCell className="p-2">
                                   <FormField
@@ -545,7 +582,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                                     )}
                                   />
                                 </TableCell>
-                                
+
                                 {/* Subtotal (€) com botão delete integrado */}
                                 <TableCell className="p-2 text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -575,7 +612,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23 })}
+                      onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'part' })}
                       className="w-full"
                     >
                       <Plus className="h-4 w-4 mr-2" />

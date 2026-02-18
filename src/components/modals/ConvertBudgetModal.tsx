@@ -273,8 +273,8 @@ export function ConvertBudgetModal({
             </div>
           )}
 
-          {/* Address fields for non-reparacao or cliente location */}
-          {(serviceType !== 'reparacao' || serviceLocation === 'cliente') && (
+          {/* Address fields */}
+          {(true) && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Morada</Label>

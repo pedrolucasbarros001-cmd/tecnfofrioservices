@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -22,6 +22,13 @@ import {
   Truck,
   ChevronRight,
   CalendarIcon,
+  Globe,
+  Wallet,
+  Tags,
+  Map,
+  ClipboardList,
+  Paperclip,
+  Users,
 } from 'lucide-react';
 import {
   Sheet,
@@ -29,6 +36,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -70,6 +91,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
+import { useUpdateCustomer } from '@/hooks/useCustomers';
 import type { Customer, Service, ServiceStatus } from '@/types/database';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
@@ -81,6 +103,20 @@ interface CustomerDetailSheetProps {
   onUpdate?: () => void;
 }
 
+const customerFormSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório'),
+  nif: z.string().optional().nullable(),
+  phone: z.string().min(1, 'Telefone é obrigatório'),
+  email: z.string().email('Email inválido').optional().nullable().or(z.literal('')),
+  address: z.string().optional().nullable(),
+  postal_code: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  customer_type: z.enum(['particular', 'empresa']).default('particular'),
+  notes: z.string().optional().nullable(),
+});
+
+type CustomerFormValues = z.infer<typeof customerFormSchema>;
+
 export function CustomerDetailSheet({
   open,
   onOpenChange,
@@ -90,6 +126,54 @@ export function CustomerDetailSheet({
   const [showCreateServiceModal, setShowCreateServiceModal] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showServiceDetail, setShowServiceDetail] = useState(false);
+  const updateCustomer = useUpdateCustomer();
+
+  const form = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerFormSchema),
+    defaultValues: {
+      name: '',
+      nif: '',
+      phone: '',
+      email: '',
+      address: '',
+      postal_code: '',
+      city: '',
+      customer_type: 'particular',
+      notes: '',
+    },
+  });
+
+  // Reset form when customer changes
+  useEffect(() => {
+    if (customer) {
+      form.reset({
+        name: customer.name || '',
+        nif: customer.nif || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        address: customer.address || '',
+        postal_code: customer.postal_code || '',
+        city: customer.city || '',
+        customer_type: (customer.customer_type as any) || 'particular',
+        notes: customer.notes || '',
+      });
+    }
+  }, [customer, form]);
+
+  const handleUpdateProfile = async (values: CustomerFormValues) => {
+    if (!customer) return;
+    try {
+      await updateCustomer.mutateAsync({
+        id: customer.id,
+        ...values,
+      });
+      toast.success('Perfil atualizado com sucesso');
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Erro ao atualizar perfil');
+    }
+  };
 
   // Fetch customer services
   const { data: services = [], isLoading: loadingServices, refetch: refetchServices } = useQuery({
@@ -112,31 +196,7 @@ export function CustomerDetailSheet({
     enabled: !!customer?.id && open,
   });
 
-  // Fetch customer budgets
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['customer-budgets', customer?.id],
-    queryFn: async () => {
-      if (!customer?.id) return [];
-      const { data, error } = await supabase
-        .from('budgets')
-        .select('*')
-        .eq('customer_id', customer.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!customer?.id && open,
-  });
-
   if (!customer) return null;
-
-  const getServiceTypeIcon = (service: Service) => {
-    if (service.service_type === 'entrega') return <Truck className="h-4 w-4" />;
-    if (service.service_type === 'instalacao') return <Package className="h-4 w-4" />;
-    if (service.service_location === 'oficina') return <Wrench className="h-4 w-4" />;
-    return <MapPin className="h-4 w-4" />;
-  };
 
   const handleViewService = (service: Service) => {
     setSelectedService(service);
@@ -148,246 +208,289 @@ export function CustomerDetailSheet({
     onUpdate?.();
   };
 
-  const activeServices = services.filter(s => !['finalizado', 'concluidos'].includes(s.status));
-  const completedServices = services.filter(s => ['finalizado', 'concluidos'].includes(s.status));
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-xl flex flex-col p-0">
+        <SheetContent className="w-full sm:max-w-[1000px] flex flex-col p-0 h-[90vh] my-auto rounded-l-xl border-l-0 shadow-2xl">
           {/* Header */}
-          <SheetHeader className="flex-shrink-0 p-6 pb-4 border-b">
+          <SheetHeader className="flex-shrink-0 p-6 pb-4 border-b bg-muted/20">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-7 w-7 text-primary" />
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1">
-                <SheetTitle className="text-xl">{customer.name}</SheetTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">ID: {customer.id.slice(0, 8)}</span>
+                  <SheetTitle className="text-xl">{customer.name}</SheetTitle>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={customer.customer_type === 'empresa' ? 'outline' : 'secondary'}>
-                    {customer.customer_type === 'empresa' ? (
-                      <>
-                        <Building2 className="h-3 w-3 mr-1" />
-                        Empresa
-                      </>
-                    ) : (
-                      'Particular'
-                    )}
+                  <Badge variant={customer.customer_type === 'empresa' ? 'outline' : 'secondary'} className="rounded-md">
+                    {customer.customer_type === 'empresa' ? 'Empresa' : 'Particular'}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {services.length} serviço{services.length !== 1 ? 's' : ''}
+                    {services.length} serviço{services.length !== 1 ? 's' : ''} registados
                   </span>
                 </div>
               </div>
-            </div>
-          </SheetHeader>
-
-          <ScrollArea className="flex-1">
-            <div className="p-6 space-y-6">
-              {/* Contact Info */}
-              <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4">
-                <h3 className="font-semibold text-sm text-blue-700 dark:text-blue-400 mb-3">
-                  Informações de Contacto
-                </h3>
-                <div className="space-y-2 text-sm">
-                  {customer.phone && (
-                    <p className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <a href={`tel:${customer.phone}`} className="hover:underline">
-                        {customer.phone}
-                      </a>
-                    </p>
-                  )}
-                  {customer.email && (
-                    <p className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <a href={`mailto:${customer.email}`} className="hover:underline">
-                        {customer.email}
-                      </a>
-                    </p>
-                  )}
-                  {customer.nif && (
-                    <p className="text-muted-foreground">NIF: {customer.nif}</p>
-                  )}
-                  {customer.address && (
-                    <p className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      {[customer.address, customer.postal_code, customer.city]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="flex gap-3">
-                <Button
-                  className="flex-1"
-                  onClick={() => setShowCreateServiceModal(true)}
-                >
+              <div className="flex gap-2">
+                <Button variant="default" className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateServiceModal(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Serviço
                 </Button>
               </div>
-
-              <Separator />
-
-              {/* Active Services */}
-              <div>
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-orange-500" />
-                  Serviços Ativos ({activeServices.length})
-                </h3>
-                {loadingServices ? (
-                  <p className="text-sm text-muted-foreground">A carregar...</p>
-                ) : activeServices.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    Nenhum serviço ativo
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {activeServices.map((service) => {
-                      const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
-                      return (
-                        <button
-                          key={service.id}
-                          onClick={() => handleViewService(service)}
-                          className="w-full p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors text-left"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-semibold text-primary">
-                                  {service.code}
-                                </span>
-                                <Badge className={cn("text-xs", statusConfig?.color)}>
-                                  {statusConfig?.label}
-                                </Badge>
-                                {service.is_urgent && (
-                                  <AlertCircle className="h-4 w-4 text-red-500" />
-                                )}
-                                {service.is_warranty && (
-                                  <Shield className="h-4 w-4 text-purple-500" />
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                {getServiceTypeIcon(service)}
-                                <span>
-                                  {[service.appliance_type, service.brand]
-                                    .filter(Boolean)
-                                    .join(' ') || 'Equipamento não especificado'}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {format(new Date(service.created_at), "d 'de' MMMM", { locale: pt })}
-                              </p>
-                            </div>
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Completed Services */}
-              {completedServices.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <Wrench className="h-4 w-4 text-green-500" />
-                    Histórico ({completedServices.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {completedServices.slice(0, 5).map((service) => {
-                      const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
-                      return (
-                        <button
-                          key={service.id}
-                          onClick={() => handleViewService(service)}
-                          className="w-full p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors text-left"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-semibold text-muted-foreground">
-                                  {service.code}
-                                </span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {statusConfig?.label}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {[service.appliance_type, service.brand]
-                                  .filter(Boolean)
-                                  .join(' ') || 'Equipamento não especificado'}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {format(new Date(service.created_at), "d 'de' MMMM 'de' yyyy", { locale: pt })}
-                              </p>
-                            </div>
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {completedServices.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center pt-2">
-                        +{completedServices.length - 5} serviços anteriores
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Budgets */}
-              {budgets.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-500" />
-                    Orçamentos ({budgets.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {budgets.slice(0, 3).map((budget: any) => (
-                      <div
-                        key={budget.id}
-                        className="p-3 rounded-lg border bg-card"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-mono font-semibold">{budget.code}</span>
-                            <p className="text-sm text-muted-foreground">
-                              {budget.appliance_type || 'Sem tipo'}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <Badge
-                              className={cn(
-                                budget.status === 'pendente' && 'bg-yellow-500 text-black',
-                                budget.status === 'aprovado' && 'bg-green-500',
-                                budget.status === 'recusado' && 'bg-red-500',
-                                budget.status === 'convertido' && 'bg-blue-500'
-                              )}
-                            >
-                              {budget.status === 'pendente' ? 'Pendente' :
-                                budget.status === 'aprovado' ? 'Aprovado' :
-                                  budget.status === 'recusado' ? 'Recusado' : 'Convertido'}
-                            </Badge>
-                            {budget.estimated_total && (
-                              <p className="text-sm font-semibold text-orange-600 mt-1">
-                                {budget.estimated_total.toFixed(2)} €
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-          </ScrollArea>
+          </SheetHeader>
+
+          <Tabs defaultValue="perfil" className="flex flex-1 overflow-hidden">
+            {/* Sidebar Tabs */}
+            <div className="w-[200px] border-r bg-muted/10 p-4">
+              <TabsList className="flex flex-col h-auto bg-transparent gap-1 items-stretch p-0">
+                <TabsTrigger
+                  value="perfil"
+                  className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
+                >
+                  <User className="h-4 w-4" /> Perfil
+                </TabsTrigger>
+                <TabsTrigger
+                  value="servicos"
+                  className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Serviços
+                  <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
+                    {services.length}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Tab Contents */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  {/* Perfil Content */}
+                  <TabsContent value="perfil" className="mt-0 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold border-b pb-2 mb-4">Dados Cadastrais</h3>
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleUpdateProfile)} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                  <FormLabel>Nome Completo / Empresa *</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="customer_type"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Tipo de Cliente</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o tipo" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="particular">Particular</SelectItem>
+                                      <SelectItem value="empresa">Empresa</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="nif"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>NIF</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} value={field.value || ''} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Telefone *</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} value={field.value || ''} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="md:col-span-2 pt-4">
+                              <h4 className="font-medium text-sm text-muted-foreground border-b pb-2 mb-4">Localização</h4>
+                              <div className="space-y-4">
+                                <FormField
+                                  control={form.control}
+                                  name="address"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Morada</FormLabel>
+                                      <FormControl>
+                                        <Textarea {...field} value={field.value || ''} rows={2} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="city"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Cidade</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} value={field.value || ''} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="postal_code"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Código Postal</FormLabel>
+                                        <FormControl>
+                                          <Input {...field} value={field.value || ''} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <FormField
+                              control={form.control}
+                              name="notes"
+                              render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                  <FormLabel>Notas Internas</FormLabel>
+                                  <FormControl>
+                                    <Textarea {...field} value={field.value || ''} rows={3} placeholder="Observações sobre este cliente..." />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex justify-end pt-4">
+                            <Button type="submit" disabled={updateCustomer.isPending}>
+                              {updateCustomer.isPending ? 'A guardar...' : 'Guardar Alterações'}
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </div>
+                  </TabsContent>
+
+                  {/* Serviços Content */}
+                  <TabsContent value="servicos" className="mt-0">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold">Histórico de Serviços</h3>
+                      <Button variant="outline" size="sm" onClick={refetchServices}>
+                        <Clock className="h-4 w-4 mr-2" /> Atualizar
+                      </Button>
+                    </div>
+                    {loadingServices ? (
+                      <p className="text-center py-8 text-muted-foreground">A carregar serviços...</p>
+                    ) : services.length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                        <Wrench className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                        <p className="text-muted-foreground">Nenhum serviço registado para este cliente.</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[120px]">Código</TableHead>
+                              <TableHead>Aparelho</TableHead>
+                              <TableHead>Avaria</TableHead>
+                              <TableHead>Data</TableHead>
+                              <TableHead>Valor</TableHead>
+                              <TableHead className="text-right">Estado</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {services.map((service) => {
+                              const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus];
+                              const isPaid = (service.amount_paid || 0) >= (service.final_price || 0) && (service.final_price || 0) > 0;
+
+                              return (
+                                <TableRow
+                                  key={service.id}
+                                  className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                  onClick={() => handleViewService(service)}
+                                >
+                                  <TableCell className="font-mono font-medium text-primary">
+                                    {service.code}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {[service.appliance_type, service.brand].filter(Boolean).join(' ')}
+                                  </TableCell>
+                                  <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                                    {service.fault_description}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {service.scheduled_date ? format(new Date(service.scheduled_date), 'dd/MM/yyyy') : '-'}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {service.final_price?.toFixed(2) || '0,00'} €
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusConfig?.color)}>
+                                      {statusConfig?.label}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </TabsContent>
+                </div>
+              </ScrollArea>
+            </div>
+          </Tabs>
         </SheetContent>
       </Sheet>
 
@@ -497,9 +600,9 @@ function CreateServiceFromCustomerModal({
         notes: values.notes,
         service_type: values.service_type,
         status: initialStatus,
-        service_address: values.service_address || customer.address,
-        service_postal_code: values.service_postal_code || customer.postal_code,
-        service_city: values.service_city || customer.city,
+        service_address: values.service_address || null,
+        service_postal_code: values.service_postal_code || null,
+        service_city: values.service_city || null,
         // Using a simpler logic for pricing
         pending_pricing: values.is_warranty ? false : undefined,
         final_price: values.is_warranty ? 0 : undefined,
@@ -554,6 +657,10 @@ function CreateServiceFromCustomerModal({
               onClick={() => {
                 form.setValue('service_type', 'instalacao');
                 form.setValue('service_location', 'cliente');
+                // Clear address fields if needed or keep them empty for "not inherited"
+                form.setValue('service_address', '');
+                form.setValue('service_postal_code', '');
+                form.setValue('service_city', '');
                 setStep('form');
               }}
               className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-primary/10 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all group"
@@ -570,6 +677,10 @@ function CreateServiceFromCustomerModal({
               onClick={() => {
                 form.setValue('service_type', 'entrega');
                 form.setValue('service_location', 'cliente');
+                // Clear address fields if needed or keep them empty for "not inherited"
+                form.setValue('service_address', '');
+                form.setValue('service_postal_code', '');
+                form.setValue('service_city', '');
                 setStep('form');
               }}
               className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-primary/10 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all group"
@@ -684,8 +795,8 @@ function CreateServiceFromCustomerModal({
                     )}
                   />
 
-                  {/* Address fields for visits/installations/deliveries */}
-                  {(serviceType !== 'reparacao' || form.watch('service_location') === 'cliente') && (
+                  {/* Address fields */}
+                  {form.watch('service_location') === 'cliente' && (
                     <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-4">
                       <h4 className="font-medium text-blue-800 flex items-center gap-2 text-sm">
                         <MapPin className="h-4 w-4" />
@@ -911,7 +1022,11 @@ function CreateServiceFromCustomerModal({
                   variant="outline"
                   onClick={() => {
                     if (step === 'form') {
-                      setStep(serviceType === 'reparacao' ? 'location' : 'type');
+                      if (serviceType === 'reparacao') {
+                        setStep('location');
+                      } else {
+                        setStep('type');
+                      }
                     } else if (step === 'location') {
                       setStep('type');
                     }

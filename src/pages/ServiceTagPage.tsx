@@ -140,6 +140,8 @@ export default function ServiceTagPage() {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
         }
         .tag-preview-wrapper {
@@ -152,8 +154,7 @@ export default function ServiceTagPage() {
         }
         .print-tag-container {
           width: 62mm;
-          height: auto;
-          min-height: 90mm;
+          height: 90mm;
           background: white;
           box-sizing: border-box;
           display: flex;
@@ -188,26 +189,26 @@ export default function ServiceTagPage() {
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
           {/* Top blue bar */}
-          <div style={{ width: '100%', height: '5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+          <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
           {/* Logo */}
-          <div style={{ padding: '3mm 4mm 2mm', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ padding: '2mm 4mm 1mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
             <img
               src={tecnofrioLogoFull}
               alt="TECNOFRIO"
-              style={{ height: '8mm', objectFit: 'contain' }}
+              style={{ height: '7mm', maxWidth: '100%', objectFit: 'contain' }}
             />
           </div>
 
           {/* QR Code */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0 2mm' }}>
-            <QRCodeSVG value={qrUrl} size={120} level="M" includeMargin={false} />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0' }}>
+            <QRCodeSVG value={qrUrl} size={110} level="M" includeMargin={false} />
           </div>
 
           {/* Service Code */}
-          <div style={{ textAlign: 'center', padding: '2mm 4mm 1mm' }}>
+          <div style={{ textAlign: 'center', padding: '1mm 4mm' }}>
             <p style={{
-              fontSize: '14px',
+              fontSize: '13px',
               fontFamily: 'monospace',
               fontWeight: 'bold',
               color: '#2B4F84',
@@ -219,14 +220,24 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 'calc(100% - 8mm)', height: '0.5px', backgroundColor: '#e5e7eb', margin: '1mm 4mm' }} />
+          <div style={{ width: 'calc(100% - 6mm)', height: '0.2mm', backgroundColor: '#e5e7eb', margin: '1mm 3mm' }} />
 
           {/* Details */}
-          <div style={{ padding: '1mm 4mm 2mm', width: '100%', boxSizing: 'border-box', flex: 1 }}>
+          <div style={{ padding: '1mm 4mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
             {details.map(({ label, value }) => (
-              <div key={label} style={{ display: 'flex', gap: '2px', marginBottom: '1mm', lineHeight: '1.3' }}>
-                <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '12px' }}>{label}:</span>
-                <span style={{ fontSize: '9px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+              <div key={label} style={{ display: 'flex', gap: '3px', marginBottom: '0.5mm', lineHeight: '1.2' }}>
+                <span style={{ fontSize: '8.5px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '13px' }}>{label}:</span>
+                <span style={{
+                  fontSize: '8.5px',
+                  color: '#000000',
+                  wordBreak: 'break-all',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }} title={value || ''}>
+                  {value}
+                </span>
               </div>
             ))}
           </div>

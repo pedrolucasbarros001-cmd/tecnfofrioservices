@@ -29,6 +29,7 @@ interface BudgetItem {
   qty: number;
   price: number;
   tax: number;
+  type: 'part' | 'labor';
 }
 
 const TAX_RATES = [
@@ -65,21 +66,22 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
             qty: it.qty || 1,
             price: it.price || 0,
             tax: it.tax ?? 23,
+            type: it.type || 'part',
           })));
         } else {
-          setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23 }]);
+          setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
         }
         setDiscountValue(parsed.discountValue || parsed.discount || 0);
         setDiscountType(parsed.discountType === 'percent' ? 'percent' : 'euro');
       } catch {
-        setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23 }]);
+        setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
         setDiscountValue(0);
         setDiscountType('euro');
       }
     }
   }, [open, budget]);
 
-  const addItem = () => setItems(prev => [...prev, { description: '', details: '', qty: 1, price: 0, tax: 23 }]);
+  const addItem = () => setItems(prev => [...prev, { description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
   const removeItem = (index: number) => setItems(prev => prev.filter((_, i) => i !== index));
   const updateItem = (index: number, field: keyof BudgetItem, value: any) => {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
@@ -108,12 +110,21 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
         discountType,
         discountValue,
       };
+
+      const partsTotal = validItems
+        .filter(it => it.type === 'part')
+        .reduce((sum, it) => sum + it.qty * it.price, 0);
+
+      const laborTotal = validItems
+        .filter(it => it.type === 'labor')
+        .reduce((sum, it) => sum + it.qty * it.price, 0);
+
       const { error } = await supabase
         .from('budgets')
         .update({
           pricing_description: JSON.stringify(pricingData),
-          estimated_labor: totals.subtotal,
-          estimated_parts: totals.iva,
+          estimated_labor: laborTotal,
+          estimated_parts: partsTotal,
           estimated_total: totals.total,
           notes: notes || null,
         })
@@ -146,6 +157,7 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
                 <span>Artigo</span>
                 <span>Descrição</span>
                 <span>Qtd</span>
+                <span>Tipo</span>
                 <span>Valor</span>
                 <span>IVA</span>
                 <span></span>
@@ -171,6 +183,13 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
                     min={1}
                     className="h-8 text-sm"
                   />
+                  <Select value={item.type} onValueChange={v => updateItem(index, 'type', v as 'part' | 'labor')}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="part">Peça</SelectItem>
+                      <SelectItem value="labor">Mão de Obra</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     value={item.price}

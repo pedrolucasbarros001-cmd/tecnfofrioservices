@@ -28,21 +28,44 @@ const SHIFT_LABELS: Record<string, string> = {
   noite: 'Noite',
 };
 
-export function AgendaDrawer({ 
-  date, 
-  services, 
-  open, 
-  onOpenChange, 
-  onServiceClick 
+export function AgendaDrawer({
+  date,
+  services,
+  open,
+  onOpenChange,
+  onServiceClick
 }: AgendaDrawerProps) {
   if (!date) return null;
 
-  const groupedByShift: Record<string, Service[]> = {};
-  
-  SHIFT_ORDER.forEach(shift => {
-    groupedByShift[shift] = services.filter(s => s.scheduled_shift === shift);
+  // Helper to get friendly shift label
+  const getShiftLabel = (shift: string | null | undefined): string => {
+    if (!shift) return 'Sem hora definida';
+    if (shift === 'manha') return 'Manhã';
+    if (shift === 'tarde') return 'Tarde';
+    if (shift === 'noite') return 'Noite';
+    return shift;
+  };
+
+  // Group services by shift value
+  const groupedServices = services.reduce((acc, service) => {
+    const shift = service.scheduled_shift || 'sem_turno';
+    if (!acc[shift]) acc[shift] = [];
+    acc[shift].push(service);
+    return acc;
+  }, {} as Record<string, Service[]>);
+
+  // Sort groups: legacy shifts first (in order), then specific times, then sem_turno
+  const sortedShiftKeys = Object.keys(groupedServices).sort((a, b) => {
+    if (a === 'sem_turno') return 1;
+    if (b === 'sem_turno') return -1;
+
+    const order = { 'manha': 1, 'tarde': 2, 'noite': 3 };
+    const aOrder = order[a as keyof typeof order] || 4;
+    const bOrder = order[b as keyof typeof order] || 4;
+
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return a.localeCompare(b);
   });
-  groupedByShift['sem_turno'] = services.filter(s => !s.scheduled_shift);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -64,14 +87,13 @@ export function AgendaDrawer({
             </div>
           ) : (
             <div className="space-y-6 pr-4">
-              {SHIFT_ORDER.map(shift => {
-                const shiftServices = groupedByShift[shift];
-                if (!shiftServices || shiftServices.length === 0) return null;
-                
+              {sortedShiftKeys.map(shiftKey => {
+                const shiftServices = groupedServices[shiftKey];
+
                 return (
-                  <div key={shift}>
+                  <div key={shiftKey}>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      {SHIFT_LABELS[shift]}
+                      {getShiftLabel(shiftKey === 'sem_turno' ? null : shiftKey)}
                     </h4>
                     <div className="space-y-2">
                       {shiftServices.map(service => (
@@ -88,26 +110,6 @@ export function AgendaDrawer({
                   </div>
                 );
               })}
-              
-              {groupedByShift['sem_turno']?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Sem turno definido
-                  </h4>
-                  <div className="space-y-2">
-                    {groupedByShift['sem_turno'].map(service => (
-                      <ServiceDrawerCard
-                        key={service.id}
-                        service={service}
-                        onClick={() => {
-                          onOpenChange(false);
-                          onServiceClick(service);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </ScrollArea>
