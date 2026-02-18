@@ -25,6 +25,14 @@ export async function ensureValidSession() {
   const { data, error } = await supabase.auth.getSession();
 
   if (error || !data.session) {
+    // if the session is gone, force a logout and navigate to login to avoid
+    // repeated query errors that trigger the error boundary.
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
     throw new Error('Sessão expirada. Por favor, faça login novamente.');
   }
 
@@ -34,6 +42,12 @@ export async function ensureValidSession() {
   if (tokenExp && tokenExp - now < 60) {
     const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError || !refreshed.session) {
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       throw new Error('Sessão expirada. Por favor, faça login novamente.');
     }
     return refreshed.session;
