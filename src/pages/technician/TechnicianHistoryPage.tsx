@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { TechnicianServiceSheet } from '@/components/technician/TechnicianServiceSheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -127,6 +127,12 @@ export default function TechnicianHistoryPage() {
                     {services.length} Serviços no total
                 </Badge>
             </div>
+            <p className="text-sm text-muted-foreground mt-2">
+                Ao abrir a ficha de um serviço verá apenas informações básicas e fotos –
+                não há ações administrativas como emissão de etiquetas ou alteração de
+                valores. Essa visão simplificada é pensada para técnicos, evitando
+                distrações.
+            </p>
 
             {/* Search and Filter */}
             <div className="relative">
@@ -199,13 +205,12 @@ export default function TechnicianHistoryPage() {
                 </div>
             )}
 
-            {/* Service Detail Sheet */}
+            {/* Simplified service view for technicians */}
             {selectedService && (
-                <ServiceDetailSheet
+                <TechnicianServiceSheet
                     service={selectedService}
                     open={showDetailSheet}
                     onOpenChange={setShowDetailSheet}
-                    onServiceUpdated={() => queryClient.invalidateQueries({ queryKey: ['technician-history'] })}
                 />
             )}
 
