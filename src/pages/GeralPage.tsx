@@ -44,6 +44,7 @@ export default function GeralPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(searchParams.get('status') as ServiceStatus || 'all');
+  const [selectedLocation, setSelectedLocation] = useState<'cliente' | 'oficina' | 'all'>(searchParams.get('location') as any || 'all');
   const PAGE_SIZE = 50;
 
   // Debounce search
@@ -54,6 +55,14 @@ export default function GeralPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Sync state with URL params
+  useEffect(() => {
+    const statusParam = searchParams.get('status') as ServiceStatus || 'all';
+    const locationParam = searchParams.get('location') as any || 'all';
+    setSelectedStatus(statusParam);
+    setSelectedLocation(locationParam);
+  }, [searchParams]);
 
   // Current service for actions
   const [currentService, setCurrentService] = useState<Service | null>(null);
@@ -88,6 +97,7 @@ export default function GeralPage() {
     isLoading
   } = usePaginatedServices({
     status: effectiveStatus as any,
+    location: selectedLocation,
     page: currentPage,
     pageSize: PAGE_SIZE,
     searchTerm: debouncedSearch || undefined,
@@ -120,15 +130,20 @@ export default function GeralPage() {
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
   const filteredServices = services;
+
   const handleStatusFilter = (status: ServiceStatus | 'all') => {
     setSelectedStatus(status);
     setCurrentPage(1);
+    const newParams = new URLSearchParams(searchParams);
     if (status === 'all') {
-      searchParams.delete('status');
+      newParams.delete('status');
     } else {
-      searchParams.set('status', status);
+      newParams.set('status', status);
     }
-    setSearchParams(searchParams);
+    // Clear location if setting a specific status that is not location agnostic? 
+    // Usually status filters are primary. But let's keep location if set, unless user explicitly clears it.
+    // For now, simple behavior.
+    setSearchParams(newParams);
   };
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);

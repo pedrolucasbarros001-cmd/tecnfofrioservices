@@ -37,7 +37,7 @@ interface DashboardStats {
 const DASHBOARD_CARDS = [
   { key: 'por_fazer' as const, label: 'Aberto', icon: ClipboardList, route: '/geral?status=por_fazer' },
   { key: 'em_execucao' as const, label: 'Em Execução', icon: Play, route: '/geral?status=em_execucao' },
-  { key: 'na_oficina' as const, label: 'Oficina', icon: Building2, route: '/geral?status=na_oficina' },
+  { key: 'na_oficina' as const, label: 'Oficina', icon: Building2, route: '/geral?location=oficina' },
   { key: 'para_pedir_peca' as const, label: 'Pedir Peça', icon: Package, route: '/geral?status=para_pedir_peca' },
   { key: 'em_espera_de_peca' as const, label: 'Espera de Peça', icon: Clock, route: '/geral?status=em_espera_de_peca' },
   { key: 'concluidos' as const, label: 'Oficina Reparados', icon: Truck, route: '/geral?status=concluidos' },
@@ -80,7 +80,7 @@ export default function DashboardPage() {
       // Fetch services stats (incluindo final_price e amount_paid para cálculo de débito)
       const { data: services, error: servicesError } = await supabase
         .from('services')
-        .select('status, pending_pricing, final_price, amount_paid, is_warranty');
+        .select('status, pending_pricing, final_price, amount_paid, is_warranty, service_location');
 
       if (servicesError) throw servicesError;
 
@@ -106,17 +106,37 @@ export default function DashboardPage() {
 
       services?.forEach((service) => {
         const status = service.status as ServiceStatus;
-        
-        // Contagem de status operacionais (excluindo a_precificar e em_debito que são calculados)
+
+        // Contagem de status operacionais
         if (status !== 'a_precificar' && status !== 'em_debito' && status in counts) {
-          counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito'>]++;
+          // Special handling for 'na_oficina': we want location based count, not status based
+          // So if status is 'na_oficina', we don't auto-increment here if we want strictly location logic?
+          // Actually, if we want "Oficina" card to be location based, we should calculate it separately.
+          // BUT, if we want coexistence, active status counters (like 'para_pedir_peca') should still work.
+          // The issue is 'na_oficina' status is somewhat redundant if we use location.
+          // Let's increment standard statuses EXCEPT 'na_oficina' which we'll handle by location.
+          if (status !== 'na_oficina') {
+            counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito'>]++;
+          }
         }
-        
+
+        // Count for "Oficina" card based on LOCATION
+        // Includes any service physically in workshop, unless finalized/delivered?
+        // User said "permanece na oficina ate ele ter uma reparação conluida".
+        // Usually 'concluidos' status might mean repair done but still in workshop?
+        // 'finalizado' usually means delivered/done.
+        // Let's include everything with location='oficina' except maybe 'finalizado'/'entregue'?
+        // The user's request: "serviços que estao com location oficina ... permanece na oficina".
+
+        if (service.service_location === 'oficina' && status !== 'finalizado') {
+          counts.na_oficina++;
+        }
+
         // "A Precificar" = pending_pricing=true (estado financeiro, não operacional)
         if (service.pending_pricing) {
           counts.a_precificar++;
         }
-        
+
         // "Em Débito" = tem preço, não é garantia, e amount_paid < final_price (estado financeiro calculado)
         const finalPrice = service.final_price || 0;
         const amountPaid = service.amount_paid || 0;
@@ -150,14 +170,14 @@ export default function DashboardPage() {
           const Icon = card.icon;
           const count = stats[card.key as keyof DashboardStats];
           const isLit = count > 0;
-          
+
           return (
             <Card
               key={card.key}
               className={cn(
                 "cursor-pointer transition-all duration-200",
-                isLit 
-                  ? "bg-[hsl(207,74%,63%)] border-[hsl(207,65%,53%)] shadow-md ring-1 ring-[hsl(207,80%,73%)]/30 hover:shadow-lg hover:-translate-y-0.5" 
+                isLit
+                  ? "bg-[hsl(207,74%,63%)] border-[hsl(207,65%,53%)] shadow-md ring-1 ring-[hsl(207,80%,73%)]/30 hover:shadow-lg hover:-translate-y-0.5"
                   : "bg-[hsl(207,55%,42%)] border-[hsl(207,50%,35%)] hover:bg-[hsl(207,55%,47%)]"
               )}
               onClick={() => navigate(card.route)}
