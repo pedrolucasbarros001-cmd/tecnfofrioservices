@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -49,15 +50,11 @@ export default function ClientesPage() {
   if (error) {
     const message = (error as Error).message || 'Erro ao carregar clientes.';
     return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
-            <p className="text-muted-foreground mb-4">{message}</p>
-            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
-          </CardContent>
-        </Card>
+      <div className="p-6 text-center">
+        <div className="text-destructive text-4xl mb-4">⚠️</div>
+        <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+        <p className="text-muted-foreground mb-4">{message}</p>
+        <Button onClick={() => window.location.reload()}>Recarregar página</Button>
       </div>
     );
   }
@@ -90,14 +87,7 @@ export default function ClientesPage() {
   return (
     <ErrorBoundary
       fallback={
-        <div className="p-6 text-center">
-          <div className="text-destructive text-4xl mb-4">⚠️</div>
-          <h2 className="text-lg font-semibold mb-2">Ocorreu um erro</h2>
-          <p className="text-muted-foreground mb-4">
-            Algo deu errado ao carregar a página. Tente recarregar.
-          </p>
-          <Button onClick={() => window.location.reload()}>Recarregar</Button>
-        </div>
+        <ErrorBoundaryFallbackContent />
       }
     >
     <div className="p-6 space-y-6">
