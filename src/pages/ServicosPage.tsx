@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,22 +64,6 @@ export default function ServicosPage() {
     staleTime: 30000,
     refetchOnWindowFocus: true,
   });
-
-  if (error) {
-    const message = (error as Error).message || 'Erro ao carregar os seus serviços.';
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
-            <p className="text-muted-foreground mb-4">{message}</p>
-            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   // Navigation functions
   const goToPrevious = () => setCurrentDate(prev => subDays(prev, 1));

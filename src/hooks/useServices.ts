@@ -30,11 +30,6 @@ export function useServices(options: UseServicesOptions = {}) {
   return useQuery({
     queryKey: ['services', status, location, technicianId],
     queryFn: async () => {
-      // make sure token is fresh before performing any query; prevents unexpected
-      // "not authenticated" / JWT expired errors that would bubble up and crash
-      // the page.
-      await ensureValidSession();
-
       let query = supabase
         .from('services')
         .select(`
@@ -65,10 +60,6 @@ export function useServices(options: UseServicesOptions = {}) {
       if (error) throw error;
       return (data as unknown as Service[]) || [];
     },
-    onError: (err: unknown) => {
-      console.error('Error fetching services list:', err);
-      toast.error('Erro ao carregar serviços. Tente novamente.');
-    },
   });
 }
 
@@ -78,8 +69,6 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
   return useQuery({
     queryKey: ['services-paginated', status, location, technicianId, page, pageSize, searchTerm],
     queryFn: async () => {
-      await ensureValidSession();
-
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -123,10 +112,6 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
       };
     },
     placeholderData: (prev) => prev,
-    onError: (err: unknown) => {
-      console.error('Error fetching paginated services:', err);
-      toast.error('Erro ao carregar serviços. Tente novamente.');
-    },
   });
 }
 

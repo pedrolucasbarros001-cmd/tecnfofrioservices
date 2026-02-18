@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, AlertCircle } from 'lucide-react';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -37,7 +35,7 @@ export default function ClientesPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const { data: result, isLoading, error } = usePaginatedCustomers({
+  const { data: result, isLoading } = usePaginatedCustomers({
     page: currentPage,
     pageSize: PAGE_SIZE,
     searchTerm: debouncedSearch || undefined,
@@ -46,18 +44,6 @@ export default function ClientesPage() {
   const customers = result?.data || [];
   const totalCount = result?.totalCount || 0;
   const totalPages = result?.totalPages || 0;
-
-  if (error) {
-    const message = (error as Error).message || 'Erro ao carregar clientes.';
-    return (
-      <div className="p-6 text-center">
-        <div className="text-destructive text-4xl mb-4">⚠️</div>
-        <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
-        <p className="text-muted-foreground mb-4">{message}</p>
-        <Button onClick={() => window.location.reload()}>Recarregar página</Button>
-      </div>
-    );
-  }
 
   const deleteCustomer = useDeleteCustomer();
 
@@ -85,11 +71,6 @@ export default function ClientesPage() {
   };
 
   return (
-    <ErrorBoundary
-      fallback={
-        <ErrorBoundaryFallbackContent />
-      }
-    >
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="clientes-header">
@@ -220,6 +201,5 @@ export default function ClientesPage() {
         onUpdate={() => deleteCustomer.reset()}
       />
     </div>
-    </ErrorBoundary>
   );
 }

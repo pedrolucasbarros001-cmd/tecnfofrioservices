@@ -13,8 +13,6 @@ export function useCustomers(searchTerm?: string) {
   return useQuery({
     queryKey: ['customers', searchTerm],
     queryFn: async () => {
-      await ensureValidSession();
-
       let query = supabase
         .from('customers')
         .select('*')
@@ -25,27 +23,10 @@ export function useCustomers(searchTerm?: string) {
         query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
       }
 
-      let { data, error } = await query;
-
-      // if the backend hasn't been migrated the deleted_at column won't exist
-      // and the query returns an error. retry without that filter so the page
-      // continues to function until the database is upgraded.
-      if (error && error.message?.toLowerCase().includes('deleted_at')) {
-        console.warn('Customer query failed due to missing deleted_at, retrying without filter');
-        const { data: data2, error: err2 } = await supabase
-          .from('customers')
-          .select('*')
-          .order('name', { ascending: true });
-        if (err2) throw err2;
-        return (data2 as Customer[]) || [];
-      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data as Customer[]) || [];
-    },
-    onError: (err: unknown) => {
-      console.error('Error fetching customers:', err);
-      toast.error('Erro ao carregar clientes.');
     },
   });
 }
@@ -54,8 +35,6 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
   return useQuery({
     queryKey: ['customers-paginated', page, pageSize, searchTerm],
     queryFn: async () => {
-      await ensureValidSession();
-
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -70,22 +49,7 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
         query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
       }
 
-      let { data, error, count } = await query;
-
-      if (error && error.message?.toLowerCase().includes('deleted_at')) {
-        console.warn('Paginated customer query failed due to missing deleted_at, retrying without filter');
-        const { data: data2, error: err2, count: count2 } = await supabase
-          .from('customers')
-          .select('*', { count: 'exact' })
-          .order('name', { ascending: true })
-          .range(from, to);
-        if (err2) throw err2;
-        return {
-          data: (data2 as Customer[]) || [],
-          totalCount: count2 || 0,
-          totalPages: Math.ceil((count2 || 0) / pageSize),
-        };
-      }
+      const { data, error, count } = await query;
 
       if (error) throw error;
       return {
@@ -95,10 +59,6 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
       };
     },
     placeholderData: (prev) => prev,
-    onError: (err: unknown) => {
-      console.error('Error fetching paginated customers:', err);
-      toast.error('Erro ao carregar clientes.');
-    },
   });
 }
 
