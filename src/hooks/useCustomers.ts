@@ -59,8 +59,16 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
         dataQuery,
       ]);
 
-      if (countError) throw countError;
-      if (dataError) throw dataError;
+      console.log('Customers Debug:', { count, countError, data, dataError });
+
+      if (countError) {
+        console.error('Count Error:', countError);
+        throw countError;
+      }
+      if (dataError) {
+        console.error('Data Error:', dataError);
+        throw dataError;
+      }
 
       return {
         data: (data as Customer[]) || [],
