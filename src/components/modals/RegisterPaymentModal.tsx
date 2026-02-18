@@ -52,21 +52,22 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const { user, profile } = useAuth();
 
   const amountPaid = service?.amount_paid || 0;
-  const finalPrice = service?.final_price || 0;
+  const finalPrice = service?.final_price || 0; // 0 means not defined or free
   const remainingBalance = finalPrice - amountPaid;
 
   useEffect(() => {
     if (service && open) {
-      // Pre-fill with remaining balance
-      setAmount(remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
+      // Pre-fill with remaining balance when there's a price defined
+      setAmount(finalPrice > 0 && remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
       setPaymentMethod('dinheiro');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setDescription('');
     }
-  }, [service, open, remainingBalance]);
+  }, [service, open, finalPrice, remainingBalance]);
 
   const paymentValue = parseCurrencyInput(amount);
-  const newBalance = Math.max(0, remainingBalance - paymentValue);
+  // If there's no final price we can't compute a real balance, just show 0
+  const newBalance = finalPrice > 0 ? Math.max(0, remainingBalance - paymentValue) : 0;
 
   const handleSubmit = async () => {
     if (!service || paymentValue <= 0) return;
@@ -145,24 +146,32 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Financial Summary Box */}
+          {/* Financial Summary Box - only meaningful when price known */}
           <div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Valor Total:</span>
-              <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Já Pago:</span>
-              <span className="text-green-600 font-semibold">
-                €{amountPaid.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-red-600 font-semibold">Em Falta:</span>
-              <span className="text-red-600 font-bold">
-                €{remainingBalance.toFixed(2)}
-              </span>
-            </div>
+            {finalPrice > 0 ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Valor Total:</span>
+                  <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Já Pago:</span>
+                  <span className="text-green-600 font-semibold">
+                    €{amountPaid.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-red-600 font-semibold">Em Falta:</span>
+                  <span className="text-red-600 font-bold">
+                    €{remainingBalance.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Ainda não foi definido um preço para este serviço. Insira o montante pago pelo cliente e será registado.
+              </p>
+            )}
           </div>
 
           {/* Payment Method */}
@@ -189,7 +198,11 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
               id="amount"
               type="text"
               inputMode="decimal"
-              placeholder={`Ex: 2.000,00 (Max: €${remainingBalance.toFixed(2)})`}
+              placeholder={
+                finalPrice > 0
+                  ? `Ex: 2.000,00 (Max: €${remainingBalance.toFixed(2)})`
+                  : 'Ex: 20,00 (preço ainda não definido)'
+              }
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
@@ -219,7 +232,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
           </div>
 
           {/* New Balance Preview */}
-          {paymentValue > 0 && (
+          {paymentValue > 0 && finalPrice > 0 && (
             <div className="border-t pt-4">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Novo saldo em falta:</span>

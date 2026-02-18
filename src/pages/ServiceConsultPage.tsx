@@ -199,8 +199,11 @@ export default function ServiceConsultPage() {
           </Card>
         </div>
 
-        {/* Price - only if defined */}
-        {service.final_price && service.final_price > 0 && (
+        {/* Price info
+            • if a price exists show total / paid / open
+            • if no price but there is an amount paid, show a minimal card with the paid value
+        */}
+        {service.final_price && service.final_price > 0 ? (
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="pt-4 space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -222,7 +225,22 @@ export default function ServiceConsultPage() {
               )}
             </CardContent>
           </Card>
-        )}
+        ) : service.amount_paid && service.amount_paid > 0 ? (
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="pt-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Euro className="h-4 w-4" />
+                Pagamento registado
+              </div>
+              <p className="text-2xl font-bold text-green-600">
+                {service.amount_paid.toFixed(2)} €
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Preço final ainda não definido pelo administrador.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Separator />
 

@@ -232,7 +232,7 @@ export function CameraCapture({
 
   // Render helpers
   const renderPermissionPrompt = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background">
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background overflow-y-auto">
       <Camera className="h-16 w-16 text-primary mb-4" />
       <h3 className="text-lg font-semibold mb-2">Acesso à Câmara</h3>
       <p className="text-sm text-muted-foreground mb-6">
@@ -274,7 +274,7 @@ export function CameraCapture({
   );
 
   const renderPermissionDenied = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background">
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background overflow-y-auto">
       <AlertCircle className="h-16 w-16 text-destructive mb-4" />
       <h3 className="text-lg font-semibold mb-2">Permissão Negada</h3>
       <p className="text-sm text-muted-foreground mb-4">
@@ -312,7 +312,7 @@ export function CameraCapture({
   );
 
   const renderUnsupported = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background">
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background overflow-y-auto">
       <X className="h-16 w-16 text-muted-foreground mb-4" />
       <h3 className="text-lg font-semibold mb-2">Câmara Não Suportada</h3>
       <p className="text-sm text-muted-foreground mb-6">
@@ -340,7 +340,7 @@ export function CameraCapture({
   );
 
   const renderError = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center">
+    <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center overflow-y-auto">
       <X className="h-10 w-10 mb-3 text-destructive" />
       <p className="text-sm mb-4">{state.errorMessage}</p>
       <div className="flex gap-2">
