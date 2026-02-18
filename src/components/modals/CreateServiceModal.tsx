@@ -111,6 +111,21 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
   const createService = useCreateService();
+  const { user } = useAuth();
+  const [userProfile, setUserProfile] = useState<{ full_name: string | null } | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .single();
+      if (data) setUserProfile(data);
+    };
+    fetchProfile();
+  }, [user?.id]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -230,7 +245,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         ? (values.technician_id ? 'na_oficina' : 'por_fazer')
         : 'por_fazer';
 
-      await createService.mutateAsync({
+      const newService = await createService.mutateAsync({
         customer_id: finalCustomerId,
         appliance_type: values.appliance_type,
         brand: values.brand,
@@ -252,6 +267,15 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
       });
+
+      if (newService && newService.id) {
+        await logServiceCreation(
+          newService.code,
+          newService.id,
+          user?.id,
+          userProfile?.full_name || undefined
+        );
+      }
 
       handleClose();
     } catch (error: any) {

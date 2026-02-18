@@ -16,7 +16,9 @@ export type ActivityActionType =
   | 'tarefa'
   | 'transferencia_solicitada'
   | 'transferencia_aceite'
-  | 'transferencia_recusada';
+  | 'transferencia_recusada'
+  | 'nota_adicionada'
+  | 'criacao';
 
 export interface ActivityLogData {
   serviceId?: string;
@@ -234,8 +236,8 @@ export async function logTaskSent(
   actorId?: string,
   actorName?: string
 ): Promise<void> {
-  const recipient = recipientType === 'todos' 
-    ? 'todos' 
+  const recipient = recipientType === 'todos'
+    ? 'todos'
     : recipientName || recipientType;
 
   await logActivity({
@@ -301,5 +303,23 @@ export async function logTransferRejected(
     actionType: 'transferencia_recusada',
     description: `${toTechnicianName} recusou assumir ${serviceCode} de ${fromTechnicianName}`,
     isPublic: false,
+  });
+}
+
+/**
+ * Log service creation
+ */
+export async function logServiceCreation(
+  serviceCode: string,
+  serviceId: string,
+  actorId?: string,
+  actorName?: string
+): Promise<void> {
+  await logActivity({
+    serviceId,
+    actorId,
+    actionType: 'criacao',
+    description: `${actorName || 'Utilizador'} criou o serviço ${serviceCode}`,
+    isPublic: true,
   });
 }

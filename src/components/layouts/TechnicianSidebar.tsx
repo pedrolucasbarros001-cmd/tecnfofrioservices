@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, Wrench, User, Settings, LogOut } from 'lucide-react';
+import { ClipboardList, Wrench, History, User, Settings, LogOut } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 const menuItems = [
   { title: 'Serviços', url: '/servicos', icon: ClipboardList },
   { title: 'Oficina', url: '/oficina-tecnico', icon: Wrench },
+  { title: 'Histórico', url: '/technician/history', icon: History },
   { title: 'Perfil', url: '/perfil', icon: User },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
 ];
@@ -51,8 +52,8 @@ export function TechnicianSidebar() {
         <SidebarMenu data-tour="sidebar-menu">
           {menuItems.map(item => (
             <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton 
-                isActive={isActive(item.url)} 
+              <SidebarMenuButton
+                isActive={isActive(item.url)}
                 tooltip={item.title}
                 onClick={() => handleNavClick(item.url)}
                 className={cn(
@@ -79,12 +80,12 @@ export function TechnicianSidebar() {
             <p className="text-xs text-sidebar-foreground/70">Técnico</p>
           </div>
         )}
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className={cn(
             'w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
             isCollapsed && 'justify-center px-2'
-          )} 
+          )}
           onClick={signOut}
         >
           <LogOut className="h-5 w-5 shrink-0" />

@@ -89,6 +89,9 @@ const getPhotoTypeLabel = (type: string | null): string => {
     case 'instalacao_depois': return 'Depois (Instalação)';
     case 'antes': return 'Antes';
     case 'depois': return 'Depois';
+    case 'aparelho': return 'Aparelho';
+    case 'etiqueta': return 'Etiqueta';
+    case 'estado': return 'Estado';
     default: return 'Foto';
   }
 };
@@ -198,11 +201,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (!service?.id) return [];
       const { data, error } = await supabase
         .from('service_payments')
-        .select('*')
+        .select('*, receiver:profiles!service_payments_received_by_fkey(full_name)')
         .eq('service_id', service.id)
         .order('payment_date', { ascending: false });
       if (error) throw error;
-      return data as ServicePayment[];
+      return data as (ServicePayment & { receiver: { full_name: string | null } | null })[];
     },
     enabled: !!service?.id && open, // Técnicos também veem pagamentos
   });
@@ -214,11 +217,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (!service?.id) return [];
       const { data, error } = await supabase
         .from('service_photos')
-        .select('*')
+        .select('*, creator:profiles!service_photos_uploaded_by_fkey(full_name)')
         .eq('service_id', service.id)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
-      return data as ServicePhoto[];
+      return data as (ServicePhoto & { creator: { full_name: string | null } | null })[];
     },
     enabled: !!service?.id && open,
   });
@@ -246,11 +249,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (!service?.id) return [];
       const { data, error } = await supabase
         .from('activity_logs')
-        .select('*')
+        .select('*, actor:profiles!activity_logs_actor_id_fkey(full_name)')
         .eq('service_id', service.id)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return data as { id: string; action_type: string; description: string; created_at: string; is_public: boolean }[];
+      return data as (any & { actor: { full_name: string | null } | null })[];
     },
     enabled: !!service?.id && open,
   });
@@ -535,6 +538,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
                 {service.detected_fault && (
                   <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="text-[10px] text-amber-700 uppercase font-medium mb-1">
+                      Detectada por: {service.technician?.profile?.full_name || 'Técnico'}
+                    </p>
                     <p className="text-xs text-amber-600 uppercase mb-1">Avaria Detectada</p>
                     <p className="text-sm">{service.detected_fault}</p>
                   </div>
@@ -542,6 +548,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
                 {service.work_performed && (
                   <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-[10px] text-green-700 uppercase font-medium mb-1">
+                      Realizado por: {service.technician?.profile?.full_name || 'Técnico'}
+                    </p>
                     <p className="text-xs text-green-600 uppercase mb-1">Trabalho Realizado</p>
                     <p className="text-sm">{service.work_performed}</p>
                   </div>
@@ -714,8 +723,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
-              {/* Payment History - Only for dono/secretaria */}
-              {(role === 'dono' || role === 'secretaria') && servicePayments.length > 0 && (
+              {/* Payment History - For dono, secretaria and tecnico */}
+              {(role === 'dono' || role === 'secretaria' || role === 'tecnico') && servicePayments.length > 0 && (
                 <Section
                   title="Histórico de Pagamentos"
                   bgColor="bg-teal-50"
@@ -723,22 +732,29 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 >
                   <div className="space-y-2">
                     {servicePayments.map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-teal-600" />
-                          <div>
-                            <p className="font-medium">{payment.amount.toFixed(2)} €</p>
-                            <p className="text-xs text-muted-foreground">
-                              {payment.payment_date && format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })}
-                              {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
-                            </p>
-                          </div>
-                        </div>
-                        {payment.description && (
-                          <span className="text-xs text-muted-foreground max-w-[150px] truncate">
-                            {payment.description}
-                          </span>
+                      <div key={payment.id} className="space-y-1">
+                        {payment.receiver?.full_name && (
+                          <p className="text-[10px] text-muted-foreground uppercase font-medium pl-1">
+                            Recebido por: {payment.receiver.full_name}
+                          </p>
                         )}
+                        <div className="flex items-center justify-between p-2 bg-white rounded border text-sm">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-teal-600" />
+                            <div>
+                              <p className="font-medium">{payment.amount.toFixed(2)} €</p>
+                              <p className="text-xs text-muted-foreground">
+                                {payment.payment_date && format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })}
+                                {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
+                              </p>
+                            </div>
+                          </div>
+                          {payment.description && (
+                            <span className="text-xs text-muted-foreground max-w-[150px] truncate">
+                              {payment.description}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                     <div className="flex justify-between pt-2 border-t font-medium text-sm">
@@ -760,16 +776,23 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 >
                   <div className="grid grid-cols-3 gap-2">
                     {servicePhotos.map((photo) => (
-                      <div key={photo.id} className="relative">
-                        <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
-                          <img
-                            src={photo.file_url}
-                            alt={photo.description || 'Foto do serviço'}
-                            className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
-                          />
-                        </a>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
-                          {getPhotoTypeLabel(photo.photo_type)}
+                      <div key={photo.id} className="flex flex-col gap-1">
+                        {photo.creator?.full_name && (
+                          <p className="text-[9px] text-muted-foreground truncate" title={photo.creator.full_name}>
+                            Por: {photo.creator.full_name.split(' ')[0]}
+                          </p>
+                        )}
+                        <div className="relative">
+                          <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={photo.file_url}
+                              alt={photo.description || 'Foto do serviço'}
+                              className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          </a>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
+                            {getPhotoTypeLabel(photo.photo_type)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1040,6 +1063,9 @@ interface ActivityLogItemProps {
     description: string;
     created_at: string;
     is_public: boolean;
+    actor?: {
+      full_name: string | null;
+    } | null;
   };
   isLast: boolean;
 }
@@ -1064,6 +1090,11 @@ function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
 
       {/* Content */}
       <div className="flex-1 pb-3">
+        {log.actor?.full_name && (
+          <p className="text-[10px] text-muted-foreground uppercase font-medium leading-none mb-1">
+            {log.actor.full_name}
+          </p>
+        )}
         <p className="text-sm">{log.description}</p>
         <p className="text-xs text-muted-foreground mt-1">
           {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}

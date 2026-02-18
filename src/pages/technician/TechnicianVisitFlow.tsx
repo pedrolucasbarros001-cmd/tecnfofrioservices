@@ -22,6 +22,7 @@ import {
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { RequestPartModal } from '@/components/modals/RequestPartModal';
+import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
 import { useUpdateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ export default function TechnicianVisitFlow() {
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const updateService = useUpdateService();
 
@@ -173,7 +175,12 @@ export default function TechnicianVisitFlow() {
       setShowSignature(false);
       setCurrentStep('completed');
 
-      setTimeout(() => navigate('/servicos'), 2000);
+      // If it was fixed on site, ask if they want to register payment
+      if (formValues.outcome !== 'take_to_workshop' && formValues.outcome !== 'need_part') {
+        setShowPaymentModal(true);
+      } else {
+        setTimeout(() => navigate('/servicos'), 2000);
+      }
     } catch (error) {
       console.error('Error completing visit:', error);
       toast.error('Erro ao concluir visita');
@@ -421,6 +428,15 @@ export default function TechnicianVisitFlow() {
         service={service}
         open={showPartModal}
         onOpenChange={setShowPartModal}
+      />
+
+      <RegisterPaymentModal
+        service={service}
+        open={showPaymentModal}
+        onOpenChange={(open) => {
+          setShowPaymentModal(open);
+          if (!open) navigate('/servicos');
+        }}
       />
     </div>
   );
