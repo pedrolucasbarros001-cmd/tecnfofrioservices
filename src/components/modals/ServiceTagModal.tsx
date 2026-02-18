@@ -24,7 +24,7 @@ interface ServiceTagModalProps {
 export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModalProps) {
   const tagRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   if (!service) return null;
 
   const handleDownloadPDF = async () => {
@@ -36,6 +36,11 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
+        onclone: (_doc, el) => {
+          const element = el as HTMLElement;
+          element.style.overflow = 'visible';
+          element.style.position = 'relative';
+        },
       });
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 90] });
       const canvasHeight = (canvas.height / canvas.width) * 62;
@@ -137,7 +142,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button variant="outline" onClick={() => printServiceTag()}>
+            <Button variant="outline" onClick={() => window.open(`/print/tag/${service.id}`, '_blank')}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>

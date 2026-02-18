@@ -18,6 +18,7 @@ import {
   Shield,
   Package,
   Wrench,
+  Settings,
   Truck,
   ChevronRight,
   CalendarIcon,
@@ -221,8 +222,8 @@ export function CustomerDetailSheet({
 
               {/* Quick Actions */}
               <div className="flex gap-3">
-                <Button 
-                  className="flex-1" 
+                <Button
+                  className="flex-1"
                   onClick={() => setShowCreateServiceModal(true)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -361,7 +362,7 @@ export function CustomerDetailSheet({
                             </p>
                           </div>
                           <div className="text-right">
-                            <Badge 
+                            <Badge
                               className={cn(
                                 budget.status === 'pendente' && 'bg-yellow-500 text-black',
                                 budget.status === 'aprovado' && 'bg-green-500',
@@ -370,8 +371,8 @@ export function CustomerDetailSheet({
                               )}
                             >
                               {budget.status === 'pendente' ? 'Pendente' :
-                               budget.status === 'aprovado' ? 'Aprovado' :
-                               budget.status === 'recusado' ? 'Recusado' : 'Convertido'}
+                                budget.status === 'aprovado' ? 'Aprovado' :
+                                  budget.status === 'recusado' ? 'Recusado' : 'Convertido'}
                             </Badge>
                             {budget.estimated_total && (
                               <p className="text-sm font-semibold text-orange-600 mt-1">
@@ -418,20 +419,23 @@ interface CreateServiceFromCustomerModalProps {
 }
 
 const serviceFormSchema = z.object({
+  service_type: z.enum(['reparacao', 'instalacao', 'entrega', 'manutencao']).default('reparacao'),
   appliance_type: z.string().min(1, 'Tipo de aparelho é obrigatório'),
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
-  fault_description: z.string().min(1, 'Avaria é obrigatória'),
+  fault_description: z.string().min(1, 'Descrição é obrigatória'),
   is_warranty: z.boolean().default(false),
   warranty_brand: z.string().optional(),
   warranty_process_number: z.string().optional(),
-  warranty_covered: z.boolean().default(true),
   is_urgent: z.boolean().default(false),
-  service_location: z.enum(['cliente', 'oficina']),
+  service_location: z.enum(['cliente', 'oficina']).default('cliente'),
   technician_id: z.string().optional(),
   scheduled_date: z.date().optional(),
-  scheduled_shift: z.enum(['manha', 'tarde', 'noite']).optional(),
+  scheduled_shift: z.string().optional(),
+  service_address: z.string().optional(),
+  service_postal_code: z.string().optional(),
+  service_city: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -443,23 +447,27 @@ function CreateServiceFromCustomerModal({
   customer,
   onSuccess,
 }: CreateServiceFromCustomerModalProps) {
-  const [step, setStep] = useState<'location' | 'form'>('location');
+  const [step, setStep] = useState<'type' | 'location' | 'form'>('type');
   const { data: technicians = [] } = useTechnicians();
   const createService = useCreateService();
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
+      service_type: 'reparacao',
       appliance_type: '',
       fault_description: '',
       is_warranty: false,
-      warranty_covered: true,
       is_urgent: false,
       service_location: 'cliente',
+      service_address: customer.address || '',
+      service_postal_code: customer.postal_code || '',
+      service_city: customer.city || '',
     },
   });
 
   const isWarranty = form.watch('is_warranty');
+  const serviceType = form.watch('service_type');
 
   const handleSubmit = async (values: ServiceFormValues) => {
     try {
@@ -487,27 +495,29 @@ function CreateServiceFromCustomerModal({
         scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
         scheduled_shift: values.scheduled_shift,
         notes: values.notes,
-        service_type: 'reparacao',
+        service_type: values.service_type,
         status: initialStatus,
-        service_address: customer.address,
-        service_postal_code: customer.postal_code,
-        service_city: customer.city,
-        pending_pricing: values.is_warranty && values.warranty_covered ? false : undefined,
-        final_price: values.is_warranty && values.warranty_covered ? 0 : undefined,
+        service_address: values.service_address || customer.address,
+        service_postal_code: values.service_postal_code || customer.postal_code,
+        service_city: values.service_city || customer.city,
+        // Using a simpler logic for pricing
+        pending_pricing: values.is_warranty ? false : undefined,
+        final_price: values.is_warranty ? 0 : undefined,
       });
 
       toast.success('Serviço criado com sucesso!');
       handleClose();
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating service:', error);
+      toast.error(error.message || 'Erro ao criar serviço');
     }
   };
 
   const handleClose = () => {
     onOpenChange(false);
     form.reset();
-    setStep('location');
+    setStep('type');
   };
 
   return (
@@ -515,11 +525,65 @@ function CreateServiceFromCustomerModal({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
-            {step === 'location' ? 'Tipo de Serviço' : `Novo Serviço para ${customer.name}`}
+            {step === 'type'
+              ? 'Qual o tipo de serviço?'
+              : step === 'location'
+                ? 'Local do Serviço'
+                : `Novo Serviço para ${customer.name}`}
           </DialogTitle>
         </DialogHeader>
 
-        {step === 'location' ? (
+        {step === 'type' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-8 px-6">
+            <button
+              onClick={() => {
+                form.setValue('service_type', 'reparacao');
+                setStep('location');
+              }}
+              className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-primary/10 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all group"
+            >
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Wrench className="h-7 w-7 text-primary" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-base">Reparação</h3>
+                <p className="text-xs text-muted-foreground mt-1 text-balance">Conserto de avarias</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                form.setValue('service_type', 'instalacao');
+                form.setValue('service_location', 'cliente');
+                setStep('form');
+              }}
+              className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-primary/10 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all group"
+            >
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Settings className="h-7 w-7 text-primary" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-base">Instalação</h3>
+                <p className="text-xs text-muted-foreground mt-1 text-balance">Novos equipamentos</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                form.setValue('service_type', 'entrega');
+                form.setValue('service_location', 'cliente');
+                setStep('form');
+              }}
+              className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-primary/10 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all group"
+            >
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Truck className="h-7 w-7 text-primary" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-base">Entrega</h3>
+                <p className="text-xs text-muted-foreground mt-1 text-balance">Entrega e recolha</p>
+              </div>
+            </button>
+          </div>
+        ) : step === 'location' ? (
           <div className="grid grid-cols-2 gap-6 py-8 px-6">
             <button
               onClick={() => {
@@ -536,7 +600,7 @@ function CreateServiceFromCustomerModal({
                 <p className="text-sm text-blue-700/70 mt-1">Serviço no local do cliente</p>
               </div>
             </button>
-            
+
             <button
               onClick={() => {
                 form.setValue('service_location', 'oficina');
@@ -548,8 +612,8 @@ function CreateServiceFromCustomerModal({
                 <Package className="h-8 w-8 text-orange-600" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-lg text-orange-900">Deixou na Oficina</h3>
-                <p className="text-sm text-orange-700/70 mt-1">Cliente trouxe equipamento</p>
+                <h3 className="font-semibold text-lg text-orange-900">Na Oficina</h3>
+                <p className="text-sm text-orange-700/70 mt-1">Equipamento está connosco</p>
               </div>
             </button>
           </div>
@@ -603,18 +667,73 @@ function CreateServiceFromCustomerModal({
                     name="fault_description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Avaria *</FormLabel>
+                        <FormLabel>
+                          {serviceType === 'entrega' ? 'Instruções de Entrega *' :
+                            serviceType === 'instalacao' ? 'Descrição da Instalação *' :
+                              'Avaria / Problema *'}
+                        </FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="Descreva o problema..." 
+                          <Textarea
+                            placeholder={serviceType === 'entrega' ? "O que entregar/recolher?" : "Descreva os detalhes..."}
                             className="min-h-[80px]"
-                            {...field} 
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {/* Address fields for visits/installations/deliveries */}
+                  {(serviceType !== 'reparacao' || form.watch('service_location') === 'cliente') && (
+                    <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-4">
+                      <h4 className="font-medium text-blue-800 flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4" />
+                        Morada do Serviço
+                      </h4>
+                      <FormField
+                        control={form.control}
+                        name="service_address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Rua / Morada</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-8 text-sm" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="service_postal_code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Código Postal</FormLabel>
+                              <FormControl>
+                                <Input {...field} className="h-8 text-sm" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="service_city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Cidade</FormLabel>
+                              <FormControl>
+                                <Input {...field} className="h-8 text-sm" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Checkboxes */}
                   <div className="flex flex-wrap gap-6">
@@ -685,25 +804,8 @@ function CreateServiceFromCustomerModal({
                           )}
                         />
                       </div>
-                      <FormField
-                        control={form.control}
-                        name="warranty_covered"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center gap-2">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <Label className="cursor-pointer text-sm">
-                              Garantia cobre a reparação (sem cobrança ao cliente)
-                            </Label>
-                          </FormItem>
-                        )}
-                      />
                       <p className="text-xs text-purple-600">
-                        Se desmarcado, o cliente deverá pagar e o fluxo de precificação será ativado.
+                        O fluxo de precificação manual não será ativado se a garantia cobrir tudo.
                       </p>
                     </div>
                   )}
@@ -725,7 +827,7 @@ function CreateServiceFromCustomerModal({
                             {technicians.map((tech) => (
                               <SelectItem key={tech.id} value={tech.id}>
                                 <div className="flex items-center gap-2">
-                                  <div 
+                                  <div
                                     className="w-3 h-3 rounded-full"
                                     style={{ backgroundColor: tech.color || '#3B82F6' }}
                                   />
@@ -788,19 +890,13 @@ function CreateServiceFromCustomerModal({
                       name="scheduled_shift"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Turno</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecionar" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="manha">Manhã</SelectItem>
-                              <SelectItem value="tarde">Tarde</SelectItem>
-                              <SelectItem value="noite">Noite</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Turno / Hora</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: 14:00 ou Manhã"
+                              {...field}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -810,11 +906,21 @@ function CreateServiceFromCustomerModal({
               </ScrollArea>
 
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
-                <Button type="button" variant="outline" onClick={() => setStep('location')}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (step === 'form') {
+                      setStep(serviceType === 'reparacao' ? 'location' : 'type');
+                    } else if (step === 'location') {
+                      setStep('type');
+                    }
+                  }}
+                >
                   Voltar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={createService.isPending}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
