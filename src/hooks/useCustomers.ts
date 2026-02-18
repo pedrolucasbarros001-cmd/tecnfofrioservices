@@ -38,20 +38,35 @@ export function usePaginatedCustomers({ page = 1, pageSize = 50, searchTerm }: U
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      let query = supabase
+      // Build base query
+      let countQuery = supabase
         .from('customers')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null);
+
+      let dataQuery = supabase
+        .from('customers')
+        .select('*')
         .is('deleted_at', null)
         .order('name', { ascending: true })
         .range(from, to);
 
+      // Apply search filter to both queries
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        const searchFilter = `name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,nif.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`;
+        countQuery = countQuery.or(searchFilter);
+        dataQuery = dataQuery.or(searchFilter);
       }
 
-      const { data, error, count } = await query;
+      // Execute both queries in parallel
+      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
+        countQuery,
+        dataQuery,
+      ]);
 
-      if (error) throw error;
+      if (countError) throw countError;
+      if (dataError) throw dataError;
+
       return {
         data: (data as Customer[]) || [],
         totalCount: count || 0,
