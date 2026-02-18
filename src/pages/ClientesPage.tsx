@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, AlertCircle } from 'lucide-react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +88,22 @@ export default function ClientesPage() {
   };
 
   return (
+    <ErrorBoundary
+      fallback={
+        <div className="p-6">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <h2 className="text-lg font-semibold mb-2">Ocorreu um erro</h2>
+              <p className="text-muted-foreground mb-4">
+                Algo deu errado ao carregar a página. Tente recarregar.
+              </p>
+              <Button onClick={() => window.location.reload()}>Recarregar</Button>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="clientes-header">
@@ -217,5 +234,6 @@ export default function ClientesPage() {
         onUpdate={() => deleteCustomer.reset()}
       />
     </div>
+    </ErrorBoundary>
   );
 }

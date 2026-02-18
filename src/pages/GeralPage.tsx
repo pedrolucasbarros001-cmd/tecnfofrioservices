@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, ChevronDown, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,8 +41,20 @@ export default function GeralPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(searchParams.get('status') as ServiceStatus || 'all');
+  const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(
+    (searchParams.get('status') as ServiceStatus) || 'all'
+  );
   const PAGE_SIZE = 50;
+
+  // keep status state in sync when query string changes (e.g. when clicking a
+  // dashboard card while already on /geral). otherwise the component will stay
+  // at the previous filter value and appear to “not open”.
+  useEffect(() => {
+    const param = searchParams.get('status') as ServiceStatus | null;
+    if (param && param !== selectedStatus) {
+      setSelectedStatus(param);
+    }
+  }, [searchParams, selectedStatus]);
 
   // Debounce search
   useEffect(() => {
@@ -229,7 +242,24 @@ export default function GeralPage() {
     setCurrentService(service);
     setShowEditDetailsModal(true);
   };
-  return <div className="p-6 space-y-6">
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className="p-6">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <h2 className="text-lg font-semibold mb-2">Ocorreu um erro</h2>
+              <p className="text-muted-foreground mb-4">
+                Algo deu errado ao carregar a página. Tente recarregar.
+              </p>
+              <Button onClick={() => window.location.reload()}>Recarregar</Button>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="geral-header">
         <div>
@@ -470,5 +500,7 @@ export default function GeralPage() {
       
       {/* Detail Sheet */}
       <ServiceDetailSheet service={selectedService} open={showDetailSheet} onOpenChange={setShowDetailSheet} />
-    </div>;
+    </div>
+    </ErrorBoundary>
+  );
 }
