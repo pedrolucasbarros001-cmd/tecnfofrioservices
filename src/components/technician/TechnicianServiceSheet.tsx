@@ -50,7 +50,7 @@ export function TechnicianServiceSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent hideClose>
+      <SheetContent>
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <span className="font-mono font-semibold">{service.code}</span>

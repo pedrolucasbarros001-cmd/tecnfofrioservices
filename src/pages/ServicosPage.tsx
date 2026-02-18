@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Sun, Moon, Sunrise, CalendarDays, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,14 +14,6 @@ import { InstallationFlowModals } from '@/components/technician/InstallationFlow
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
 import type { Service } from '@/types/database';
 
-const SHIFT_CONFIG = {
-  manha: { label: 'Manhã', icon: Sunrise, color: 'text-amber-500' },
-  tarde: { label: 'Tarde', icon: Sun, color: 'text-orange-500' },
-  noite: { label: 'Noite', icon: Moon, color: 'text-indigo-500' },
-  sem_turno: { label: 'Sem Turno Definido', icon: CalendarDays, color: 'text-muted-foreground' },
-} as const;
-
-type ShiftKey = keyof typeof SHIFT_CONFIG;
 type FlowType = 'visit' | 'installation' | 'delivery' | null;
 
 export default function ServicosPage() {
@@ -89,14 +81,14 @@ export default function ServicosPage() {
     });
   }, [services, currentDate]);
 
-  // Group services by shift
-  const groupedByShift = useMemo(() => {
-    return {
-      manha: dayServices.filter(s => s.scheduled_shift === 'manha'),
-      tarde: dayServices.filter(s => s.scheduled_shift === 'tarde'),
-      noite: dayServices.filter(s => s.scheduled_shift === 'noite'),
-      sem_turno: dayServices.filter(s => !s.scheduled_shift),
-    };
+  // sort services by the assigned time (scheduled_shift) lexicographically;
+  // entries without a time appear last
+  const sortedDayServices = useMemo(() => {
+    return [...dayServices].sort((a, b) => {
+      const aTime = a.scheduled_shift || 'zzz';
+      const bTime = b.scheduled_shift || 'zzz';
+      return aTime.localeCompare(bTime);
+    });
   }, [dayServices]);
 
   const handleStartFlow = (service: Service, e: React.MouseEvent) => {
@@ -151,9 +143,6 @@ export default function ServicosPage() {
   };
 
   const ServiceCard = ({ service }: { service: Service }) => {
-    const shiftKey = (service.scheduled_shift || 'sem_turno') as ShiftKey;
-    const shiftConfig = SHIFT_CONFIG[shiftKey] || SHIFT_CONFIG.sem_turno;
-    const ShiftIcon = shiftConfig.icon;
     const serviceConfig = getServiceConfig(service);
     
     return (
@@ -180,12 +169,12 @@ export default function ServicosPage() {
               {service.appliance_type || 'Aparelho'} - {service.fault_description || 'Sem descrição'}
             </p>
 
-            {/* Shift + Tags */}
+            {/* Time + Tags */}
             <div className="flex items-center justify-between gap-2 pt-1">
               <div className="flex items-center gap-1.5">
-                <ShiftIcon className={cn('h-4 w-4', shiftConfig.color)} />
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  {shiftConfig.label}
+                  {service.scheduled_shift || 'Sem hora'}
                 </span>
               </div>
               <div className="flex gap-1">
@@ -217,39 +206,6 @@ export default function ServicosPage() {
     );
   };
 
-  const ShiftSection = ({ shiftKey }: { shiftKey: ShiftKey }) => {
-    const shiftServices = groupedByShift[shiftKey];
-    const config = SHIFT_CONFIG[shiftKey];
-    const ShiftIcon = config.icon;
-
-    return (
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <ShiftIcon className={cn('h-5 w-5', config.color)} />
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {config.label}
-          </h3>
-          {shiftServices.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {shiftServices.length}
-            </Badge>
-          )}
-        </div>
-        
-        {shiftServices.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg border-dashed">
-            Sem serviços
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {shiftServices.map(service => (
-              <ServiceCard key={service.id} service={service} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-hidden" data-tour="servicos-agenda">
@@ -304,9 +260,9 @@ export default function ServicosPage() {
           </p>
         </div>
       ) : (
-        <div className="flex-1 space-y-8 overflow-y-auto">
-          {(['manha', 'tarde', 'noite', 'sem_turno'] as const).map(shiftKey => (
-            <ShiftSection key={shiftKey} shiftKey={shiftKey} />
+        <div className="flex-1 space-y-3 overflow-y-auto">
+          {sortedDayServices.map(service => (
+            <ServiceCard key={service.id} service={service} />
           ))}
         </div>
       )}

@@ -20,13 +20,6 @@ interface AgendaDrawerProps {
   onServiceClick: (service: Service) => void;
 }
 
-const SHIFT_ORDER = ['manha', 'tarde', 'noite'] as const;
-
-const SHIFT_LABELS: Record<string, string> = {
-  manha: 'Manhã',
-  tarde: 'Tarde',
-  noite: 'Noite',
-};
 
 export function AgendaDrawer({
   date,
@@ -37,34 +30,11 @@ export function AgendaDrawer({
 }: AgendaDrawerProps) {
   if (!date) return null;
 
-  // Helper to get friendly shift label
-  const getShiftLabel = (shift: string | null | undefined): string => {
-    if (!shift) return 'Sem hora definida';
-    if (shift === 'manha') return 'Manhã';
-    if (shift === 'tarde') return 'Tarde';
-    if (shift === 'noite') return 'Noite';
-    return shift;
-  };
-
-  // Group services by shift value
-  const groupedServices = services.reduce((acc, service) => {
-    const shift = service.scheduled_shift || 'sem_turno';
-    if (!acc[shift]) acc[shift] = [];
-    acc[shift].push(service);
-    return acc;
-  }, {} as Record<string, Service[]>);
-
-  // Sort groups: legacy shifts first (in order), then specific times, then sem_turno
-  const sortedShiftKeys = Object.keys(groupedServices).sort((a, b) => {
-    if (a === 'sem_turno') return 1;
-    if (b === 'sem_turno') return -1;
-
-    const order = { 'manha': 1, 'tarde': 2, 'noite': 3 };
-    const aOrder = order[a as keyof typeof order] || 4;
-    const bOrder = order[b as keyof typeof order] || 4;
-
-    if (aOrder !== bOrder) return aOrder - bOrder;
-    return a.localeCompare(b);
+  // sort services by scheduled_shift (time string) ascending
+  const sortedServices = [...services].sort((a, b) => {
+    const aTime = a.scheduled_shift || 'zzz';
+    const bTime = b.scheduled_shift || 'zzz';
+    return aTime.localeCompare(bTime);
   });
 
   return (
@@ -86,30 +56,17 @@ export function AgendaDrawer({
               <p className="text-muted-foreground">Sem serviços neste dia</p>
             </div>
           ) : (
-            <div className="space-y-6 pr-4">
-              {sortedShiftKeys.map(shiftKey => {
-                const shiftServices = groupedServices[shiftKey];
-
-                return (
-                  <div key={shiftKey}>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      {getShiftLabel(shiftKey === 'sem_turno' ? null : shiftKey)}
-                    </h4>
-                    <div className="space-y-2">
-                      {shiftServices.map(service => (
-                        <ServiceDrawerCard
-                          key={service.id}
-                          service={service}
-                          onClick={() => {
-                            onOpenChange(false);
-                            onServiceClick(service);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-2 pr-4">
+              {sortedServices.map(service => (
+                <ServiceDrawerCard
+                  key={service.id}
+                  service={service}
+                  onClick={() => {
+                    onOpenChange(false);
+                    onServiceClick(service);
+                  }}
+                />
+              ))}
             </div>
           )}
         </ScrollArea>
@@ -179,6 +136,11 @@ function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
       <div className="flex items-center gap-2 mb-1">
         <config.Icon className={cn("h-4 w-4", config.iconColor)} />
         <span className="font-mono font-semibold text-sm">{service.code}</span>
+        {service.scheduled_shift && (
+          <span className="ml-auto text-[10px] text-muted-foreground">
+            {service.scheduled_shift}
+          </span>
+        )}
         {service.is_urgent && (
           <Badge variant="destructive" className="text-xs animate-pulse">
             Urgente

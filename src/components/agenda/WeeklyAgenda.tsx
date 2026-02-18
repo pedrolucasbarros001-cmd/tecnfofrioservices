@@ -27,13 +27,9 @@ interface WeeklyAgendaProps {
   onServiceClick: (service: Service) => void;
 }
 
-// Helper to display shift/time values
+// Helper to display shift/time values (now simply the time string)
 const formatShiftLabel = (shift: string | null | undefined): string => {
-  if (!shift) return 'Sem hora';
-  if (shift === 'manha') return 'Manhã';
-  if (shift === 'tarde') return 'Tarde';
-  if (shift === 'noite') return 'Noite';
-  return shift; // Already a time like "10:00"
+  return shift || 'Sem hora';
 };
 
 type ViewMode = 'week' | 'month';
