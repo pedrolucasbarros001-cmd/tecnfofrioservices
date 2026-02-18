@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, Phone } from 'lucide-react';
+import { DollarSign, Phone, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,23 @@ export default function SecretaryDebitoPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
 
-  const { data: allServices = [], isLoading } = useServices({ status: 'all' });
+  const { data: allServices = [], isLoading, error } = useServices({ status: 'all' });
+
+  if (error) {
+    const message = (error as Error).message || 'Erro ao carregar os serviços.';
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+            <p className="text-muted-foreground mb-4">{message}</p>
+            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Filter services with pending payment
   const debitServices = allServices.filter((service) => {

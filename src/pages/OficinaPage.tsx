@@ -19,7 +19,23 @@ export default function OficinaPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
 
-  const { data: services = [], isLoading } = useServices({ location: 'oficina' });
+  const { data: services = [], isLoading, error } = useServices({ location: 'oficina' });
+
+  if (error) {
+    const message = (error as Error).message || 'Erro ao carregar serviços da oficina.';
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+            <p className="text-muted-foreground mb-4">{message}</p>
+            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);

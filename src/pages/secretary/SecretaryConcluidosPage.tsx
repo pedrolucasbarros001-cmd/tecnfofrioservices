@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Truck, Phone, Clock } from 'lucide-react';
+import { CheckCircle2, Truck, Phone, Clock, AlertCircle } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,23 @@ export default function SecretaryConcluidosPage() {
   const [showAssignDeliveryModal, setShowAssignDeliveryModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
 
-  const { data: services = [], isLoading } = useServices({ status: 'concluidos' });
+  const { data: services = [], isLoading, error } = useServices({ status: 'concluidos' });
+
+  if (error) {
+    const message = (error as Error).message || 'Erro ao carregar serviços concluídos.';
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Não foi possível carregar</h2>
+            <p className="text-muted-foreground mb-4">{message}</p>
+            <Button onClick={() => window.location.reload()}>Recarregar página</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const updateService = useUpdateService();
 
   // Filter only services in workshop awaiting delivery
