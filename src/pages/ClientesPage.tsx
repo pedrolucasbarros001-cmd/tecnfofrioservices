@@ -107,6 +107,15 @@ export default function ClientesPage() {
           </Badge>
         </div>
 
+        {/* DEBUGGING ALERT - REMOVE AFTER FIX */}
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+          <p className="font-bold">Modo de Diagnóstico Ativo</p>
+          <p>Total de Clientes (Raw): {totalCount}</p>
+          <p>Dados carregados? {customers.length > 0 ? 'Sim' : 'Não'}</p>
+          <p>Erro (se houver): {JSON.stringify(result, null, 2)}</p>
+        </div>
+
+
         {/* Table */}
         <div className="border rounded-lg">
           <Table>
