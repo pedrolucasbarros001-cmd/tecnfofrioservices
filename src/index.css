@@ -364,7 +364,7 @@
   border-radius: 0.25rem;
 }
 
-/* ========== Tag Print Page (62mm x 29mm) ========== */
+/* ========== Tag Print Page (62mm x 90mm portrait) ========== */
 .print-tag-page {
   min-height: 100vh;
   background: hsl(var(--muted));
@@ -389,9 +389,9 @@
 
 .print-tag-page .print-tag-container {
   width: 62mm;
-  height: 29mm;
+  height: auto;
+  min-height: 90mm;
   background: white;
-  padding: 1.5mm;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   border-radius: 0.25rem;
   box-sizing: border-box;
@@ -484,7 +484,7 @@
     border-radius: 0 !important;
   }
 
-  /* ========== TAG PRINT PAGE (62mm x 29mm) ========== */
+  /* ========== TAG PRINT PAGE (62mm x 90mm portrait) ========== */
   .print-tag-page {
     background: white !important;
     padding: 0 !important;
@@ -497,10 +497,11 @@
 
   .print-tag-page .print-tag-container {
     width: 62mm !important;
-    height: 29mm !important;
+    height: auto !important;
+    min-height: 90mm !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding: 1.5mm !important;
+    padding: 0 !important;
     border-radius: 0 !important;
   }
 
@@ -567,21 +568,24 @@
     background-color: #f9fafb !important;
   }
 
-  /* ========== TAG (62mm x 29mm) ========== */
+  /* ========== TAG (62mm x 90mm portrait) ========== */
   body.print-type-tag {
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Tag container - fixed size for 62mm x 29mm */
+  /* Tag container - portrait size for 62mm x 90mm */
   .print-tag {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
     visibility: visible !important;
     position: static !important;
     width: 62mm !important;
-    height: 29mm !important;
+    height: auto !important;
+    min-height: 90mm !important;
     margin: 0 !important;
-    padding: 1.5mm !important;
+    padding: 0 !important;
     background: white !important;
     border: none !important;
     border-radius: 0 !important;

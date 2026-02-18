@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import type { Service } from '@/types/database';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
-import { generatePDF } from '@/utils/pdfUtils';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface ServiceTagModalProps {
   service: Service | null;
@@ -30,13 +31,18 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
     if (!tagRef.current || !service) return;
     setIsGenerating(true);
     try {
-      await generatePDF({ 
-        element: tagRef.current, 
-        filename: `Etiqueta-${service.code}`,
-        format: [29, 90],
-        margin: 0,
-        autoHeight: true
+      const canvas = await html2canvas(tagRef.current, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
       });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 90] });
+      const canvasHeight = (canvas.height / canvas.width) * 62;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 62, canvasHeight);
+      pdf.save(`Etiqueta-${service.code}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF da etiqueta:', err);
     } finally {
       setIsGenerating(false);
     }
@@ -48,58 +54,84 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>
 
-         {/* Tag content - preview (29mm x 90mm scale) */}
-         <div ref={tagRef} className="print-tag border rounded-lg p-2 bg-white mx-auto" style={{ width: '29mm' }}>
-           {/* Top accent bar */}
-           <div className="h-1 -mx-2 -mt-2 rounded-t-lg" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-           
-           {/* Logo */}
-           <div className="flex justify-center mt-1 mb-1">
-             <img 
-               src={tecnofrioLogoFull} 
-               alt="TECNOFRIO" 
-               className="h-4 object-contain"
-             />
-           </div>
-           
-           {/* QR Code */}
-           <div className="flex justify-center mb-1">
-             <QRCodeSVG
-               value={qrData}
-               size={55}
-               level="M"
-               includeMargin={false}
-             />
-           </div>
-           
-           {/* Service Code */}
-           <div className="text-center mb-1">
-             <p className="text-[10px] font-mono font-bold tracking-wide" style={{ color: '#000' }}>
-               {service.code}
-             </p>
-           </div>
-           
-           {/* Customer Info - compact */}
-           <div className="space-y-0 text-[7px] leading-tight">
-             <p className="truncate">
-               <span style={{ color: '#6b7280' }}>Cl:</span>{' '}
-               <span className="font-medium" style={{ color: '#000' }}>{service.customer?.name || 'N/A'}</span>
-             </p>
-             <p className="truncate">
-               <span style={{ color: '#6b7280' }}>Eq:</span>{' '}
-               <span className="font-medium" style={{ color: '#000' }}>{service.appliance_type || 'N/A'}</span>
-             </p>
-             <p>
-               <span style={{ color: '#6b7280' }}>Tel:</span>{' '}
-               <span className="font-medium" style={{ color: '#000' }}>{service.customer?.phone || 'N/A'}</span>
-             </p>
-           </div>
-         </div>
+          {/* Tag content - portrait 62mm layout */}
+          <div className="flex justify-center py-2">
+            <div
+              ref={tagRef}
+              className="print-tag"
+              style={{
+                width: '62mm',
+                background: '#ffffff',
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              {/* Top accent bar */}
+              <div style={{ width: '100%', height: '5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+
+              {/* Logo */}
+              <div style={{ padding: '3mm 4mm 2mm', display: 'flex', justifyContent: 'center' }}>
+                <img
+                  src={tecnofrioLogoFull}
+                  alt="TECNOFRIO"
+                  style={{ height: '8mm', objectFit: 'contain' }}
+                />
+              </div>
+
+              {/* QR Code */}
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0 2mm' }}>
+                <QRCodeSVG
+                  value={qrData}
+                  size={120}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+
+              {/* Service Code */}
+              <div style={{ textAlign: 'center', padding: '2mm 4mm 1mm' }}>
+                <p style={{
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  color: '#2B4F84',
+                  letterSpacing: '1px',
+                  margin: 0,
+                }}>
+                  {service.code}
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div style={{ width: 'calc(100% - 8mm)', height: '0.5px', backgroundColor: '#e5e7eb', margin: '1mm 4mm' }} />
+
+              {/* Service Details */}
+              <div style={{ padding: '1mm 4mm 2mm', width: '100%', boxSizing: 'border-box' }}>
+                {[
+                  { label: 'Cl', value: service.customer?.name },
+                  { label: 'Tel', value: service.customer?.phone },
+                  { label: 'Eq', value: service.appliance_type },
+                  { label: 'Av', value: service.detected_fault || service.fault_description },
+                ].map(({ label, value }) => value ? (
+                  <div key={label} style={{ display: 'flex', gap: '2px', marginBottom: '1mm', lineHeight: '1.3' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '12px' }}>{label}:</span>
+                    <span style={{ fontSize: '9px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+                  </div>
+                ) : null)}
+              </div>
+
+              {/* Bottom accent bar */}
+              <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', marginTop: 'auto', flexShrink: 0 }} />
+            </div>
+          </div>
 
           <DialogFooter className="gap-2 no-print">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
