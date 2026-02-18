@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Camera } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -163,10 +165,14 @@ export function TechnicianServiceSheet({
                         <option key={key} value={key}>{label}</option>
                       ))}
                     </select>
+                    import {Camera} from 'lucide-react';
+
+                    // ... (in the component)
                     <Button onClick={() => setShowCamera(true)} size="sm" className="gap-1">
-                      <Clock className="h-4 w-4" />
+                      <Camera className="h-4 w-4" />
                       Adicionar Foto
                     </Button>
+
                   </div>
                 </div>
               </>

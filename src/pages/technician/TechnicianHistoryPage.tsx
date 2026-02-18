@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Search, Eye, MessageSquarePlus, Filter } from 'lucide-react';
+import { History, Search, Eye, MessageSquarePlus, Filter, Camera, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
+import { CameraCapture } from '@/components/shared/CameraCapture';
 import type { Service } from '@/types/database';
 
 export default function TechnicianHistoryPage() {
@@ -26,6 +27,10 @@ export default function TechnicianHistoryPage() {
     const [showNoteDialog, setShowNoteDialog] = useState(false);
     const [newNote, setNewNote] = useState('');
     const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+
+    // Photo upload state
+    const [showCamera, setShowCamera] = useState(false);
+    const [photoFile, setPhotoFile] = useState<string | null>(null);
 
     // Fetch technician's complete history
     const { data: services = [], isLoading } = useQuery({
@@ -72,24 +77,53 @@ export default function TechnicianHistoryPage() {
         e.stopPropagation();
         setSelectedService(service);
         setNewNote('');
+        setPhotoFile(null);
         setShowNoteDialog(true);
     };
 
+    const handlePhotoCapture = (imageData: string) => {
+        setPhotoFile(imageData);
+        setShowCamera(false);
+    };
+
+    const handleRemovePhoto = () => {
+        setPhotoFile(null);
+    };
+
     const handleAddNote = async () => {
-        if (!selectedService || !newNote.trim()) return;
+        if (!selectedService || (!newNote.trim() && !photoFile)) return;
 
         setIsSubmittingNote(true);
         try {
+            let noteText = newNote.trim();
+
+            // Upload photo if exists
+            if (photoFile) {
+                const { error: photoError } = await supabase.from('service_photos').insert({
+                    service_id: selectedService.id,
+                    photo_type: 'visita', // Generic type for observation photos
+                    file_url: photoFile,
+                    description: 'Foto anexada à observação',
+                    uploaded_by: user?.id
+                });
+
+                if (photoError) throw photoError;
+
+                noteText += ' (Foto anexada)';
+                queryClient.invalidateQueries({ queryKey: ['service-photos', selectedService.id] });
+            }
+
             await logActivity({
                 serviceId: selectedService.id,
                 actorId: user?.id,
                 actionType: 'nota_adicionada',
-                description: `Observação do técnico: ${newNote.trim()}`,
+                description: `Observação do técnico: ${noteText}`,
                 isPublic: true,
             });
 
             toast.success('Observação adicionada com sucesso!');
             setShowNoteDialog(false);
+            setPhotoFile(null);
             queryClient.invalidateQueries({ queryKey: ['activity-logs', selectedService.id] });
         } catch (error) {
             console.error('Error adding note:', error);
@@ -223,24 +257,55 @@ export default function TechnicianHistoryPage() {
                             Adicione uma observação ao serviço {selectedService?.code}. Esta nota ficará registada no histórico de atividade.
                         </p>
                     </DialogHeader>
-                    <div className="py-4">
+                    <div className="py-4 space-y-4">
                         <Textarea
                             placeholder="Escreva aqui a sua observação..."
                             value={newNote}
                             onChange={(e) => setNewNote(e.target.value)}
                             rows={4}
                         />
+
+                        {photoFile ? (
+                            <div className="relative rounded-lg overflow-hidden border">
+                                <img src={photoFile} alt="Preview" className="w-full h-48 object-cover" />
+                                <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-8 w-8"
+                                    onClick={handleRemovePhoto}
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                className="w-full h-24 flex flex-col gap-2 border-dashed"
+                                onClick={() => setShowCamera(true)}
+                            >
+                                <Camera className="h-8 w-8 text-muted-foreground" />
+                                <span className="text-muted-foreground">Adicionar Foto (Opcional)</span>
+                            </Button>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowNoteDialog(false)}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleAddNote} disabled={isSubmittingNote || !newNote.trim()}>
+                        <Button onClick={handleAddNote} disabled={isSubmittingNote || (!newNote.trim() && !photoFile)}>
                             {isSubmittingNote ? 'A guardar...' : 'Guardar Observação'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CameraCapture
+                open={showCamera}
+                onOpenChange={setShowCamera}
+                onCapture={handlePhotoCapture}
+                title="Foto da Observação"
+            />
         </div>
     );
 }
+
