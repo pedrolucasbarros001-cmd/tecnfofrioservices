@@ -11,6 +11,8 @@ import {
   SERVICE_STATUS_CONFIG,
   type Service,
   type ServicePhoto,
+  type PhotoType,
+  PHOTO_TYPE_LABELS,
 } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
@@ -29,6 +31,11 @@ export function TechnicianServiceSheet({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
+  // photo upload state
+  const [showCamera, setShowCamera] = useState(false);
+  const [photoType, setPhotoType] = useState<PhotoType>('aparelho');
+
+  const queryClient = useQueryClient();
   const { data: servicePhotos = [] } = useQuery({
     queryKey: ['service-photos', service?.id],
     queryFn: async () => {
@@ -43,6 +50,22 @@ export function TechnicianServiceSheet({
     },
     enabled: !!service?.id && open,
   });
+
+  const handlePhotoCapture = async (imageData: string) => {
+    if (!service?.id) return;
+    try {
+      await supabase.from('service_photos').insert({
+        service_id: service.id,
+        photo_type: photoType,
+        file_url: imageData,
+        description: PHOTO_TYPE_LABELS[photoType] || photoType,
+      });
+      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      setShowCamera(false);
+    } catch (err) {
+      console.error('Error uploading photo:', err);
+    }
+  };
 
   if (!service) return null;
 
@@ -129,6 +152,21 @@ export function TechnicianServiceSheet({
                         </div>
                       </button>
                     ))}
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <select
+                      value={photoType}
+                      onChange={(e) => setPhotoType(e.target.value as PhotoType)}
+                      className="border px-2 py-1 rounded"
+                    >
+                      {Object.entries(PHOTO_TYPE_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                    <Button onClick={() => setShowCamera(true)} size="sm" className="gap-1">
+                      <Clock className="h-4 w-4" />
+                      Adicionar Foto
+                    </Button>
                   </div>
                 </div>
               </>
