@@ -294,6 +294,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           scheduled_date: null, // Clear scheduling
           scheduled_shift: null,
           detected_fault: formData.detectedFault,
+          shouldSelect: false, // Prevent RLS error as technician loses access
         });
 
         // Log activity - levantamento para oficina

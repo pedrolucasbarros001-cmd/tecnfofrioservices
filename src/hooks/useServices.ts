@@ -272,16 +272,21 @@ export function useUpdateService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, skipToast, ...updates }: Partial<Service> & { id: string; skipToast?: boolean }) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ id, skipToast, shouldSelect = true, ...updates }: Partial<Service> & { id: string; skipToast?: boolean; shouldSelect?: boolean }) => {
+      const query = supabase
         .from('services')
         .update(updates as any)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
 
-      if (error) throw error;
-      return { data, skipToast };
+      if (shouldSelect) {
+        const { data, error } = await query.select().single();
+        if (error) throw error;
+        return { data, skipToast };
+      } else {
+        const { error } = await query;
+        if (error) throw error;
+        return { data: null, skipToast };
+      }
     },
     onSuccess: ({ skipToast }) => {
       invalidateAllServiceQueries(queryClient);
