@@ -443,13 +443,9 @@
     margin: 0;
   }
 
-  /* Hide Radix overlay - CRITICAL for Safari blank preview fix */
+  /* Hide Radix overlay - Modified to allow content visibility while fixing Safari issue */
   [data-radix-dialog-overlay] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
     background: transparent !important;
-    pointer-events: none !important;
   }
 
   /* Show print-only elements */
@@ -506,7 +502,8 @@
   }
 
   /* For modal-based printing: hide React app */
-  body:not(:has(.print-page)):not(:has(.print-tag-page)) #root {
+  /* Only hide root if we are NOT printing a sheet modal */
+  body:not(:has(.print-page)):not(:has(.print-tag-page)):not(:has([data-radix-dialog-content])) #root {
     display: none !important;
     visibility: hidden !important;
   }
@@ -521,6 +518,27 @@
   [data-radix-portal] {
     display: block !important;
     visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    z-index: 9999 !important;
+  }
+  
+  /* Ensure content inside portal is visible and correctly positioned for print */
+  [data-radix-dialog-content] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    transform: none !important;
   }
 
   /* ========== A4 SHEET (modal) ========== */
