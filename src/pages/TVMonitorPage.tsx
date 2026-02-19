@@ -144,7 +144,7 @@ export default function TVMonitorPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 lg:p-6 pb-64">
       {/* Header */}
-      <header className="flex items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 py-[2px] px-[2px]">
+      <header className="flex items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-6">
           <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-16 w-16 lg:h-20 lg:w-20 object-contain" />
           <div>
@@ -175,11 +175,11 @@ export default function TVMonitorPage() {
           return (
             <div
               key={section.key}
-              className={cn("rounded-2xl p-5 text-center transition-all border-2 py-[2px] px-[2px]",
-
-              count > 0 ?
-              "bg-white border-[#2B4F84] shadow-md ring-4 ring-[#2B4F84]/5" :
-              "bg-slate-100 border-transparent opacity-60"
+              className={cn(
+                "rounded-2xl p-5 text-center transition-all border-2",
+                count > 0 ?
+                "bg-white border-[#2B4F84] shadow-md ring-4 ring-[#2B4F84]/5" :
+                "bg-slate-100 border-transparent opacity-60"
               )}>
 
               <p
@@ -198,7 +198,7 @@ export default function TVMonitorPage() {
         {services.map((service) =>
         <div
           key={service.id}
-          className={cn("rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between py-[6px] px-[9px]",
+          className={cn("rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between py-[10px]",
 
           service.is_urgent ? "border-red-500 bg-red-50/30" : "border-slate-200"
           )}>
@@ -239,7 +239,7 @@ export default function TVMonitorPage() {
             </div>
             <div>
               {service.technician_id ?
-            <div className="flex items-center gap-3 bg-blue-50/50 p-2 rounded-xl mb-4 px-[8px] py-[5px]">
+            <div className="flex items-center gap-3 bg-blue-50/50 p-2 rounded-xl mb-4">
                   <div
                 className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-black text-white shadow-md"
                 style={{ backgroundColor: service.tech_color || "#2B4F84" }}>
@@ -261,10 +261,10 @@ export default function TVMonitorPage() {
 
       {/* RODAPÉ GIGANTE - BARRA DE TAREFAS */}
       <footer className="fixed bottom-0 left-0 right-0 z-50 shadow-2xl">
-        <div className="bg-[#2B4F84] border-t-4 border-yellow-400 p-6 my-0 py-0">
+        <div className="bg-[#2B4F84] border-t-4 border-yellow-400 p-6 py-[2px] px-[2px]">
           <div className="flex items-center gap-4 mb-3">
-            <Activity className="h-6 w-6 text-yellow-400 animate-bounce my-[2px]" />
-            <span className="text-xl text-yellow-400 font-black uppercase tracking-widest my-[5px]">
+            <Activity className="h-6 w-6 text-yellow-400 animate-bounce" />
+            <span className="text-xl text-yellow-400 font-black uppercase tracking-widest">
               Tarefas Adicionais & Avisos Administrativos
             </span>
           </div>
@@ -277,7 +277,7 @@ export default function TVMonitorPage() {
               activityLogs.map((log) =>
               <div
                 key={log.id}
-                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl flex items-center gap-4 py-[10px] px-[10px]">
+                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl px-8 py-4 flex items-center gap-4">
 
                     <span className="text-xl text-yellow-200 font-mono font-bold opacity-70">
                       [{format(new Date(log.created_at), "HH:mm")}]
@@ -290,7 +290,7 @@ export default function TVMonitorPage() {
           </div>
         </div>
 
-        <div className="bg-white px-6 flex items-center justify-between border-t border-slate-200 py-px">
+        <div className="bg-white px-6 py-4 flex items-center justify-between border-t border-slate-200">
           <span className="text-xl font-black">
             <span className="text-[#2B4F84]">TECNO</span>
             <span className="text-slate-300">FRIO</span>
