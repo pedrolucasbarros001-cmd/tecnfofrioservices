@@ -26,6 +26,9 @@ import {
   DollarSign,
   ClipboardList,
   Pencil,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -177,6 +180,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+  // Lightbox state
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -829,22 +834,24 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   borderColor="border-l-indigo-500"
                 >
                   <div className="grid grid-cols-3 gap-2">
-                    {servicePhotos.map((photo) => (
+                    {servicePhotos.map((photo, index) => (
                       <div key={photo.id} className="flex flex-col gap-1">
                         {photo.creator?.full_name && (
                           <p className="text-[9px] text-muted-foreground truncate" title={photo.creator.full_name}>
                             Por: {photo.creator.full_name.split(' ')[0]}
                           </p>
                         )}
-                        <div className="relative">
-                          <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={photo.file_url}
-                              alt={photo.description || 'Foto do serviço'}
-                              className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
-                            />
-                          </a>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
+                        <div
+                          className="relative cursor-pointer group"
+                          onClick={() => setSelectedPhotoIndex(index)}
+                        >
+                          <img
+                            src={photo.file_url}
+                            alt={photo.description || 'Foto do serviço'}
+                            className="w-full h-20 object-cover rounded border transition-opacity hover:opacity-90"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded" />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize truncate">
                             {getPhotoTypeLabel(photo.photo_type)}
                           </div>
                         </div>
@@ -904,6 +911,59 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     {activityLogs.map((log, index) => (
                       <ActivityLogItem key={log.id} log={log} isLast={index === activityLogs.length - 1} />
                     ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Technician Notes (Observations) */}
+              {activityLogs.some(log => log.action_type === 'nota_adicionada') && (
+                <Section
+                  title="Notas do Técnico"
+                  bgColor="bg-amber-50"
+                  borderColor="border-l-amber-500"
+                >
+                  <div className="space-y-3">
+                    {activityLogs
+                      .filter(log => log.action_type === 'nota_adicionada')
+                      .map((log) => (
+                        <div key={log.id} className="bg-white p-3 rounded border text-sm">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-medium text-amber-700 text-xs uppercase">
+                              {log.actor?.full_name || 'Técnico'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+                            </span>
+                          </div>
+                          <p className="text-gray-800 whitespace-pre-wrap">{log.description}</p>
+
+                          {/* Photos in notes */}
+                          {log.metadata?.photos && Array.isArray(log.metadata.photos) && log.metadata.photos.length > 0 && (
+                            <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                              {log.metadata.photos.map((photoUrl: string, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="relative cursor-pointer group shrink-0"
+                                  onClick={() => {
+                                    // Find global index of this photo to open lightbox
+                                    // This is an approximation since we don't have the photo ID easily mapped here
+                                    // But we can try to find by URL or just open isolated if needed
+                                    // For now, let's look it up in servicePhotos
+                                    const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
+                                    if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
+                                  }}
+                                >
+                                  <img
+                                    src={photoUrl}
+                                    alt="Foto da nota"
+                                    className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 </Section>
               )}
@@ -1045,7 +1105,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         onSuccess={handleModalSuccess}
       />
 
-      {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1066,6 +1125,51 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Lightbox for Photos */}
+      {selectedPhotoIndex !== null && servicePhotos.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
+            onClick={() => setSelectedPhotoIndex(null)}
+          >
+            <X className="h-8 w-8" />
+          </button>
+
+          <button
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
+            onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+            disabled={selectedPhotoIndex === 0}
+          >
+            <ChevronLeft className="h-10 w-10" />
+          </button>
+
+          <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
+            <img
+              src={servicePhotos[selectedPhotoIndex].file_url}
+              alt="Foto em detalhe"
+              className="max-w-full max-h-[80vh] object-contain rounded-md"
+            />
+            <div className="mt-4 text-white text-center">
+              <p className="font-medium text-lg">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
+              {servicePhotos[selectedPhotoIndex].description && (
+                <p className="text-gray-300 text-sm mt-1">{servicePhotos[selectedPhotoIndex].description}</p>
+              )}
+              <p className="text-gray-400 text-xs mt-2">
+                {selectedPhotoIndex + 1} de {servicePhotos.length} • {format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+              </p>
+            </div>
+          </div>
+
+          <button
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
+            onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : prev))}
+            disabled={selectedPhotoIndex === servicePhotos.length - 1}
+          >
+            <ChevronRight className="h-10 w-10" />
+          </button>
+        </div>
+      )}
     </>
   );
 }
