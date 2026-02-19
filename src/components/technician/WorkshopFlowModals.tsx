@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus } from "lucide-react";
+import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, PenTool } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ type ModalStep =
   | "foto_aparelho"
   | "foto_etiqueta"
   | "foto_estado"
+  | "dados_aparelho"
   | "diagnostico"
   | "pecas_usadas"
   | "pedir_peca"
@@ -49,6 +51,9 @@ interface WorkshopFlowModalsProps {
 interface WorkshopFormData {
   detectedFault: string;
   workPerformed: string;
+  brand: string;
+  model: string;
+  serialNumber: string;
   usedParts: boolean;
   usedPartsList: PartEntry[];
   needsPartOrder: boolean;
@@ -68,6 +73,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
   const [formData, setFormData] = useState<WorkshopFormData>({
     detectedFault: "",
     workPerformed: "",
+    brand: service.brand || "",
+    model: service.model || "",
+    serialNumber: service.serial_number || "",
     usedParts: false,
     usedPartsList: [],
     needsPartOrder: false,
@@ -100,6 +108,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
         setFormData({
           detectedFault: service.detected_fault || "",
           workPerformed: service.work_performed || "",
+          brand: service.brand || "",
+          model: service.model || "",
+          serialNumber: service.serial_number || "",
           usedParts: false,
           usedPartsList: [],
           needsPartOrder: false,
@@ -136,7 +147,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       if (!hasPreviousHistory) {
         setCurrentStep("foto_aparelho");
       } else {
-        setCurrentStep("diagnostico");
+        // Check if metadata is missing even with history
+        if (!service.brand || !service.model || !service.serial_number) {
+          setCurrentStep("dados_aparelho");
+        } else {
+          setCurrentStep("diagnostico");
+        }
       }
     } catch (error) {
       console.error("Error starting repair:", error);
@@ -253,6 +269,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
     setFormData({
       detectedFault: "",
       workPerformed: "",
+      brand: service.brand || "",
+      model: service.model || "",
+      serialNumber: service.serial_number || "",
       usedParts: false,
       usedPartsList: [],
       needsPartOrder: false,
@@ -278,6 +297,26 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       "pedir_peca",
       "conclusao",
     ];
+
+  // Logic to insert dados_aparelho if missing info
+  if (!service.brand || !service.model || !service.serial_number) {
+    // Insert after foto_estado (which is index 3 in the full list)
+    // Or after resumo if hasPreviousHistory (index 0)
+    if (hasPreviousHistory) {
+      // If has history, maybe we didn't collect it before?
+      // Insert after cancel/resumo, before diagnostico
+      if (!steps.includes("dados_aparelho")) {
+        steps.splice(1, 0, "dados_aparelho");
+      }
+    } else {
+      // Full flow
+      if (!steps.includes("dados_aparelho")) {
+        // Find foto_estado index
+        const idx = steps.indexOf("foto_estado");
+        if (idx >= 0) steps.splice(idx + 1, 0, "dados_aparelho");
+      }
+    }
+  }
 
   const stepIndex = steps.indexOf(currentStep);
   const showProgress = currentStep !== "resumo";
@@ -454,7 +493,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep("foto_estado")}
+              onClick={() => {
+                // Calculate next step
+                const idx = steps.indexOf(currentStep);
+                if (idx >= 0 && idx < steps.length - 1) {
+                  setCurrentStep(steps[idx + 1] as ModalStep);
+                }
+              }}
               disabled={!formData.photoEtiqueta}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -497,7 +542,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep("diagnostico")}
+              onClick={() => {
+                // Calculate next step
+                const idx = steps.indexOf(currentStep);
+                if (idx >= 0 && idx < steps.length - 1) {
+                  setCurrentStep(steps[idx + 1] as ModalStep);
+                }
+              }}
               disabled={formData.photosEstado.length === 0}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -506,8 +557,94 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
         </DialogContent>
       </Dialog>
 
+      {/* Modal Extra: Dados do Aparelho (Conditional) */}
+      <Dialog open={currentStep === "dados_aparelho" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <ModalHeader title="Dados do Aparelho" step="Info Obrigatória" />
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <PenTool className="h-4 w-4 shrink-0" />
+              <span>Dados técnicos em falta na ficha. Por favor preencha.</span>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="brand">Marca *</Label>
+                <Input
+                  id="brand"
+                  value={formData.brand}
+                  onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                  placeholder="Ex: Samsung, LG..."
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="model">Modelo *</Label>
+                <Input
+                  id="model"
+                  value={formData.model}
+                  onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
+                  placeholder="Identificado na etiqueta"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="serial">Número de Série *</Label>
+                <Input
+                  id="serial"
+                  value={formData.serialNumber}
+                  onChange={(e) => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
+                  placeholder="S/N da etiqueta"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => {
+              // Logic to calculate previous step dynamically
+              const idx = steps.indexOf(currentStep);
+              if (idx > 0) setCurrentStep(steps[idx - 1] as ModalStep);
+            }}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <Button
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+              onClick={async () => {
+                if (!formData.brand.trim() || !formData.model.trim() || !formData.serialNumber.trim()) {
+                  toast.error("Preencha todos os campos obrigatórios");
+                  return;
+                }
+                try {
+                  await updateService.mutateAsync({
+                    id: service.id,
+                    brand: formData.brand.trim(),
+                    model: formData.model.trim(),
+                    serial_number: formData.serialNumber.trim(),
+                    skipToast: true,
+                  });
+                  toast.success("Dados do aparelho guardados");
+
+                  // Logic to calculate next step dynamically
+                  const idx = steps.indexOf(currentStep);
+                  if (idx >= 0 && idx < steps.length - 1) {
+                    setCurrentStep(steps[idx + 1] as ModalStep);
+                  }
+                } catch (error) {
+                  toast.error("Erro ao guardar dados");
+                }
+              }}
+              disabled={!formData.brand.trim() || !formData.model.trim() || !formData.serialNumber.trim()}
+            >
+              Guardar e Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog >
+
       {/* Modal 2: Diagnóstico Complementar */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Diagnóstico" step="Passo 2" />
 
@@ -538,7 +675,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => setCurrentStep(!hasPreviousHistory ? "foto_estado" : "resumo")}
+              onClick={() => {
+                const idx = steps.indexOf(currentStep);
+                if (idx > 0) setCurrentStep(steps[idx - 1] as ModalStep);
+              }}
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
@@ -547,10 +687,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Modal 3: Peças Usadas */}
-      <Dialog
+      < Dialog
         open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal}
         onOpenChange={() => handleClose()}
       >
@@ -621,10 +761,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Modal 4: Pedir Peça */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
@@ -715,10 +855,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             )}
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Modal 5: Conclusão */}
-      <Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Conclusão" step="Passo 5" />
 
@@ -753,10 +893,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Camera Modal */}
-      <CameraCapture
+      < CameraCapture
         open={showCamera}
         onOpenChange={setShowCamera}
         onCapture={async (imageData) => {

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,7 @@ export default function ServicosPage() {
       // Fetch all services assigned to this technician (active ones, NOT in oficina for this view)
       const { data, error } = await supabase
         .from('services')
-        .select('*, customer:customers(*)')
+        .select('*, customer:customers(*), service_parts(*)')
         .eq('technician_id', technicianData.id)
         .neq('service_location', 'oficina') // Workshop services go to the Oficina page
         .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca'])
@@ -145,6 +145,13 @@ export default function ServicosPage() {
   const ServiceCard = ({ service }: { service: Service }) => {
     const serviceConfig = getServiceConfig(service);
 
+    // Check if service should be blocked due to waiting for parts
+    const isWaitingForParts = service.status === 'em_espera_de_peca';
+    const pendingParts = (service.service_parts || []).filter(
+      (p: any) => p.is_requested && !p.arrived
+    );
+    const isBlocked = isWaitingForParts && pendingParts.length > 0;
+
     return (
       <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)} data-tour="service-cards">
         <CardContent className="p-4">
@@ -191,15 +198,27 @@ export default function ServicosPage() {
               </div>
             </div>
 
-            {/* Start Button */}
-            <Button
-              size="sm"
-              className={cn('w-full h-9 text-sm mt-2', serviceConfig.buttonColor)}
-              onClick={(e) => handleStartFlow(service, e)}
-            >
-              <Play className="h-4 w-4 mr-1.5" />
-              Começar
-            </Button>
+            {/* Start Button or Block Message */}
+            {isBlocked ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-9 text-sm mt-2 opacity-80 cursor-not-allowed border-dashed bg-muted/50"
+                disabled
+              >
+                <Lock className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Em espera de peça</span>
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className={cn('w-full h-9 text-sm mt-2', serviceConfig.buttonColor)}
+                onClick={(e) => handleStartFlow(service, e)}
+              >
+                <Play className="h-4 w-4 mr-1.5" />
+                Começar
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
