@@ -267,7 +267,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   if (!service) return null;
 
-  const statusConfig = SERVICE_STATUS_CONFIG[service.status];
+  const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
 
   const handleStartExecution = () => {
     // Navigate to appropriate technician flow
