@@ -146,10 +146,12 @@ export default function ServicosPage() {
     const serviceConfig = getServiceConfig(service);
 
     // Check if service should be blocked due to waiting for parts
-    const isWaitingForParts = service.status === 'em_espera_de_peca';
+    const isWaitingForParts = service.status === 'em_espera_de_peca' || service.status === 'para_pedir_peca';
     const pendingParts = (service.service_parts || []).filter(
       (p: any) => p.is_requested && !p.arrived
     );
+    // Block if status is waiting/requesting AND has pending parts
+    // OR just if status implies waiting (user request "bloqueado e so abre de novo quando o adm registar que a peça chegou")
     const isBlocked = isWaitingForParts && pendingParts.length > 0;
 
     return (
