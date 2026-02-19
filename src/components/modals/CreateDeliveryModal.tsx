@@ -76,6 +76,7 @@ const formSchema = z.object({
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
+  pnc: z.string().optional(),
 
   // Schedule
   technician_id: z.string().optional(),
@@ -115,6 +116,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
       customer_email: '',
       customer_address: '',
       appliance_type: '',
+      pnc: '',
     },
   });
 
@@ -223,11 +225,13 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         technician_id: values.technician_id || null,
         scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
         scheduled_shift: values.scheduled_shift as any,
+        pnc: values.pnc,
         notes: values.notes,
         service_type: 'entrega',
         is_sale: true,
         status: 'por_fazer',
         final_price: values.final_price || null,
+        pending_pricing: !values.final_price,
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
@@ -445,7 +449,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="model"
@@ -464,9 +468,22 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                         name="serial_number"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Número de Série</FormLabel>
+                            <FormLabel>Nº Série</FormLabel>
                             <FormControl>
                               <Input placeholder="S/N" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="pnc"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>PNC</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Code" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

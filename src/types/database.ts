@@ -136,6 +136,7 @@ export interface Service {
   notes: string | null;
   last_status_before_part_request: string | null;
   pricing_description: string | null;
+  pnc: string | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;

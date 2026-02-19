@@ -37,10 +37,10 @@ export default function ServicePrintPage() {
   const navigate = useNavigate();
   const printSheetRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   // Session bridge for new tab authentication
   const { isSettling: sessionSettling, sessionRestored } = usePrintSessionBridge();
-  
+
   // Auth state from context
   const { isAuthenticated, loading: authLoading } = useAuth();
 
@@ -116,7 +116,7 @@ export default function ServicePrintPage() {
     if (!service?.pricing_description) {
       return { subtotal: service?.labor_cost || 0, iva: service?.parts_cost || 0, hasItemizedPricing: false };
     }
-    
+
     try {
       const parsed = JSON.parse(service.pricing_description);
       if (parsed.items && Array.isArray(parsed.items)) {
@@ -125,20 +125,20 @@ export default function ServicePrintPage() {
           const price = item.price || item.unit_price || 0;
           return sum + (qty * price);
         }, 0);
-        
+
         const iva = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number; tax?: number; tax_rate?: number }) => {
           const qty = item.qty || item.quantity || 1;
           const price = item.price || item.unit_price || 0;
           const tax = item.tax || item.tax_rate || 0;
           return sum + ((qty * price) * (tax / 100));
         }, 0);
-        
+
         return { subtotal, iva, hasItemizedPricing: true };
       }
     } catch {
       // Fallback to existing fields
     }
-    
+
     return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
   }, [service?.pricing_description, service?.labor_cost, service?.parts_cost]);
 
@@ -148,12 +148,12 @@ export default function ServicePrintPage() {
 
   const handleDownloadPDF = async () => {
     if (!printSheetRef.current || !service) return;
-    
+
     setIsGenerating(true);
     try {
-      await generatePDF({ 
-        element: printSheetRef.current, 
-        filename: `Ficha-${service.code}` 
+      await generatePDF({
+        element: printSheetRef.current,
+        filename: `Ficha-${service.code}`
       });
     } finally {
       setIsGenerating(false);
@@ -162,10 +162,10 @@ export default function ServicePrintPage() {
 
   // Combined loading state: auth settling + session bridge + query loading
   const isLoading = authLoading || sessionSettling || loadingService;
-  
+
   // If session bridge is done and we're still not authenticated, show login prompt
   const showLoginPrompt = !sessionSettling && !authLoading && !isAuthenticated;
-  
+
   if (showLoginPrompt) {
     return (
       <div className="print-page">
@@ -184,7 +184,7 @@ export default function ServicePrintPage() {
       </div>
     );
   }
-  
+
   if (isLoading) {
     return (
       <div className="print-page">
@@ -248,13 +248,13 @@ export default function ServicePrintPage() {
       {/* A4 Sheet - this is what prints */}
       <div ref={printSheetRef} className="print-sheet relative bg-white">
         {/* Watermark */}
-        <div 
+        <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
           aria-hidden="true"
         >
-          <img 
-            src={tecnofrioLogoIcon} 
-            alt="" 
+          <img
+            src={tecnofrioLogoIcon}
+            alt=""
             className="w-[180mm] h-[180mm] object-contain"
           />
         </div>
@@ -262,9 +262,9 @@ export default function ServicePrintPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-1.5 relative z-10">
           <div className="flex flex-col">
-            <img 
-              src={tecnofrioLogoFull} 
-              alt="TECNOFRIO" 
+            <img
+              src={tecnofrioLogoFull}
+              alt="TECNOFRIO"
               className="h-10 object-contain"
             />
             <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
@@ -343,7 +343,7 @@ export default function ServicePrintPage() {
             <div className="col-span-2">
               <span className="text-muted-foreground">Data Agendada:</span>{' '}
               <span className="font-medium">
-                {service.scheduled_date 
+                {service.scheduled_date
                   ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
@@ -372,6 +372,10 @@ export default function ServicePrintPage() {
             <div>
               <span className="text-muted-foreground">Nº Série:</span>{' '}
               <span className="font-medium">{service.serial_number || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">PNC:</span>{' '}
+              <span className="font-medium">{service.pnc || 'N/A'}</span>
             </div>
             <div className="col-span-2">
               <span className="text-muted-foreground">Avaria:</span>{' '}
@@ -516,7 +520,7 @@ export default function ServicePrintPage() {
                   {payments.map((payment) => (
                     <tr key={payment.id} className="border-b">
                       <td className="py-1">
-                        {payment.payment_date 
+                        {payment.payment_date
                           ? format(new Date(payment.payment_date), "dd/MM/yy", { locale: pt })
                           : '-'}
                       </td>
@@ -543,9 +547,9 @@ export default function ServicePrintPage() {
               <div className="space-y-2">
                 {signatures.map((sig) => (
                   <div key={sig.id} className="flex gap-2 p-1.5 border rounded bg-gray-50">
-                    <img 
-                      src={sig.file_url} 
-                      alt="Assinatura" 
+                    <img
+                      src={sig.file_url}
+                      alt="Assinatura"
                       className="w-24 h-14 object-contain border bg-white rounded"
                     />
                     <div className="flex-1 min-w-0">
@@ -574,8 +578,8 @@ export default function ServicePrintPage() {
                 IMPORTANTE - Termos de Guarda
               </h3>
               <p className="text-amber-700 leading-tight text-[10px]">
-                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após
+                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong>
                 pela guarda ou danos.
               </p>
             </section>

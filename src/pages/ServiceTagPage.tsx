@@ -122,6 +122,7 @@ export default function ServiceTagPage() {
     { label: "Cliente", value: service.customer?.name },
     { label: "Telefone", value: service.customer?.phone },
     { label: "Equipamento", value: service.appliance_type },
+    { label: "Modelo/PNC", value: `${service.model || ''}${service.pnc ? ` / ${service.pnc}` : ''}` },
     { label: "Descrição", value: service.detected_fault || service.fault_description },
   ].filter(d => !!d.value);
 
