@@ -318,31 +318,9 @@ export default function ServiceDetailPage() {
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {activityLogs.map((log) => (
-                  <div key={log.id} className="flex gap-3 text-sm border-l-2 border-muted pl-3 pb-2 last:pb-0">
+                  <div key={log.id} className="flex gap-3 text-sm border-l-2 border-muted pl-3">
                     <div className="flex-1">
                       <p className="font-medium">{log.description}</p>
-
-                      {/* Metadata Photos */}
-                      {log.metadata?.photos && Array.isArray(log.metadata.photos) && log.metadata.photos.length > 0 && (
-                        <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                          {log.metadata.photos.map((photoUrl: string, idx: number) => (
-                            <a
-                              key={idx}
-                              href={photoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="relative group shrink-0"
-                            >
-                              <img
-                                src={photoUrl}
-                                alt="Foto da atividade"
-                                className="h-16 w-16 object-cover rounded border hover:opacity-80 transition-opacity"
-                              />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
                       <div className="flex items-center justify-between mt-0.5">
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}

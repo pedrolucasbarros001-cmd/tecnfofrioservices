@@ -141,7 +141,6 @@ export interface Service {
   updated_at: string;
   customer?: Customer;
   technician?: Technician;
-  service_parts?: ServicePart[];
 }
 
 export interface ServicePart {

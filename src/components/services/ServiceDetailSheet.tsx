@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -27,9 +26,6 @@ import {
   DollarSign,
   ClipboardList,
   Pencil,
-  X,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -39,16 +35,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -109,7 +95,16 @@ const getPhotoTypeLabel = (type: string | null): string => {
     default: return 'Foto';
   }
 };
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ServiceDetailSheetProps {
   service: Service | null;
@@ -182,8 +177,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
-  // Lightbox state
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -267,7 +260,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   if (!service) return null;
 
-  const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
+  const statusConfig = SERVICE_STATUS_CONFIG[service.status];
 
   const handleStartExecution = () => {
     // Navigate to appropriate technician flow
@@ -574,9 +567,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime())
+                      {service.scheduled_date
                         ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt })
-                        : service.scheduled_date ? service.scheduled_date : 'Não agendado'}
+                        : 'Não agendado'}
                     </span>
                   </div>
                   {service.scheduled_shift && (
@@ -604,8 +597,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   </div>
                 )}
               </Section>
-
-              {/* Activity History - REMOVED DUPLICATE SECTION */}
 
               {/* Pricing - Enhanced financial section */}
               {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
@@ -676,12 +667,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Criado em:</span>
-                    <span>{service.created_at && !isNaN(new Date(service.created_at).getTime()) ? format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
+                    <span>{format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Última atualização:</span>
-                    <span>{service.updated_at && !isNaN(new Date(service.updated_at).getTime()) ? format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
+                    <span>{format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
                   </div>
                 </div>
               </Section>
@@ -753,7 +744,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             <div>
                               <p className="font-medium">{payment.amount.toFixed(2)} €</p>
                               <p className="text-xs text-muted-foreground">
-                                {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt }) : '-'}
+                                {payment.payment_date && format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })}
                                 {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
                               </p>
                             </div>
@@ -784,24 +775,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   borderColor="border-l-indigo-500"
                 >
                   <div className="grid grid-cols-3 gap-2">
-                    {servicePhotos.map((photo, index) => (
+                    {servicePhotos.map((photo) => (
                       <div key={photo.id} className="flex flex-col gap-1">
                         {photo.creator?.full_name && (
                           <p className="text-[9px] text-muted-foreground truncate" title={photo.creator.full_name}>
                             Por: {photo.creator.full_name.split(' ')[0]}
                           </p>
                         )}
-                        <div
-                          className="relative cursor-pointer group"
-                          onClick={() => setSelectedPhotoIndex(index)}
-                        >
-                          <img
-                            src={photo.file_url}
-                            alt={photo.description || 'Foto do serviço'}
-                            className="w-full h-20 object-cover rounded border transition-opacity hover:opacity-90"
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded" />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize truncate">
+                        <div className="relative">
+                          <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={photo.file_url}
+                              alt={photo.description || 'Foto do serviço'}
+                              className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          </a>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
                             {getPhotoTypeLabel(photo.photo_type)}
                           </div>
                         </div>
@@ -841,7 +830,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {sig.signed_at && !isNaN(new Date(sig.signed_at).getTime()) ? format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
+                            {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
                           </p>
                         </div>
                       </div>
@@ -865,78 +854,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
-              {/* Technician Notes (Observations) */}
-              {Array.isArray(activityLogs) && activityLogs.some((log: any) => log && log.action_type === 'nota_adicionada') && (
-                <Section
-                  title="Notas do Técnico"
-                  bgColor="bg-amber-50"
-                  borderColor="border-l-amber-500"
-                >
-                  <div className="space-y-3">
-                    {activityLogs
-                      .filter((log: any) => log && log.action_type === 'nota_adicionada')
-                      .map((log: any) => (
-                        <div key={log.id || Math.random()} className="bg-white p-3 rounded border text-sm">
-                          <div className="flex justify-between items-start mb-1">
-                            <span className="font-medium text-amber-700 text-xs uppercase">
-                              {log.actor?.full_name || 'Técnico'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {log.created_at && !isNaN(new Date(log.created_at).getTime())
-                                ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })
-                                : '-'}
-                            </span>
-                          </div>
-                          <p className="text-gray-800 whitespace-pre-wrap">{log.description || ''}</p>
-
-                          {/* Photos in notes */}
-                          {log.metadata &&
-                            typeof log.metadata === 'object' &&
-                            log.metadata !== null &&
-                            Array.isArray((log.metadata as any).photos) &&
-                            (log.metadata as any).photos.length > 0 && (
-                              <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                                {(log.metadata as any).photos.map((photoUrl: string, idx: number) => {
-                                  if (!photoUrl || typeof photoUrl !== 'string') return null;
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="relative cursor-pointer group shrink-0"
-                                      onClick={() => {
-                                        if (!servicePhotos) return;
-                                        const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
-                                        if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
-                                      }}
-                                    >
-                                      <img
-                                        src={photoUrl}
-                                        alt="Foto da nota"
-                                        className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
-                                      />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                        </div>
-                      ))}
-                  </div>
-                </Section>
-              )}
-
               {/* Notes */}
               {service.notes && (
                 <Section
-                  title="Notas"
-                  bgColor="bg-gray-50"
-                  borderColor="border-l-gray-400"
-                  action={role === 'dono' ? (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowEditDetailsModal(true)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : undefined}
+                  title="Observações"
+                  bgColor="bg-slate-50"
+                  borderColor="border-l-slate-400"
                 >
-                  <p className="text-sm whitespace-pre-line">{service.notes}</p>
+                  <p className="text-sm whitespace-pre-wrap">{service.notes}</p>
                 </Section>
               )}
             </div>
@@ -1066,6 +991,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         onSuccess={handleModalSuccess}
       />
 
+      {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1086,53 +1012,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Lightbox for Photos */}
-      {
-        selectedPhotoIndex !== null && servicePhotos.length > 0 && servicePhotos[selectedPhotoIndex] && (
-          <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
-            <button
-              className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
-              onClick={() => setSelectedPhotoIndex(null)}
-            >
-              <X className="h-8 w-8" />
-            </button>
-
-            <button
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
-              onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
-              disabled={selectedPhotoIndex === 0}
-            >
-              <ChevronLeft className="h-10 w-10" />
-            </button>
-
-            <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
-              <img
-                src={servicePhotos[selectedPhotoIndex].file_url}
-                alt="Foto em detalhe"
-                className="max-w-full max-h-[80vh] object-contain rounded-md"
-              />
-              <div className="mt-4 text-white text-center">
-                <p className="font-medium text-lg">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
-                {servicePhotos[selectedPhotoIndex].description && (
-                  <p className="text-gray-300 text-sm mt-1">{servicePhotos[selectedPhotoIndex].description}</p>
-                )}
-                <p className="text-gray-400 text-xs mt-2">
-                  {selectedPhotoIndex + 1} de {servicePhotos.length} • {servicePhotos[selectedPhotoIndex].uploaded_at && !isNaN(new Date(servicePhotos[selectedPhotoIndex].uploaded_at).getTime()) ? format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt }) : '-'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
-              onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : prev))}
-              disabled={selectedPhotoIndex === servicePhotos.length - 1}
-            >
-              <ChevronRight className="h-10 w-10" />
-            </button>
-          </div>
-        )
-      }
     </>
   );
 }
@@ -1217,11 +1096,8 @@ function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
           </p>
         )}
         <p className="text-sm">{log.description}</p>
-
         <p className="text-xs text-muted-foreground mt-1">
-          {log.created_at && !isNaN(new Date(log.created_at).getTime())
-            ? format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })
-            : '-'}
+          {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
         </p>
       </div>
     </div>
