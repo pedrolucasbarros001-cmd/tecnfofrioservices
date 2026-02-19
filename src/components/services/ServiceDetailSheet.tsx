@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -1128,7 +1128,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       </AlertDialog>
 
       {/* Lightbox for Photos */}
-      {selectedPhotoIndex !== null && servicePhotos.length > 0 && (
+      {selectedPhotoIndex !== null && servicePhotos.length > 0 && servicePhotos[selectedPhotoIndex] && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
           <button
             className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
