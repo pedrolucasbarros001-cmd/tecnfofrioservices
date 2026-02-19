@@ -144,7 +144,7 @@ export default function TVMonitorPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 lg:p-6 pb-64">
       {/* Header */}
-      <header className="flex items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <header className="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-200 py-[2px] pb-px pt-px mb-[20px] pr-[20px] pl-[20px]">
         <div className="flex items-center gap-6">
           <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-16 w-16 lg:h-20 lg:w-20 object-contain" />
           <div>
@@ -277,7 +277,7 @@ export default function TVMonitorPage() {
               activityLogs.map((log) =>
               <div
                 key={log.id}
-                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl flex items-center gap-4 px-[20px] py-[10px]">
+                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl px-8 py-4 flex items-center gap-4">
 
                     <span className="text-xl text-yellow-200 font-mono font-bold opacity-70">
                       [{format(new Date(log.created_at), "HH:mm")}]
