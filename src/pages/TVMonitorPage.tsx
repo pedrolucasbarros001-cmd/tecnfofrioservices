@@ -198,9 +198,9 @@ export default function TVMonitorPage() {
         {services.map((service) =>
         <div
           key={service.id}
-          className={cn("rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between py-[10px] px-[10px]",
-
-          service.is_urgent ? "border-red-500 bg-red-50/30" : "border-slate-200"
+          className={cn(
+            "rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between",
+            service.is_urgent ? "border-red-500 bg-red-50/30" : "border-slate-200"
           )}>
 
             <div>
@@ -277,7 +277,7 @@ export default function TVMonitorPage() {
               activityLogs.map((log) =>
               <div
                 key={log.id}
-                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl px-8 py-4 flex items-center gap-4">
+                className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl flex items-center gap-4 px-[20px] py-[10px]">
 
                     <span className="text-xl text-yellow-200 font-mono font-bold opacity-70">
                       [{format(new Date(log.created_at), "HH:mm")}]
