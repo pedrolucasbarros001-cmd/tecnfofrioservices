@@ -642,7 +642,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       </Dialog >
 
       {/* Modal 2: Diagnóstico Complementar */}
-      < Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Diagnóstico" step="Passo 2" />
 
@@ -688,7 +688,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       </Dialog >
 
       {/* Modal 3: Peças Usadas */}
-      < Dialog
+      <Dialog
         open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal}
         onOpenChange={() => handleClose()}
       >
@@ -762,7 +762,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       </Dialog >
 
       {/* Modal 4: Pedir Peça */}
-      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
@@ -856,7 +856,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       </Dialog >
 
       {/* Modal 5: Conclusão */}
-      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Conclusão" step="Passo 5" />
 
@@ -894,7 +894,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       </Dialog >
 
       {/* Camera Modal */}
-      < CameraCapture
+      <CameraCapture
         open={showCamera}
         onOpenChange={setShowCamera}
         onCapture={async (imageData) => {
@@ -934,8 +934,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
         subtitle="Adicione as peças utilizadas na reparação."
         initialParts={formData.usedPartsList.length > 0 ? formData.usedPartsList : undefined}
       />
-
-
     </>
   );
 }
