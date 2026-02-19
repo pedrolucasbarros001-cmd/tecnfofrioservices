@@ -50,13 +50,14 @@ type RepairModalStep =
   | "foto_aparelho"
   | "foto_etiqueta"
   | "foto_estado"
+  | "produto"
   | "diagnostico"
   | "decisao"
   | "pecas_usadas"
   | "pedir_peca";
 
 // Steps for other services (original flow)
-type OtherModalStep = "resumo" | "deslocacao" | "foto" | "diagnostico" | "decisao" | "pecas_usadas" | "pedir_peca";
+type OtherModalStep = "resumo" | "deslocacao" | "foto" | "produto" | "diagnostico" | "decisao" | "pecas_usadas" | "pedir_peca";
 
 type ModalStep = RepairModalStep | OtherModalStep;
 type DecisionType = "reparar_local" | "levantar_oficina";
@@ -91,6 +92,12 @@ interface VisitFormData {
     name: string;
     reference: string;
   };
+  // Product info
+  productBrand: string;
+  productModel: string;
+  productSerial: string;
+  productPNC: string;
+  productType: string;
   [key: string]: unknown;
 }
 
@@ -110,6 +117,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
     usedPartsList: [{ name: "", reference: "", quantity: 1 }],
     needsPartOrder: false,
     partToOrder: { name: "", reference: "" },
+    productBrand: "",
+    productModel: "",
+    productSerial: "",
+    productPNC: "",
+    productType: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -144,6 +156,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           usedPartsList: [{ name: "", reference: "", quantity: 1 }],
           needsPartOrder: false,
           partToOrder: { name: "", reference: "" },
+          productBrand: service.brand || "",
+          productModel: service.model || "",
+          productSerial: service.serial_number || "",
+          productPNC: (service as any).pnc || "",
+          productType: service.appliance_type || "",
         });
       }
     }
@@ -443,8 +460,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const canProceedFromFoto = formData.photoFile !== null; // Legacy for non-reparacao
   const canProceedFromDiagnostico = formData.detectedFault.trim().length > 0;
 
+  // Check if product info step is needed (only if brand/model not set)
+  const needsProductStep = !service.brand && !service.model;
+
   // Get step list based on service type
   const getSteps = (): string[] => {
+    const productStep = needsProductStep ? ["produto"] : [];
     if (isReparacao) {
       return [
         "resumo",
@@ -452,13 +473,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         "foto_aparelho",
         "foto_etiqueta",
         "foto_estado",
+        ...productStep,
         "diagnostico",
         "decisao",
         "pecas_usadas",
         "pedir_peca",
       ];
     }
-    return ["resumo", "deslocacao", "foto", "diagnostico", "decisao", "pecas_usadas", "pedir_peca"];
+    return ["resumo", "deslocacao", "foto", ...productStep, "diagnostico", "decisao", "pecas_usadas", "pedir_peca"];
   };
 
   // Progress calculation
@@ -498,6 +520,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const goToPreviousPhotoStep = () => {
     if (currentStep === "foto_etiqueta") setCurrentStep("foto_aparelho");
     else if (currentStep === "foto_estado") setCurrentStep("foto_etiqueta");
+    else if (currentStep === "produto" && isReparacao) setCurrentStep("foto_estado");
+    else if (currentStep === "produto") setCurrentStep("foto");
+    else if (currentStep === "diagnostico" && needsProductStep) setCurrentStep("produto");
     else if (currentStep === "diagnostico" && isReparacao) setCurrentStep("foto_estado");
     else if (currentStep === "diagnostico") setCurrentStep("foto");
     else setCurrentStep("deslocacao");
@@ -506,8 +531,25 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const goToNextPhotoStep = () => {
     if (currentStep === "foto_aparelho") setCurrentStep("foto_etiqueta");
     else if (currentStep === "foto_etiqueta") setCurrentStep("foto_estado");
-    else if (currentStep === "foto_estado") setCurrentStep("diagnostico");
-    else if (currentStep === "foto") setCurrentStep("diagnostico");
+    else if (currentStep === "foto_estado") setCurrentStep(needsProductStep ? "produto" : "diagnostico");
+    else if (currentStep === "foto") setCurrentStep(needsProductStep ? "produto" : "diagnostico");
+    else if (currentStep === "produto") setCurrentStep("diagnostico");
+  };
+
+  // Save product info to service
+  const handleProductoConfirm = async () => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        brand: formData.productBrand || undefined,
+        model: formData.productModel || undefined,
+        serial_number: formData.productSerial || undefined,
+        appliance_type: formData.productType || undefined,
+      } as any);
+    } catch {
+      // Non-critical - don't block flow
+    }
+    setCurrentStep("diagnostico");
   };
 
   if (!isOpen) return null;
@@ -819,8 +861,87 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         </Dialog>
       )}
 
+      {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
+      {needsProductStep && (
+        <Dialog open={currentStep === "produto" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="prod_type" className="text-sm">Tipo de Aparelho</Label>
+                <Input
+                  id="prod_type"
+                  placeholder="Ex: Máquina de Lavar, Frigorífico..."
+                  value={formData.productType as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="prod_brand" className="text-sm">Marca</Label>
+                  <Input
+                    id="prod_brand"
+                    placeholder="Ex: Bosch, LG..."
+                    value={formData.productBrand as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="prod_model" className="text-sm">Modelo</Label>
+                  <Input
+                    id="prod_model"
+                    placeholder="Ex: WAT24469ES"
+                    value={formData.productModel as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="prod_serial" className="text-sm">Nº de Série</Label>
+                  <Input
+                    id="prod_serial"
+                    placeholder="Número de série"
+                    value={formData.productSerial as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="prod_pnc" className="text-sm">PNC</Label>
+                  <Input
+                    id="prod_pnc"
+                    placeholder="Product Number Code"
+                    value={formData.productPNC as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Preencha o que estiver visível na placa do aparelho. Campos opcionais.
+              </p>
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-6">
+              <Button variant="outline" onClick={goToPreviousPhotoStep} className="flex items-center gap-1">
+                <ArrowLeft className="h-4 w-4" /> Voltar
+              </Button>
+              <Button onClick={handleProductoConfirm} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white">
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Modal 4/6: Diagnóstico */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
 

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useUpdateService } from "@/hooks/useServices";
@@ -34,6 +35,7 @@ type ModalStep =
   | "foto_aparelho"
   | "foto_etiqueta"
   | "foto_estado"
+  | "produto"
   | "diagnostico"
   | "pecas_usadas"
   | "pedir_peca"
@@ -57,6 +59,12 @@ interface WorkshopFormData {
   photoAparelho: string | null;
   photoEtiqueta: string | null;
   photosEstado: string[];
+  // Product info
+  productBrand: string;
+  productModel: string;
+  productSerial: string;
+  productPNC: string;
+  productType: string;
   [key: string]: unknown;
 }
 
@@ -76,6 +84,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
     photoAparelho: null,
     photoEtiqueta: null,
     photosEstado: [],
+    productBrand: "",
+    productModel: "",
+    productSerial: "",
+    productPNC: "",
+    productType: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -108,6 +121,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
           photoAparelho: null,
           photoEtiqueta: null,
           photosEstado: [],
+          productBrand: service.brand || "",
+          productModel: service.model || "",
+          productSerial: service.serial_number || "",
+          productPNC: (service as any).pnc || "",
+          productType: service.appliance_type || "",
         });
       }
     }
@@ -259,8 +277,31 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
       photoAparelho: null,
       photoEtiqueta: null,
       photosEstado: [],
+      productBrand: "",
+      productModel: "",
+      productSerial: "",
+      productPNC: "",
+      productType: "",
     });
     onClose();
+  };
+
+  // Check if product info step is needed
+  const needsProductStep = !service.brand && !service.model;
+
+  const handleProductoConfirm = async () => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        brand: formData.productBrand || undefined,
+        model: formData.productModel || undefined,
+        serial_number: formData.productSerial || undefined,
+        appliance_type: formData.productType || undefined,
+      } as any);
+    } catch {
+      // Non-critical - don't block flow
+    }
+    setCurrentStep("diagnostico");
   };
 
   // Progress calculation
@@ -495,7 +536,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep("diagnostico")}
+              onClick={() => setCurrentStep(needsProductStep ? "produto" : "diagnostico")}
               disabled={formData.photosEstado.length === 0}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -503,6 +544,84 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
+      {needsProductStep && (
+        <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <ModalHeader title="Informação do Produto" step="Passo 2" />
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="ws_prod_type" className="text-sm">Tipo de Aparelho</Label>
+                <Input
+                  id="ws_prod_type"
+                  placeholder="Ex: Máquina de Lavar, Frigorífico..."
+                  value={formData.productType as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="ws_prod_brand" className="text-sm">Marca</Label>
+                  <Input
+                    id="ws_prod_brand"
+                    placeholder="Ex: Bosch, LG..."
+                    value={formData.productBrand as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ws_prod_model" className="text-sm">Modelo</Label>
+                  <Input
+                    id="ws_prod_model"
+                    placeholder="Ex: WAT24469ES"
+                    value={formData.productModel as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="ws_prod_serial" className="text-sm">Nº de Série</Label>
+                  <Input
+                    id="ws_prod_serial"
+                    placeholder="Número de série"
+                    value={formData.productSerial as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ws_prod_pnc" className="text-sm">PNC</Label>
+                  <Input
+                    id="ws_prod_pnc"
+                    placeholder="Product Number Code"
+                    value={formData.productPNC as string}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Preencha o que estiver visível na placa do aparelho. Campos opcionais.
+              </p>
+            </div>
+
+            <DialogFooter className="flex gap-2 mt-6">
+              <Button variant="outline" onClick={() => setCurrentStep("foto_estado")} className="flex items-center gap-1">
+                <ArrowLeft className="h-4 w-4" /> Voltar
+              </Button>
+              <Button onClick={handleProductoConfirm} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Modal 2: Diagnóstico Complementar */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>

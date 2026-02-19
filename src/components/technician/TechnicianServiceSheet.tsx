@@ -46,10 +46,12 @@ export function TechnicianServiceSheet({
   const [newNote, setNewNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
   // Default photo type for observations is 'visita'
   const photoType: PhotoType = 'visita';
+  const MAX_PHOTOS = 3;
+  // Multi-photo support
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
 
   const queryClient = useQueryClient();
 
@@ -57,7 +59,7 @@ export function TechnicianServiceSheet({
   useEffect(() => {
     if (open) {
       setNewNote('');
-      setCapturedPhoto(null);
+      setCapturedPhotos([]);
       setActiveTab('details');
     }
   }, [open, service?.id]);
@@ -95,34 +97,34 @@ export function TechnicianServiceSheet({
   });
 
   const handlePhotoCapture = (imageData: string) => {
-    setCapturedPhoto(imageData);
+    setCapturedPhotos(prev => prev.length < MAX_PHOTOS ? [...prev, imageData] : prev);
     setShowCamera(false);
   };
 
   const handleAddStart = async () => {
-    if (!service?.id || (!newNote.trim() && !capturedPhoto)) return;
+    if (!service?.id || (!newNote.trim() && capturedPhotos.length === 0)) return;
 
     setIsSubmitting(true);
     try {
       let noteText = newNote.trim();
 
-      // 1. Upload photo if exists
-      if (capturedPhoto) {
-        const { error: photoError } = await supabase.from('service_photos').insert({
-          service_id: service.id,
-          photo_type: photoType,
-          file_url: capturedPhoto,
-          description: noteText || 'Foto de observação',
-          uploaded_by: user?.id
-        });
-
-        if (photoError) throw photoError;
-
-        noteText += ' (Foto anexada)';
+      // Upload all photos
+      if (capturedPhotos.length > 0) {
+        for (const photoData of capturedPhotos) {
+          const { error: photoError } = await supabase.from('service_photos').insert({
+            service_id: service.id,
+            photo_type: photoType,
+            file_url: photoData,
+            description: noteText || 'Foto de observação',
+            uploaded_by: user?.id
+          });
+          if (photoError) throw photoError;
+        }
+        if (capturedPhotos.length > 0) noteText += ` (${capturedPhotos.length} foto${capturedPhotos.length > 1 ? 's' : ''} anexada${capturedPhotos.length > 1 ? 's' : ''})`;
         queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
       }
 
-      // 2. Log activity
+      // Log activity
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
@@ -133,7 +135,7 @@ export function TechnicianServiceSheet({
 
       toast.success('Registo adicionado!');
       setNewNote('');
-      setCapturedPhoto(null);
+      setCapturedPhotos([]);
       queryClient.invalidateQueries({ queryKey: ['activity-logs', service.id] });
     } catch (err) {
       console.error('Error adding record:', err);
@@ -256,15 +258,20 @@ export function TechnicianServiceSheet({
                 className="min-h-[80px] resize-none focus-visible:ring-1"
               />
 
-              {capturedPhoto && (
-                <div className="relative inline-block border rounded-md overflow-hidden h-20 w-20">
-                  <img src={capturedPhoto} alt="Preview" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setCapturedPhoto(null)}
-                    className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-1 rounded-bl shadow-sm"
-                  >
-                    <Camera className="h-3 w-3" />
-                  </button>
+              {/* Photos preview - multi-photo */}
+              {capturedPhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {capturedPhotos.map((photo, i) => (
+                    <div key={i} className="relative inline-block border rounded-md overflow-hidden h-20 w-20">
+                      <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setCapturedPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-0.5 rounded-bl shadow-sm"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -273,15 +280,16 @@ export function TechnicianServiceSheet({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowCamera(true)}
-                  className={cn("gap-2 text-xs", capturedPhoto ? "text-primary border-primary bg-primary/5" : "")}
+                  disabled={capturedPhotos.length >= MAX_PHOTOS}
+                  className={cn("gap-2 text-xs", capturedPhotos.length > 0 ? "text-primary border-primary bg-primary/5" : "")}
                 >
                   <Camera className="h-4 w-4" />
-                  {capturedPhoto ? 'Foto Anexada' : 'Adicionar Foto'}
+                  {capturedPhotos.length > 0 ? `${capturedPhotos.length}/${MAX_PHOTOS} fotos` : 'Adicionar Foto'}
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleAddStart}
-                  disabled={(!newNote.trim() && !capturedPhoto) || isSubmitting}
+                  disabled={(!newNote.trim() && capturedPhotos.length === 0) || isSubmitting}
                   className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
                 >
                   {isSubmitting ? 'A enviar...' : 'Publicar'}
