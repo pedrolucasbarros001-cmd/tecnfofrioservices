@@ -144,7 +144,7 @@ export default function TVMonitorPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 lg:p-6 pb-64">
       {/* Header */}
-      <header className="flex items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 py-[10px] px-[10px]">
+      <header className="flex items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-6">
           <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-16 w-16 lg:h-20 lg:w-20 object-contain" />
           <div>
@@ -175,11 +175,11 @@ export default function TVMonitorPage() {
           return (
             <div
               key={section.key}
-              className={cn("rounded-2xl p-5 text-center transition-all border-2 px-px py-px",
-
-              count > 0 ?
-              "bg-white border-[#2B4F84] shadow-md ring-4 ring-[#2B4F84]/5" :
-              "bg-slate-100 border-transparent opacity-60"
+              className={cn(
+                "rounded-2xl p-5 text-center transition-all border-2",
+                count > 0 ?
+                "bg-white border-[#2B4F84] shadow-md ring-4 ring-[#2B4F84]/5" :
+                "bg-slate-100 border-transparent opacity-60"
               )}>
 
               <p
@@ -198,9 +198,9 @@ export default function TVMonitorPage() {
         {services.map((service) =>
         <div
           key={service.id}
-          className={cn(
-            "rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between",
-            service.is_urgent ? "border-red-500 bg-red-50/30" : "border-slate-200"
+          className={cn("rounded-2xl p-6 bg-white border-2 transition-all shadow-sm flex flex-col justify-between py-[10px] px-[10px]",
+
+          service.is_urgent ? "border-red-500 bg-red-50/30" : "border-slate-200"
           )}>
 
             <div>
