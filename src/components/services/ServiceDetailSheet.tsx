@@ -574,9 +574,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {service.scheduled_date
+                      {service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime())
                         ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt })
-                        : 'Não agendado'}
+                        : service.scheduled_date ? service.scheduled_date : 'Não agendado'}
                     </span>
                   </div>
                   {service.scheduled_shift && (
