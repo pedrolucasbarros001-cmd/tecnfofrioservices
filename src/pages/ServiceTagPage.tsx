@@ -119,10 +119,10 @@ export default function ServiceTagPage() {
   }
 
   const details = [
-    { label: "Cl", value: service.customer?.name },
-    { label: "Tel", value: service.customer?.phone },
-    { label: "Eq", value: service.appliance_type },
-    { label: "Av", value: service.detected_fault || service.fault_description },
+    { label: "Cliente", value: service.customer?.name },
+    { label: "Telefone", value: service.customer?.phone },
+    { label: "Equipamento", value: service.appliance_type },
+    { label: "Descrição", value: service.detected_fault || service.fault_description },
   ].filter(d => !!d.value);
 
   return (
@@ -226,9 +226,9 @@ export default function ServiceTagPage() {
           <div style={{ padding: '1mm 4mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
             {details.map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', gap: '3px', marginBottom: '0.5mm', lineHeight: '1.2' }}>
-                <span style={{ fontSize: '8.5px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '13px' }}>{label}:</span>
+                <span style={{ fontSize: '7.5px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, minWidth: '50px' }}>{label}:</span>
                 <span style={{
-                  fontSize: '8.5px',
+                  fontSize: '7.5px',
                   color: '#000000',
                   wordBreak: 'break-all',
                   display: '-webkit-box',

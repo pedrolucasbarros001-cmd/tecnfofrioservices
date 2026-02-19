@@ -46,17 +46,34 @@ export async function generatePDF({
     overflow: visible;
     position: static;
     transform: none;
+    background-color: #ffffff;
+    color: #000000;
   `;
   
-  // Also reset overflow on all children
+  // Fix all children: force explicit colors to prevent CSS variable resolution failures
+  // (css variables like hsl(var(--foreground)) don't resolve in offscreen clones)
   const allChildren = clone.querySelectorAll('*');
   allChildren.forEach((child) => {
     if (child instanceof HTMLElement) {
       const computed = window.getComputedStyle(child);
+      // Fix overflow issues
       if (computed.overflow === 'auto' || computed.overflow === 'scroll' || computed.overflowY === 'auto' || computed.overflowY === 'scroll') {
         child.style.overflow = 'visible';
         child.style.maxHeight = 'none';
         child.style.height = 'auto';
+      }
+      // Force text color: if computed color has near-zero alpha or is transparent, force black
+      const color = computed.color;
+      if (color && (color.includes('rgba(0, 0, 0, 0)') || color === 'transparent' || color === 'rgba(0,0,0,0)')) {
+        child.style.color = '#000000';
+      } else if (!child.style.color || child.style.color === '') {
+        // Force explicit color from computed style to avoid CSS variable resolution failure
+        child.style.color = computed.color || '#000000';
+      }
+      // Ensure background is explicit (not variable-based)
+      const bg = computed.backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && !child.style.backgroundColor) {
+        child.style.backgroundColor = bg;
       }
     }
   });

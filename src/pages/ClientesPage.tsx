@@ -85,15 +85,6 @@ export default function ClientesPage() {
       }
     >
       <div className="p-6 space-y-6">
-        {/* ... (rest of the component) */}
-
-        <CreateCustomerModal
-          open={showModal}
-          onOpenChange={handleModalClose}
-          customer={editingCustomer}
-          onSuccess={handleCreateSuccess}
-        />
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
@@ -222,7 +213,7 @@ export default function ClientesPage() {
           open={showDetailSheet}
           onOpenChange={setShowDetailSheet}
           customer={selectedCustomer}
-          onUpdate={() => deleteCustomer.reset()}
+          onUpdate={() => { /* handled by query invalidation */ }}
         />
       </div >
     </ErrorBoundary >

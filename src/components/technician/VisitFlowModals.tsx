@@ -311,10 +311,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           signer_name: signerName || service.customer?.name,
         });
 
-        // Update service - repaired on site goes to a_precificar
+        // Update service - repaired on site goes to concluidos (financially coexists with pending_pricing + em_debito)
         await updateService.mutateAsync({
           id: service.id,
-          status: "a_precificar",
+          status: "concluidos",
           pending_pricing: true,
           detected_fault: formData.detectedFault,
           work_performed: "Reparado no local do cliente",
@@ -324,7 +324,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-        toast.success("Visita concluída! Aguarda precificação.");
+        toast.success("Visita concluída com sucesso!");
       }
 
       // Clear persisted state on completion
