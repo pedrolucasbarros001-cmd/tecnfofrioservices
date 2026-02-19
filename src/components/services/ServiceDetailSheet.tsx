@@ -992,10 +992,10 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
             </div>
-          </ScrollArea >
+          </ScrollArea>
 
           {/* Fixed Footer with Actions */}
-          < div className="flex-shrink-0 border-t bg-card p-4" >
+          <div className="flex-shrink-0 border-t bg-card p-4">
             <StateActionButtons
               service={service}
               onAssignTechnician={() => setShowAssignModal(true)}
@@ -1016,18 +1016,17 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
             </p>
-          </div >
-        </SheetContent >
-      </Sheet >
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* All Modals */}
-      < AssignTechnicianModal
+      <AssignTechnicianModal
         open={showAssignModal}
         onOpenChange={(open) => {
           setShowAssignModal(open);
           if (!open) handleModalSuccess();
-        }
-        }
+        }}
         service={service}
       />
       <SetPriceModal
