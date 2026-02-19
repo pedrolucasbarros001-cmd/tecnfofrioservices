@@ -70,21 +70,21 @@ const formSchema = z.object({
   customer_address: z.string().min(1, 'Morada é obrigatória'),
   customer_postal_code: z.string().optional(),
   customer_city: z.string().optional(),
-  
+
   // Equipment
   appliance_type: z.string().min(1, 'Tipo de aparelho é obrigatório'),
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
-  
+
   // Schedule
   technician_id: z.string().optional(),
   scheduled_date: z.date().optional(),
   scheduled_shift: z.string().optional(),
-  
+
   // Notes
   notes: z.string().optional(),
-  
+
   // Pricing
   final_price: z.number().optional(),
 });
@@ -102,7 +102,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
-  
+
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
   const createService = useCreateService();
@@ -125,10 +125,10 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
   useEffect(() => {
     const searchCustomer = async () => {
       if (selectedCustomer) return;
-      
+
       const searchPhone = customerPhone?.replace(/\s/g, '');
       const searchNif = customerNif?.replace(/\s/g, '');
-      
+
       if ((!searchPhone || searchPhone.length < 6) && (!searchNif || searchNif.length < 6)) {
         setFoundCustomer(null);
         setShowFoundCustomerBox(false);
@@ -137,15 +137,15 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
       try {
         let query = supabase.from('customers').select('*');
-        
+
         if (searchPhone && searchPhone.length >= 6) {
           query = query.ilike('phone', `%${searchPhone}%`);
         } else if (searchNif && searchNif.length >= 6) {
           query = query.ilike('nif', `%${searchNif}%`);
         }
-        
+
         const { data, error } = await query.limit(1).maybeSingle();
-        
+
         if (!error && data) {
           setFoundCustomer(data);
           setShowFoundCustomerBox(true);
@@ -164,7 +164,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
   const handleSelectFoundCustomer = () => {
     if (!foundCustomer) return;
-    
+
     setSelectedCustomer(foundCustomer);
     form.setValue('customer_name', foundCustomer.name);
     form.setValue('customer_nif', foundCustomer.nif || '');
@@ -195,7 +195,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
   const processSubmit = async (values: FormValues, customerId?: string) => {
     try {
       let finalCustomerId = customerId;
-      
+
       if (!finalCustomerId) {
         const newCustomer = await createCustomer.mutateAsync({
           name: values.customer_name,
@@ -272,7 +272,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                   {/* Customer Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Informações do Cliente</h3>
-                    
+
                     {selectedCustomer ? (
                       <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-center gap-2">
@@ -281,9 +281,9 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                             Cliente: {selectedCustomer.name}
                           </span>
                         </div>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
+                        <Button
+                          type="button"
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedCustomer(null);
@@ -415,7 +415,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                   {/* Equipment Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Equipamento a Entregar</h3>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -444,7 +444,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                         )}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -480,7 +480,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                   {/* Schedule Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Agendamento da Entrega</h3>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -498,7 +498,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                                 {technicians.map((tech) => (
                                   <SelectItem key={tech.id} value={tech.id}>
                                     <div className="flex items-center gap-2">
-                                      <div 
+                                      <div
                                         className="w-3 h-3 rounded-full"
                                         style={{ backgroundColor: tech.color || '#3B82F6' }}
                                       />
@@ -559,26 +559,9 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                       name="scheduled_shift"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Turno</FormLabel>
+                          <FormLabel>Horário</FormLabel>
                           <FormControl>
-                            <RadioGroup
-                              value={field.value}
-                              onValueChange={field.onChange}
-                              className="flex gap-6 pt-2"
-                            >
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem value="manha" id="delivery-manha" />
-                                <Label htmlFor="delivery-manha" className="font-normal cursor-pointer">Manhã</Label>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem value="tarde" id="delivery-tarde" />
-                                <Label htmlFor="delivery-tarde" className="font-normal cursor-pointer">Tarde</Label>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem value="noite" id="delivery-noite" />
-                                <Label htmlFor="delivery-noite" className="font-normal cursor-pointer">Noite</Label>
-                              </div>
-                            </RadioGroup>
+                            <Input type="time" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -592,10 +575,10 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                         <FormItem>
                           <FormLabel>Notas</FormLabel>
                           <FormControl>
-                            <Textarea 
-                              placeholder="Notas sobre a entrega..." 
+                            <Textarea
+                              placeholder="Notas sobre a entrega..."
                               className="min-h-[60px]"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -609,7 +592,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                   {/* Price Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Precificação (Opcional)</h3>
-                    
+
                     <FormField
                       control={form.control}
                       name="final_price"
@@ -643,8 +626,8 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                 <Button type="button" variant="outline" onClick={handleClose}>
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={createService.isPending || createCustomer.isPending}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >

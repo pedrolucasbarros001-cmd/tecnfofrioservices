@@ -39,6 +39,7 @@ import { humanizeError } from "@/utils/errorMessages";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
+import { FieldPaymentStep } from "@/components/technician/FieldPaymentStep";
 import { useFlowPersistence } from "@/hooks/useFlowPersistence";
 import type { Service, PhotoType } from "@/types/database";
 
@@ -115,6 +116,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const [currentPhotoType, setCurrentPhotoType] = useState<PhotoType>("visita");
   const [showSignature, setShowSignature] = useState(false);
   const [signatureType, setSignatureType] = useState<SignatureType>("conclusao");
+  const [showPayment, setShowPayment] = useState(false);
 
   // Check if this is a repair service
   const isReparacao = service.service_type === "reparacao";
@@ -342,11 +344,22 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
   const handleDecisionConfirm = () => {
     if (formData.decision === "levantar_oficina") {
       setSignatureType("recolha");
-      setShowSignature(true);
+      setShowPayment(true);
     } else {
       // Go to pecas_usadas step
       setCurrentStep("pecas_usadas");
     }
+  };
+
+  // Payment step handlers
+  const handlePaymentComplete = () => {
+    setShowPayment(false);
+    setShowSignature(true);
+  };
+
+  const handlePaymentSkip = () => {
+    setShowPayment(false);
+    setShowSignature(true);
   };
 
   const handlePecasUsadasConfirm = () => {
@@ -371,9 +384,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
       setSignatureType("pedido_peca");
       setShowSignature(true);
     } else {
-      // Go to conclusion signature
+      // Go to payment step before conclusion signature
       setSignatureType("conclusao");
-      setShowSignature(true);
+      setShowPayment(true);
     }
   };
 
@@ -1102,6 +1115,19 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
         onOpenChange={setShowCamera}
         onCapture={handlePhotoCapture}
         title={getPhotoDescription(currentPhotoType)}
+      />
+
+      {/* Payment Step - Before Signature */}
+      <FieldPaymentStep
+        service={service}
+        open={showPayment}
+        onSkip={handlePaymentSkip}
+        onComplete={handlePaymentComplete}
+        headerBg="bg-blue-500"
+        headerText="text-white"
+        badgeBg="bg-blue-100"
+        badgeText="text-blue-700"
+        flowTitle="Visita"
       />
 
       {/* Signature Modal */}

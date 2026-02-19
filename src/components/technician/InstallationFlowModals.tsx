@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { 
-  Navigation, 
-  MapPin, 
-  Camera, 
-  ArrowLeft, 
+import {
+  Navigation,
+  MapPin,
+  Camera,
+  ArrowLeft,
   ArrowRight,
   ImageIcon,
   Package,
@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
+import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
 import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
@@ -67,6 +68,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const [showSignature, setShowSignature] = useState(false);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [cameraMode, setCameraMode] = useState<'antes' | 'depois'>('antes');
+  const [showPayment, setShowPayment] = useState(false);
 
   // Flow persistence
   const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'instalacao');
@@ -115,15 +117,15 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         file_url: imageData,
         description: cameraMode === 'antes' ? 'Foto antes da instalação' : 'Foto após instalação',
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-      
+
       if (cameraMode === 'antes') {
         setFormData(prev => ({ ...prev, photoAntes: imageData }));
       } else {
         setFormData(prev => ({ ...prev, photoDepois: imageData }));
       }
-      
+
       setShowCamera(false);
       toast.success('Foto guardada!');
     } catch (error) {
@@ -145,12 +147,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         cost: 0,
       });
     }
-    
+
     setFormData(prev => ({ ...prev, usedMaterials: materials }));
     setShowMaterialsModal(false);
     queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
     toast.success('Materiais registados!');
-    
+
     // Advance to next step
     setCurrentStep('trabalho');
   };
@@ -168,7 +170,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
       // Determine final status - installations go to a_precificar
       const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
-      
+
       await updateService.mutateAsync({
         id: service.id,
         status: needsPricing ? 'a_precificar' : 'finalizado',
@@ -305,8 +307,8 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
             <Button variant="outline" className="flex-1" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button 
-              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black" 
+            <Button
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
               onClick={() => setCurrentStep('deslocacao')}
             >
               Começar Instalação
@@ -526,7 +528,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
                   />
                 )}
               </div>
-              
+
               {/* Foto depois */}
               <div>
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -572,7 +574,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setShowSignature(true)}
+              onClick={() => setShowPayment(true)}
               disabled={!canProceedFromFotoDepois || isSubmitting}
             >
               Concluir Instalação <ArrowRight className="h-4 w-4 ml-1" />
@@ -597,6 +599,19 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         title="Registar Material Utilizado"
         subtitle="Adicione os materiais utilizados na instalação (tubagem, cabos, acessórios, etc.)"
         initialParts={formData.usedMaterials.length > 0 ? formData.usedMaterials : undefined}
+      />
+
+      {/* Payment Step - Before Signature */}
+      <FieldPaymentStep
+        service={service}
+        open={showPayment}
+        onSkip={() => { setShowPayment(false); setShowSignature(true); }}
+        onComplete={() => { setShowPayment(false); setShowSignature(true); }}
+        headerBg="bg-yellow-500"
+        headerText="text-black"
+        badgeBg="bg-yellow-100"
+        badgeText="text-yellow-700"
+        flowTitle="Instalação"
       />
 
       {/* Signature Modal - Updated title */}

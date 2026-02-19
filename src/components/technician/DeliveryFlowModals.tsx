@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { 
-  Navigation, 
-  MapPin, 
-  Camera, 
-  ArrowLeft, 
+import {
+  Navigation,
+  MapPin,
+  Camera,
+  ArrowLeft,
   ArrowRight,
   Package,
   CheckCircle2
@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
+import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
 import { useFlowPersistence } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
@@ -55,6 +56,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
 
   // Flow persistence
   const { loadState, saveState, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
@@ -136,7 +138,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
-      
+
       // Clear persisted state on completion
       clearState();
       setShowSignature(false);
@@ -234,8 +236,8 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
             <Button variant="outline" className="flex-1" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button 
-              className="flex-1 bg-green-500 hover:bg-green-600" 
+            <Button
+              className="flex-1 bg-green-500 hover:bg-green-600"
               onClick={() => setCurrentStep('deslocacao')}
             >
               Caminho para o Cliente
@@ -330,7 +332,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
             </Button>
             <Button
               className="flex-1 bg-green-500 hover:bg-green-600"
-              onClick={() => setShowSignature(true)}
+              onClick={() => setShowPayment(true)}
               disabled={isSubmitting}
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -346,6 +348,19 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         onOpenChange={setShowCamera}
         onCapture={handlePhotoCapture}
         title="Foto da Entrega"
+      />
+
+      {/* Payment Step - Before Signature */}
+      <FieldPaymentStep
+        service={service}
+        open={showPayment}
+        onSkip={() => { setShowPayment(false); setShowSignature(true); }}
+        onComplete={() => { setShowPayment(false); setShowSignature(true); }}
+        headerBg="bg-green-500"
+        headerText="text-white"
+        badgeBg="bg-green-100"
+        badgeText="text-green-700"
+        flowTitle="Entrega"
       />
 
       {/* Signature Modal - Updated title */}
