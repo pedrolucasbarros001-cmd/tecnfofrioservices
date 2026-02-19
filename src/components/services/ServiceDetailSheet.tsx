@@ -605,59 +605,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
-              {/* Activity History - Now with detailed logs */}
-              <Section
-                title="Histórico de Atividade"
-                bgColor="bg-gray-50"
-                borderColor="border-l-gray-400"
-              >
-                {activityLogs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-2">Sem atividades registadas.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {activityLogs.map((log: any) => (
-                      <div key={log.id} className="relative pl-4 border-l-2 border-muted pb-1 last:pb-0">
-                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-muted-foreground ring-2 ring-white" />
-
-                        <div className="text-sm">
-                          <p className="font-medium text-foreground/90">{log.description}</p>
-
-                          {/* Metadata Photos */}
-                          {log.metadata?.photos && Array.isArray(log.metadata.photos) && log.metadata.photos.length > 0 && (
-                            <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                              {log.metadata.photos.map((photoUrl: string, idx: number) => (
-                                <a
-                                  key={idx}
-                                  href={photoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="relative group shrink-0"
-                                >
-                                  <img
-                                    src={photoUrl}
-                                    alt="Foto da atividade"
-                                    className="h-16 w-16 object-cover rounded border hover:opacity-80 transition-opacity"
-                                  />
-                                </a>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>{format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}</span>
-                            {log.actor?.full_name && (
-                              <>
-                                <span>•</span>
-                                <span>{log.actor.full_name}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Section>
+              {/* Activity History - REMOVED DUPLICATE SECTION */}
 
               {/* Pricing - Enhanced financial section */}
               {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
@@ -728,12 +676,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Criado em:</span>
-                    <span>{format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
+                    <span>{service.created_at && !isNaN(new Date(service.created_at).getTime()) ? format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Última atualização:</span>
-                    <span>{format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
+                    <span>{service.updated_at && !isNaN(new Date(service.updated_at).getTime()) ? format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
                   </div>
                 </div>
               </Section>
@@ -805,7 +753,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             <div>
                               <p className="font-medium">{payment.amount.toFixed(2)} €</p>
                               <p className="text-xs text-muted-foreground">
-                                {payment.payment_date && format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })}
+                                {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt }) : '-'}
                                 {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
                               </p>
                             </div>
@@ -893,7 +841,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                            {sig.signed_at && !isNaN(new Date(sig.signed_at).getTime()) ? format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
                           </p>
                         </div>
                       </div>
@@ -1170,7 +1118,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <p className="text-gray-300 text-sm mt-1">{servicePhotos[selectedPhotoIndex].description}</p>
                 )}
                 <p className="text-gray-400 text-xs mt-2">
-                  {selectedPhotoIndex + 1} de {servicePhotos.length} • {format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+                  {selectedPhotoIndex + 1} de {servicePhotos.length} • {servicePhotos[selectedPhotoIndex].uploaded_at && !isNaN(new Date(servicePhotos[selectedPhotoIndex].uploaded_at).getTime()) ? format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt }) : '-'}
                 </p>
               </div>
             </div>
