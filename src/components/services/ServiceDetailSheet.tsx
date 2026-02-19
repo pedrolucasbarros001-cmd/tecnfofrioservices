@@ -918,7 +918,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               )}
 
               {/* Technician Notes (Observations) */}
-              {activityLogs.some((log: any) => log.action_type === 'nota_adicionada') && (
+              {Array.isArray(activityLogs) && activityLogs.some((log: any) => log && log.action_type === 'nota_adicionada') && (
                 <Section
                   title="Notas do Técnico"
                   bgColor="bg-amber-50"
@@ -926,15 +926,17 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 >
                   <div className="space-y-3">
                     {activityLogs
-                      .filter((log: any) => log.action_type === 'nota_adicionada')
+                      .filter((log: any) => log && log.action_type === 'nota_adicionada')
                       .map((log: any) => (
-                        <div key={log.id} className="bg-white p-3 rounded border text-sm">
+                        <div key={log.id || Math.random()} className="bg-white p-3 rounded border text-sm">
                           <div className="flex justify-between items-start mb-1">
                             <span className="font-medium text-amber-700 text-xs uppercase">
                               {log.actor?.full_name || 'Técnico'}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {log.created_at ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt }) : '-'}
+                              {log.created_at && !isNaN(new Date(log.created_at).getTime())
+                                ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })
+                                : '-'}
                             </span>
                           </div>
                           <p className="text-gray-800 whitespace-pre-wrap">{log.description || ''}</p>
@@ -942,30 +944,30 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           {/* Photos in notes */}
                           {log.metadata &&
                             typeof log.metadata === 'object' &&
+                            log.metadata !== null &&
                             Array.isArray((log.metadata as any).photos) &&
                             (log.metadata as any).photos.length > 0 && (
                               <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                                {(log.metadata as any).photos.map((photoUrl: string, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="relative cursor-pointer group shrink-0"
-                                    onClick={() => {
-                                      if (!servicePhotos) return;
-                                      // Find global index of this photo to open lightbox
-                                      // This is an approximation since we don't have the photo ID easily mapped here
-                                      // But we can try to find by URL or just open isolated if needed
-                                      // For now, let's look it up in servicePhotos
-                                      const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
-                                      if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
-                                    }}
-                                  >
-                                    <img
-                                      src={photoUrl}
-                                      alt="Foto da nota"
-                                      className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
-                                    />
-                                  </div>
-                                ))}
+                                {(log.metadata as any).photos.map((photoUrl: string, idx: number) => {
+                                  if (!photoUrl || typeof photoUrl !== 'string') return null;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="relative cursor-pointer group shrink-0"
+                                      onClick={() => {
+                                        if (!servicePhotos) return;
+                                        const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
+                                        if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
+                                      }}
+                                    >
+                                      <img
+                                        src={photoUrl}
+                                        alt="Foto da nota"
+                                        className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
+                                      />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                         </div>
@@ -1268,8 +1270,11 @@ function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
           </p>
         )}
         <p className="text-sm">{log.description}</p>
+
         <p className="text-xs text-muted-foreground mt-1">
-          {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+          {log.created_at && !isNaN(new Date(log.created_at).getTime())
+            ? format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })
+            : '-'}
         </p>
       </div>
     </div>
