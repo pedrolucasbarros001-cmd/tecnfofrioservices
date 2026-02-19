@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -916,8 +917,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
-              {/* Technician Notes (Observations) */}
-              {activityLogs.some(log => log.action_type === 'nota_adicionada') && (
+              {/* Technician Notes (Observations) - TEMPORARILY DISABLED FOR DEBUGGING
+              {activityLogs.some((log: any) => log.action_type === 'nota_adicionada') && (
                 <Section
                   title="Notas do Técnico"
                   bgColor="bg-amber-50"
@@ -925,65 +926,70 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 >
                   <div className="space-y-3">
                     {activityLogs
-                      .filter(log => log.action_type === 'nota_adicionada')
-                      .map((log) => (
+                      .filter((log: any) => log.action_type === 'nota_adicionada')
+                      .map((log: any) => (
                         <div key={log.id} className="bg-white p-3 rounded border text-sm">
                           <div className="flex justify-between items-start mb-1">
                             <span className="font-medium text-amber-700 text-xs uppercase">
                               {log.actor?.full_name || 'Técnico'}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+                              {log.created_at ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt }) : '-'}
                             </span>
                           </div>
-                          <p className="text-gray-800 whitespace-pre-wrap">{log.description}</p>
+                          <p className="text-gray-800 whitespace-pre-wrap">{log.description || ''}</p>
 
                           {/* Photos in notes */}
-                          {log.metadata?.photos && Array.isArray(log.metadata.photos) && log.metadata.photos.length > 0 && (
-                            <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                              {log.metadata.photos.map((photoUrl: string, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="relative cursor-pointer group shrink-0"
-                                  onClick={() => {
-                                    // Find global index of this photo to open lightbox
-                                    // This is an approximation since we don't have the photo ID easily mapped here
-                                    // But we can try to find by URL or just open isolated if needed
-                                    // For now, let's look it up in servicePhotos
-                                    const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
-                                    if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
-                                  }}
-                                >
-                                  <img
-                                    src={photoUrl}
-                                    alt="Foto da nota"
-                                    className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+              {log.metadata &&
+                typeof log.metadata === 'object' &&
+                Array.isArray((log.metadata as any).photos) &&
+                (log.metadata as any).photos.length > 0 && (
+                  <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                    {(log.metadata as any).photos.map((photoUrl: string, idx: number) => (
+                      <div
+                        key={idx}
+                        className="relative cursor-pointer group shrink-0"
+                        onClick={() => {
+                          if (!servicePhotos) return;
+                          // Find global index of this photo to open lightbox
+                          // This is an approximation since we don't have the photo ID easily mapped here
+                          // But we can try to find by URL or just open isolated if needed
+                          // For now, let's look it up in servicePhotos
+                          const globalIndex = servicePhotos.findIndex(p => p.file_url === photoUrl);
+                          if (globalIndex !== -1) setSelectedPhotoIndex(globalIndex);
+                        }}
+                      >
+                        <img
+                          src={photoUrl}
+                          alt="Foto da nota"
+                          className="h-12 w-12 object-cover rounded border hover:opacity-80 transition-opacity"
+                        />
+                      </div>
+                    ))}
                   </div>
-                </Section>
-              )}
-
-              {/* Notes */}
-              {service.notes && (
-                <Section
-                  title="Observações"
-                  bgColor="bg-slate-50"
-                  borderColor="border-l-slate-400"
-                >
-                  <p className="text-sm whitespace-pre-wrap">{service.notes}</p>
-                </Section>
-              )}
+                )}
             </div>
-          </ScrollArea>
+                      ))}
+          </div>
+        </Section>
+              )}
+              */}
 
-          {/* Fixed Footer with Actions */}
-          <div className="flex-shrink-0 border-t bg-card p-4">
+        {/* Notes */}
+        {service.notes && (
+          <Section
+            title="Observações"
+            bgColor="bg-slate-50"
+            borderColor="border-l-slate-400"
+          >
+            <p className="text-sm whitespace-pre-wrap">{service.notes}</p>
+          </Section>
+        )}
+      </div>
+    </ScrollArea >
+
+      {/* Fixed Footer with Actions */ }
+      < div className = "flex-shrink-0 border-t bg-card p-4" >
             <StateActionButtons
               service={service}
               onAssignTechnician={() => setShowAssignModal(true)}
@@ -1004,19 +1010,20 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
             </p>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </div >
+        </SheetContent >
+      </Sheet >
 
-      {/* All Modals */}
-      <AssignTechnicianModal
-        open={showAssignModal}
-        onOpenChange={(open) => {
-          setShowAssignModal(open);
-          if (!open) handleModalSuccess();
-        }}
-        service={service}
-      />
+    {/* All Modals */ }
+    < AssignTechnicianModal
+  open = { showAssignModal }
+  onOpenChange = {(open) => {
+    setShowAssignModal(open);
+    if (!open) handleModalSuccess();
+  }
+}
+service = { service }
+  />
       <SetPriceModal
         open={showSetPriceModal}
         onOpenChange={(open) => {
@@ -1127,50 +1134,52 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Lightbox for Photos */}
-      {selectedPhotoIndex !== null && servicePhotos.length > 0 && servicePhotos[selectedPhotoIndex] && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
-          <button
-            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
-            onClick={() => setSelectedPhotoIndex(null)}
-          >
-            <X className="h-8 w-8" />
-          </button>
+{/* Lightbox for Photos */ }
+{
+  selectedPhotoIndex !== null && servicePhotos.length > 0 && servicePhotos[selectedPhotoIndex] && (
+    <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
+      <button
+        className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
+        onClick={() => setSelectedPhotoIndex(null)}
+      >
+        <X className="h-8 w-8" />
+      </button>
 
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
-            onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
-            disabled={selectedPhotoIndex === 0}
-          >
-            <ChevronLeft className="h-10 w-10" />
-          </button>
+      <button
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
+        onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+        disabled={selectedPhotoIndex === 0}
+      >
+        <ChevronLeft className="h-10 w-10" />
+      </button>
 
-          <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
-            <img
-              src={servicePhotos[selectedPhotoIndex].file_url}
-              alt="Foto em detalhe"
-              className="max-w-full max-h-[80vh] object-contain rounded-md"
-            />
-            <div className="mt-4 text-white text-center">
-              <p className="font-medium text-lg">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
-              {servicePhotos[selectedPhotoIndex].description && (
-                <p className="text-gray-300 text-sm mt-1">{servicePhotos[selectedPhotoIndex].description}</p>
-              )}
-              <p className="text-gray-400 text-xs mt-2">
-                {selectedPhotoIndex + 1} de {servicePhotos.length} • {format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt })}
-              </p>
-            </div>
-          </div>
-
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
-            onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : prev))}
-            disabled={selectedPhotoIndex === servicePhotos.length - 1}
-          >
-            <ChevronRight className="h-10 w-10" />
-          </button>
+      <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
+        <img
+          src={servicePhotos[selectedPhotoIndex].file_url}
+          alt="Foto em detalhe"
+          className="max-w-full max-h-[80vh] object-contain rounded-md"
+        />
+        <div className="mt-4 text-white text-center">
+          <p className="font-medium text-lg">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
+          {servicePhotos[selectedPhotoIndex].description && (
+            <p className="text-gray-300 text-sm mt-1">{servicePhotos[selectedPhotoIndex].description}</p>
+          )}
+          <p className="text-gray-400 text-xs mt-2">
+            {selectedPhotoIndex + 1} de {servicePhotos.length} • {format(new Date(servicePhotos[selectedPhotoIndex].uploaded_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+          </p>
         </div>
-      )}
+      </div>
+
+      <button
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 p-2 disabled:opacity-30"
+        onClick={() => setSelectedPhotoIndex(prev => (prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : prev))}
+        disabled={selectedPhotoIndex === servicePhotos.length - 1}
+      >
+        <ChevronRight className="h-10 w-10" />
+      </button>
+    </div>
+  )
+}
     </>
   );
 }
