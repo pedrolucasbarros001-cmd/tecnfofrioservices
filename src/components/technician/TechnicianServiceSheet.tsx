@@ -113,17 +113,20 @@ export function TechnicianServiceSheet({
       let noteText = newNote.trim();
 
       // 1. Upload photos if exist
+      const photoUrls: string[] = [];
       if (capturedPhotos.length > 0) {
         // Upload all photos in parallel
         await Promise.all(capturedPhotos.map(async (photoData) => {
-          const { error: photoError } = await supabase.from('service_photos').insert({
+          const { data: insertedPhoto, error: photoError } = await supabase.from('service_photos').insert({
             service_id: service.id,
             photo_type: photoType,
             file_url: photoData,
             description: noteText || 'Foto de observação',
             uploaded_by: user?.id
-          });
+          }).select().single();
+
           if (photoError) throw photoError;
+          if (insertedPhoto) photoUrls.push(insertedPhoto.file_url);
         }));
 
         noteText += ` (${capturedPhotos.length} foto${capturedPhotos.length > 1 ? 's' : ''} anexada${capturedPhotos.length > 1 ? 's' : ''})`;
@@ -137,6 +140,7 @@ export function TechnicianServiceSheet({
         actionType: 'nota_adicionada',
         description: `Observação: ${noteText}`,
         isPublic: true,
+        metadata: { photos: photoUrls } // Save photo URLs to metadata
       });
 
       toast.success('Registo adicionado!');

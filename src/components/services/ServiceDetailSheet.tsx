@@ -598,6 +598,60 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
+              {/* Activity History - Now with detailed logs */}
+              <Section
+                title="Histórico de Atividade"
+                bgColor="bg-gray-50"
+                borderColor="border-l-gray-400"
+              >
+                {activityLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-2">Sem atividades registadas.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {activityLogs.map((log: any) => (
+                      <div key={log.id} className="relative pl-4 border-l-2 border-muted pb-1 last:pb-0">
+                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-muted-foreground ring-2 ring-white" />
+
+                        <div className="text-sm">
+                          <p className="font-medium text-foreground/90">{log.description}</p>
+
+                          {/* Metadata Photos */}
+                          {log.metadata?.photos && Array.isArray(log.metadata.photos) && log.metadata.photos.length > 0 && (
+                            <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                              {log.metadata.photos.map((photoUrl: string, idx: number) => (
+                                <a
+                                  key={idx}
+                                  href={photoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="relative group shrink-0"
+                                >
+                                  <img
+                                    src={photoUrl}
+                                    alt="Foto da atividade"
+                                    className="h-16 w-16 object-cover rounded border hover:opacity-80 transition-opacity"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <span>{format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}</span>
+                            {log.actor?.full_name && (
+                              <>
+                                <span>•</span>
+                                <span>{log.actor.full_name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
               {/* Pricing - Enhanced financial section */}
               {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
                 <Section
