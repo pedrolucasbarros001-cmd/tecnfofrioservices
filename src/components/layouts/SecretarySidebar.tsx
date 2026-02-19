@@ -7,6 +7,7 @@ import {
   Users,
   Settings,
   LogOut,
+  DollarSign,
 } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ const menuItems = [
   { title: 'Geral', url: '/geral', icon: List },
   { title: 'Oficina', url: '/oficina', icon: Wrench },
   { title: 'Oficina Reparados', url: '/concluidos', icon: CheckCircle2 },
+  { title: 'Precificar', url: '/precificar', icon: DollarSign },
   { title: 'Em Débito', url: '/em-debito', icon: AlertCircle },
   { title: 'Clientes', url: '/clientes', icon: Users },
   { title: 'Preferências', url: '/preferencias', icon: Settings },

@@ -24,6 +24,7 @@ import ColaboradoresPage from "@/pages/ColaboradoresPage";
 import PerformancePage from "@/pages/PerformancePage";
 import SecretaryConcluidosPage from "@/pages/secretary/SecretaryConcluidosPage";
 import SecretaryDebitoPage from "@/pages/secretary/SecretaryDebitoPage";
+import SecretaryPrecificarPage from "@/pages/secretary/SecretaryPrecificarPage";
 import TechnicianOfficePage from "@/pages/technician/TechnicianOfficePage";
 import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
 import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
@@ -167,6 +168,11 @@ const App = () => (
                       <Route path="/em-debito" element={
                         <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
                           <SecretaryDebitoPage />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/precificar" element={
+                        <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+                          <SecretaryPrecificarPage />
                         </ProtectedRoute>
                       } />
 

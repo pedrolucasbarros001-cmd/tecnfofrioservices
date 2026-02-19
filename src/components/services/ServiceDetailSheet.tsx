@@ -205,7 +205,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         .eq('service_id', service.id)
         .order('payment_date', { ascending: false });
       if (error) throw error;
-      return data as (ServicePayment & { receiver: { full_name: string | null } | null })[];
+      return data as unknown as (ServicePayment & { receiver: { full_name: string | null } | null })[];
     },
     enabled: !!service?.id && open, // Técnicos também veem pagamentos
   });
@@ -221,7 +221,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         .eq('service_id', service.id)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
-      return data as (ServicePhoto & { creator: { full_name: string | null } | null })[];
+      return data as unknown as (ServicePhoto & { creator: { full_name: string | null } | null })[];
     },
     enabled: !!service?.id && open,
   });
@@ -874,7 +874,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onAssignTechnician={() => setShowAssignModal(true)}
               onViewDetails={() => { }}
               onStartExecution={role === 'tecnico' ? handleStartExecution : undefined}
-              onSetPrice={role === 'dono' ? () => setShowSetPriceModal(true) : undefined}
+              onSetPrice={(role === 'dono' || role === 'secretaria') ? () => setShowSetPriceModal(true) : undefined}
               onRegisterPayment={(role === 'dono' || role === 'secretaria') ? () => setShowPaymentModal(true) : undefined}
               onManageDelivery={(role === 'dono' || role === 'secretaria') ? () => setShowDeliveryModal(true) : undefined}
               onFinalize={(role === 'dono' || role === 'secretaria') ? handleFinalize : undefined}

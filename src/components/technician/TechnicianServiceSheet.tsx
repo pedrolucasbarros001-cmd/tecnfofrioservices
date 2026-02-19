@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, Send, User, MessageSquare } from 'lucide-react';
+import { Camera, Send, User, MessageSquare, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -151,20 +151,25 @@ export function TechnicianServiceSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md p-0 flex flex-col h-full bg-background" side="right">
         <SheetHeader className="p-4 border-b bg-background z-10 shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-lg">
-            <span className="font-mono font-bold text-primary">{service.code}</span>
-            <Badge
-              variant="outline"
-              className="text-xs font-normal"
-              style={{
-                backgroundColor: statusConfig?.color ? statusConfig.color.includes('bg-') ? undefined : statusConfig.color + '15' : undefined,
-                color: statusConfig?.color?.split(' ')[1] || 'currentColor',
-                borderColor: 'transparent'
-              }}
-            >
-              {statusConfig?.label}
-            </Badge>
-          </SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2 text-lg">
+              <span className="font-mono font-bold text-primary">{service.code}</span>
+              <Badge
+                variant="outline"
+                className="text-xs font-normal"
+                style={{
+                  backgroundColor: statusConfig?.color ? statusConfig.color.includes('bg-') ? undefined : statusConfig.color + '15' : undefined,
+                  color: statusConfig?.color?.split(' ')[1] || 'currentColor',
+                  borderColor: 'transparent'
+                }}
+              >
+                {statusConfig?.label}
+              </Badge>
+            </SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">

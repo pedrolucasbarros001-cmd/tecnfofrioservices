@@ -424,7 +424,7 @@ export function CustomerDetailSheet({
                   <TabsContent value="servicos" className="mt-0">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-lg font-semibold">Histórico de Serviços</h3>
-                      <Button variant="outline" size="sm" onClick={refetchServices}>
+                      <Button variant="outline" size="sm" onClick={() => { refetchServices(); }}>
                         <Clock className="h-4 w-4 mr-2" /> Atualizar
                       </Button>
                     </div>
