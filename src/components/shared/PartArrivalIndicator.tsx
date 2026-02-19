@@ -16,8 +16,8 @@ interface PartArrivalIndicatorProps {
   showLabel?: boolean;
 }
 
-export function PartArrivalIndicator({ 
-  estimatedArrival, 
+export function PartArrivalIndicator({
+  estimatedArrival,
   className,
   showLabel = true,
 }: PartArrivalIndicatorProps) {
@@ -40,8 +40,14 @@ export function PartArrivalIndicator({
   }
 
   const arrival = new Date(estimatedArrival);
+
+  // Validate date before proceeding - prevents crash on invalid dates
+  if (isNaN(arrival.getTime())) {
+    return null;
+  }
+
   arrival.setHours(0, 0, 0, 0);
-  
+
   const businessDaysRemaining = getBusinessDaysRemaining(arrival);
 
   const getIndicatorConfig = () => {

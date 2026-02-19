@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +27,9 @@ import {
   DollarSign,
   ClipboardList,
   Pencil,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -177,6 +181,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   // Fetch service parts
   const { data: serviceParts = [] } = useQuery({
@@ -568,7 +573,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
                       {service.scheduled_date
-                        ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt })
+                        ? (service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime()) ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt }) : 'Data inválida')
                         : 'Não agendado'}
                     </span>
                   </div>
@@ -667,12 +672,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Criado em:</span>
-                    <span>{format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
+                    <span>{service.created_at && !isNaN(new Date(service.created_at).getTime()) ? format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Última atualização:</span>
-                    <span>{format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}</span>
+                    <span>{service.updated_at && !isNaN(new Date(service.updated_at).getTime()) ? format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
                   </div>
                 </div>
               </Section>
@@ -744,7 +749,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             <div>
                               <p className="font-medium">{payment.amount.toFixed(2)} €</p>
                               <p className="text-xs text-muted-foreground">
-                                {payment.payment_date && format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt })}
+                                {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt }) : '-'}
                                 {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
                               </p>
                             </div>
@@ -775,21 +780,19 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   borderColor="border-l-indigo-500"
                 >
                   <div className="grid grid-cols-3 gap-2">
-                    {servicePhotos.map((photo) => (
+                    {servicePhotos.map((photo, idx) => (
                       <div key={photo.id} className="flex flex-col gap-1">
                         {photo.creator?.full_name && (
                           <p className="text-[9px] text-muted-foreground truncate" title={photo.creator.full_name}>
                             Por: {photo.creator.full_name.split(' ')[0]}
                           </p>
                         )}
-                        <div className="relative">
-                          <a href={photo.file_url} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={photo.file_url}
-                              alt={photo.description || 'Foto do serviço'}
-                              className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
-                            />
-                          </a>
+                        <div className="relative cursor-pointer" onClick={() => setSelectedPhotoIndex(idx)}>
+                          <img
+                            src={photo.file_url}
+                            alt={photo.description || 'Foto do serviço'}
+                            className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity"
+                          />
                           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
                             {getPhotoTypeLabel(photo.photo_type)}
                           </div>
@@ -830,7 +833,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                            {sig.signed_at && !isNaN(new Date(sig.signed_at).getTime()) ? format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
                           </p>
                         </div>
                       </div>
@@ -1012,6 +1015,49 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Lightbox Overlay */}
+      {selectedPhotoIndex !== null && servicePhotos[selectedPhotoIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setSelectedPhotoIndex(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
+            onClick={() => setSelectedPhotoIndex(null)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <button
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(prev => prev !== null && prev > 0 ? prev - 1 : servicePhotos.length - 1); }}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={e => e.stopPropagation()}>
+            <img
+              src={servicePhotos[selectedPhotoIndex].file_url}
+              alt={servicePhotos[selectedPhotoIndex].description || 'Foto'}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+            />
+            <div className="text-white text-center">
+              <p className="font-medium capitalize">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
+              {servicePhotos[selectedPhotoIndex].description && (
+                <p className="text-sm text-white/70">{servicePhotos[selectedPhotoIndex].description}</p>
+              )}
+              <p className="text-xs text-white/50 mt-1">
+                {selectedPhotoIndex + 1} / {servicePhotos.length}
+              </p>
+            </div>
+          </div>
+          <button
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(prev => prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : 0); }}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -1054,6 +1100,7 @@ const ACTION_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className
   pagamento: { icon: CreditCard, bgColor: 'bg-teal-100', iconColor: 'text-teal-600' },
   entrega: { icon: Truck, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
   tarefa: { icon: ClipboardList, bgColor: 'bg-gray-100', iconColor: 'text-gray-600' },
+  nota_adicionada: { icon: Pencil, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' },
 };
 
 interface ActivityLogItemProps {
@@ -1097,7 +1144,7 @@ function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
         )}
         <p className="text-sm">{log.description}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+          {log.created_at && !isNaN(new Date(log.created_at).getTime()) ? format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
         </p>
       </div>
     </div>

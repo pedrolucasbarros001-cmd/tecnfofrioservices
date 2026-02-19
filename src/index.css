@@ -431,6 +431,7 @@
 
 /* ========== PRINT MEDIA STYLES ========== */
 @media print {
+
   /* Reset geral - preservar cores */
   * {
     -webkit-print-color-adjust: exact !important;
@@ -445,9 +446,6 @@
 
   /* Hide Radix overlay - CRITICAL for Safari blank preview fix */
   [data-radix-dialog-overlay] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
     background: transparent !important;
     pointer-events: none !important;
   }
@@ -506,14 +504,14 @@
   }
 
   /* For modal-based printing: hide React app */
-  body:not(:has(.print-page)):not(:has(.print-tag-page)) #root {
+  body:not(:has(.print-page)):not(:has(.print-tag-page)):not(:has([data-radix-dialog-content])) #root {
     display: none !important;
     visibility: hidden !important;
   }
 
   /* Esconder todos os elementos do body que não são portais (only for modal printing) */
   /* CRITICAL: Exclude BOTH .print-page AND .print-tag-page from this rule */
-  body:not(:has(.print-page)):not(:has(.print-tag-page)) > *:not([data-radix-portal]):not(.print-portal) {
+  body:not(:has(.print-page)):not(:has(.print-tag-page))>*:not([data-radix-portal]):not(.print-portal) {
     display: none !important;
   }
 

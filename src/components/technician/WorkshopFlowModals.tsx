@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { UsedPartsModal, PartEntry } from "@/components/modals/UsedPartsModal";
-import { RegisterPaymentModal } from "@/components/modals/RegisterPaymentModal";
+
 import { ServicePreviousSummary } from "@/components/technician/ServicePreviousSummary";
 import { DiagnosisPhotosGallery } from "@/components/technician/DiagnosisPhotosGallery";
 import { useFlowPersistence } from "@/hooks/useFlowPersistence";
@@ -80,7 +80,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showPartsModal, setShowPartsModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
 
   // Flow persistence
   const { loadState, saveState, clearState } = useFlowPersistence(service.id, "oficina");
@@ -237,9 +237,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
 
       clearState();
       toast.success(`${service.code} concluído! Aguarda precificação.`);
-
-      // Open payment modal
-      setShowPaymentModal(true);
+      onComplete();
     } catch (error) {
       console.error("Error completing repair:", error);
       toast.error("Erro ao concluir reparação");
@@ -797,14 +795,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete }: Wor
         initialParts={formData.usedPartsList.length > 0 ? formData.usedPartsList : undefined}
       />
 
-      <RegisterPaymentModal
-        service={service}
-        open={showPaymentModal}
-        onOpenChange={(open) => {
-          setShowPaymentModal(open);
-          if (!open) onComplete();
-        }}
-      />
+
     </>
   );
 }
