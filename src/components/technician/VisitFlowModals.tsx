@@ -303,11 +303,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
           id: service.id,
           status: "por_fazer", // Trigger normalizes for workshop without technician
           service_location: "oficina",
-          technician_id: null, // Remove technician - service becomes available
+          // technician_id: null, // KEEP technician assigned to avoid RLS error. Admin/Manager can reassign.
           scheduled_date: null, // Clear scheduling
           scheduled_shift: null,
           detected_fault: formData.detectedFault,
-          shouldSelect: false, // Prevent RLS error as technician loses access
+          shouldSelect: true, // Re-enable selection as technician should still have access
         });
 
         // Log activity - levantamento para oficina
