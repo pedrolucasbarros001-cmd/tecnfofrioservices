@@ -63,6 +63,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment, type ServicePhoto, type ServiceSignature } from '@/types/database';
+import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
@@ -399,36 +400,10 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
               {/* Tags */}
               <div className="flex gap-2 flex-wrap">
-                {/* Estado principal - sempre primeiro */}
-                <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
+                {/* Estado principal - sempre primeiro (inclui badge 'A Precificar' se pending_pricing) */}
+                <ServiceStatusBadge service={service} />
 
-                {/* Tipo de serviço */}
-                {service.service_type === 'instalacao' && (
-                  <Badge className="bg-yellow-500 text-black">
-                    <Wrench className="h-3 w-3 mr-1" />
-                    Instalação
-                  </Badge>
-                )}
-                {service.service_type === 'entrega' && (
-                  <Badge className="bg-green-500 text-white">
-                    <Truck className="h-3 w-3 mr-1" />
-                    Entrega
-                  </Badge>
-                )}
-                {service.service_type === 'reparacao' && service.service_location === 'oficina' && (
-                  <Badge className="bg-orange-500 text-white">
-                    <Wrench className="h-3 w-3 mr-1" />
-                    Oficina
-                  </Badge>
-                )}
-                {service.service_type === 'reparacao' && service.service_location === 'cliente' && (
-                  <Badge className="bg-blue-500 text-white">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    Visita
-                  </Badge>
-                )}
-
-                {/* Tags complementares - NÃO duplicar estado */}
+                {/* Tags complementares */}
                 {service.is_urgent && (
                   <Badge variant="destructive" className="animate-pulse">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -442,12 +417,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   </Badge>
                 )}
 
-                {/* A Precificar - só se estado não for a_precificar */}
-                {service.pending_pricing && service.status !== 'a_precificar' && (
-                  <Badge className="bg-yellow-500 text-black">
-                    A Precificar
-                  </Badge>
-                )}
+                {/* A Precificar - gerido pelo ServiceStatusBadge acima */}
 
                 {/* Em Débito - indica débito coexistente */}
                 {service.status !== 'em_debito' &&

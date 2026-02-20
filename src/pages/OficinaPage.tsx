@@ -10,6 +10,7 @@ import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal
 import { SendTaskModal } from '@/components/modals/SendTaskModal';
 import { useServices } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
+import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
 
 export default function OficinaPage() {
@@ -87,9 +88,7 @@ export default function OficinaPage() {
                       <p className="font-mono text-xl font-bold text-primary">
                         {service.code}
                       </p>
-                      <Badge className={cn("mt-1", statusConfig?.color || "bg-gray-500")}>
-                        {statusConfig?.label || service.status}
-                      </Badge>
+                      <ServiceStatusBadge service={service} className="mt-1" />
                     </div>
                     <div className="flex flex-col gap-1 items-end">
                       {service.is_urgent && (

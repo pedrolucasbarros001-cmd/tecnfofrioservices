@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 
 interface TechnicianServiceSheetProps {
   service: Service | null;
@@ -156,17 +157,7 @@ export function TechnicianServiceSheet({
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2 text-lg">
               <span className="font-mono font-bold text-primary">{service.code}</span>
-              <Badge
-                variant="outline"
-                className="text-xs font-normal"
-                style={{
-                  backgroundColor: statusConfig?.color ? statusConfig.color.includes('bg-') ? undefined : statusConfig.color + '15' : undefined,
-                  color: statusConfig?.color?.split(' ')[1] || 'currentColor',
-                  borderColor: 'transparent'
-                }}
-              >
-                {statusConfig?.label}
-              </Badge>
+              <ServiceStatusBadge service={service} />
             </SheetTitle>
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-8 w-8">
               <X className="h-4 w-4" />

@@ -34,6 +34,7 @@ import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { usePaginatedServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
+import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -351,9 +352,7 @@ export default function GeralPage() {
                       {/* Estado */}
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <Badge className={statusConfig.color}>
-                            {statusConfig.label}
-                          </Badge>
+                          <ServiceStatusBadge service={service} />
                           {/* Part arrival indicator for services waiting for parts */}
                           {service.status === 'em_espera_de_peca' && (
                             <PartArrivalIndicator
@@ -376,10 +375,7 @@ export default function GeralPage() {
                             <Badge variant="subtle-warranty" className="text-xs">Garantia</Badge>
                           )}
 
-                          {/* A Precificar - só mostra se estado NÃO for a_precificar */}
-                          {service.pending_pricing && service.status !== 'a_precificar' && (
-                            <Badge variant="subtle-pricing" className="text-xs">A Precificar</Badge>
-                          )}
+                          {/* A Precificar - gerido pelo ServiceStatusBadge na coluna Estado */}
 
                           {/* Em Débito - indica débito quando estado principal é outro */}
                           {service.status !== 'em_debito' &&
