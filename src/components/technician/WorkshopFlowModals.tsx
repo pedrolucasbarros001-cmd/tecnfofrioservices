@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus } from "lucide-react";
+import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -158,15 +158,20 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         return;
       }
 
-      await updateService.mutateAsync({
-        id: service.id,
-        status: "em_execucao",
-        skipToast: true,
+      // Usa RPC SECURITY DEFINER: atribui o técnico se necessário e
+      // muda para em_execucao sem erro de RLS (funciona mesmo quando
+      // technician_id era null antes do início).
+      const { error: rpcError } = await supabase.rpc('start_workshop_service', {
+        _service_id: service.id,
       });
+      if (rpcError) throw rpcError;
 
       // Log activity
       await logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
+      queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
 
       if (!hasPreviousHistory) {
@@ -219,15 +224,15 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         cost: 0,
       });
 
-      // Update service status
-      await updateService.mutateAsync({
-        id: service.id,
-        status: "para_pedir_peca",
-        last_status_before_part_request: service.status,
-        detected_fault: formData.detectedFault,
-        work_performed: formData.workPerformed,
-        skipToast: true,
+      // Update service status via RPC (bypassa RLS)
+      const { error: rpcError } = await supabase.rpc('technician_update_service', {
+        _service_id: service.id,
+        _status: 'para_pedir_peca',
+        _last_status_before_part_request: service.status,
+        _detected_fault: formData.detectedFault || null,
+        _work_performed: formData.workPerformed || null,
       });
+      if (rpcError) throw rpcError;
 
       // Log activity
       await logPartRequest(
@@ -263,15 +268,15 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
     setIsSubmitting(true);
     try {
-      // Update service to concluidos + pending_pricing
-      await updateService.mutateAsync({
-        id: service.id,
-        status: "concluidos",
-        pending_pricing: true,
-        detected_fault: formData.detectedFault,
-        work_performed: finalWorkPerformed,
-        skipToast: true,
+      // Update service to concluidos + pending_pricing via RPC (bypassa RLS)
+      const { error: rpcError } = await supabase.rpc('technician_update_service', {
+        _service_id: service.id,
+        _status: 'concluidos',
+        _pending_pricing: true,
+        _detected_fault: formData.detectedFault || null,
+        _work_performed: finalWorkPerformed,
       });
+      if (rpcError) throw rpcError;
 
       // Log activity
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
