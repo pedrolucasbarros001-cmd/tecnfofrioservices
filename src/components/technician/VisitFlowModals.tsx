@@ -74,6 +74,7 @@ interface VisitFlowModalsProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: () => void;
+  mode?: "normal" | "continuacao_peca";
 }
 
 interface VisitFormData {
