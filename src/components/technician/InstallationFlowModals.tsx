@@ -63,6 +63,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     workPerformed: '',
     usedMaterials: [],
   });
+  const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
@@ -87,7 +88,11 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'instalacao', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
-      setCurrentStep(resumeStep as ModalStep);
+      setDerivedResumeStep(resumeStep as ModalStep);
+
+      // Show Resumo first
+      setCurrentStep('resumo');
+
       setFormData({
         photoAntes: null,
         photoDepois: null,
@@ -314,10 +319,16 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               Cancelar
             </Button>
             <Button
-              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('deslocacao')}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
+              onClick={() => {
+                if (derivedResumeStep && derivedResumeStep !== 'resumo') {
+                  setCurrentStep(derivedResumeStep);
+                } else {
+                  setCurrentStep('deslocacao');
+                }
+              }}
             >
-              Começar Instalação
+              Iniciar Instalação
             </Button>
           </DialogFooter>
         </DialogContent>

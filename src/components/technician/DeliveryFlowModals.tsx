@@ -55,6 +55,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [showSignature, setShowSignature] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
 
@@ -75,7 +76,10 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
     // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'entrega', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
-      setCurrentStep(resumeStep as ModalStep);
+      setDerivedResumeStep(resumeStep as ModalStep);
+
+      // Show Resumo first
+      setCurrentStep('resumo');
       setFormData({ photoFile: null, ...formDataOverrides });
     });
   }, [isOpen, loadState, service]);
@@ -242,10 +246,16 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
               Cancelar
             </Button>
             <Button
-              className="flex-1 bg-green-500 hover:bg-green-600"
-              onClick={() => setCurrentStep('deslocacao')}
+              className="flex-1 bg-green-500 hover:bg-green-600 font-bold"
+              onClick={() => {
+                if (derivedResumeStep && derivedResumeStep !== 'resumo') {
+                  setCurrentStep(derivedResumeStep);
+                } else {
+                  setCurrentStep('deslocacao');
+                }
+              }}
             >
-              Caminho para o Cliente
+              Iniciar Entrega
             </Button>
           </DialogFooter>
         </DialogContent>

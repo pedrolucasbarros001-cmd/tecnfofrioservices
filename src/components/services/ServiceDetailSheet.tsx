@@ -265,6 +265,30 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     enabled: !!service?.id && open,
   });
 
+  const handleDeletePhoto = async (photoId: string) => {
+    try {
+      const { error } = await supabase
+        .from('service_photos')
+        .delete()
+        .eq('id', photoId);
+
+      if (error) throw error;
+
+      // @ts-ignore - queryClient is available from parent or through hook
+      const queryClient = (window as any).queryClient; // Fallback if not available in scope
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      } else {
+        // Alternative if queryClient isn't easily accessible
+        window.location.reload();
+      }
+      toast.success('Foto eliminada com sucesso');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Erro ao eliminar foto');
+    }
+  };
+
   if (!service) return null;
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
@@ -990,6 +1014,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           initialIndex={selectedPhotoIndex || 0}
           open={selectedPhotoIndex !== null}
           onOpenChange={(open) => !open && setSelectedPhotoIndex(null)}
+          onDelete={(role === 'dono' || role === 'secretaria') ? handleDeletePhoto : undefined}
         />
       )}
     </>

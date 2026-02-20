@@ -95,6 +95,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     productType: "",
     partInstalled: false,
   });
+  const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showPartsModal, setShowPartsModal] = useState(false);
@@ -123,7 +124,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       // If the service has no in-progress data yet, start from resumo
       const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
-      setCurrentStep(resumeStep as ModalStep);
+      setDerivedResumeStep(resumeStep as ModalStep);
+
+      // We still want to show Resumo first, but we remember where to jump
+      setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
+
       setFormData({
         detectedFault: service.detected_fault || "",
         workPerformed: service.work_performed || "",
@@ -176,7 +181,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
 
-      if (!hasPreviousHistory) {
+      if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
+        setCurrentStep(derivedResumeStep);
+      } else if (!hasPreviousHistory) {
         setCurrentStep("foto_aparelho");
       } else {
         setCurrentStep("diagnostico");
@@ -347,11 +354,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         "foto_aparelho",
         "foto_etiqueta",
         "foto_estado",
+        needsProductStep ? "produto" : null,
         "diagnostico",
         "pecas_usadas",
         "pedir_peca",
         "conclusao",
-      ];
+      ].filter(Boolean) as ModalStep[];
   }
 
   const stepIndex = steps.indexOf(currentStep);

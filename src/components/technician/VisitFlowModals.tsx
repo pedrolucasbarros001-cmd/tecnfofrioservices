@@ -124,6 +124,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     productPNC: "",
     productType: "",
   });
+  const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [currentPhotoType, setCurrentPhotoType] = useState<PhotoType>("visita");
@@ -153,7 +154,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     const persistenceFlowType = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
-      setCurrentStep(resumeStep as ModalStep);
+      setDerivedResumeStep(resumeStep as ModalStep);
+
+      // We still want to show Resumo first
+      setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
+
       setFormData({
         detectedFault: service.detected_fault || "",
         photoFile: null,
@@ -621,8 +626,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const goToNextPhotoStep = () => {
     if (currentStep === "foto_aparelho") setCurrentStep("foto_etiqueta");
     else if (currentStep === "foto_etiqueta") setCurrentStep("foto_estado");
-    else if (currentStep === "foto_estado") setCurrentStep("produto"); // Always go to product in repair
-    else if (currentStep === "foto") setCurrentStep(needsProductStep ? "produto" : "diagnostico");
+    else if (currentStep === "foto_estado") setCurrentStep("produto"); // Always check product step
+    else if (currentStep === "foto") setCurrentStep("produto"); // Also for non-repair now for consistency
     else if (currentStep === "produto") setCurrentStep("diagnostico");
   };
 
@@ -700,7 +705,16 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             <Button variant="outline" className="flex-1" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => setCurrentStep("deslocacao")}>
+            <Button
+              className="flex-1 bg-blue-500 hover:bg-blue-600"
+              onClick={() => {
+                if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
+                  setCurrentStep(derivedResumeStep);
+                } else {
+                  setCurrentStep("deslocacao");
+                }
+              }}
+            >
               {mode === "continuacao_peca" ? "Ir para Local" : "Começar Visita"}
             </Button>
           </DialogFooter>

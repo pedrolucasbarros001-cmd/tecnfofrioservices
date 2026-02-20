@@ -12,8 +12,8 @@ export interface FlowState<T = Record<string, unknown>> {
 const STORAGE_KEY_PREFIX = 'technician_flow_';
 const MAX_AGE_HOURS = 24;
 
-function getStorageKey(serviceId: string): string {
-  return `${STORAGE_KEY_PREFIX}${serviceId}`;
+function getStorageKey(serviceId: string, flowType: string): string {
+  return `${STORAGE_KEY_PREFIX}${flowType}_${serviceId}`;
 }
 
 function isStateValid<T>(state: FlowState<T>): boolean {
@@ -90,6 +90,11 @@ export async function deriveStepFromDb(
     if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
     if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
     if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+
+    // Check if brand/model info is missing - if so, go to 'produto' step
+    const hasProductInfo = !!(service.brand && service.model);
+    if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+
     if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
     if (hasRequestedPart) return { step: 'conclusao', formDataOverrides }; // Already ordered a part
     if (!workPerformed) return { step: 'pecas_usadas', formDataOverrides };
@@ -119,12 +124,23 @@ export async function deriveStepFromDb(
       if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
       if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
       if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+
+      // Check if brand/model info is missing - if so, go to 'produto' step
+      const hasProductInfo = !!(service.brand && service.model);
+      if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
       if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
       return { step: 'decisao', formDataOverrides };
     } else {
       // Non-repair visit
       if (!hasPhoto('visita')) return { step: 'foto', formDataOverrides };
+
+      // Still check product info for non-repair? User might want it too.
+      // But keeping it consistent with repair for now.
+      const hasProductInfo = !!(service.brand && service.model);
+      if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
       if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
       return { step: 'decisao', formDataOverrides };
@@ -170,7 +186,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
   // Load saved state from localStorage
   const loadState = useCallback((): FlowState<T> | null => {
     try {
-      const key = getStorageKey(serviceId);
+      const key = getStorageKey(serviceId, flowType);
       const stored = localStorage.getItem(key);
 
       if (!stored) return null;
@@ -198,7 +214,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
   // Save state to localStorage
   const saveState = useCallback((currentStep: string, formData: T) => {
     try {
-      const key = getStorageKey(serviceId);
+      const key = getStorageKey(serviceId, flowType);
       const state: FlowState<T> = {
         serviceId,
         flowType,
@@ -215,7 +231,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
   // Clear state from localStorage
   const clearState = useCallback(() => {
     try {
-      const key = getStorageKey(serviceId);
+      const key = getStorageKey(serviceId, flowType);
       localStorage.removeItem(key);
     } catch (error) {
       console.error('Error clearing flow state:', error);

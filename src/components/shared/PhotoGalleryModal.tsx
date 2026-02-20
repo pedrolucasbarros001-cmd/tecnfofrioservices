@@ -1,8 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Carousel,
   CarouselContent,
@@ -23,6 +33,7 @@ interface PhotoGalleryModalProps {
   initialIndex?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDelete?: (photoId: string) => Promise<void>;
 }
 
 export function PhotoGalleryModal({
@@ -30,9 +41,12 @@ export function PhotoGalleryModal({
   initialIndex = 0,
   open,
   onOpenChange,
+  onDelete,
 }: PhotoGalleryModalProps) {
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(initialIndex);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!api) return;
@@ -70,6 +84,17 @@ export function PhotoGalleryModal({
           <span className="text-white/80 text-sm font-medium">
             {current + 1} / {photos.length}
           </span>
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-destructive h-9 w-9"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
         {/* Carousel */}
@@ -137,6 +162,41 @@ export function PhotoGalleryModal({
           )}
         </div>
       </DialogContent>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Foto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem a certeza que deseja eliminar esta foto? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!onDelete || !currentPhoto) return;
+                setIsDeleting(true);
+                try {
+                  await onDelete(currentPhoto.id);
+                  if (photos.length <= 1) {
+                    onOpenChange(false);
+                  }
+                } finally {
+                  setIsDeleting(false);
+                  setShowDeleteConfirm(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

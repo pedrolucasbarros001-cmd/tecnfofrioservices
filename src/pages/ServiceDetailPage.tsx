@@ -13,7 +13,12 @@ import {
   FileSignature,
   Package,
   Printer,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { PhotoGalleryModal } from "@/components/shared/PhotoGalleryModal";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +49,8 @@ export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading, role } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   // Fetch service with customer
   const {
@@ -137,7 +144,25 @@ export default function ServiceDetailPage() {
       return data as ServiceSignature[];
     },
     enabled: !!serviceId && isAuthenticated && !authLoading,
+    enabled: !!serviceId && isAuthenticated && !authLoading,
   });
+
+  const handleDeletePhoto = async (photoId: string) => {
+    try {
+      const { error } = await supabase
+        .from("service_photos")
+        .delete()
+        .eq("id", photoId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["service-photos-detail", serviceId] });
+      toast.success("Foto eliminada com sucesso");
+    } catch (err) {
+      console.error("Error deleting photo:", err);
+      toast.error("Erro ao eliminar foto");
+    }
+  };
 
   // Show loading while auth is being restored
   if (authLoading || loadingService) {
@@ -392,12 +417,10 @@ export default function ServiceDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo) => (
-                  <a
+                {photos.map((photo, index) => (
+                  <button
                     key={photo.id}
-                    href={photo.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() => setSelectedPhotoIndex(index)}
                     className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition"
                   >
                     <img
@@ -405,11 +428,22 @@ export default function ServiceDetailPage() {
                       alt={photo.description || "Foto do serviço"}
                       className="w-full h-full object-cover"
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Photo Gallery Modal */}
+        {photos.length > 0 && (
+          <PhotoGalleryModal
+            photos={photos}
+            initialIndex={selectedPhotoIndex || 0}
+            open={selectedPhotoIndex !== null}
+            onOpenChange={(open) => !open && setSelectedPhotoIndex(null)}
+            onDelete={(role === "dono" || role === "secretaria") ? handleDeletePhoto : undefined}
+          />
         )}
 
         {/* Signatures */}
