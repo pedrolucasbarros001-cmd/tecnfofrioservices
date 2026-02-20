@@ -102,7 +102,7 @@ interface VisitFormData {
   [key: string]: unknown;
 }
 
-export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitFlowModalsProps) {
+export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "normal" }: VisitFlowModalsProps) {
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
@@ -587,6 +587,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete }: VisitF
     setShowPayment(true);
     setSignatureType("conclusao");
   };
+
+
 
   if (!isOpen) return null;
 
