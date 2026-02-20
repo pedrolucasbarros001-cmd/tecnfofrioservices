@@ -276,7 +276,9 @@ export default function GeralPage() {
 
 
         {/* Weekly Agenda - only show when no status filter */}
-        {selectedStatus === 'all' && <WeeklyAgenda services={services} onServiceClick={handleServiceClick} />}
+        {selectedStatus === 'all' && selectedLocation === 'all' && !searchTerm && (
+          <WeeklyAgenda services={services} onServiceClick={handleServiceClick} />
+        )}
 
         {/* Services Table */}
         <Card data-tour="services-table">
