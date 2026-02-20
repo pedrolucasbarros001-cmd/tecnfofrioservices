@@ -719,7 +719,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === "deslocacao" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "deslocacao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -756,7 +756,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_aparelho" && !showCamera && !showSignature}
-          onOpenChange={() => handleClose()}
+          onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Foto do Aparelho" step="Passo 3" />
@@ -812,7 +812,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_etiqueta" && !showCamera && !showSignature}
-          onOpenChange={() => handleClose()}
+          onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
@@ -869,7 +869,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_estado" && !showCamera && !showSignature}
-          onOpenChange={() => handleClose()}
+          onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Estado do Aparelho" step="Passo 5" />
@@ -933,7 +933,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
       {!isReparacao && (
-        <Dialog open={currentStep === "foto" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <Dialog open={currentStep === "foto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Tirar Foto" step="Passo 3" />
 
@@ -982,7 +982,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       {needsProductStep && (
-        <Dialog open={currentStep === "produto" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+        <Dialog open={currentStep === "produto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
@@ -1059,7 +1059,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       )}
 
       {/* Modal 4/6: Diagnóstico */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
 
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
@@ -1096,7 +1096,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 5/7: Decisão */}
-      <Dialog open={currentStep === "decisao" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "decisao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
 
@@ -1167,7 +1167,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
-      <Dialog open={currentStep === "pecas_usadas" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "pecas_usadas" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Peças Usadas" step={isReparacao ? "Passo 8" : "Passo 6"} />
 
@@ -1257,7 +1257,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 7/9: Pedir Peça? (only for reparar_local) */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? "Passo 9" : "Passo 7"} />
 
@@ -1350,7 +1350,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 3d: Confirmação Peça */}
-      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md p-6">
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 

@@ -111,7 +111,7 @@ export async function deriveStepFromDb(
     }
 
     const hasProductInfo = !!(service.brand && service.model);
-    if (!hasProductInfo && !skipInitialPhotos) return { step: 'produto', formDataOverrides };
+    if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
     if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
     if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
@@ -159,7 +159,7 @@ export async function deriveStepFromDb(
       }
 
       const hasProductInfo = !!(service.brand && service.model);
-      if (!hasProductInfo && !skipInitialPhotos) return { step: 'produto', formDataOverrides };
+      if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
       if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };

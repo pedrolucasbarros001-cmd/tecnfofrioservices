@@ -454,7 +454,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 1b: Confirmação Peça */}
-      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md p-6">
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
@@ -585,7 +585,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 2c: Foto do Estado (if no history) */}
-      <Dialog open={currentStep === "foto_estado" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "foto_estado" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Estado do Aparelho" step="Fotos Obrigatórias" />
           <div className="space-y-4">
@@ -629,7 +629,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       {needsProductStep && (
-        <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+        <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
             <ModalHeader title="Informação do Produto" step="Passo 2" />
 
@@ -706,7 +706,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       )}
 
       {/* Modal 2: Diagnóstico Complementar */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Diagnóstico" step="Passo 2" />
 
@@ -759,7 +759,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       < Dialog
         open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal
         }
-        onOpenChange={() => handleClose()}
+        onOpenChange={(open) => !open && handleClose()}
       >
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Peças Usadas" step="Passo 3" />
@@ -831,7 +831,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog >
 
       {/* Modal 4: Pedir Peça */}
-      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
@@ -925,7 +925,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog >
 
       {/* Modal 5: Conclusão */}
-      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Conclusão" step="Passo 5" />
 

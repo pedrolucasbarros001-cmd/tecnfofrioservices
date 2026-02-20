@@ -215,7 +215,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Resumo da Entrega" step="Passo 1" />
 
@@ -270,7 +270,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -312,7 +312,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 3: Foto (opcional) */}
-      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Foto da Entrega" step="Passo 3" />
 
