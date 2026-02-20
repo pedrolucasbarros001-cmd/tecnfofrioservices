@@ -29,7 +29,7 @@ export function ServiceStatusBadge({ service, className }: ServiceStatusBadgePro
             </Badge>
             {needsPricing && (
                 <Badge className="text-xs bg-orange-100 text-orange-700 border border-orange-300">
-                    A Precificar
+                    Orçamentar
                 </Badge>
             )}
         </span>

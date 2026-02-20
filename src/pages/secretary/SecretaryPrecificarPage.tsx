@@ -43,7 +43,7 @@ export default function SecretaryPrecificarPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Precificar</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Orçamentar</h1>
         <p className="text-muted-foreground">
           Serviços concluídos que aguardam definição de preço.
         </p>
@@ -102,7 +102,7 @@ export default function SecretaryPrecificarPage() {
                         onClick={(e) => handleSetPrice(service, e)}
                       >
                         <DollarSign className="h-4 w-4 mr-1" />
-                        Definir Preço
+                        Orçamentar
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -41,7 +41,7 @@ const DASHBOARD_CARDS = [
   { key: 'para_pedir_peca' as const, label: 'Pedir Peça', icon: Package, route: '/geral?status=para_pedir_peca' },
   { key: 'em_espera_de_peca' as const, label: 'Espera de Peça', icon: Clock, route: '/geral?status=em_espera_de_peca' },
   { key: 'concluidos' as const, label: 'Oficina Reparados', icon: Truck, route: '/geral?status=concluidos' },
-  { key: 'a_precificar' as const, label: 'Precificar', icon: DollarSign, route: '/geral?status=a_precificar' },
+  { key: 'a_precificar' as const, label: 'Orçamentar', icon: DollarSign, route: '/geral?status=a_precificar' },
   { key: 'em_debito' as const, label: 'Em Débito', icon: AlertCircle, route: '/em-debito' },
   { key: 'finalizado' as const, label: 'Concluídos', icon: CheckSquare, route: '/geral?status=finalizado' },
   { key: 'orcamentos' as const, label: 'Orçamentos', icon: FileText, route: '/orcamentos' },

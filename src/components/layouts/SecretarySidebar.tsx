@@ -28,7 +28,7 @@ const menuItems = [
   { title: 'Geral', url: '/geral', icon: List },
   { title: 'Oficina', url: '/oficina', icon: Wrench },
   { title: 'Oficina Reparados', url: '/concluidos', icon: CheckCircle2 },
-  { title: 'Precificar', url: '/precificar', icon: DollarSign },
+  { title: 'Orçamentar', url: '/precificar', icon: DollarSign },
   { title: 'Em Débito', url: '/em-debito', icon: AlertCircle },
   { title: 'Clientes', url: '/clientes', icon: Users },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
@@ -55,9 +55,9 @@ export function SecretarySidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <img 
-            src={tecnofrioLogoIcon} 
-            alt="TECNOFRIO" 
+          <img
+            src={tecnofrioLogoIcon}
+            alt="TECNOFRIO"
             className="h-9 w-9 shrink-0 rounded-lg object-contain bg-white p-0.5"
           />
           {!isCollapsed && (

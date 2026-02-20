@@ -66,7 +66,7 @@ export default function TechnicianHistoryPage() {
             na_oficina: { label: 'Oficina', className: 'bg-orange-100 text-orange-700' },
             para_pedir_peca: { label: 'Pedir Peça', className: 'bg-amber-100 text-amber-700' },
             em_espera_de_peca: { label: 'Espera Peça', className: 'bg-purple-100 text-purple-700' },
-            a_precificar: { label: 'A Precificar', className: 'bg-cyan-100 text-cyan-700' },
+            a_precificar: { label: 'Orçamentar', className: 'bg-cyan-100 text-cyan-700' },
             concluidos: { label: 'Concluído', className: 'bg-emerald-100 text-emerald-700' },
             em_debito: { label: 'Em Débito', className: 'bg-red-100 text-red-700' },
             finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-700' },

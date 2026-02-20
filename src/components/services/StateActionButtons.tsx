@@ -155,7 +155,7 @@ export function StateActionButtons({
       case 'a_precificar':
         if ((isDono || isSecretaria) && onSetPrice) {
           return {
-            label: 'Definir Preço',
+            label: 'Orçamentar',
             icon: DollarSign,
             onClick: onSetPrice,
             className: primaryButtonClass,
@@ -167,7 +167,7 @@ export function StateActionButtons({
       case 'finalizado':
         if ((isDono || isSecretaria) && service.pending_pricing && onSetPrice) {
           return {
-            label: 'Definir Preço',
+            label: 'Orçamentar',
             icon: DollarSign,
             onClick: onSetPrice,
             className: primaryButtonClass,
@@ -180,7 +180,7 @@ export function StateActionButtons({
         const needsPricing = service.pending_pricing || !isServicePriced;
         if (needsPricing && (isDono || isSecretaria) && onSetPrice) {
           return {
-            label: 'Definir Preço',
+            label: 'Orçamentar',
             icon: DollarSign,
             onClick: onSetPrice,
             className: primaryButtonClass,
@@ -287,7 +287,7 @@ export function StateActionButtons({
           {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && (isDono || isSecretaria) && onSetPrice && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSetPrice(); }}>
               <DollarSign className="h-4 w-4 mr-2" />
-              Definir Preço
+              Orçamentar
             </DropdownMenuItem>
           )}
 
