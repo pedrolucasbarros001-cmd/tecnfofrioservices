@@ -43,6 +43,9 @@ interface StateActionButtonsProps {
   onDelete?: () => void;
   onReschedule?: () => void;
   onEditDetails?: () => void;
+  /** When set, restricts the main button to only the action that matches
+   * this filter context. Use the active filter/card status from the parent page. */
+  viewContext?: ServiceStatus | 'all';
 }
 
 interface ActionConfig {
@@ -69,6 +72,7 @@ export function StateActionButtons({
   onDelete,
   onReschedule,
   onEditDetails,
+  viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
   const isDono = role === 'dono';
@@ -84,20 +88,15 @@ export function StateActionButtons({
   const primaryButtonClass = 'bg-primary text-primary-foreground hover:bg-primary/90';
 
   const getMainAction = (): ActionConfig | null => {
-    // ── Global override ────────────────────────────────────────────────────────
-    // When a service requires pricing, "Definir Preço" takes absolute priority
-    // over any status-specific action, regardless of the current state.
-    if (service.pending_pricing && isDono && onSetPrice) {
-      return {
-        label: 'Definir Preço',
-        icon: DollarSign,
-        onClick: onSetPrice,
-        className: primaryButtonClass,
-      };
-    }
-    // ──────────────────────────────────────────────────────────────────────────
+    // When a viewContext is active (user clicked a specific filter card),
+    // the main button is determined by that context — not the service's own status.
+    // This keeps buttons scoped to the navigation context the user is in.
+    const contextStatus: ServiceStatus =
+      viewContext && viewContext !== 'all'
+        ? viewContext as ServiceStatus
+        : (service.status as ServiceStatus);
 
-    switch (service.status as ServiceStatus) {
+    switch (contextStatus) {
       case 'por_fazer':
         if (!service.technician_id) {
           return {
