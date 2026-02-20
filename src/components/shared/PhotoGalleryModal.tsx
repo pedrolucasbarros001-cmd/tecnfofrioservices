@@ -70,7 +70,7 @@ export function PhotoGalleryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden z-[100]">
+      <DialogContent className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden z-50">
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
           <Button
@@ -107,12 +107,15 @@ export function PhotoGalleryModal({
             <CarouselContent className="h-full">
               {photos.map((photo) => (
                 <CarouselItem key={photo.id} className="flex items-center justify-center h-[100dvh]">
-                  <img
-                    src={photo.file_url}
-                    alt={photo.description || 'Foto do serviço'}
-                    className="max-w-full max-h-[80dvh] object-contain select-none"
-                    draggable={false}
-                  />
+                  <div className="relative flex items-center justify-center w-full h-full p-4">
+                    <img
+                      src={photo.file_url}
+                      alt={photo.description || 'Foto do serviço'}
+                      className="max-w-full max-h-[85dvh] object-contain select-none shadow-2xl"
+                      draggable={false}
+                      loading="eager"
+                    />
+                  </div>
                 </CarouselItem>
               ))}
             </CarouselContent>

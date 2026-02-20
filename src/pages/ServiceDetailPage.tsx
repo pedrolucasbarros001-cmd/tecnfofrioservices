@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -14,7 +15,6 @@ import {
   Package,
   Printer,
   Trash2,
-  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PhotoGalleryModal } from "@/components/shared/PhotoGalleryModal";
@@ -143,7 +143,6 @@ export default function ServiceDetailPage() {
       if (error) throw error;
       return data as ServiceSignature[];
     },
-    enabled: !!serviceId && isAuthenticated && !authLoading,
     enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
@@ -427,6 +426,7 @@ export default function ServiceDetailPage() {
                       src={photo.file_url}
                       alt={photo.description || "Foto do serviço"}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   </button>
                 ))}

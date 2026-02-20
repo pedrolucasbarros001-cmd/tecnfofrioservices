@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MapPin,
   Phone,
@@ -165,6 +165,7 @@ const getServiceProgressSteps = (service: Service) => {
 export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdated }: ServiceDetailSheetProps) {
   const navigate = useNavigate();
   const { role } = useAuth();
+  const queryClient = useQueryClient();
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
 
@@ -274,14 +275,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
       if (error) throw error;
 
-      // @ts-ignore - queryClient is available from parent or through hook
-      const queryClient = (window as any).queryClient; // Fallback if not available in scope
-      if (queryClient) {
-        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-      } else {
-        // Alternative if queryClient isn't easily accessible
-        window.location.reload();
-      }
+      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
       toast.success('Foto eliminada com sucesso');
     } catch (error) {
       console.error('Error deleting photo:', error);
@@ -782,6 +776,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             src={photo.file_url}
                             alt={photo.description || 'Foto do serviço'}
                             className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity"
+                            loading="lazy"
                           />
                           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
                             {getPhotoTypeLabel(photo.photo_type)}
