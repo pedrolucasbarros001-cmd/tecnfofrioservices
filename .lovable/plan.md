@@ -1,204 +1,232 @@
 
-# Plano de Correções — 8 Problemas Identificados
+# Plano de Implementação — Fluxos de Execução Técnica (Mega-revisão)
 
-## Visão Geral
+## Visão Geral dos 8 Requisitos
 
-| # | Problema | Ficheiros Afetados |
+| # | Requisito | Complexidade |
 |---|---|---|
-| 1 | Cliente não desaparece após eliminação | `ClientesPage.tsx`, `useCustomers.ts` |
-| 2 | "Quem fez o quê" em cada secção da ficha | `ServiceDetailSheet.tsx` |
-| 3 | Botão X para fechar ficha do histórico do técnico | `TechnicianHistoryPage.tsx`, `TechnicianServiceSheet.tsx` |
-| 4 | PDF da ficha com dados censurados | `pdfUtils.ts`, `ServicePrintPage.tsx` |
-| 5 | Abreviações na etiqueta → palavras completas | `ServiceTagModal.tsx`, `ServiceTagPage.tsx` |
-| 6 | Visita concluída no local → status "concluidos" | `VisitFlowModals.tsx` |
-| 7 | Secretaria pode definir preço + nova página Precificar | `SecretarySidebar.tsx`, `ServiceDetailSheet.tsx`, `App.tsx` |
-| 8 | Erros de build (TypeScript) | `ServiceDetailSheet.tsx`, `CustomerDetailSheet.tsx` |
+| 1 | Fotos visíveis na ficha de consulta (ServiceDetailSheet) | Baixa — já existe, precisa garantir que visita também mostra |
+| 2 | Observações e fotos do histórico técnico visíveis na ficha | Baixa — as fotos já são guardadas em `service_photos`, já aparecem |
+| 3 | Etapa de marca/modelo/série no fluxo de Visita (sempre) | Média — tornar etapa OBRIGATÓRIA em vez de condicional |
+| 4 | Etapa de marca/modelo/série na Oficina (só se não preenchido antes) | Baixa — lógica já existe com `needsProductStep` |
+| 5 | Pagamento em TODOS os fluxos de campo (exceto Oficina pura) | Média — instalar `FieldPaymentStep` em Instalação e Entrega |
+| 6 | Bloqueio de serviço aguardando peça — visita (no cliente) | Alta — novo fluxo "continuar após peça" |
+| 7 | Bloqueio de serviço aguardando peça — oficina | Alta — mesmo conceito, adaptado para oficina |
+| 8 | Correção do bug de build no `VisitFlowModals.tsx` | Urgente — `handleClose` não inicializa campos do tipo VisitFormData |
 
 ---
 
-## 1. Cliente Não Desaparece Após Eliminação
+## Diagnóstico do Bug de Build
 
-**Causa raiz**: O `ClientesPage` tem dois `<CreateCustomerModal>` renderizados (duplicado — veja linhas 90-95 e 214-219). Além disso, a lista exibida é a `customers` do resultado de `usePaginatedCustomers`, mas o `onUpdate` no `CustomerDetailSheet` está ligado a `deleteCustomer.reset()` em vez de uma re-fetch da query paginada. A deleção executa (o hook invalida `['customers']` e `['customers-paginated']`), mas o componente pode não re-renderizar corretamente por causa do modal duplicado.
-
-**Solução**:
-- Remover o `<CreateCustomerModal>` duplicado do topo da lista (linhas 90-95 do `ClientesPage`)
-- Corrigir o `onUpdate` do `CustomerDetailSheet` para ser uma função que invalida a query paginada
-- No `useDeleteCustomer`, garantir que o `toast` e o `invalidateQueries` são chamados após um pequeno delay (ou usar `await queryClient.refetchQueries`) para forçar re-render
-
-**Ficheiro**: `src/pages/ClientesPage.tsx` — remover duplicado do CreateCustomerModal, corrigir prop `onUpdate`
-
----
-
-## 2. "Quem Fez o Quê" Acima de Cada Detalhe na Ficha
-
-**Causa**: O `ServiceDetailSheet` já busca `activityLogs` com JOIN ao `profiles` (linha 252-258) e mostra no `ActivityLogItem`. Mas os outros dados (pagamentos, fotos) já têm `receiver.full_name` e `creator.full_name` — estão a ser exibidos mas de forma discreta (texto pequeno abaixo ou acima do item). O problema de build TS (linhas 208 e 224 de `ServiceDetailSheet.tsx`) está relacionado com o JOIN Supabase nos tipos.
-
-**Solução do bug de build**:
-
-As queries que usam `!fkey` com JOIN estão a retornar `SelectQueryError` porque a coluna de foreign key (`received_by` em `service_payments`, `uploaded_by` em `service_photos`) não tem uma relação definida no schema do Supabase com o nome exacto `service_payments_received_by_fkey`.
-
-Corrigir usando cast `as unknown as ...`:
-```ts
-return data as unknown as (ServicePayment & { receiver: { full_name: string | null } | null })[];
+O erro atual em `VisitFlowModals.tsx` linha 412:
+```
+Type '{ ... }' is missing: productBrand, productModel, productSerial, productPNC, productType
 ```
 
-**Melhoria visual**: Adicionar um cabeçalho discreto "Por: [Nome]" acima de cada secção de pagamento, foto e assinatura — de forma consistente. O `activityLogs` já mostra o actor. Para outros dados, os nomes já existem mas devem ser posicionados como um "header" antes de cada item para clareza.
-
-**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx`
+O `handleClose` faz `setFormData({ ... })` sem os campos de produto. Corrigir adicionando os 5 campos em falta.
 
 ---
 
-## 3. Botão X para Fechar a Ficha do Histórico do Técnico
+## 1. Fotos na Ficha de Consulta (ServiceDetailSheet)
 
-**Causa**: O `TechnicianHistoryPage` abre o `TechnicianServiceSheet`. O `TechnicianServiceSheet` é um `Sheet` do Radix que já tem um botão de fechar (o `X` padrão do Radix). Mas o utilizador reporta que não consegue fechar — a imagem mostra que a vista está a abrir num contexto diferente.
+**Estado atual**: A secção "Fotos do Serviço" JÁ EXISTE (linhas 776-800 do `ServiceDetailSheet.tsx`) e já mostra TODAS as fotos de TODOS os tipos. As fotos gravadas durante a execução (visita, oficina, aparelho, etiqueta, estado, entrega, instalação) já aparecem.
 
-**Solução**: O `TechnicianServiceSheet` usa `Sheet` + `SheetContent`, que por padrão tem um `SheetClose` incluído pelo Radix UI. Se não está a aparecer, é porque o `SheetContent` está customizado sem o botão de fechar padrão.
+**O que falta**: Confirmar que as fotos adicionadas no "Histórico do Técnico" (`TechnicianServiceSheet`) também aparecem — e já aparecem, porque são inseridas na tabela `service_photos` com `photo_type: 'visita'`.
 
-Adicionar explicitamente um botão de fechar no `SheetHeader` do `TechnicianServiceSheet`:
+**Acção**: Nenhuma mudança necessária no `ServiceDetailSheet` para este ponto — já funciona. Apenas garantir que não há regressão.
+
+---
+
+## 2. Etapa Obrigatória de Produto no Fluxo de Visita
+
+**Estado atual**: A etapa `produto` só aparece `se (!service.brand && !service.model)` — `needsProductStep`. Ou seja, se o serviço já tem marca/modelo, o técnico nunca preenche esta informação.
+
+**Novo requisito**: Em serviços de Visita (no cliente), o técnico SEMPRE deve passar pela etapa de verificação/preenchimento de marca, modelo e número de série, independentemente de já estarem preenchidos. O técnico pode confirmar ou corrigir.
+
+**Implementação em `VisitFlowModals.tsx`**:
+- Remover a flag `needsProductStep` 
+- A etapa `produto` torna-se parte FIXA do fluxo para TODOS os serviços de visita (`isReparacao` ou não)
+- Sequência: `deslocacao` → `foto_aparelho/foto_etiqueta/foto_estado` (reparação) OU `foto` (outros) → **`produto`** → `diagnostico` → `decisao` → ...
+- O passo de produto pré-preenche com os valores actuais do serviço e o técnico confirma/corrige
+- O step `needsProductStep` nas navegações (`goToPreviousPhotoStep`, `goToNextPhotoStep`) deve ser removido — o produto é sempre o próximo depois das fotos
+
+---
+
+## 3. Etapa de Produto na Oficina — Condicional (sem alteração)
+
+Na `WorkshopFlowModals.tsx`, a lógica actual de `needsProductStep` mantém-se:
+- Se os dados já foram preenchidos na visita → técnico da oficina **NÃO** vê a etapa
+- Se o serviço foi criado directamente na oficina (sem visita anterior) → técnico **VÊ** a etapa
+
+Esta lógica está correcta e não precisa de alteração.
+
+---
+
+## 4. Pagamento em TODOS os Fluxos de Campo (exceto Oficina pura)
+
+**Estado actual**:
+- `VisitFlowModals`: ✅ `FieldPaymentStep` já integrado
+- `InstallationFlowModals`: ✅ `FieldPaymentStep` já integrado (vendo o código linha 71)
+- `DeliveryFlowModals`: ✅ `FieldPaymentStep` já integrado (vendo o código linha 59)
+- Oficina (`WorkshopFlowModals`): ❌ SEM pagamento — correcto, cliente não está lá
+
+**Confirmação**: Os 3 fluxos de campo já têm pagamento. Confirmar que na Instalação e Entrega, o step de pagamento aparece ANTES da assinatura (verificar o fluxo completo de cada um).
+
+**Verificação do `InstallationFlowModals` após linha 100**: A leitura mostra que `showPayment` existe (linha 71). Preciso confirmar que é chamado antes da assinatura.
+
+**Verificação do `DeliveryFlowModals` após linha 100**: O `showPayment` existe (linha 59). Confirmar fluxo.
+
+Estes fluxos já têm o pagamento integrado — a revisão é só de confirmação.
+
+---
+
+## 5. Bloqueio de Serviço Aguardando Peça — Visita no Cliente (NOVO FLUXO)
+
+Esta é a mudança mais complexa. Quando um técnico no cliente solicita uma peça:
+- Estado actual: `para_pedir_peca` → depois `em_espera_de_peca`
+- O serviço aparece na lista de serviços do técnico (página de serviços)
+- O botão DEVE mostrar "Espera de Peça" e ser **não clicável** (bloqueado)
+- Quando a peça chega (registada por admin), estado muda para o `last_status_before_part_request`
+- Aparece botão "**Continuar**" 
+
+### 5a — Novo Fluxo "Continuar após Peça" para Visita no Cliente
+
+**Detecção**: O serviço tem `status: 'em_espera_de_peca'` E `service_location: 'cliente'` E tem técnico atribuído.
+
+**Novo tipo de fluxo** no `VisitFlowModals.tsx` — modo `continuacao_peca`:
+
+Steps do novo fluxo:
+1. `resumo_continuacao` — Mostra resumo anterior (diagnóstico, fotos, decisão anterior)
+2. `deslocacao` — Mapa, ir até ao cliente
+3. `confirmacao_peca` — "A peça foi instalada?" (Sim/Não)
+4. `pagamento` — Pergunta de pagamento (FieldPaymentStep)
+5. `assinatura` — Assinatura de conclusão → status `concluidos` + `pending_pricing: true`
+
+**Detecção na `ServicosPage` / card do técnico**: Quando `status === 'em_espera_de_peca'` → botão "Espera de Peça" desabilitado. Quando `status === last_status_before_part_request` (voltou ao estado anterior após chegada da peça) → botão "Continuar" habilitado que abre o novo fluxo.
+
+**Nota sobre detecção**: O status `em_espera_de_peca` já existe. Quando a peça chega, o admin regista com `PartArrivedModal` que deveria restaurar o status para `last_status_before_part_request`. Esta lógica precisa de ser verificada para garantir que o status volta para `por_fazer` ou `na_oficina` corretamente.
+
+### 5b — Localização das mudanças
+
+**`TechnicianVisitFlow.tsx` e `ServicosPage.tsx`**: Adicionar lógica ao card de serviço:
+- Se `status === 'para_pedir_peca' || status === 'em_espera_de_peca'` → mostrar badge "Espera de Peça" + botão desabilitado com texto "Aguarda Peça"
+- Se `status === 'por_fazer'` E o serviço JÁ tem `detected_fault` (tem histórico de visita anterior) E tem `last_status_before_part_request` preenchido → mostrar botão "Continuar"
+
+**`VisitFlowModals.tsx`**: Adicionar prop `mode: 'normal' | 'continuacao_peca'` e renderizar o fluxo simplificado quando em modo continuação.
+
+---
+
+## 6. Bloqueio de Serviço Aguardando Peça — Oficina (NOVO FLUXO)
+
+Mesma lógica, adaptada para oficina:
+
+**`TechnicianOfficePage.tsx`** — no `ServiceCard`:
+- Se `status === 'para_pedir_peca' || status === 'em_espera_de_peca'` → botão "Aguarda Peça" desabilitado (sem clique)
+- Quando peça chega e status volta → botão "Continuar" habilitado
+
+**Novo fluxo simplificado na oficina** (`WorkshopFlowModals.tsx`) — modo `continuacao_peca`:
+
+Steps:
+1. `resumo_continuacao` — Mostra o que foi feito antes (diagnóstico, trabalho anterior, fotos)
+2. `confirmacao_peca` — "A peça foi instalada?" (confirmação)
+3. `conclusao` — Descrição rápida do trabalho final + conclusão → status `concluidos` + `pending_pricing: true`
+
+**SEM pagamento, SEM assinatura** — na oficina não faz sentido.
+
+---
+
+## 7. Verificação do `PartArrivedModal` e Fluxo de Chegada de Peça
+
+Quando a peça chega, o admin clica em "Peça Chegou" no `PartArrivedModal`. Este modal deve:
+1. Marcar `service_parts.arrived = true`
+2. Atualizar `services.status` de volta para `last_status_before_part_request`
+3. Agendar técnico e data (já obrigatório pela memória)
+
+Após este passo, o técnico vê o botão "Continuar" no seu card de serviço.
+
+Preciso verificar o `PartArrivedModal` para confirmar que a lógica está correcta.
+
+---
+
+## 8. Estrutura de Implementação — Ficheiros a Alterar
+
+### Prioridade 1: Bug de Build (1 ficheiro)
+- `src/components/technician/VisitFlowModals.tsx` — corrigir `handleClose` (adicionar campos em falta)
+
+### Prioridade 2: Etapa de Produto Obrigatória na Visita (1 ficheiro)
+- `src/components/technician/VisitFlowModals.tsx` — remover `needsProductStep`, tornar etapa produto sempre activa
+
+### Prioridade 3: Bloqueio de Serviços Aguardando Peça — UI
+- `src/pages/technician/TechnicianOfficePage.tsx` — adaptar `ServiceCard` para mostrar estado bloqueado vs "Continuar"
+- `src/pages/ServicosPage.tsx` (ou equivalente de lista de serviços do técnico) — idem
+
+### Prioridade 4: Novo Fluxo "Continuar após Peça" — Visita
+- `src/components/technician/VisitFlowModals.tsx` — adicionar modo `continuacao_peca` com steps simplificados
+
+### Prioridade 5: Novo Fluxo "Continuar após Peça" — Oficina  
+- `src/components/technician/WorkshopFlowModals.tsx` — adicionar modo `continuacao_peca`
+
+### Prioridade 6: Verificar e Confirmar Pagamento em Instalação/Entrega
+- `src/components/technician/InstallationFlowModals.tsx` — verificar posição do payment step
+- `src/components/technician/DeliveryFlowModals.tsx` — verificar posição do payment step
+
+---
+
+## Detalhes Técnicos Críticos
+
+### Detecção de "Continuar após Peça" na Lista do Técnico
+
+Para saber se um serviço é um "continuar após peça", verificar:
+```ts
+const isAwaitingPart = ['para_pedir_peca', 'em_espera_de_peca'].includes(service.status);
+const isContinuacaoPeca = service.status === 'por_fazer' && 
+  !!service.last_status_before_part_request && 
+  !!service.detected_fault;
+// Para oficina: status 'na_oficina' voltou de espera de peça
+const isOficinaContinuacao = service.service_location === 'oficina' && 
+  service.status === 'na_oficina' && 
+  !!service.last_status_before_part_request;
+```
+
+### Etapa de Confirmação de Peça Instalada
+
 ```tsx
-<Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-  <X className="h-5 w-5" />
-</Button>
+// Modal simples com dois botões
+"A peça encomendada foi instalada com sucesso?"
+[✗ Ainda não]  [✓ Sim, instalada]
 ```
 
-**Ficheiro**: `src/components/technician/TechnicianServiceSheet.tsx`
+Se "Ainda não" → fechar modal sem avançar (o técnico ainda não pode concluir)
+Se "Sim" → avançar para pagamento (visita) ou conclusão (oficina)
+
+### Sequência Final — Visita Normal (Reparação)
+
+```
+resumo → deslocacao → foto_aparelho → foto_etiqueta → foto_estado → produto → diagnostico → decisao
+  ↓ reparar_local                                    ↓ levantar_oficina
+pecas_usadas → pedir_peca                           [pagamento] → assinatura_recolha → FIM (oficina)
+  ↓ não pede peça                ↓ pede peça
+[pagamento] → assinatura        assinatura_pedido_peca → FIM (para_pedir_peca)
+  concluidos + pending_pricing
+```
+
+### Sequência Final — Visita Continuação (após peça chegar)
+
+```
+resumo_continuacao → deslocacao → confirmacao_peca → [pagamento] → assinatura → FIM (concluidos)
+```
+
+### Sequência Final — Oficina Continuação (após peça chegar)
+
+```
+resumo_continuacao → confirmacao_peca → conclusao → FIM (concluidos)
+```
 
 ---
 
-## 4. PDF da Ficha com Dados Censurados
+## Impacto no Sistema
 
-**Causa**: O `pdfUtils.ts` usa `html2pdf.js` que clona o elemento offscreen. As CSS variables (`hsl(var(--foreground))`, `hsl(var(--primary))`) não resolvem no clone offscreen porque as custom properties CSS só estão definidas no `:root` do documento principal. O clone recebe a estrutura HTML mas não herda os valores computados das variáveis.
-
-**Solução em `pdfUtils.ts`**: Após clonar o elemento e antes de chamar `html2pdf`, iterar todos os descendentes do clone e forçar `color: rgb(0,0,0)` em elementos de texto (exceto os que têm cores de fundo coloridas intencionais). Adicionalmente, forçar `background-color: white` no container root do clone.
-
-```ts
-// Após clonar:
-const textElements = clone.querySelectorAll('p, span, h1, h2, h3, h4, td, th, div');
-textElements.forEach((el) => {
-  if (el instanceof HTMLElement) {
-    const computed = window.getComputedStyle(el);
-    // Se a cor tem var() não resolvido (alpha = 0 ou color computado errado)
-    el.style.color = '#000000'; // forçar preto
-  }
-});
-```
-
-Mas a abordagem mais robusta é usar `html2canvas` diretamente (como no `ServiceTagModal`) em vez de `html2pdf.js`:
-- `html2canvas` captura os estilos **computados** pelo browser
-- Não há problema de CSS variables não resolvidas
-- Para A4, usar `jsPDF` com `format: 'a4'`
-
-**Ficheiro**: `src/utils/pdfUtils.ts` — substituir `html2pdf.js` por `html2canvas + jsPDF` para capturar estilos computados reais
-
----
-
-## 5. Abreviações na Etiqueta → Palavras Completas
-
-**Causa**: As abreviações "Cl:", "Tel:", "Av:" existem na `ServiceTagPage.tsx`. No `ServiceTagModal.tsx` (versão modal), já foram substituídas por palavras completas na última iteração. Mas a `ServiceTagPage` (usada ao imprimir) ainda tem as abreviações antigas.
-
-**Verificação do `ServiceTagModal.tsx`** (já correto):
-```ts
-{ label: 'Cliente', value: ... }
-{ label: 'Telefone', value: ... }
-{ label: 'Descrição', value: service.detected_fault || service.fault_description }
-```
-
-**Correção na `ServiceTagPage.tsx`**: Substituir abreviações:
-- `Cl:` → `Cliente:`
-- `Tel:` → `Telefone:`
-- `Av:` → `Descrição:`
-- Adicionar `Av` → `service.detected_fault || service.fault_description`
-
-**Ficheiro**: `src/pages/ServiceTagPage.tsx`
-
----
-
-## 6. Visita Concluída no Local → Status "concluidos" + Coexistência Financeira
-
-**Requisito**: Quando o técnico finaliza a reparação no local do cliente e assina, o serviço deve ir para `status: 'concluidos'` (em vez do atual `status: 'a_precificar'`). Mas deve manter `pending_pricing: true` para continuar a aparecer na lista "Precificar". Se já tiver preço definido e dívida pendente, deve coexistir em "Em Débito". O estado `a_precificar` deixa de ser o destino — `concluidos` passa a ser o estado operacional final para reparações no local.
-
-**Causa atual**: Na linha 314-321 do `VisitFlowModals.tsx`:
-```ts
-await updateService.mutateAsync({
-  id: service.id,
-  status: "a_precificar",   // ← isto precisa mudar para "concluidos"
-  pending_pricing: true,
-  ...
-});
-```
-
-**Solução**: Mudar `status: "a_precificar"` para `status: "concluidos"` ao concluir reparação no local. O campo `pending_pricing: true` garante que aparece na lista "Precificar" do dono/secretária. A coexistência com "Em Débito" já funciona (é calculada em runtime pela lógica `final_price > amount_paid`). A coexistência com "Precificar" já funciona (é `pending_pricing === true`).
-
-**Impacto**: O status operacional `concluidos` indica que o trabalho está feito. As vistas financeiras (`pending_pricing`, `em_debito`) são calculadas dinamicamente e não são afetadas pelo status operacional — estão em coexistência por design.
-
-**Ficheiro**: `src/components/technician/VisitFlowModals.tsx` — linha ~315, mudar `status: "a_precificar"` para `status: "concluidos"`
-
----
-
-## 7. Secretaria Pode Definir Preço + Nova Página "Precificar"
-
-### 7a — Permissão de Definir Preço para Secretaria
-
-**Causa**: No `ServiceDetailSheet.tsx` linha 877:
-```ts
-onSetPrice={role === 'dono' ? () => setShowSetPriceModal(true) : undefined}
-```
-Apenas `dono` tem acesso ao `SetPriceModal`.
-
-**Solução**: Mudar para:
-```ts
-onSetPrice={(role === 'dono' || role === 'secretaria') ? () => setShowSetPriceModal(true) : undefined}
-```
-
-Também verificar o `StateActionButtons` para garantir que o botão "Definir Preço" aparece para secretaria.
-
-### 7b — Nova Página "Precificar" na Sidebar da Secretaria
-
-**Solução**:
-1. **Criar** `src/pages/secretary/SecretaryPrecificarPage.tsx` — lista de serviços com `pending_pricing = true`, com colunas: código, cliente, aparelho, estado operacional, data. Ao clicar, abre `ServiceDetailSheet` com opção de definir preço.
-2. **Adicionar** à `SecretarySidebar.tsx`: inserir `{ title: 'Precificar', url: '/precificar', icon: DollarSign }` acima de `{ title: 'Em Débito', ... }`
-3. **Adicionar rota** em `App.tsx`: `<Route path="/precificar" element={<ProtectedRoute allowedRoles={['dono', 'secretaria']}><SecretaryPrecificarPage /></ProtectedRoute>} />`
-4. **Reaproveitar**: A página reutiliza o hook `useServices` com filtro `pending_pricing: true`, mesmo padrão das outras páginas da secretaria.
-
-**Garantia de coexistência**: A definição de preço pela secretaria não muda o `status` operacional — apenas define `final_price`, `labor_cost`, `discount`, e define `pending_pricing: false`. Se o valor pago for menor que o preço definido, o serviço aparece automaticamente em "Em Débito" (calculado em runtime).
-
----
-
-## 8. Corrigir Erros de Build TypeScript
-
-### Erro 1 e 2 — `SelectQueryError` nos joins de `service_payments` e `service_photos`
-
-O Supabase não consegue resolver a relação pelo nome do fkey explícito. Mudar as queries para:
-
-```ts
-// service_payments — sem especificar fkey pelo nome
-.select('*, receiver:profiles(full_name)')
-```
-
-Mas se houver ambiguidade (múltiplas FK para `profiles`), usar cast para silenciar o erro de TypeScript:
-```ts
-return data as unknown as (ServicePayment & { receiver: ... })[];
-```
-
-### Erro 3 — `CustomerDetailSheet.tsx` linha 427
-
-```ts
-onUpdate={() => deleteCustomer.reset()}
-```
-
-O tipo esperado é `MouseEventHandler<HTMLButtonElement>` mas `refetch` retorna uma Promise. Trocar para uma função anónima que não retorna nada ou para uma prop tipada corretamente.
-
-**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx` e `src/pages/ClientesPage.tsx`
-
----
-
-## Ordem de Implementação
-
-1. **Erros de build** — corrigir TypeScript primeiro para garantir compilação (`ServiceDetailSheet.tsx`, `ClientesPage.tsx`)
-2. **Cliente não desaparece** — remover modal duplicado em `ClientesPage.tsx`, corrigir prop `onUpdate`
-3. **Abreviações na etiqueta** — ajuste simples em `ServiceTagPage.tsx`
-4. **X para fechar ficha do técnico** — adicionar botão em `TechnicianServiceSheet.tsx`
-5. **Quem fez o quê na ficha** — melhorar layout de "actor" em `ServiceDetailSheet.tsx`
-6. **PDF da ficha sem censura** — corrigir `pdfUtils.ts` forçando cores explícitas
-7. **Visita concluída → status "concluidos"** — 1 linha em `VisitFlowModals.tsx`
-8. **Secretaria define preço + página Precificar** — nova página, sidebar, rota, permissão no `ServiceDetailSheet`
+- **Coexistência de estados**: Não é afectada. O status `concluidos` + `pending_pricing: true` continua a coexistir com "Precificar" e "Em Débito" como antes.
+- **RLS**: Não são necessárias alterações à base de dados.
+- **Migrações**: Nenhuma necessária — as colunas `last_status_before_part_request`, `status`, `detected_fault` já existem.
+- **Persistência localStorage**: Os novos flows serão integrados com `useFlowPersistence` para manter o estado entre sessões.
