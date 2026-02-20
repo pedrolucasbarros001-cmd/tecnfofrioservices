@@ -153,7 +153,7 @@ export function StateActionButtons({
         return null;
 
       case 'a_precificar':
-        if (isDono && onSetPrice) {
+        if ((isDono || isSecretaria) && onSetPrice) {
           return {
             label: 'Definir Preço',
             icon: DollarSign,
@@ -165,7 +165,7 @@ export function StateActionButtons({
 
       // Serviços finalizados que ainda precisam de precificação
       case 'finalizado':
-        if (isDono && service.pending_pricing && onSetPrice) {
+        if ((isDono || isSecretaria) && service.pending_pricing && onSetPrice) {
           return {
             label: 'Definir Preço',
             icon: DollarSign,
@@ -178,7 +178,7 @@ export function StateActionButtons({
       case 'concluidos': {
         // Priority 1: Pricing must be resolved first
         const needsPricing = service.pending_pricing || !isServicePriced;
-        if (needsPricing && isDono && onSetPrice) {
+        if (needsPricing && (isDono || isSecretaria) && onSetPrice) {
           return {
             label: 'Definir Preço',
             icon: DollarSign,
@@ -283,8 +283,8 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {/* Set Price - Only Dono - Shows when pending_pricing=true OR status is a_precificar/concluidos without price */}
-          {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && isDono && onSetPrice && (
+          {/* Set Price - Dono or Secretaria */}
+          {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && (isDono || isSecretaria) && onSetPrice && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSetPrice(); }}>
               <DollarSign className="h-4 w-4 mr-2" />
               Definir Preço
