@@ -353,28 +353,28 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        // Update to workshop:
-        // - technician_id: null → serviço fica sem técnico (qualquer um pode assumir)
-        // - shouldSelect: false → evita SELECT após UPDATE (evita erro RLS quando
-        //   o utilizador perde acesso ao row ao deixar de ser o técnico)
-        await updateService.mutateAsync({
-          id: service.id,
-          status: "na_oficina",
-          service_location: "oficina",
-          technician_id: null,
-          scheduled_date: null,
-          scheduled_shift: null,
-          detected_fault: formData.detectedFault,
-          shouldSelect: false,
-          skipToast: true,
+        // Update to workshop via SECURITY DEFINER RPC:
+        // A função verifica que o utilizador é o técnico atribuído e
+        // executa o UPDATE como dono da BD (bypassa o RLS WITH CHECK que
+        // impede definir technician_id=null a partir do cliente).
+        const { error: rpcError } = await supabase.rpc('lift_service_to_workshop', {
+          _service_id: service.id,
+          _detected_fault: formData.detectedFault || null,
         });
+
+        if (rpcError) throw rpcError;
 
         // Log activity - levantamento para oficina (only if signature was new)
         if (!existingSig) {
           await logWorkshopPickup(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
 
+        // Invalidate all service queries so lists update immediately
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        queryClient.invalidateQueries({ queryKey: ["technician-services"] });
+        queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
+        queryClient.invalidateQueries({ queryKey: ["available-workshop-services"] });
         toast.success("Aparelho recolhido para oficina!");
       } else {
         // Idempotent: only insert signature if it doesn't exist yet
