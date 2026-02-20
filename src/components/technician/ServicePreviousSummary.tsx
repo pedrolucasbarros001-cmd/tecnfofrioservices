@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  History, 
-  User, 
-  Calendar, 
-  FileText, 
-  Camera, 
-  ChevronDown, 
+import {
+  History,
+  User,
+  Calendar,
+  FileText,
+  Camera,
+  ChevronDown,
   ChevronUp,
   ArrowRight,
   ZoomIn
@@ -23,7 +23,7 @@ import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 
 interface ServicePreviousSummaryProps {
   service: Service;
-  onContinue: () => void;
+  onContinue?: () => void;
   onViewDetails?: () => void;
   className?: string;
 }
@@ -85,11 +85,11 @@ export function ServicePreviousSummary({
 
   // Get the most recent execution log
   const lastExecutionLog = activityLogs?.[0];
-  
+
   // Determine what type of previous work was done
   const getPreviousWorkType = () => {
     if (!lastExecutionLog) return null;
-    
+
     switch (lastExecutionLog.action_type) {
       case 'levantamento':
         return { label: 'Levantado para oficina', color: 'bg-orange-100 text-orange-700' };
@@ -113,162 +113,136 @@ export function ServicePreviousSummary({
 
   return (
     <>
-    <div className={cn('rounded-lg border bg-amber-50 border-amber-200', className)}>
-      {/* Header */}
-      <div 
-        className="flex items-center justify-between p-4 cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-amber-600" />
-          <span className="font-semibold text-amber-900">Resumo do atendimento anterior</span>
+      <div className={cn('rounded-lg border bg-amber-50 border-amber-200', className)}>
+        {/* Header */}
+        <div
+          className="flex items-center justify-between p-4 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-amber-600" />
+            <span className="font-semibold text-amber-900">Resumo do atendimento anterior</span>
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="h-5 w-5 text-amber-600" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-amber-600" />
+          )}
         </div>
-        {isExpanded ? (
-          <ChevronUp className="h-5 w-5 text-amber-600" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-amber-600" />
-        )}
-      </div>
 
-      {/* Content */}
-      {isExpanded && (
-        <div className="px-4 pb-4 space-y-4">
-          {/* Previous work type */}
-          {previousWork && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Última ação:</span>
-              <Badge className={previousWork.color}>{previousWork.label}</Badge>
-            </div>
-          )}
-
-          {/* Last execution info */}
-          {lastExecutionLog && (
-            <div className="grid grid-cols-2 gap-3 text-sm">
+        {/* Content */}
+        {isExpanded && (
+          <div className="px-4 pb-4 space-y-4">
+            {/* Previous work type */}
+            {previousWork && (
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  {format(new Date(lastExecutionLog.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
-                </span>
+                <span className="text-sm text-muted-foreground">Última ação:</span>
+                <Badge className={previousWork.color}>{previousWork.label}</Badge>
               </div>
-              {lastExecutionLog.actor_name && (
+            )}
+
+            {/* Last execution info */}
+            {lastExecutionLog && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span>{lastExecutionLog.actor_name}</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    {format(new Date(lastExecutionLog.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Diagnosis */}
-          {service.detected_fault && (
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <FileText className="h-4 w-4" />
-                <span>Diagnóstico</span>
+                {lastExecutionLog.actor_name && (
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span>{lastExecutionLog.actor_name}</span>
+                  </div>
+                )}
               </div>
-              <p className="text-sm">{service.detected_fault}</p>
-            </div>
-          )}
+            )}
 
-          {/* Photos - clickable thumbnails */}
-          {photos && photos.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Camera className="h-4 w-4" />
-                <span>Fotos ({photos.length})</span>
+            {/* Diagnosis */}
+            {service.detected_fault && (
+              <div className="bg-white rounded-lg p-3 border">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                  <FileText className="h-4 w-4" />
+                  <span>Diagnóstico</span>
+                </div>
+                <p className="text-sm">{service.detected_fault}</p>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                {photos.slice(0, 4).map((photo, index) => (
+            )}
+
+            {/* Photos - clickable thumbnails */}
+            {photos && photos.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <Camera className="h-4 w-4" />
+                  <span>Fotos ({photos.length})</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {photos.slice(0, 4).map((photo, index) => (
+                    <button
+                      key={photo.id}
+                      className="relative group rounded-lg overflow-hidden"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGalleryIndex(index);
+                        setGalleryOpen(true);
+                      }}
+                    >
+                      <img
+                        src={photo.file_url}
+                        alt={photo.description || 'Foto do serviço'}
+                        className="w-full h-16 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                        <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      {photo.photo_type && (
+                        <Badge
+                          className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] px-1 py-0"
+                          variant="secondary"
+                        >
+                          {PHOTO_TYPE_LABELS[photo.photo_type as PhotoType] || photo.photo_type}
+                        </Badge>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {photos.length > 4 && (
                   <button
-                    key={photo.id}
-                    className="relative group rounded-lg overflow-hidden"
+                    className="text-xs text-primary mt-1 hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setGalleryIndex(index);
+                      setGalleryIndex(0);
                       setGalleryOpen(true);
                     }}
                   >
-                    <img
-                      src={photo.file_url}
-                      alt={photo.description || 'Foto do serviço'}
-                      className="w-full h-16 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                      <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    {photo.photo_type && (
-                      <Badge 
-                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] px-1 py-0"
-                        variant="secondary"
-                      >
-                        {PHOTO_TYPE_LABELS[photo.photo_type as PhotoType] || photo.photo_type}
-                      </Badge>
-                    )}
+                    +{photos.length - 4} mais fotos — ver todas
                   </button>
-                ))}
+                )}
               </div>
-              {photos.length > 4 && (
-                <button
-                  className="text-xs text-primary mt-1 hover:underline"
+            )}
+
+            {/* Action buttons - onViewDetails only; continue button is in the parent footer */}
+            {onViewDetails && (
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setGalleryIndex(0);
-                    setGalleryOpen(true);
+                    onViewDetails();
                   }}
                 >
-                  +{photos.length - 4} mais fotos — ver todas
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex gap-2 pt-2">
-            {onViewDetails && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewDetails();
-                }}
-              >
-                Ver ficha completa
-              </Button>
+                  Ver ficha completa
+                </Button>
+              </div>
             )}
-            <Button 
-              size="sm" 
-              className="flex-1 bg-amber-600 hover:bg-amber-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                onContinue();
-              }}
-            >
-              Continuar execução
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Collapsed state - show continue button */}
-      {!isExpanded && (
-        <div className="px-4 pb-4">
-          <Button 
-            size="sm" 
-            className="w-full bg-amber-600 hover:bg-amber-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onContinue();
-            }}
-          >
-            Continuar execução
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
-    </div>
+        {/* Collapsed state — sem botão interno, o footer do modal tem o botão */}
+      </div>
 
       {/* Photo Gallery Modal */}
       {photos && photos.length > 0 && (

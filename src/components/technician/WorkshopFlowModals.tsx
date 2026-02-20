@@ -399,9 +399,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             step="Passo 1"
           />
 
-          {/* Show previous summary if exists (only in normal mode or if really relevant) */}
+          {/* Resumo do atendimento anterior (sem botão interno, o botão está no footer) */}
           {hasPreviousHistory && mode !== "continuacao_peca" && (
-            <ServicePreviousSummary service={service} onContinue={handleStartRepair} className="mb-4" />
+            <ServicePreviousSummary service={service} className="mb-4" />
           )}
 
           {/* Show diagnosis photos from visit — só quando não há resumo anterior
@@ -437,7 +437,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </Button>
             <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={handleStartRepair}>
               <Wrench className="h-4 w-4 mr-1" />
-              {mode === "continuacao_peca" ? "Continuar Reparação" : "Iniciar Reparação"}
+              {hasPreviousHistory || mode === "continuacao_peca" ? "Continuar Reparação" : "Iniciar Reparação"}
             </Button>
           </DialogFooter>
         </DialogContent>
