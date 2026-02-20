@@ -426,7 +426,6 @@ export default function ServiceDetailPage() {
                       src={photo.file_url}
                       alt={photo.description || "Foto do serviço"}
                       className="w-full h-full object-cover"
-                      loading="lazy"
                     />
                   </button>
                 ))}

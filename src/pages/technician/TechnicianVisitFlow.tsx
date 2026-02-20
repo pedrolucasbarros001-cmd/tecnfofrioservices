@@ -62,6 +62,7 @@ export default function TechnicianVisitFlow() {
       return data as unknown as Service;
     },
     enabled: !!serviceId,
+    refetchInterval: 30000, // Auto-refresh every 30s for live updates
   });
 
   const form = useForm<FormValues>({

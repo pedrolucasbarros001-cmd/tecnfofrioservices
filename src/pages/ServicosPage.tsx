@@ -62,8 +62,7 @@ export default function ServicosPage() {
       return (data as Service[]) || [];
     },
     enabled: !!profile,
-    staleTime: 30000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
   });
 
   // Navigation functions

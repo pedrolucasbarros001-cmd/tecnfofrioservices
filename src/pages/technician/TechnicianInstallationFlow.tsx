@@ -37,6 +37,7 @@ export default function TechnicianInstallationFlow() {
       return data as unknown as Service;
     },
     enabled: !!serviceId,
+    refetchInterval: 30000,
   });
 
   const handleStartInstallation = async () => {
@@ -95,7 +96,7 @@ export default function TechnicianInstallationFlow() {
       setShowSignature(false);
       setCurrentStep('completed');
       toast.success('Instalação concluída com sucesso!');
-      
+
       // Navigate back after delay
       setTimeout(() => navigate('/servicos'), 2000);
     } catch (error) {
@@ -155,7 +156,7 @@ export default function TechnicianInstallationFlow() {
               <p className="font-medium">{service.customer?.phone || 'N/A'}</p>
             </div>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <MapPin className="h-4 w-4" />
