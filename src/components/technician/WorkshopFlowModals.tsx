@@ -348,7 +348,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     steps = ["resumo_continuacao", "confirmacao_peca", "conclusao"];
   } else {
     steps = hasPreviousHistory
-      ? ["resumo", "diagnostico", "pecas_usadas", "pedir_peca", "conclusao"]
+      ? ["resumo", needsProductStep ? "produto" : null, "diagnostico", "pecas_usadas", "pedir_peca", "conclusao"].filter(Boolean) as ModalStep[]
       : [
         "resumo",
         "foto_aparelho",

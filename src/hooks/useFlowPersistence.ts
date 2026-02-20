@@ -41,9 +41,9 @@ export async function deriveStepFromDb(
   // Fetch photos for this service
   const { data: photos = [] } = await supabase
     .from('service_photos')
-    .select('photo_type, file_url, created_at')
+    .select('photo_type, file_url, uploaded_at')
     .eq('service_id', serviceId)
-    .order('created_at', { ascending: false });
+    .order('uploaded_at', { ascending: false });
 
   // Fetch parts for this service
   const { data: parts = [] } = await supabase
