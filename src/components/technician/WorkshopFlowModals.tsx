@@ -404,8 +404,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             <ServicePreviousSummary service={service} onContinue={handleStartRepair} className="mb-4" />
           )}
 
-          {/* Show diagnosis photos from visit */}
-          <DiagnosisPhotosGallery serviceId={service.id} className="mb-4" />
+          {/* Show diagnosis photos from visit — só quando não há resumo anterior
+              (o ServicePreviousSummary já inclui as fotos internamente) */}
+          {!hasPreviousHistory && <DiagnosisPhotosGallery serviceId={service.id} className="mb-4" />}
 
           <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
             <div className="grid grid-cols-2 gap-3">
