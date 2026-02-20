@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export interface FlowState<T = Record<string, unknown>> {
   serviceId: string;
-  flowType: 'visita' | 'instalacao' | 'oficina' | 'entrega';
+  flowType: 'visita' | 'instalacao' | 'oficina' | 'entrega' | 'visita_continuacao' | 'oficina_continuacao';
   currentStep: string;
   formData: T;
   savedAt: string;
