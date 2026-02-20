@@ -288,15 +288,72 @@ export function useUpdateService() {
         return { data: null, skipToast };
       }
     },
-    onSuccess: ({ skipToast }) => {
-      invalidateAllServiceQueries(queryClient);
-      if (!skipToast) {
-        toast.success('Serviço atualizado!');
+    onMutate: async (newService) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['service', newService.id] });
+      await queryClient.cancelQueries({ queryKey: ['services'] });
+      await queryClient.cancelQueries({ queryKey: ['services-paginated'] });
+
+      // Snapshot the previous value
+      const previousService = queryClient.getQueryData(['service', newService.id]);
+
+      // Optimistically update to the new value
+      if (previousService) {
+        queryClient.setQueryData(['service', newService.id], (old: any) => ({
+          ...old,
+          ...newService,
+        }));
       }
+
+      // Also update in lists if found
+      queryClient.setQueriesData({ queryKey: ['services'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((service: any) =>
+            service.id === newService.id ? { ...service, ...newService } : service
+          );
+        }
+        return old;
+      });
+
+      // Update paginated lists
+      queryClient.setQueriesData({ queryKey: ['services-paginated'] }, (old: any) => {
+        if (!old || !old.data) return old;
+        return {
+          ...old,
+          data: old.data.map((service: any) =>
+            service.id === newService.id ? { ...service, ...newService } : service
+          ),
+        };
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousService };
     },
-    onError: (error) => {
+    onError: (error, newService, context) => {
       console.error('Error updating service:', error);
       toast.error('Erro ao atualizar serviço');
+
+      // Rollback to the previous value if we have it
+      if (context?.previousService) {
+        queryClient.setQueryData(['service', newService.id], context.previousService);
+      }
+      // We can't easily rollback lists without snapshotting them all, but invalidation will fix it
+    },
+    onSettled: (data, error, variables) => {
+      // Always refetch after error or success to ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: ['service', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
+
+      // Also invalidate technician specific lists
+      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+
+      if (data && !data.skipToast) {
+        toast.success('Serviço atualizado!');
+      }
     },
   });
 }

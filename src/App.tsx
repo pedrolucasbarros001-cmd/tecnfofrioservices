@@ -42,7 +42,16 @@ import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
 import ImportPage from "@/pages/ImportPage";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 3, // 3 minutes - User requested reduction from 5min
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours - Keep unused data in cache for 24h
+      refetchOnWindowFocus: false, // Don't refetch when clicking back to window
+      retry: 1,
+    },
+  },
+});
 
 // Global error handler component
 function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
