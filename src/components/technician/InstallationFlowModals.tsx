@@ -32,7 +32,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
-import { useFlowPersistence } from '@/hooks/useFlowPersistence';
+import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto_antes' | 'materiais' | 'trabalho' | 'foto_depois' | 'finalizacao';
@@ -75,22 +75,28 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
   // Load saved state on mount
   useEffect(() => {
-    if (isOpen) {
-      const savedState = loadState();
-      if (savedState) {
-        setCurrentStep(savedState.currentStep as ModalStep);
-        setFormData(savedState.formData as InstallationFormData);
-      } else {
-        setCurrentStep('resumo');
-        setFormData({
-          photoAntes: null,
-          photoDepois: null,
-          workPerformed: '',
-          usedMaterials: [],
-        });
-      }
+    if (!isOpen) return;
+
+    const savedState = loadState();
+    if (savedState) {
+      setCurrentStep(savedState.currentStep as ModalStep);
+      setFormData(savedState.formData as InstallationFormData);
+      return;
     }
-  }, [isOpen, loadState]);
+
+    // No localStorage → derive step from DB (handles phone/browser restart)
+    deriveStepFromDb(service.id, 'instalacao', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
+      const resumeStep = step === 'resumo' ? 'resumo' : step;
+      setCurrentStep(resumeStep as ModalStep);
+      setFormData({
+        photoAntes: null,
+        photoDepois: null,
+        workPerformed: '',
+        usedMaterials: [],
+        ...formDataOverrides,
+      });
+    });
+  }, [isOpen, loadState, service]);
 
   // Save state on step/formData change
   useEffect(() => {

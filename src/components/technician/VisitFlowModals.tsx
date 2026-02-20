@@ -40,7 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
 import { FieldPaymentStep } from "@/components/technician/FieldPaymentStep";
-import { useFlowPersistence } from "@/hooks/useFlowPersistence";
+import { useFlowPersistence, deriveStepFromDb } from "@/hooks/useFlowPersistence";
 import type { Service, PhotoType } from "@/types/database";
 
 // Steps for repair services (reparacao)
@@ -140,39 +140,40 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   // Load saved state or reset when opened
   useEffect(() => {
-    if (isOpen) {
-      const savedState = loadState();
-      if (savedState) {
-        setCurrentStep(savedState.currentStep as ModalStep);
-        setFormData(savedState.formData);
-      } else {
-        // Initial state based on mode
-        if (mode === "continuacao_peca") {
-          setCurrentStep("resumo_continuacao");
-        } else {
-          setCurrentStep("resumo");
-        }
+    if (!isOpen) return;
 
-        setFormData({
-          detectedFault: service.detected_fault || "",
-          photoFile: null,
-          photoAparelho: null,
-          photoEtiqueta: null,
-          photosEstado: [],
-          decision: "reparar_local",
-          usedParts: false,
-          usedPartsList: [{ name: "", reference: "", quantity: 1 }],
-          needsPartOrder: false,
-          partToOrder: { name: "", reference: "" },
-          productBrand: service.brand || "",
-          productModel: service.model || "",
-          productSerial: service.serial_number || "",
-          productPNC: (service as any).pnc || "",
-          productType: service.appliance_type || "",
-          partInstalled: false, // New field for continuation
-        });
-      }
+    const savedState = loadState();
+    if (savedState) {
+      setCurrentStep(savedState.currentStep as ModalStep);
+      setFormData(savedState.formData);
+      return;
     }
+
+    // No localStorage → derive step from DB (handles phone restart)
+    const persistenceFlowType = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
+    deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
+      const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      setCurrentStep(resumeStep as ModalStep);
+      setFormData({
+        detectedFault: service.detected_fault || "",
+        photoFile: null,
+        photoAparelho: null,
+        photoEtiqueta: null,
+        photosEstado: [],
+        decision: "reparar_local",
+        usedParts: false,
+        usedPartsList: [{ name: "", reference: "", quantity: 1 }],
+        needsPartOrder: false,
+        partToOrder: { name: "", reference: "" },
+        productBrand: service.brand || "",
+        productModel: service.model || "",
+        productSerial: service.serial_number || "",
+        productPNC: (service as any).pnc || "",
+        productType: service.appliance_type || "",
+        partInstalled: false,
+        ...formDataOverrides,
+      });
+    });
   }, [isOpen, service, loadState, mode]);
 
   // Auto-save state on step/data changes

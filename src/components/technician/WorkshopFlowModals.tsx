@@ -26,7 +26,7 @@ import { UsedPartsModal, PartEntry } from "@/components/modals/UsedPartsModal";
 
 import { ServicePreviousSummary } from "@/components/technician/ServicePreviousSummary";
 import { DiagnosisPhotosGallery } from "@/components/technician/DiagnosisPhotosGallery";
-import { useFlowPersistence } from "@/hooks/useFlowPersistence";
+import { useFlowPersistence, deriveStepFromDb } from "@/hooks/useFlowPersistence";
 import type { Service } from "@/types/database";
 
 type ModalStep =
@@ -109,39 +109,41 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   // Load saved state or pre-fill from service
   useEffect(() => {
-    if (isOpen) {
-      const savedState = loadState();
-      if (savedState) {
-        setCurrentStep(savedState.currentStep as ModalStep);
-        setFormData(savedState.formData);
-      } else {
-        // Initial state based on mode
-        if (mode === "continuacao_peca") {
-          setCurrentStep("resumo_continuacao");
-        } else {
-          setCurrentStep("resumo");
-        }
+    if (!isOpen) return;
 
-        setFormData({
-          detectedFault: service.detected_fault || "",
-          workPerformed: service.work_performed || "",
-          usedParts: false,
-          usedPartsList: [],
-          needsPartOrder: false,
-          partToOrder: "",
-          partNotes: "",
-          photoAparelho: null,
-          photoEtiqueta: null,
-          photosEstado: [],
-          productBrand: service.brand || "",
-          productModel: service.model || "",
-          productSerial: service.serial_number || "",
-          productPNC: (service as any).pnc || "",
-          productType: service.appliance_type || "",
-          partInstalled: false,
-        });
-      }
+    const savedState = loadState();
+    if (savedState) {
+      setCurrentStep(savedState.currentStep as ModalStep);
+      setFormData(savedState.formData);
+      return;
     }
+
+    // No localStorage → derive step from DB (handles phone restart)
+    const persistenceFlowType = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
+    deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
+      // If the service has no in-progress data yet, start from resumo
+      const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      setCurrentStep(resumeStep as ModalStep);
+      setFormData({
+        detectedFault: service.detected_fault || "",
+        workPerformed: service.work_performed || "",
+        usedParts: false,
+        usedPartsList: [],
+        needsPartOrder: false,
+        partToOrder: "",
+        partNotes: "",
+        photoAparelho: null,
+        photoEtiqueta: null,
+        photosEstado: [],
+        productBrand: service.brand || "",
+        productModel: service.model || "",
+        productSerial: service.serial_number || "",
+        productPNC: (service as any).pnc || "",
+        productType: service.appliance_type || "",
+        partInstalled: false,
+        ...formDataOverrides,
+      });
+    });
   }, [isOpen, service, loadState, mode]);
 
   // Save state on changes

@@ -28,7 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
-import { useFlowPersistence } from '@/hooks/useFlowPersistence';
+import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'finalizacao';
@@ -63,17 +63,22 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
 
   // Load saved state or reset when opened
   useEffect(() => {
-    if (isOpen) {
-      const savedState = loadState();
-      if (savedState) {
-        setCurrentStep(savedState.currentStep as ModalStep);
-        setFormData(savedState.formData);
-      } else {
-        setCurrentStep('resumo');
-        setFormData({ photoFile: null });
-      }
+    if (!isOpen) return;
+
+    const savedState = loadState();
+    if (savedState) {
+      setCurrentStep(savedState.currentStep as ModalStep);
+      setFormData(savedState.formData);
+      return;
     }
-  }, [isOpen, loadState]);
+
+    // No localStorage → derive step from DB (handles phone/browser restart)
+    deriveStepFromDb(service.id, 'entrega', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
+      const resumeStep = step === 'resumo' ? 'resumo' : step;
+      setCurrentStep(resumeStep as ModalStep);
+      setFormData({ photoFile: null, ...formDataOverrides });
+    });
+  }, [isOpen, loadState, service]);
 
   // Auto-save state on step/data changes
   useEffect(() => {
