@@ -84,6 +84,19 @@ export function StateActionButtons({
   const primaryButtonClass = 'bg-primary text-primary-foreground hover:bg-primary/90';
 
   const getMainAction = (): ActionConfig | null => {
+    // ── Global override ────────────────────────────────────────────────────────
+    // When a service requires pricing, "Definir Preço" takes absolute priority
+    // over any status-specific action, regardless of the current state.
+    if (service.pending_pricing && isDono && onSetPrice) {
+      return {
+        label: 'Definir Preço',
+        icon: DollarSign,
+        onClick: onSetPrice,
+        className: primaryButtonClass,
+      };
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     switch (service.status as ServiceStatus) {
       case 'por_fazer':
         if (!service.technician_id) {
