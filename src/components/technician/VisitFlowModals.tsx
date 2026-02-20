@@ -239,12 +239,21 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setShowCamera(true);
   };
 
-  // Save used parts to database
+  // Save used parts to database (idempotent — skips insert if part already exists)
   const saveUsedParts = async () => {
     if (!formData.usedParts) return;
 
+    // Fetch parts already saved for this service (used parts, not requested)
+    const { data: existingParts } = await supabase
+      .from("service_parts")
+      .select("part_name")
+      .eq("service_id", service.id)
+      .eq("is_requested", false);
+
+    const existingNames = new Set((existingParts || []).map((p: any) => p.part_name?.toLowerCase().trim()));
+
     for (const part of formData.usedPartsList) {
-      if (part.name.trim()) {
+      if (part.name.trim() && !existingNames.has(part.name.toLowerCase().trim())) {
         await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: part.name.trim(),
@@ -261,28 +270,47 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
-      // Save used parts if any
+      // Save used parts if any (idempotent)
       await saveUsedParts();
 
       if (signatureType === "pedido_peca") {
-        // Save signature for part request
-        await supabase.from("service_signatures").insert({
-          service_id: service.id,
-          signature_type: "pedido_peca",
-          file_url: signatureData,
-          signer_name: signerName || service.customer?.name,
-        });
+        // Idempotent: only insert signature if it doesn't exist yet
+        const { data: existingSig } = await supabase
+          .from("service_signatures")
+          .select("id")
+          .eq("service_id", service.id)
+          .eq("signature_type", "pedido_peca")
+          .maybeSingle();
 
-        // Save part to order
-        await supabase.from("service_parts").insert({
-          service_id: service.id,
-          part_name: formData.partToOrder.name.trim(),
-          part_code: formData.partToOrder.reference.trim() || null,
-          quantity: 1,
-          is_requested: true,
-          arrived: false,
-          cost: 0,
-        });
+        if (!existingSig) {
+          await supabase.from("service_signatures").insert({
+            service_id: service.id,
+            signature_type: "pedido_peca",
+            file_url: signatureData,
+            signer_name: signerName || service.customer?.name,
+          });
+        }
+
+        // Idempotent: only insert part order if it doesn't exist yet
+        const { data: existingPartOrder } = await supabase
+          .from("service_parts")
+          .select("id")
+          .eq("service_id", service.id)
+          .eq("is_requested", true)
+          .eq("part_name", formData.partToOrder.name.trim())
+          .maybeSingle();
+
+        if (!existingPartOrder) {
+          await supabase.from("service_parts").insert({
+            service_id: service.id,
+            part_name: formData.partToOrder.name.trim(),
+            part_code: formData.partToOrder.reference.trim() || null,
+            quantity: 1,
+            is_requested: true,
+            arrived: false,
+            cost: 0,
+          });
+        }
 
         // Update service status
         await updateService.mutateAsync({
@@ -290,66 +318,96 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           status: "para_pedir_peca",
           last_status_before_part_request: service.status,
           detected_fault: formData.detectedFault,
+          skipToast: true,
         });
 
-        // Log activity - pedido de peça
-        await logPartRequest(
-          service.code || "N/A",
-          service.id,
-          formData.partToOrder.name.trim(),
-          profile?.full_name || "Técnico",
-          user?.id,
-        );
+        // Log activity - pedido de peça (only if signature was new)
+        if (!existingSig) {
+          await logPartRequest(
+            service.code || "N/A",
+            service.id,
+            formData.partToOrder.name.trim(),
+            profile?.full_name || "Técnico",
+            user?.id,
+          );
+        }
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
         queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
         toast.success("Pedido de peça registado com assinatura!");
       } else if (signatureType === "recolha") {
-        // Save signature for pickup
-        await supabase.from("service_signatures").insert({
-          service_id: service.id,
-          signature_type: "recolha",
-          file_url: signatureData,
-          signer_name: signerName || service.customer?.name,
-        });
+        // Idempotent: only insert signature if it doesn't exist yet
+        const { data: existingSig } = await supabase
+          .from("service_signatures")
+          .select("id")
+          .eq("service_id", service.id)
+          .eq("signature_type", "recolha")
+          .maybeSingle();
 
-        // Update to workshop - remove technician so it's available for anyone to assume
+        if (!existingSig) {
+          await supabase.from("service_signatures").insert({
+            service_id: service.id,
+            signature_type: "recolha",
+            file_url: signatureData,
+            signer_name: signerName || service.customer?.name,
+          });
+        }
+
+        // Update to workshop:
+        // - technician_id: null → serviço fica sem técnico (qualquer um pode assumir)
+        // - shouldSelect: false → evita SELECT após UPDATE (evita erro RLS quando
+        //   o utilizador perde acesso ao row ao deixar de ser o técnico)
         await updateService.mutateAsync({
           id: service.id,
-          status: "por_fazer", // Trigger normalizes for workshop without technician
+          status: "na_oficina",
           service_location: "oficina",
-          technician_id: null, // Remove technician - service becomes available
-          scheduled_date: null, // Clear scheduling
+          technician_id: null,
+          scheduled_date: null,
           scheduled_shift: null,
           detected_fault: formData.detectedFault,
-          shouldSelect: false, // Prevent RLS error as technician loses access
+          shouldSelect: false,
+          skipToast: true,
         });
 
-        // Log activity - levantamento para oficina
-        await logWorkshopPickup(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
+        // Log activity - levantamento para oficina (only if signature was new)
+        if (!existingSig) {
+          await logWorkshopPickup(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
+        }
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
         toast.success("Aparelho recolhido para oficina!");
       } else {
-        // Save signature for conclusion
-        await supabase.from("service_signatures").insert({
-          service_id: service.id,
-          signature_type: "visita",
-          file_url: signatureData,
-          signer_name: signerName || service.customer?.name,
-        });
+        // Idempotent: only insert signature if it doesn't exist yet
+        const { data: existingSig } = await supabase
+          .from("service_signatures")
+          .select("id")
+          .eq("service_id", service.id)
+          .eq("signature_type", "visita")
+          .maybeSingle();
 
-        // Update service - repaired on site goes to concluidos (financially coexists with pending_pricing + em_debito)
+        if (!existingSig) {
+          await supabase.from("service_signatures").insert({
+            service_id: service.id,
+            signature_type: "visita",
+            file_url: signatureData,
+            signer_name: signerName || service.customer?.name,
+          });
+        }
+
+        // Update service - repaired on site
         await updateService.mutateAsync({
           id: service.id,
           status: "concluidos",
           pending_pricing: true,
           detected_fault: formData.detectedFault,
           work_performed: mode === "continuacao_peca" ? "Peça instalada e serviço concluído" : "Reparado no local do cliente",
+          skipToast: true,
         });
 
-        // Log activity - conclusão
-        await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
+        // Log activity - conclusão (only if signature was new)
+        if (!existingSig) {
+          await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
+        }
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
         toast.success("Visita concluída com sucesso!");

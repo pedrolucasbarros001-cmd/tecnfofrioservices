@@ -239,10 +239,12 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       }
 
       // Create service
-      // Regra de status para oficina:
-      // - Com técnico: 'na_oficina' (aguarda início)
-      // - Sem técnico: 'por_fazer' (para assumir)
-      // Para cliente: sempre 'por_fazer'
+      // Regra de status:
+      // - Oficina + com técnico: 'na_oficina'
+      // - Oficina + sem técnico: 'por_fazer' (qualquer técnico pode assumir)
+      // - Cliente (visita): 'por_fazer'
+      // Todos os serviços começam com pending_pricing: true pois não têm preço definido.
+      // A flag coexiste com qualquer estado e não afeta o fluxo de execução.
       const initialStatus = values.service_location === 'oficina'
         ? (values.technician_id ? 'na_oficina' : 'por_fazer')
         : 'por_fazer';
@@ -265,6 +267,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         notes: values.notes,
         service_type: 'reparacao',
         status: initialStatus,
+        pending_pricing: true,
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
