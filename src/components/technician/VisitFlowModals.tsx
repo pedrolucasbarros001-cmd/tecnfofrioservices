@@ -542,10 +542,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   // Continuation Flow: Check if part installed confirmed
   const canProceedFromConfirmarPeca = formData.partInstalled === true;
 
-  // Check if product info step is needed 
-  // For normal flow in REPAIR, it is ALWAYS mandatory now
-  // For other flows, it remains conditional
-  const needsProductStep = isReparacao ? true : (!service.brand && !service.model);
+  // Check if product info step is needed (for repairs or if info missing)
+  const needsProductStep = !(service.brand || formData.productBrand) || !(service.model || formData.productModel);
 
   // Get step list based on service type and mode
   const getSteps = (): string[] => {

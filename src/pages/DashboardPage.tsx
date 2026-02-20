@@ -107,31 +107,6 @@ export default function DashboardPage() {
       services?.forEach((service) => {
         const status = service.status as ServiceStatus;
 
-        // Contagem de status operacionais
-        if (status !== 'a_precificar' && status !== 'em_debito' && status in counts) {
-          // Special handling for 'na_oficina': we want location based count, not status based
-          // So if status is 'na_oficina', we don't auto-increment here if we want strictly location logic?
-          // Actually, if we want "Oficina" card to be location based, we should calculate it separately.
-          // BUT, if we want coexistence, active status counters (like 'para_pedir_peca') should still work.
-          // The issue is 'na_oficina' status is somewhat redundant if we use location.
-          // Let's increment standard statuses EXCEPT 'na_oficina' which we'll handle by location.
-          if (status !== 'na_oficina') {
-            counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito'>]++;
-          }
-        }
-
-        // Count for "Oficina" card based on LOCATION
-        // Includes any service physically in workshop, unless finalized/delivered?
-        // User said "permanece na oficina ate ele ter uma reparação conluida".
-        // Usually 'concluidos' status might mean repair done but still in workshop?
-        // 'finalizado' usually means delivered/done.
-        // Let's include everything with location='oficina' except maybe 'finalizado'/'entregue'?
-        // The user's request: "serviços que estao com location oficina ... permanece na oficina".
-
-        if (service.service_location === 'oficina' && status !== 'finalizado') {
-          counts.na_oficina++;
-        }
-
         // "A Precificar" = pending_pricing=true (estado financeiro, não operacional)
         if (service.pending_pricing) {
           counts.a_precificar++;
@@ -143,6 +118,28 @@ export default function DashboardPage() {
         const isWarranty = service.is_warranty || false;
         if (!isWarranty && finalPrice > 0 && amountPaid < finalPrice) {
           counts.em_debito++;
+        }
+
+        // Count for "Oficina" card based on LOCATION
+        // Includes any service physically in workshop, excluding finalized/concluded
+        if (service.service_location === 'oficina' && status !== 'finalizado' && status !== 'concluidos') {
+          counts.na_oficina++;
+        }
+
+        // Count for "Oficina Reparados" - must be in workshop AND concluded
+        if (service.service_location === 'oficina' && status === 'concluidos') {
+          counts.concluidos++;
+        }
+
+        // Other operacional status counts (excluding na_oficina and concluidos which are location-based above)
+        if (
+          status !== 'a_precificar' &&
+          status !== 'em_debito' &&
+          status !== 'na_oficina' &&
+          status !== 'concluidos' &&
+          status in counts
+        ) {
+          counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito' | 'na_oficina' | 'concluidos'>]++;
         }
       });
 

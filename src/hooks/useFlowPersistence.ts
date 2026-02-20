@@ -71,12 +71,6 @@ export async function deriveStepFromDb(
 
   // --- WORKSHOP FLOW ---
   if (flowType === 'oficina' || flowType === 'oficina_continuacao') {
-    if (flowType === 'oficina_continuacao') {
-      // Continuation after part arrival — go straight to part confirmation
-      return { step: 'confirmacao_peca', formDataOverrides: {} };
-    }
-
-    // Normal workshop flow: derive step from DB
     const formDataOverrides: Record<string, unknown> = {
       detectedFault,
       workPerformed,
@@ -85,28 +79,32 @@ export async function deriveStepFromDb(
       photosEstado: allPhotos('estado'),
       usedPartsList,
       usedParts: usedPartsList.length > 0,
+      productBrand: service.brand || "",
+      productModel: service.model || "",
+      productSerial: service.serial_number || "",
+      productPNC: (service as any).pnc || "",
+      productType: service.appliance_type || "",
     };
+
+    if (flowType === 'oficina_continuacao') {
+      return { step: 'confirmacao_peca', formDataOverrides };
+    }
 
     if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
     if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
     if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
 
-    // Check if brand/model info is missing - if so, go to 'produto' step
     const hasProductInfo = !!(service.brand && service.model);
     if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
     if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
-    if (hasRequestedPart) return { step: 'conclusao', formDataOverrides }; // Already ordered a part
+    if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
     if (!workPerformed) return { step: 'pecas_usadas', formDataOverrides };
     return { step: 'conclusao', formDataOverrides };
   }
 
   // --- VISIT FLOW ---
   if (flowType === 'visita' || flowType === 'visita_continuacao') {
-    if (flowType === 'visita_continuacao') {
-      return { step: 'confirmacao_peca', formDataOverrides: {} };
-    }
-
     const serviceType = (service.service_type as string) || '';
     const isReparacao = serviceType === 'reparacao';
 
@@ -118,14 +116,22 @@ export async function deriveStepFromDb(
       photoFile: latestPhoto('visita'),
       usedPartsList,
       usedParts: usedPartsList.length > 0,
+      productBrand: service.brand || "",
+      productModel: service.model || "",
+      productSerial: service.serial_number || "",
+      productPNC: (service as any).pnc || "",
+      productType: service.appliance_type || "",
     };
+
+    if (flowType === 'visita_continuacao') {
+      return { step: 'confirmacao_peca', formDataOverrides };
+    }
 
     if (isReparacao) {
       if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
       if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
       if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
 
-      // Check if brand/model info is missing - if so, go to 'produto' step
       const hasProductInfo = !!(service.brand && service.model);
       if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
@@ -133,11 +139,8 @@ export async function deriveStepFromDb(
       if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
       return { step: 'decisao', formDataOverrides };
     } else {
-      // Non-repair visit
       if (!hasPhoto('visita')) return { step: 'foto', formDataOverrides };
 
-      // Still check product info for non-repair? User might want it too.
-      // But keeping it consistent with repair for now.
       const hasProductInfo = !!(service.brand && service.model);
       if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
@@ -173,7 +176,6 @@ export async function deriveStepFromDb(
     return { step: 'finalizacao', formDataOverrides };
   }
 
-  // Default fallback
   return { step: 'resumo', formDataOverrides: {} };
 }
 
@@ -183,27 +185,17 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
 ) {
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved state from localStorage
   const loadState = useCallback((): FlowState<T> | null => {
     try {
       const key = getStorageKey(serviceId, flowType);
       const stored = localStorage.getItem(key);
-
       if (!stored) return null;
-
       const state = JSON.parse(stored) as FlowState<T>;
-
-      // Validate state
-      if (state.serviceId !== serviceId || state.flowType !== flowType) {
-        return null;
-      }
-
-      // Check if state is still valid (not expired)
+      if (state.serviceId !== serviceId || state.flowType !== flowType) return null;
       if (!isStateValid(state)) {
         localStorage.removeItem(key);
         return null;
       }
-
       return state;
     } catch (error) {
       console.error('Error loading flow state:', error);
@@ -211,7 +203,6 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
   }, [serviceId, flowType]);
 
-  // Save state to localStorage
   const saveState = useCallback((currentStep: string, formData: T) => {
     try {
       const key = getStorageKey(serviceId, flowType);
@@ -228,7 +219,6 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
   }, [serviceId, flowType]);
 
-  // Clear state from localStorage
   const clearState = useCallback(() => {
     try {
       const key = getStorageKey(serviceId, flowType);
@@ -238,22 +228,14 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
   }, [serviceId]);
 
-  // Check if there's a saved state
   const hasSavedState = useCallback((): boolean => {
     const state = loadState();
     return state !== null;
   }, [loadState]);
 
-  // Mark as loaded on mount
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  return {
-    isLoaded,
-    loadState,
-    saveState,
-    clearState,
-    hasSavedState,
-  };
+  return { isLoaded, loadState, saveState, clearState, hasSavedState };
 }

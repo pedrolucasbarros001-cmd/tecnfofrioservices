@@ -325,7 +325,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   };
 
   // Check if product info step is needed
-  const needsProductStep = !service.brand && !service.model;
+  // We check both the service prop (DB state) and formData (local state) to avoid repetition
+  const needsProductStep = !(service.brand || formData.productBrand) || !(service.model || formData.productModel);
 
   const handleProductoConfirm = async () => {
     try {
@@ -737,7 +738,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => setCurrentStep(!hasPreviousHistory ? "foto_estado" : "resumo")}
+              onClick={() => {
+                if (!hasPreviousHistory) {
+                  setCurrentStep("foto_estado");
+                } else {
+                  // If it came from a visit, we can go back to resumo
+                  setCurrentStep("resumo");
+                }
+              }}
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
@@ -749,8 +757,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 3: Peças Usadas */}
-      <Dialog
-        open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal}
+      < Dialog
+        open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal
+        }
         onOpenChange={() => handleClose()}
       >
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
@@ -820,10 +829,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Modal 4: Pedir Peça */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
@@ -914,10 +923,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             )}
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Modal 5: Conclusão */}
-      <Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <ModalHeader title="Conclusão" step="Passo 5" />
 
@@ -952,10 +961,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Camera Modal */}
-      <CameraCapture
+      < CameraCapture
         open={showCamera}
         onOpenChange={setShowCamera}
         onCapture={async (imageData) => {
@@ -987,7 +996,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       />
 
       {/* Parts Modal */}
-      <UsedPartsModal
+      < UsedPartsModal
         open={showPartsModal}
         onOpenChange={setShowPartsModal}
         onConfirm={handlePartsConfirm}

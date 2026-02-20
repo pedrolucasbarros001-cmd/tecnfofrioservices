@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Wrench, Settings, Truck } from 'lucide-react';
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  addWeeks, 
-  subWeeks, 
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  subWeeks,
   eachDayOfInterval,
   isSameDay,
   parseISO,
@@ -39,7 +39,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  
+
   // Week view calculations
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -116,7 +116,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
             </Button>
             <span className="text-sm font-medium ml-2">{dateRangeText}</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border p-1">
               <Button
@@ -146,17 +146,17 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
               const dayServices = getServicesForDay(day);
               const sortedServices = getServicesSortedByTime(day);
               const hasServices = dayServices.length > 0;
-              
+
               return (
-                <div 
-                  key={day.toISOString()} 
+                <div
+                  key={day.toISOString()}
                   className={cn(
                     "min-h-[200px] p-2",
                     isToday(day) && "bg-primary/5"
                   )}
                 >
                   {/* Day Header */}
-                  <div 
+                  <div
                     className={cn(
                       "text-center pb-2 mb-2 border-b cursor-pointer hover:bg-accent/50 rounded transition-colors",
                       isToday(day) && "bg-primary/10 border-primary/30"
@@ -188,8 +188,8 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                             {formatShiftLabel(service.scheduled_shift)}
                           </p>
                         )}
-                        <ServiceCard 
-                          service={service} 
+                        <ServiceCard
+                          service={service}
                           onClick={() => onServiceClick(service)}
                         />
                       </div>
@@ -199,7 +199,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                         +{sortedServices.length - 5} mais
                       </p>
                     )}
-                    
+
                     {/* Empty state */}
                     {!hasServices && (
                       <p className="text-xs text-muted-foreground text-center py-4">
@@ -226,13 +226,13 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                 start: weekStart,
                 end: endOfWeek(weekStart, { weekStartsOn: 1 })
               });
-              
+
               return (
                 <div key={weekIndex} className="grid grid-cols-7 gap-1">
                   {weekDays.map(day => {
                     const dayServices = getServicesForDay(day);
                     const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                    
+
                     return (
                       <div
                         key={day.toISOString()}
@@ -319,7 +319,7 @@ function getServiceTypeConfig(service: Service) {
 function ServiceCard({ service, onClick }: ServiceCardProps) {
   const config = getServiceTypeConfig(service);
   const techColor = service.technician?.color;
-  
+
   return (
     <div
       onClick={(e) => {
@@ -334,13 +334,12 @@ function ServiceCard({ service, onClick }: ServiceCardProps) {
     >
       <div className="flex items-center gap-1">
         <config.Icon className={cn("h-3 w-3", config.iconColor)} />
-        <span className="font-medium truncate">{service.code}</span>
+        <span className="font-medium truncate">
+          {[service.appliance_type, service.brand].filter(Boolean).join(' ') || service.fault_description || 'Serviço'}
+        </span>
       </div>
-      <p className="text-muted-foreground truncate">
-        {service.customer?.name || 'Sem cliente'}
-      </p>
-      <p className="text-muted-foreground truncate">
-        {service.appliance_type || ''}
+      <p className="text-[10px] text-muted-foreground truncate italic">
+        {service.technician?.profile?.full_name || 'Sem técnico'}
       </p>
     </div>
   );

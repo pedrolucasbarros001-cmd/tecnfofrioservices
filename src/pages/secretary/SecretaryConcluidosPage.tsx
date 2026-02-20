@@ -28,9 +28,9 @@ export default function SecretaryConcluidosPage() {
   const { data: services = [], isLoading } = useServices({ status: 'concluidos' });
   const updateService = useUpdateService();
 
-  // Filter only services in workshop awaiting delivery
+  // Filter only services in workshop (status concluidos)
   const workshopServices = services.filter(
-    (s) => s.service_location === 'oficina' && !s.delivery_method
+    (s) => s.service_location === 'oficina'
   );
 
   const handleManageDelivery = (service: Service) => {
