@@ -83,7 +83,7 @@ export function DiagnosisPhotosGallery({ serviceId, className }: DiagnosisPhotos
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                   <ZoomIn className="h-4 w-4 text-white" />
                 </div>
-                <Badge 
+                <Badge
                   className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] px-1.5 py-0"
                   variant="secondary"
                 >
@@ -100,7 +100,7 @@ export function DiagnosisPhotosGallery({ serviceId, className }: DiagnosisPhotos
 
       {/* Full-screen photo viewer */}
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-        <DialogContent className="max-w-3xl p-2">
+        <DialogContent className="max-w-3xl p-2 z-[100]">
           {selectedPhoto && (
             <div className="relative">
               <img

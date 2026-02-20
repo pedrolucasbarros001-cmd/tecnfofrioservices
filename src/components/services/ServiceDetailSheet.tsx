@@ -57,6 +57,7 @@ import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
+import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService } from '@/hooks/useServices';
@@ -222,11 +223,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (!service?.id) return [];
       const { data, error } = await supabase
         .from('service_photos')
-        .select('*, creator:profiles!service_photos_uploaded_by_fkey(full_name)')
+        .select('*')
         .eq('service_id', service.id)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
-      return data as unknown as (ServicePhoto & { creator: { full_name: string | null } | null })[];
+      return data as ServicePhoto[];
     },
     enabled: !!service?.id && open,
   });
@@ -782,11 +783,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="grid grid-cols-3 gap-2">
                     {servicePhotos.map((photo, idx) => (
                       <div key={photo.id} className="flex flex-col gap-1">
-                        {photo.creator?.full_name && (
-                          <p className="text-[9px] text-muted-foreground truncate" title={photo.creator.full_name}>
-                            Por: {photo.creator.full_name.split(' ')[0]}
-                          </p>
-                        )}
                         <div className="relative cursor-pointer" onClick={() => setSelectedPhotoIndex(idx)}>
                           <img
                             src={photo.file_url}
@@ -1017,46 +1013,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       </AlertDialog>
 
       {/* Photo Lightbox Overlay */}
-      {selectedPhotoIndex !== null && servicePhotos[selectedPhotoIndex] && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
-          onClick={() => setSelectedPhotoIndex(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
-            onClick={() => setSelectedPhotoIndex(null)}
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(prev => prev !== null && prev > 0 ? prev - 1 : servicePhotos.length - 1); }}
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
-          <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={e => e.stopPropagation()}>
-            <img
-              src={servicePhotos[selectedPhotoIndex].file_url}
-              alt={servicePhotos[selectedPhotoIndex].description || 'Foto'}
-              className="max-w-full max-h-[80vh] object-contain rounded-lg"
-            />
-            <div className="text-white text-center">
-              <p className="font-medium capitalize">{getPhotoTypeLabel(servicePhotos[selectedPhotoIndex].photo_type)}</p>
-              {servicePhotos[selectedPhotoIndex].description && (
-                <p className="text-sm text-white/70">{servicePhotos[selectedPhotoIndex].description}</p>
-              )}
-              <p className="text-xs text-white/50 mt-1">
-                {selectedPhotoIndex + 1} / {servicePhotos.length}
-              </p>
-            </div>
-          </div>
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(prev => prev !== null && prev < servicePhotos.length - 1 ? prev + 1 : 0); }}
-          >
-            <ChevronRight className="h-6 w-6" />
-          </button>
-        </div>
+      {/* Photo Gallery Modal */}
+      {servicePhotos.length > 0 && (
+        <PhotoGalleryModal
+          photos={servicePhotos}
+          initialIndex={selectedPhotoIndex || 0}
+          open={selectedPhotoIndex !== null}
+          onOpenChange={(open) => !open && setSelectedPhotoIndex(null)}
+        />
       )}
     </>
   );

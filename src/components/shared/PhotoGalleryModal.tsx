@@ -56,7 +56,7 @@ export function PhotoGalleryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden">
+      <DialogContent className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden z-[100]">
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
           <Button
@@ -129,9 +129,8 @@ export function PhotoGalleryModal({
               {photos.map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                    i === current ? 'bg-white' : 'bg-white/40'
-                  }`}
+                  className={`h-1.5 w-1.5 rounded-full transition-colors ${i === current ? 'bg-white' : 'bg-white/40'
+                    }`}
                 />
               ))}
             </div>
