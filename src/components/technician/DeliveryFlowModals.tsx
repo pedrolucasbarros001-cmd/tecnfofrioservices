@@ -58,13 +58,17 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [showSignature, setShowSignature] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
 
   // Flow persistence
-  const { loadState, saveState, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
+  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
 
   // Load saved state or reset when opened
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsResuming(false);
+      return;
+    }
 
     const savedState = loadState();
     if (savedState) {
@@ -73,6 +77,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       return;
     }
 
+    setIsResuming(true);
     // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'entrega', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
@@ -80,16 +85,18 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
 
       // Show Resumo first
       setCurrentStep('resumo');
-      setFormData({ photoFile: null, ...formDataOverrides });
-    });
+      setFormData((prev) => ({ ...prev, ...formDataOverrides }));
+      setIsResuming(false);
+    }).catch(() => setIsResuming(false));
   }, [isOpen, loadState, service]);
 
   // Auto-save state on step/data changes
   useEffect(() => {
     if (isOpen && currentStep !== 'resumo') {
       saveState(currentStep, formData);
+      saveStateToDb(currentStep, formData);
     }
-  }, [isOpen, currentStep, formData, saveState]);
+  }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -254,8 +261,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
                   setCurrentStep('deslocacao');
                 }
               }}
+              disabled={isResuming}
             >
-              Iniciar Entrega
+              {isResuming ? "A carregar..." : "Iniciar Entrega"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -68,6 +68,12 @@ export async function deriveStepFromDb(
 
   const detectedFault = (service.detected_fault as string) || '';
   const workPerformed = (service.work_performed as string) || '';
+  const flowStep = (service.flow_step as string) || '';
+  const status = (service.status as string) || '';
+
+  // Status that imply the service has already passed the initial entry/photos phase
+  const isInProgress = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluido'].includes(status);
+  const hasAnyPhoto = photos.length > 0;
 
   // --- WORKSHOP FLOW ---
   if (flowType === 'oficina' || flowType === 'oficina_continuacao') {
@@ -90,12 +96,22 @@ export async function deriveStepFromDb(
       return { step: 'confirmacao_peca', formDataOverrides };
     }
 
-    if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
-    if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
-    if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+    // Prioritize explicit flow_step from DB
+    if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+      return { step: flowStep, formDataOverrides };
+    }
+
+    // Skip initial photos if service is already in progress and has any photos
+    const skipInitialPhotos = isInProgress && hasAnyPhoto;
+
+    if (!skipInitialPhotos) {
+      if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
+      if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
+      if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+    }
 
     const hasProductInfo = !!(service.brand && service.model);
-    if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+    if (!hasProductInfo && !skipInitialPhotos) return { step: 'produto', formDataOverrides };
 
     if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
     if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
@@ -127,13 +143,23 @@ export async function deriveStepFromDb(
       return { step: 'confirmacao_peca', formDataOverrides };
     }
 
+    // Prioritize explicit flow_step from DB
+    if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+      return { step: flowStep, formDataOverrides };
+    }
+
+    // Skip initial photos if service is already in progress and has any photos
+    const skipInitialPhotos = isInProgress && hasAnyPhoto;
+
     if (isReparacao) {
-      if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
-      if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
-      if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+      if (!skipInitialPhotos) {
+        if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
+        if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
+        if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+      }
 
       const hasProductInfo = !!(service.brand && service.model);
-      if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+      if (!hasProductInfo && !skipInitialPhotos) return { step: 'produto', formDataOverrides };
 
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
       if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
@@ -219,6 +245,19 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
   }, [serviceId, flowType]);
 
+  const saveStateToDb = useCallback(async (currentStep: string, formData?: T) => {
+    try {
+      const { error } = await supabase.rpc('technician_update_service', {
+        _service_id: serviceId,
+        _flow_step: currentStep,
+        _flow_data: formData || null,
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error persisting flow state to DB:', error);
+    }
+  }, [serviceId]);
+
   const clearState = useCallback(() => {
     try {
       const key = getStorageKey(serviceId, flowType);
@@ -237,5 +276,5 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     setIsLoaded(true);
   }, []);
 
-  return { isLoaded, loadState, saveState, clearState, hasSavedState };
+  return { isLoaded, loadState, saveState, saveStateToDb, clearState, hasSavedState };
 }

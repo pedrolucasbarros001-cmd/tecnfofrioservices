@@ -45,9 +45,9 @@ import ImportPage from "@/pages/ImportPage";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0, // Always check for fresh data on mount/focus
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours - Keep unused data in cache
-      refetchOnWindowFocus: true, // Crucial for mobile users returning to tab
+      staleTime: 1000 * 10, // 10 seconds - Balance between freshness and instant re-opening
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours - Keep unused data in cache for 24h
+      refetchOnWindowFocus: true, // Always refetch when coming back to window
       retry: 1,
     },
   },

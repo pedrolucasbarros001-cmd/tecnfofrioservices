@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { WorkshopFlowModals } from '@/components/technician/WorkshopFlowModals';
 import { RequestTransferModal } from '@/components/modals/RequestTransferModal';
-import { useUpdateService } from '@/hooks/useServices';
+import { useUpdateService, prefetchFullServiceData } from '@/hooks/useServices';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
 
@@ -170,6 +170,8 @@ export default function TechnicianOfficePage() {
             ? 'bg-slate-50 border-l-4 border-l-slate-400'
             : 'bg-orange-50 border-l-4 border-l-orange-500'
         )}
+        onMouseEnter={() => prefetchFullServiceData(queryClient, service.id)}
+        onTouchStart={() => prefetchFullServiceData(queryClient, service.id)}
       >
         <CardContent className="p-4 pt-6">
           {/* Transfer button - only for assigned services */}

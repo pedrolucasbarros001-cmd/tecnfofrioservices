@@ -60,7 +60,7 @@ import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsM
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUpdateService, useDeleteService } from '@/hooks/useServices';
+import { useUpdateService, useDeleteService, useFullServiceData } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment, type ServicePhoto, type ServiceSignature } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
@@ -186,85 +186,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
-  // Fetch service parts
-  const { data: serviceParts = [] } = useQuery({
-    queryKey: ['service-parts', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('service_parts')
-        .select('*')
-        .eq('service_id', service.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as ServicePart[];
-    },
-    enabled: !!service?.id && open,
-  });
+  // Consolidate status, parts, payments, photos, signatures, and activity logs into one request
+  const { data: fullData, isLoading: isLoadingFull } = useFullServiceData(service?.id, open);
 
-  // Fetch service payments
-  const { data: servicePayments = [] } = useQuery({
-    queryKey: ['service-payments', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('service_payments')
-        .select('*, receiver:profiles!service_payments_received_by_fkey(full_name)')
-        .eq('service_id', service.id)
-        .order('payment_date', { ascending: false });
-      if (error) throw error;
-      return data as unknown as (ServicePayment & { receiver: { full_name: string | null } | null })[];
-    },
-    enabled: !!service?.id && open, // Técnicos também veem pagamentos
-  });
-
-  // Fetch service photos
-  const { data: servicePhotos = [] } = useQuery({
-    queryKey: ['service-photos', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('service_photos')
-        .select('*')
-        .eq('service_id', service.id)
-        .order('uploaded_at', { ascending: false });
-      if (error) throw error;
-      return data as ServicePhoto[];
-    },
-    enabled: !!service?.id && open,
-  });
-
-  // Fetch service signatures
-  const { data: serviceSignatures = [] } = useQuery({
-    queryKey: ['service-signatures', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('service_signatures')
-        .select('*')
-        .eq('service_id', service.id)
-        .order('signed_at', { ascending: true });
-      if (error) throw error;
-      return data as ServiceSignature[];
-    },
-    enabled: !!service?.id && open,
-  });
-
-  // Fetch activity logs for this service
-  const { data: activityLogs = [] } = useQuery({
-    queryKey: ['activity-logs', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*, actor:profiles!activity_logs_actor_id_fkey(full_name)')
-        .eq('service_id', service.id)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data as (any & { actor: { full_name: string | null } | null })[];
-    },
-    enabled: !!service?.id && open,
-  });
+  const serviceParts = fullData?.parts || [];
+  const servicePayments = fullData?.payments || [];
+  const servicePhotos = fullData?.photos || [];
+  const serviceSignatures = fullData?.signatures || [];
+  const activityLogs = fullData?.logs || [];
 
   const handleDeletePhoto = async (photoId: string) => {
     try {
@@ -776,7 +705,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             src={photo.file_url}
                             alt={photo.description || 'Foto do serviço'}
                             className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity"
-                            loading="lazy"
                           />
                           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
                             {getPhotoTypeLabel(photo.photo_type)}

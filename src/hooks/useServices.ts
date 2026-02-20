@@ -60,6 +60,103 @@ export function useServices(options: UseServicesOptions = {}) {
       if (error) throw error;
       return (data as unknown as Service[]) || [];
     },
+    refetchInterval: 30000,
+  });
+}
+
+export function useFullServiceData(serviceId: string | undefined, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['service-full', serviceId],
+    queryFn: async () => {
+      if (!serviceId) return null;
+
+      const { data, error } = await supabase
+        .from('services')
+        .select(`
+          *,
+          customer:customers(*),
+          technician:technicians!services_technician_id_fkey(*, profile:profiles(*)),
+          parts:service_parts(*),
+          photos:service_photos(*),
+          signatures:service_signatures(*),
+          payments:service_payments(*),
+          logs:activity_logs(*, actor:profiles!activity_logs_actor_id_fkey(full_name))
+        `)
+        .eq('id', serviceId)
+        .single();
+
+      if (error) throw error;
+
+      // Ensure arrays are initialized even if empty
+      const result = data as any;
+      return {
+        ...result,
+        parts: result.parts || [],
+        photos: (result.photos || []).sort((a: any, b: any) =>
+          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+        ),
+        signatures: (result.signatures || []).sort((a: any, b: any) =>
+          new Date(a.signed_at).getTime() - new Date(b.signed_at).getTime()
+        ),
+        payments: (result.payments || []).sort((a: any, b: any) =>
+          new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+        ),
+        logs: (result.logs || []).sort((a: any, b: any) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ),
+      } as Service & {
+        parts: ServicePart[],
+        photos: ServicePhoto[],
+        signatures: ServiceSignature[],
+        payments: (ServicePayment & { receiver?: { full_name: string | null } })[],
+        logs: any[]
+      };
+    },
+    enabled: !!serviceId && enabled,
+    staleTime: 1000 * 30, // Keep for 30s as it's a "heavy" but critical query
+  });
+}
+
+export function prefetchFullServiceData(queryClient: QueryClient, serviceId: string) {
+  return queryClient.prefetchQuery({
+    queryKey: ['service-full', serviceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select(`
+          *,
+          customer:customers(*),
+          technician:technicians!services_technician_id_fkey(*, profile:profiles(*)),
+          parts:service_parts(*),
+          photos:service_photos(*),
+          signatures:service_signatures(*),
+          payments:service_payments(*),
+          logs:activity_logs(*, actor:profiles!activity_logs_actor_id_fkey(full_name))
+        `)
+        .eq('id', serviceId)
+        .single();
+
+      if (error) throw error;
+
+      const result = data as any;
+      return {
+        ...result,
+        parts: result.parts || [],
+        photos: (result.photos || []).sort((a: any, b: any) =>
+          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+        ),
+        signatures: (result.signatures || []).sort((a: any, b: any) =>
+          new Date(a.signed_at).getTime() - new Date(b.signed_at).getTime()
+        ),
+        payments: (result.payments || []).sort((a: any, b: any) =>
+          new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+        ),
+        logs: (result.logs || []).sort((a: any, b: any) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ),
+      };
+    },
+    staleTime: 1000 * 30,
   });
 }
 
@@ -233,6 +330,7 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         totalPages: Math.ceil(totalCount / pageSize),
       };
     },
+    refetchInterval: 30000,
     placeholderData: (prev) => prev,
   });
 }

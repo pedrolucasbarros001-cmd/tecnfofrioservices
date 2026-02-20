@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
-import { useUpdateService } from '@/hooks/useServices';
+import { useUpdateService, useFullServiceData } from '@/hooks/useServices';
+import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
@@ -16,25 +17,33 @@ export default function TechnicianDeliveryFlow() {
   const navigate = useNavigate();
   const [showSignature, setShowSignature] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const updateService = useUpdateService();
 
-  const { data: service, isLoading } = useQuery({
-    queryKey: ['service', serviceId],
-    queryFn: async () => {
-      if (!serviceId) return null;
-      const { data, error } = await supabase
-        .from('services')
-        .select('*, customer:customers(*), technician:technicians!services_technician_id_fkey(*, profile:profiles(*))')
-        .eq('id', serviceId)
-        .single();
+  const { data: service, isLoading } = useFullServiceData(serviceId);
 
-      if (error) throw error;
-      return data as unknown as Service;
-    },
-    enabled: !!serviceId,
-    refetchInterval: 30000,
-  });
+  // Initialize state from DB
+  React.useEffect(() => {
+    if (service && !isInitialized) {
+      if (service.flow_step === 'completed' || service.status === 'finalizado' || service.service_location === 'entregue') {
+        setIsCompleted(true);
+      }
+      setIsInitialized(true);
+    }
+  }, [service, isInitialized]);
+
+  const persistStep = async (step: string) => {
+    if (!serviceId) return;
+    try {
+      await updateService.mutateAsync({
+        id: serviceId,
+        flow_step: step,
+      });
+    } catch (error) {
+      console.error('Error persisting step:', error);
+    }
+  };
 
   const handleNavigate = () => {
     if (!service) return;
@@ -72,6 +81,7 @@ export default function TechnicianDeliveryFlow() {
 
       setShowSignature(false);
       setIsCompleted(true);
+      await persistStep('completed');
       toast.success('Entrega concluída com sucesso!');
 
       // Navigate back after delay

@@ -131,17 +131,21 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const [showSignature, setShowSignature] = useState(false);
   const [signatureType, setSignatureType] = useState<SignatureType>("conclusao");
   const [showPayment, setShowPayment] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
 
   // Check if this is a repair service
   const isReparacao = service.service_type === "reparacao";
 
   // Flow persistence with mode support - separate key for continuation
   const persistenceKey = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
-  const { loadState, saveState, clearState } = useFlowPersistence<VisitFormData>(service.id, persistenceKey);
+  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<VisitFormData>(service.id, persistenceKey);
 
   // Load saved state or reset when opened
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsResuming(false);
+      return;
+    }
 
     const savedState = loadState();
     if (savedState) {
@@ -150,6 +154,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       return;
     }
 
+    setIsResuming(true);
     // No localStorage → derive step from DB (handles phone restart)
     const persistenceFlowType = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
@@ -159,34 +164,27 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       // We still want to show Resumo first
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
 
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         detectedFault: service.detected_fault || "",
-        photoFile: null,
-        photoAparelho: null,
-        photoEtiqueta: null,
-        photosEstado: [],
-        decision: "reparar_local",
-        usedParts: false,
-        usedPartsList: [{ name: "", reference: "", quantity: 1 }],
-        needsPartOrder: false,
-        partToOrder: { name: "", reference: "" },
         productBrand: service.brand || "",
         productModel: service.model || "",
         productSerial: service.serial_number || "",
         productPNC: (service as any).pnc || "",
         productType: service.appliance_type || "",
-        partInstalled: false,
         ...formDataOverrides,
-      });
-    });
+      }));
+      setIsResuming(false);
+    }).catch(() => setIsResuming(false));
   }, [isOpen, service, loadState, mode]);
 
   // Auto-save state on step/data changes
   useEffect(() => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       saveState(currentStep, formData);
+      saveStateToDb(currentStep, formData);
     }
-  }, [isOpen, currentStep, formData, saveState]);
+  }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -704,16 +702,17 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               Cancelar
             </Button>
             <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600"
+              className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
               onClick={() => {
-                if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
+                if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
                   setCurrentStep(derivedResumeStep);
                 } else {
                   setCurrentStep("deslocacao");
                 }
               }}
+              disabled={isResuming}
             >
-              {mode === "continuacao_peca" ? "Ir para Local" : "Começar Visita"}
+              {isResuming ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}
             </Button>
           </DialogFooter>
         </DialogContent>

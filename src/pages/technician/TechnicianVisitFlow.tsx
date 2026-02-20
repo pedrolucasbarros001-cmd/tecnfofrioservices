@@ -23,7 +23,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { RequestPartModal } from '@/components/modals/RequestPartModal';
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
-import { useUpdateService } from '@/hooks/useServices';
+import { useUpdateService, useFullServiceData } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
@@ -41,6 +41,7 @@ export default function TechnicianVisitFlow() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<FlowStep>('traveling');
+  const [stepInitialized, setStepInitialized] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
@@ -48,22 +49,33 @@ export default function TechnicianVisitFlow() {
 
   const updateService = useUpdateService();
 
-  const { data: service, isLoading } = useQuery({
-    queryKey: ['service', serviceId],
-    queryFn: async () => {
-      if (!serviceId) return null;
-      const { data, error } = await supabase
-        .from('services')
-        .select('*, customer:customers(*), technician:technicians!services_technician_id_fkey(*, profile:profiles(*))')
-        .eq('id', serviceId)
-        .single();
+  const { data: service, isLoading } = useFullServiceData(serviceId);
 
-      if (error) throw error;
-      return data as unknown as Service;
-    },
-    enabled: !!serviceId,
-    refetchInterval: 30000, // Auto-refresh every 30s for live updates
-  });
+  // Initialize step from DB on first load
+  React.useEffect(() => {
+    if (service && !stepInitialized) {
+      if (service.flow_step) {
+        setCurrentStep(service.flow_step as FlowStep);
+      } else if (service.detected_fault) {
+        // Fallback for older services
+        setCurrentStep('working');
+      }
+      setStepInitialized(true);
+    }
+  }, [service, stepInitialized]);
+
+  const persistStep = async (step: FlowStep) => {
+    if (!serviceId) return;
+    setCurrentStep(step);
+    try {
+      await updateService.mutateAsync({
+        id: serviceId,
+        flow_step: step,
+      });
+    } catch (error) {
+      console.error('Error persisting step:', error);
+    }
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -92,10 +104,10 @@ export default function TechnicianVisitFlow() {
         status: 'em_execucao',
       });
       if (service.detected_fault) {
-        setCurrentStep('working');
+        await persistStep('working');
         toast.info('Diagnóstico anterior detectado. Foto de chegada opcional.');
       } else {
-        setCurrentStep('arrived');
+        await persistStep('arrived');
         setShowCamera(true);
       }
     } catch (error) {
@@ -115,7 +127,7 @@ export default function TechnicianVisitFlow() {
       });
       toast.success('Foto guardada!');
       setShowCamera(false);
-      setCurrentStep('working');
+      await persistStep('working');
     } catch (error) {
       console.error('Error saving photo:', error);
       toast.error('Erro ao guardar foto');
@@ -174,7 +186,7 @@ export default function TechnicianVisitFlow() {
       }
 
       setShowSignature(false);
-      setCurrentStep('completed');
+      await persistStep('completed');
 
       // If it was fixed on site, ask if they want to register payment
       if (formValues.outcome !== 'take_to_workshop' && formValues.outcome !== 'need_part') {

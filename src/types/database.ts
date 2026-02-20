@@ -137,6 +137,8 @@ export interface Service {
   last_status_before_part_request: string | null;
   pricing_description: string | null;
   pnc: string | null;
+  flow_step: string | null;
+  flow_data: any | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;

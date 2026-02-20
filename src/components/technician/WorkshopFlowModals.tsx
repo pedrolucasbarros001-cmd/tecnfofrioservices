@@ -97,20 +97,24 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   });
   const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showPartsModal, setShowPartsModal] = useState(false);
 
 
   // Flow persistence with mode support
   const persistenceKey = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
-  const { loadState, saveState, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
+  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
 
   // Check if service has previous execution history
   const hasPreviousHistory = !!service.detected_fault;
 
   // Load saved state or pre-fill from service
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsResuming(false);
+      return;
+    }
 
     const savedState = loadState();
     if (savedState) {
@@ -119,6 +123,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       return;
     }
 
+    setIsResuming(true);
     // No localStorage → derive step from DB (handles phone restart)
     const persistenceFlowType = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
@@ -129,34 +134,28 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       // We still want to show Resumo first, but we remember where to jump
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
 
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         detectedFault: service.detected_fault || "",
         workPerformed: service.work_performed || "",
-        usedParts: false,
-        usedPartsList: [],
-        needsPartOrder: false,
-        partToOrder: "",
-        partNotes: "",
-        photoAparelho: null,
-        photoEtiqueta: null,
-        photosEstado: [],
         productBrand: service.brand || "",
         productModel: service.model || "",
         productSerial: service.serial_number || "",
         productPNC: (service as any).pnc || "",
         productType: service.appliance_type || "",
-        partInstalled: false,
         ...formDataOverrides,
-      });
-    });
+      }));
+      setIsResuming(false);
+    }).catch(() => setIsResuming(false));
   }, [isOpen, service, loadState, mode]);
 
   // Save state on changes
   useEffect(() => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       saveState(currentStep, formData);
+      saveStateToDb(currentStep, formData);
     }
-  }, [isOpen, currentStep, formData, saveState]);
+  }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleStartRepair = async () => {
     try {
@@ -446,9 +445,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             <Button variant="outline" className="flex-1" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={handleStartRepair}>
+            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={handleStartRepair} disabled={isResuming}>
               <Wrench className="h-4 w-4 mr-1" />
-              {hasPreviousHistory || mode === "continuacao_peca" ? "Continuar Reparação" : "Iniciar Reparação"}
+              {isResuming ? "A carregar..." : (hasPreviousHistory || mode === "continuacao_peca" ? "Continuar Reparação" : "Iniciar Reparação")}
             </Button>
           </DialogFooter>
         </DialogContent>

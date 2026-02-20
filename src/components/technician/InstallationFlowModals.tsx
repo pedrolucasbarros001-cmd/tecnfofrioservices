@@ -70,13 +70,17 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [cameraMode, setCameraMode] = useState<'antes' | 'depois'>('antes');
   const [showPayment, setShowPayment] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
 
   // Flow persistence
-  const { loadState, saveState, clearState } = useFlowPersistence(service.id, 'instalacao');
+  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence(service.id, 'instalacao');
 
   // Load saved state on mount
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsResuming(false);
+      return;
+    }
 
     const savedState = loadState();
     if (savedState) {
@@ -85,6 +89,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       return;
     }
 
+    setIsResuming(true);
     // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'instalacao', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
@@ -93,22 +98,21 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       // Show Resumo first
       setCurrentStep('resumo');
 
-      setFormData({
-        photoAntes: null,
-        photoDepois: null,
-        workPerformed: '',
-        usedMaterials: [],
+      setFormData((prev) => ({
+        ...prev,
         ...formDataOverrides,
-      });
-    });
+      }));
+      setIsResuming(false);
+    }).catch(() => setIsResuming(false));
   }, [isOpen, loadState, service]);
 
   // Save state on step/formData change
   useEffect(() => {
     if (isOpen && currentStep !== 'resumo') {
       saveState(currentStep, formData);
+      saveStateToDb(currentStep, formData);
     }
-  }, [isOpen, currentStep, formData, saveState]);
+  }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -319,7 +323,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               Cancelar
             </Button>
             <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
               onClick={() => {
                 if (derivedResumeStep && derivedResumeStep !== 'resumo') {
                   setCurrentStep(derivedResumeStep);
@@ -327,8 +331,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
                   setCurrentStep('deslocacao');
                 }
               }}
+              disabled={isResuming}
             >
-              Iniciar Instalação
+              {isResuming ? "A carregar..." : "Iniciar Instalação"}
             </Button>
           </DialogFooter>
         </DialogContent>

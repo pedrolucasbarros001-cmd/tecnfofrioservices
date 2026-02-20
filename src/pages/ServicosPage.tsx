@@ -12,6 +12,8 @@ import { pt } from 'date-fns/locale';
 import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
 import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
+import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Service } from '@/types/database';
 
 type FlowType = 'visit' | 'installation' | 'delivery' | null;
@@ -28,6 +30,7 @@ export default function ServicosPage() {
   const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
 
   // Use React Query for proper caching and refetch
+  const queryClient = useQueryClient();
   const { data: services = [], isLoading: loading, refetch, error } = useQuery({
     queryKey: ['technician-services', profile?.id],
     queryFn: async () => {
@@ -158,7 +161,12 @@ export default function ServicosPage() {
     const isContinuation = service.status === 'por_fazer' && !!service.last_status_before_part_request;
 
     return (
-      <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)} data-tour="service-cards">
+      <Card
+        className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder)}
+        data-tour="service-cards"
+        onMouseEnter={() => prefetchFullServiceData(queryClient, service.id)}
+        onTouchStart={() => prefetchFullServiceData(queryClient, service.id)}
+      >
         <CardContent className="p-4">
           <div className="space-y-3">
             {/* Header: Code + Badge */}

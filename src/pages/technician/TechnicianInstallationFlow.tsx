@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
-import { useUpdateService } from '@/hooks/useServices';
+import { useUpdateService, useFullServiceData } from '@/hooks/useServices';
+import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
@@ -18,27 +19,36 @@ export default function TechnicianInstallationFlow() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<FlowStep>('initial');
+  const [stepInitialized, setStepInitialized] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
 
   const updateService = useUpdateService();
 
-  const { data: service, isLoading } = useQuery({
-    queryKey: ['service', serviceId],
-    queryFn: async () => {
-      if (!serviceId) return null;
-      const { data, error } = await supabase
-        .from('services')
-        .select('*, customer:customers(*), technician:technicians!services_technician_id_fkey(*, profile:profiles(*))')
-        .eq('id', serviceId)
-        .single();
+  const { data: service, isLoading } = useFullServiceData(serviceId);
 
-      if (error) throw error;
-      return data as unknown as Service;
-    },
-    enabled: !!serviceId,
-    refetchInterval: 30000,
-  });
+  // Initialize step from DB on first load
+  React.useEffect(() => {
+    if (service && !stepInitialized) {
+      if (service.flow_step) {
+        setCurrentStep(service.flow_step as FlowStep);
+      }
+      setStepInitialized(true);
+    }
+  }, [service, stepInitialized]);
+
+  const persistStep = async (step: FlowStep) => {
+    if (!serviceId) return;
+    setCurrentStep(step);
+    try {
+      await updateService.mutateAsync({
+        id: serviceId,
+        flow_step: step,
+      });
+    } catch (error) {
+      console.error('Error persisting step:', error);
+    }
+  };
 
   const handleStartInstallation = async () => {
     if (!service) return;
@@ -47,7 +57,7 @@ export default function TechnicianInstallationFlow() {
         id: service.id,
         status: 'em_execucao',
       });
-      setCurrentStep('in_progress');
+      await persistStep('in_progress');
       toast.success('Instalação iniciada!');
     } catch (error) {
       console.error('Error starting installation:', error);
@@ -66,7 +76,7 @@ export default function TechnicianInstallationFlow() {
       });
       toast.success('Foto guardada!');
       setShowCamera(false);
-      setCurrentStep('photos');
+      await persistStep('photos');
     } catch (error) {
       console.error('Error saving photo:', error);
       toast.error('Erro ao guardar foto');
@@ -94,7 +104,7 @@ export default function TechnicianInstallationFlow() {
       });
 
       setShowSignature(false);
-      setCurrentStep('completed');
+      await persistStep('completed');
       toast.success('Instalação concluída com sucesso!');
 
       // Navigate back after delay
