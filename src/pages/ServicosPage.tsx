@@ -25,6 +25,7 @@ export default function ServicosPage() {
   // Modal state
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [activeFlow, setActiveFlow] = useState<FlowType>(null);
+  const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
 
   // Use React Query for proper caching and refetch
   const { data: services = [], isLoading: loading, refetch, error } = useQuery({
@@ -76,6 +77,8 @@ export default function ServicosPage() {
   // Filter services for current day
   const dayServices = useMemo(() => {
     return services.filter(service => {
+      // Show services scheduled for today OR unfinished services from past
+      // But mainly filtered by scheduled date as per original logic
       if (!service.scheduled_date) return false;
       return isSameDay(parseISO(service.scheduled_date), currentDate);
     });
@@ -91,9 +94,10 @@ export default function ServicosPage() {
     });
   }, [dayServices]);
 
-  const handleStartFlow = (service: Service, e: React.MouseEvent) => {
+  const handleStartFlow = (service: Service, e: React.MouseEvent, mode: "normal" | "continuacao_peca" = "normal") => {
     e.stopPropagation();
     setSelectedService(service);
+    setFlowMode(mode);
 
     if (service.service_type === 'entrega') {
       setActiveFlow('delivery');
@@ -107,11 +111,13 @@ export default function ServicosPage() {
   const handleCloseFlow = () => {
     setSelectedService(null);
     setActiveFlow(null);
+    setFlowMode("normal");
   };
 
   const handleFlowComplete = () => {
     setSelectedService(null);
     setActiveFlow(null);
+    setFlowMode("normal");
     refetch();
   };
 
@@ -144,6 +150,13 @@ export default function ServicosPage() {
 
   const ServiceCard = ({ service }: { service: Service }) => {
     const serviceConfig = getServiceConfig(service);
+
+    // Logic for blocking and continuation
+    const isAwaitingPart = service.status === 'para_pedir_peca' || service.status === 'em_espera_de_peca';
+
+    // Check if it's a continuation (resumed after part arrival)
+    // It is a continuation if status is 'por_fazer' (resumed status) AND it has a previous status before part request
+    const isContinuation = service.status === 'por_fazer' && !!service.last_status_before_part_request;
 
     return (
       <Card className={cn('border-l-4 transition-shadow hover:shadow-md', serviceConfig.cardBorder)} data-tour="service-cards">
@@ -188,18 +201,34 @@ export default function ServicosPage() {
                     Garantia
                   </Badge>
                 )}
+                {isAwaitingPart && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-yellow-500 text-yellow-700 bg-yellow-50">
+                    Peça
+                  </Badge>
+                )}
               </div>
             </div>
 
-            {/* Start Button */}
-            <Button
-              size="sm"
-              className={cn('w-full h-9 text-sm mt-2', serviceConfig.buttonColor)}
-              onClick={(e) => handleStartFlow(service, e)}
-            >
-              <Play className="h-4 w-4 mr-1.5" />
-              Começar
-            </Button>
+            {/* Start/Continue/Block Button */}
+            {isAwaitingPart ? (
+              <Button
+                size="sm"
+                className="w-full h-9 text-sm mt-2 bg-muted text-muted-foreground cursor-not-allowed hover:bg-muted"
+                disabled
+              >
+                <Clock className="h-4 w-4 mr-1.5" />
+                Aguardar Peça
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className={cn('w-full h-9 text-sm mt-2', serviceConfig.buttonColor)}
+                onClick={(e) => handleStartFlow(service, e, isContinuation ? "continuacao_peca" : "normal")}
+              >
+                <Play className="h-4 w-4 mr-1.5" />
+                {isContinuation ? "Continuar" : "Começar"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -274,6 +303,7 @@ export default function ServicosPage() {
           isOpen={true}
           onClose={handleCloseFlow}
           onComplete={handleFlowComplete}
+          mode={flowMode}
         />
       )}
 

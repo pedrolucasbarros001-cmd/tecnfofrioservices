@@ -23,6 +23,7 @@ export default function TechnicianOfficePage() {
   const { profile } = useAuth();
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [flowOpen, setFlowOpen] = useState(false);
+  const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
   const [transferService, setTransferService] = useState<Service | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const queryClient = useQueryClient();
@@ -112,20 +113,23 @@ export default function TechnicianOfficePage() {
     }
   };
 
-  const handleStartFlow = (service: Service) => {
+  const handleStartFlow = (service: Service, mode: "normal" | "continuacao_peca" = "normal") => {
     setSelectedService(service);
+    setFlowMode(mode);
     setFlowOpen(true);
   };
 
   const handleFlowComplete = () => {
     setFlowOpen(false);
     setSelectedService(null);
+    setFlowMode("normal");
     refetch();
   };
 
   const handleFlowClose = () => {
     setFlowOpen(false);
     setSelectedService(null);
+    setFlowMode("normal");
   };
 
   const getStatusBadge = (status: string) => {
@@ -151,12 +155,20 @@ export default function TechnicianOfficePage() {
       setShowTransferModal(true);
     };
 
+    // Logic for blocking and continuation
+    const isAwaitingPart = service.status === 'para_pedir_peca' || service.status === 'em_espera_de_peca';
+
+    // Check if it's a continuation (resumed after part arrival)
+    // It is a continuation if status is 'por_fazer' (resumed status) or 'na_oficina' AND it has a previous status before part request
+    // For workshop, 'na_oficina' is often the resume status
+    const isContinuation = (service.status === 'por_fazer' || service.status === 'na_oficina') && !!service.last_status_before_part_request;
+
     return (
       <Card
         className={cn(
           'hover:shadow-md transition-shadow relative',
-          isAvailable 
-            ? 'bg-slate-50 border-l-4 border-l-slate-400' 
+          isAvailable
+            ? 'bg-slate-50 border-l-4 border-l-slate-400'
             : 'bg-orange-50 border-l-4 border-l-orange-500'
         )}
       >
@@ -173,7 +185,7 @@ export default function TechnicianOfficePage() {
               <ArrowRightLeft className="h-4 w-4" />
             </Button>
           )}
-          
+
           <div className="space-y-2">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
@@ -220,6 +232,11 @@ export default function TechnicianOfficePage() {
                     Garantia
                   </Badge>
                 )}
+                {isAwaitingPart && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500 text-yellow-700 bg-yellow-50">
+                    Peça
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <ShiftIcon className={cn('h-3.5 w-3.5', shiftInfo?.color)} />
@@ -236,13 +253,21 @@ export default function TechnicianOfficePage() {
                 <UserPlus className="h-4 w-4 mr-2" />
                 Assumir Serviço
               </Button>
+            ) : isAwaitingPart ? (
+              <Button
+                className="w-full bg-muted text-muted-foreground cursor-not-allowed hover:bg-muted h-9"
+                disabled
+              >
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Aguardar Peça
+              </Button>
             ) : (
               <Button
                 className="w-full bg-orange-500 hover:bg-orange-600 h-9"
-                onClick={() => handleStartFlow(service)}
+                onClick={() => handleStartFlow(service, isContinuation ? "continuacao_peca" : "normal")}
               >
                 <Play className="h-4 w-4 mr-2" />
-                Começar
+                {isContinuation ? "Continuar" : "Começar"}
               </Button>
             )}
           </div>
@@ -286,7 +311,7 @@ export default function TechnicianOfficePage() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Meus Serviços na Oficina
         </h2>
-        
+
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground py-12">
             A carregar serviços...
@@ -296,8 +321,8 @@ export default function TechnicianOfficePage() {
             <Wrench className="h-12 w-12 mb-4 opacity-30" />
             <p className="font-medium">Sem serviços atribuídos</p>
             <p className="text-sm">
-              {availableServices.length > 0 
-                ? 'Pode assumir serviços da secção acima.' 
+              {availableServices.length > 0
+                ? 'Pode assumir serviços da secção acima.'
                 : 'Quando tiver serviços atribuídos, aparecerão aqui.'}
             </p>
           </div>
@@ -317,6 +342,7 @@ export default function TechnicianOfficePage() {
           isOpen={flowOpen}
           onClose={handleFlowClose}
           onComplete={handleFlowComplete}
+          mode={flowMode}
         />
       )}
 

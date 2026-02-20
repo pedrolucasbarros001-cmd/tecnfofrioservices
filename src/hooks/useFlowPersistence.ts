@@ -33,22 +33,22 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     try {
       const key = getStorageKey(serviceId);
       const stored = localStorage.getItem(key);
-      
+
       if (!stored) return null;
-      
+
       const state = JSON.parse(stored) as FlowState<T>;
-      
+
       // Validate state
       if (state.serviceId !== serviceId || state.flowType !== flowType) {
         return null;
       }
-      
+
       // Check if state is still valid (not expired)
       if (!isStateValid(state)) {
         localStorage.removeItem(key);
         return null;
       }
-      
+
       return state;
     } catch (error) {
       console.error('Error loading flow state:', error);
