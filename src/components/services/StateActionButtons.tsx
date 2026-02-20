@@ -1,8 +1,8 @@
-import { 
-  UserPlus, 
-  Play, 
-  DollarSign, 
-  CreditCard, 
+import {
+  UserPlus,
+  Play,
+  DollarSign,
+  CreditCard,
   Truck,
   CheckCircle,
   Eye,
@@ -82,7 +82,7 @@ export function StateActionButtons({
 
   // Unified button style - all actions are primary blue
   const primaryButtonClass = 'bg-primary text-primary-foreground hover:bg-primary/90';
-  
+
   const getMainAction = (): ActionConfig | null => {
     switch (service.status as ServiceStatus) {
       case 'por_fazer':
@@ -163,8 +163,19 @@ export function StateActionButtons({
         }
         return null;
 
-      case 'concluidos':
-        if ((isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
+      case 'concluidos': {
+        // Priority 1: Pricing must be resolved first
+        const needsPricing = service.pending_pricing || !isServicePriced;
+        if (needsPricing && isDono && onSetPrice) {
+          return {
+            label: 'Definir Preço',
+            icon: DollarSign,
+            onClick: onSetPrice,
+            className: primaryButtonClass,
+          };
+        }
+        // Priority 2: Delivery management after pricing is done
+        if (!needsPricing && (isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
           return {
             label: 'Gerir Entrega',
             icon: Truck,
@@ -172,7 +183,17 @@ export function StateActionButtons({
             className: primaryButtonClass,
           };
         }
+        // Priority 3: Payment if in debit
+        if (!needsPricing && isServiceInDebit && (isDono || isSecretaria) && onRegisterPayment) {
+          return {
+            label: 'Registar Pagamento',
+            icon: CreditCard,
+            onClick: onRegisterPayment,
+            className: primaryButtonClass,
+          };
+        }
         return null;
+      }
 
       case 'em_debito':
         if ((isDono || isSecretaria) && onRegisterPayment) {
@@ -207,7 +228,7 @@ export function StateActionButtons({
           {mainAction.label}
         </Button>
       )}
-      
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
           <Button variant="outline" size="icon" className="h-8 w-8">
@@ -274,8 +295,8 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {/* Manage Delivery - Concluidos with workshop location */}
-          {service.status === 'concluidos' && service.service_location === 'oficina' && (isDono || isSecretaria) && onManageDelivery && (
+          {/* Manage Delivery - Concluidos with workshop location AND pricing resolved */}
+          {service.status === 'concluidos' && service.service_location === 'oficina' && !service.pending_pricing && isServicePriced && (isDono || isSecretaria) && onManageDelivery && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onManageDelivery(); }}>
               <Truck className="h-4 w-4 mr-2" />
               Gerir Entrega

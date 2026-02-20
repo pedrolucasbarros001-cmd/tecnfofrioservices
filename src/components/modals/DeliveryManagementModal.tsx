@@ -18,9 +18,9 @@ interface DeliveryManagementModalProps {
   onAssignDelivery: () => void;
 }
 
-export function DeliveryManagementModal({ 
-  service, 
-  open, 
+export function DeliveryManagementModal({
+  service,
+  open,
   onOpenChange,
   onAssignDelivery,
 }: DeliveryManagementModalProps) {
@@ -32,13 +32,14 @@ export function DeliveryManagementModal({
     try {
       await updateService.mutateAsync({
         id: service.id,
+        status: 'finalizado',
         delivery_method: 'client_pickup',
         skipToast: true,
       });
 
       // Contextual feedback
       const customerName = service.customer?.name || 'cliente';
-      toast.success(`Recolha pelo cliente definida! Notificar ${customerName}.`);
+      toast.success(`${service.code} finalizado — ${customerName} recolheu o equipamento.`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error setting client pickup:', error);
