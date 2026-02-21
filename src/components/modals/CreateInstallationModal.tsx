@@ -266,7 +266,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] w-[95vw] max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Nova Instalação</DialogTitle>
             <p className="text-sm text-muted-foreground">O técnico receberá os detalhes para realizar a instalação no local indicado.</p>

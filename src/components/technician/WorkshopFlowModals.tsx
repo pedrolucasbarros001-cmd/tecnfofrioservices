@@ -408,7 +408,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
       <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
             step="Passo 1"
@@ -492,7 +492,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         open={currentStep === "foto_aparelho" && !showCamera && !showPartsModal}
         onOpenChange={() => handleClose()}
       >
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto do Aparelho" step="Fotos Obrigatórias" />
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
@@ -543,7 +543,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         open={currentStep === "foto_etiqueta" && !showCamera && !showPartsModal}
         onOpenChange={() => handleClose()}
       >
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto da Etiqueta" step="Fotos Obrigatórias" />
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
@@ -591,7 +591,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal 2c: Foto do Estado (if no history) */}
       <Dialog open={currentStep === "foto_estado" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Estado do Aparelho" step="Fotos Obrigatórias" />
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
@@ -635,7 +635,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       {needsProductStep && (
         <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Informação do Produto" step="Passo 2" />
 
             <div className="space-y-4">
@@ -712,7 +712,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal 2: Diagnóstico Complementar */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Diagnóstico" step="Passo 2" />
 
           <div className="space-y-4">
@@ -766,7 +766,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         }
         onOpenChange={(open) => !open && handleClose()}
       >
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Peças Usadas" step="Passo 3" />
 
           <div className="space-y-4">
@@ -837,7 +837,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal 4: Pedir Peça */}
       < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
           <div className="space-y-4">
@@ -931,7 +931,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal 5: Conclusão */}
       < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Conclusão" step="Passo 5" />
 
           <div className="space-y-4">

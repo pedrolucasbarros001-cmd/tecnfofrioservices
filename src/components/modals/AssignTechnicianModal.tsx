@@ -170,7 +170,7 @@ export function AssignTechnicianModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Atribuir Técnico - {service.code}</DialogTitle>
           <p className="text-sm text-muted-foreground">O técnico selecionado receberá uma notificação com os detalhes do serviço.</p>

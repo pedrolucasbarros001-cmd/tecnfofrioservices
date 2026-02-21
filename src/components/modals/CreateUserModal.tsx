@@ -140,7 +140,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
   if (createdCredentials) {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Key className="h-5 w-5 text-green-600" />
@@ -196,7 +196,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Criar Utilizador</DialogTitle>
           <p className="text-sm text-muted-foreground">Este perfil terá acesso ao sistema de acordo com o nível selecionado.</p>
