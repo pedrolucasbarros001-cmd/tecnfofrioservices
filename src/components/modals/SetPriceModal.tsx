@@ -245,7 +245,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
             Definir Preço - {service?.code}

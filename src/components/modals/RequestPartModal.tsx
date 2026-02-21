@@ -123,8 +123,8 @@ export function RequestPartModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-yellow-600" />
             Solicitar Peça
@@ -132,7 +132,8 @@ export function RequestPartModal({
           <p className="text-sm text-muted-foreground">Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.</p>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6">
+         <div className="space-y-4 py-4">
           {service && (
             <div className="p-3 bg-muted rounded-lg text-sm">
               <p className="font-medium">{service.code}</p>
@@ -213,9 +214,10 @@ export function RequestPartModal({
               </div>
             </div>
           )}
+         </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>
             Cancelar
           </Button>

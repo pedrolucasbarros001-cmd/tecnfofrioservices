@@ -140,14 +140,15 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
   if (createdCredentials) {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Key className="h-5 w-5 text-green-600" />
               Utilizador Criado com Sucesso
             </DialogTitle>
           </DialogHeader>
 
+          <div className="flex-1 overflow-y-auto min-h-0 px-6">
           <Alert className="border-green-200 bg-green-50">
             <AlertTitle className="text-green-800">Credenciais de Acesso</AlertTitle>
             <AlertDescription className="mt-3 space-y-3">
@@ -183,8 +184,9 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
               </div>
             </AlertDescription>
           </Alert>
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
             <Button onClick={handleClose}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
@@ -194,14 +196,16 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Criar Utilizador</DialogTitle>
           <p className="text-sm text-muted-foreground">Este perfil terá acesso ao sistema de acordo com o nível selecionado.</p>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+           <div className="flex-1 overflow-y-auto min-h-0 px-6">
+            <div className="space-y-4 py-4">
             <FormField
               control={form.control}
               name="full_name"
@@ -297,7 +301,9 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
               />
             )}
 
-            <DialogFooter className="pt-4">
+            </div>
+           </div>
+            <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>

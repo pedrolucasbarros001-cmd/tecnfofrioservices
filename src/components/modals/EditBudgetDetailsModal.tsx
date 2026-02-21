@@ -144,12 +144,12 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Editar Artigos do Orçamento</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-2">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6">
           <div className="space-y-4">
             {/* Items table */}
             <div className="space-y-2">
@@ -256,9 +256,9 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
               <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas..." rows={2} />
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
           <Button onClick={handleSave} disabled={isLoading}>
             {isLoading ? 'A guardar...' : 'Guardar'}

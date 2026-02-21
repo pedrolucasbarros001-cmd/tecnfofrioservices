@@ -154,114 +154,116 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">
             Registar Pagamento - {service?.code}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">Este valor será abatido do saldo em aberto do serviço.</p>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Financial Summary Box - only meaningful when price known */}
-          <div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
-            {finalPrice > 0 ? (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Valor Total:</span>
-                  <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Já Pago:</span>
-                  <span className="text-green-600 font-semibold">
-                    €{amountPaid.toFixed(2)}
+        <div className="flex-1 overflow-y-auto min-h-0 px-6">
+          <div className="space-y-4 py-4">
+            {/* Financial Summary Box - only meaningful when price known */}
+            <div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
+              {finalPrice > 0 ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Valor Total:</span>
+                    <span className="font-semibold">€{finalPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Já Pago:</span>
+                    <span className="text-green-600 font-semibold">
+                      €{amountPaid.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-red-600 font-semibold">Em Falta:</span>
+                    <span className="text-red-600 font-bold">
+                      €{remainingBalance.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Ainda não foi definido um preço para este serviço. Insira o montante pago pelo cliente e será registado.
+                </p>
+              )}
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label htmlFor="paymentMethod">Método de Pagamento *</Label>
+              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar método" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((method) => (
+                    <SelectItem key={method.value} value={method.value}>
+                      {method.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Amount */}
+            <div className="space-y-2">
+              <Label htmlFor="amount">Valor deste Pagamento (€) *</Label>
+              <Input
+                id="amount"
+                type="text"
+                inputMode="decimal"
+                placeholder={
+                  finalPrice > 0
+                    ? `Ex: 2.000,00 (Max: €${remainingBalance.toFixed(2)})`
+                    : 'Ex: 20,00 (preço ainda não definido)'
+                }
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição (Opcional)</Label>
+              <Textarea
+                id="description"
+                placeholder="Ex: Pagamento parcial"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            {/* Payment Date */}
+            <div className="space-y-2">
+              <Label htmlFor="paymentDate">Data do Pagamento *</Label>
+              <Input
+                id="paymentDate"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
+
+            {/* New Balance Preview */}
+            {paymentValue > 0 && finalPrice > 0 && (
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Novo saldo em falta:</span>
+                  <span className={newBalance > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                    €{newBalance.toFixed(2)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-red-600 font-semibold">Em Falta:</span>
-                  <span className="text-red-600 font-bold">
-                    €{remainingBalance.toFixed(2)}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Ainda não foi definido um preço para este serviço. Insira o montante pago pelo cliente e será registado.
-              </p>
+              </div>
             )}
           </div>
-
-          {/* Payment Method */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Método de Pagamento *</Label>
-            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar método" />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYMENT_METHODS.map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    {method.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Payment Amount */}
-          <div className="space-y-2">
-            <Label htmlFor="amount">Valor deste Pagamento (€) *</Label>
-            <Input
-              id="amount"
-              type="text"
-              inputMode="decimal"
-              placeholder={
-                finalPrice > 0
-                  ? `Ex: 2.000,00 (Max: €${remainingBalance.toFixed(2)})`
-                  : 'Ex: 20,00 (preço ainda não definido)'
-              }
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição (Opcional)</Label>
-            <Textarea
-              id="description"
-              placeholder="Ex: Pagamento parcial"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          {/* Payment Date */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentDate">Data do Pagamento *</Label>
-            <Input
-              id="paymentDate"
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-            />
-          </div>
-
-          {/* New Balance Preview */}
-          {paymentValue > 0 && finalPrice > 0 && (
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Novo saldo em falta:</span>
-                <span className={newBalance > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
-                  €{newBalance.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
