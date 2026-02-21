@@ -634,79 +634,79 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <ModalHeader title="Informação do Produto" step="Passo 2" />
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <ModalHeader title="Informação do Produto" step="Passo 2" />
 
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="ws_prod_type" className="text-sm">Tipo de Aparelho</Label>
+              <Input
+                id="ws_prod_type"
+                placeholder="Ex: Máquina de Lavar, Frigorífico..."
+                value={formData.productType as string}
+                onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="ws_prod_type" className="text-sm">Tipo de Aparelho</Label>
+                <Label htmlFor="ws_prod_brand" className="text-sm">Marca</Label>
                 <Input
-                  id="ws_prod_type"
-                  placeholder="Ex: Máquina de Lavar, Frigorífico..."
-                  value={formData.productType as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                  id="ws_prod_brand"
+                  placeholder="Ex: Bosch, LG..."
+                  value={formData.productBrand as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
                   className="mt-1"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="ws_prod_brand" className="text-sm">Marca</Label>
-                  <Input
-                    id="ws_prod_brand"
-                    placeholder="Ex: Bosch, LG..."
-                    value={formData.productBrand as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ws_prod_model" className="text-sm">Modelo</Label>
-                  <Input
-                    id="ws_prod_model"
-                    placeholder="Ex: WAT24469ES"
-                    value={formData.productModel as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="ws_prod_model" className="text-sm">Modelo</Label>
+                <Input
+                  id="ws_prod_model"
+                  placeholder="Ex: WAT24469ES"
+                  value={formData.productModel as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
+                  className="mt-1"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="ws_prod_serial" className="text-sm">Nº de Série</Label>
-                  <Input
-                    id="ws_prod_serial"
-                    placeholder="Número de série"
-                    value={formData.productSerial as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ws_prod_pnc" className="text-sm">PNC</Label>
-                  <Input
-                    id="ws_prod_pnc"
-                    placeholder="Product Number Code"
-                    value={formData.productPNC as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Preencha o que estiver visível na placa do aparelho. Campos opcionais.
-              </p>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="ws_prod_serial" className="text-sm">Nº de Série</Label>
+                <Input
+                  id="ws_prod_serial"
+                  placeholder="Número de série"
+                  value={formData.productSerial as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="ws_prod_pnc" className="text-sm">PNC</Label>
+                <Input
+                  id="ws_prod_pnc"
+                  placeholder="Product Number Code"
+                  value={formData.productPNC as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Preencha o que estiver visível na placa do aparelho. Campos opcionais.
+            </p>
+          </div>
 
-            <DialogFooter className="flex gap-2 mt-6">
-              <Button variant="outline" onClick={() => setCurrentStep("foto_estado")} className="flex items-center gap-1">
-                <ArrowLeft className="h-4 w-4" /> Voltar
-              </Button>
-              <Button onClick={handleProductoConfirm} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          <DialogFooter className="flex gap-2 mt-6">
+            <Button variant="outline" onClick={() => setCurrentStep("foto_estado")} className="flex items-center gap-1">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+            <Button onClick={handleProductoConfirm} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal 2: Diagnóstico Complementar */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
@@ -823,10 +823,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("diagnostico")}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => setCurrentStep("pedir_peca")}>
+            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("diagnostico")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
+            <Button
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+              onClick={() => {
+                if (formData.usedParts && formData.usedPartsList.length === 0) {
+                  toast.error("Por favor, registe pelo menos uma peça utilizada.");
+                  return;
+                }
+                setCurrentStep("pedir_peca");
+              }}
+            >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </DialogFooter>

@@ -39,11 +39,21 @@ export async function deriveStepFromDb(
   service: Record<string, unknown>
 ): Promise<DbResumeResult> {
   // Fetch photos for this service
-  const { data: photos = [] } = await supabase
+  // Fetch photo metadata first to determine presence and types without fetching large file_url data
+  const { data: photoMetadata = [] } = await supabase
     .from('service_photos')
-    .select('photo_type, file_url, uploaded_at')
+    .select('id, photo_type, uploaded_at')
     .eq('service_id', serviceId)
     .order('uploaded_at', { ascending: false });
+
+  const photoMetadataByType: Record<string, { id: string; uploaded_at: string }[]> = {};
+  for (const photo of photoMetadata ?? []) {
+    if (!photoMetadataByType[photo.photo_type]) photoMetadataByType[photo.photo_type] = [];
+    photoMetadataByType[photo.photo_type].push({ id: photo.id, uploaded_at: photo.uploaded_at });
+  }
+
+  const hasPhoto = (type: string) => (photoMetadataByType[type]?.length ?? 0) > 0;
+  const hasAnyPhoto = photoMetadata.length > 0;
 
   // Fetch parts for this service
   const { data: parts = [] } = await supabase
@@ -51,20 +61,41 @@ export async function deriveStepFromDb(
     .select('part_name, part_code, quantity, is_requested, arrived')
     .eq('service_id', serviceId);
 
+  const hasRequestedPart = (parts ?? []).some((p) => p.is_requested);
+  const usedPartsList = (parts ?? [])
+    .filter((p) => !p.is_requested)
+    .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
+
+  // Identify photo IDs we actually need to fetch URLs for (latest of each relevant type, and max 3 'estado')
+  const idsToFetch: string[] = [];
+  const addLatestId = (type: string) => {
+    if (photoMetadataByType[type]?.[0]) idsToFetch.push(photoMetadataByType[type][0].id);
+  };
+
+  ['aparelho', 'etiqueta', 'antes', 'depois', 'instalacao_antes', 'instalacao_depois', 'assinatura', 'entrega', 'verificacao', 'aparelho_recuperado', 'visita'].forEach(addLatestId);
+  if (photoMetadataByType['estado']) {
+    photoMetadataByType['estado'].slice(0, 3).forEach(p => idsToFetch.push(p.id));
+  }
+
+  // Fetch actual URLs for identified photos
+  let photos: any[] = [];
+  if (idsToFetch.length > 0) {
+    const { data: fetchedPhotos } = await supabase
+      .from('service_photos')
+      .select('photo_type, file_url, uploaded_at')
+      .in('id', idsToFetch)
+      .order('uploaded_at', { ascending: false });
+    photos = fetchedPhotos ?? [];
+  }
+
   const photosByType: Record<string, string[]> = {};
   for (const photo of photos ?? []) {
     if (!photosByType[photo.photo_type]) photosByType[photo.photo_type] = [];
     photosByType[photo.photo_type].push(photo.file_url);
   }
 
-  const hasPhoto = (type: string) => (photosByType[type]?.length ?? 0) > 0;
   const latestPhoto = (type: string) => photosByType[type]?.[0] ?? null;
   const allPhotos = (type: string) => photosByType[type] ?? [];
-
-  const hasRequestedPart = (parts ?? []).some((p) => p.is_requested);
-  const usedPartsList = (parts ?? [])
-    .filter((p) => !p.is_requested)
-    .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
 
   const detectedFault = (service.detected_fault as string) || '';
   const workPerformed = (service.work_performed as string) || '';
@@ -73,7 +104,6 @@ export async function deriveStepFromDb(
 
   // Status that imply the service has already passed the initial entry/photos phase
   const isInProgress = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluido'].includes(status);
-  const hasAnyPhoto = photos.length > 0;
 
   // --- WORKSHOP FLOW ---
   if (flowType === 'oficina' || flowType === 'oficina_continuacao') {
