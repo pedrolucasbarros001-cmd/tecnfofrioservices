@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Wrench, ShoppingCart, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import type { Service, ServicePart } from '@/types/database';
 
 interface TechnicianEditServiceModalProps {
@@ -25,14 +27,21 @@ interface TechnicianEditServiceModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface NewPart {
+interface NewPart extends Partial<ServicePart> {
   part_name: string;
   part_code: string;
   quantity: number;
-  notes: string;
+  is_requested: boolean;
+  notes?: string;
 }
 
-const emptyPart: NewPart = { part_name: '', part_code: '', quantity: 1, notes: '' };
+const emptyPart = (isRequested = false): NewPart => ({
+  part_name: '',
+  part_code: '',
+  quantity: 1,
+  is_requested: isRequested,
+  notes: ''
+});
 
 export function TechnicianEditServiceModal({ service, open, onOpenChange }: TechnicianEditServiceModalProps) {
   const { user } = useAuth();
@@ -76,8 +85,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
     }
   }, [open, service]);
 
-  const handleAddNewPart = () => {
-    setNewParts(prev => [...prev, { ...emptyPart }]);
+  const handleAddNewPart = (isRequested = false) => {
+    setNewParts(prev => [...prev, emptyPart(isRequested)]);
   };
 
   const handleRemoveNewPart = (index: number) => {
@@ -99,7 +108,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
     try {
       const changes: string[] = [];
 
-      // Update service fields via RPC
+      // Update service fields
       const updates: Record<string, any> = {};
       if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: ${brand}`); }
       if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: ${model}`); }
@@ -117,7 +126,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
         if (workPerformed !== (service.work_performed || '')) changes.push('Trabalho realizado atualizado');
       }
 
-      // Update equipment fields directly (brand, model, serial_number)
+      // Update equipment fields directly
       if (Object.keys(updates).length > 0) {
         const { error: updateError } = await supabase
           .from('services')
@@ -126,12 +135,19 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
         if (updateError) throw updateError;
       }
 
-      // Delete parts
+      // Delete parts (marking) - actual deletion via admin or if owner
       if (partsToDelete.length > 0) {
-        // Technicians can't delete parts via RLS (only dono can), so we'll mark them
-        // Actually the RLS allows dono only for delete, so technician needs to use a different approach
-        // For now, let's log and notify - the parts will need admin removal
-        changes.push(`${partsToDelete.length} peça(s) marcada(s) para remoção`);
+        const { error: delError } = await supabase
+          .from('service_parts')
+          .delete()
+          .in('id', partsToDelete);
+
+        if (delError) {
+          console.warn('Technician marked parts for deletion but likely lacked RLS permissions:', delError);
+          changes.push(`${partsToDelete.length} peça(s) marcadas para remoção (aguarda admin)`);
+        } else {
+          changes.push(`${partsToDelete.length} peça(s) removida(s)`);
+        }
       }
 
       // Insert new parts
@@ -144,7 +160,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
               part_name: p.part_name.trim(),
               part_code: p.part_code.trim() || null,
               quantity: p.quantity || 1,
-              notes: p.notes.trim() || null,
+              is_requested: p.is_requested || false,
+              notes: p.notes?.trim() || null,
             }))
           );
           if (insertError) throw insertError;
@@ -178,11 +195,11 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
+      <DialogContent
+        className="sm:max-w-xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>Editar Serviço {service.code}</DialogTitle>
         </DialogHeader>
@@ -224,81 +241,110 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
           <Separator />
 
-          {/* Parts */}
-          <section className="space-y-3 pb-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Peças</h3>
-              <Button variant="outline" size="sm" onClick={handleAddNewPart} className="gap-1 text-xs">
-                <Plus className="h-3 w-3" /> Adicionar
-              </Button>
-            </div>
-
-            {/* Existing parts */}
-            {existingParts.map(part => (
-              <div
-                key={part.id}
-                className={`flex items-center gap-2 p-2 rounded-md border text-sm ${partsToDelete.includes(part.id) ? 'opacity-40 line-through bg-destructive/5' : 'bg-muted/30'}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium">{part.part_name}</span>
-                  {part.part_code && <span className="text-muted-foreground ml-1">({part.part_code})</span>}
-                  <span className="text-muted-foreground ml-2">x{part.quantity || 1}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                  onClick={() => handleToggleDeletePart(part.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
+          {/* Parts Sections */}
+          <section className="space-y-6 pb-4">
+            {/* 1. Used Parts */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-green-600 uppercase tracking-widest flex items-center gap-2">
+                  <Wrench className="h-4 w-4" /> Peças Usadas
+                </h3>
+                <Button variant="outline" size="sm" onClick={() => handleAddNewPart(false)} className="gap-1 text-[10px] h-7 border-green-200 text-green-700 hover:bg-green-50">
+                  <Plus className="h-3 w-3" /> Adicionar
                 </Button>
               </div>
-            ))}
 
-            {/* New parts */}
-            {newParts.map((part, i) => (
-              <div key={i} className="space-y-2 p-3 rounded-md border border-dashed border-primary/30 bg-primary/5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-primary">Nova peça</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveNewPart(i)}>
-                    <Trash2 className="h-3 w-3" />
+              {existingParts.filter(p => !p.is_requested).map(part => (
+                <div
+                  key={part.id}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-md border text-sm transition-opacity",
+                    partsToDelete.includes(part.id) ? 'opacity-40 line-through bg-destructive/5' : 'bg-green-50/20 border-green-100'
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-green-900">{part.part_name}</span>
+                    {part.part_code && <span className="text-muted-foreground ml-1 text-xs">({part.part_code})</span>}
+                    <span className="text-muted-foreground ml-2 font-mono text-xs">x{part.quantity || 1}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => handleToggleDeletePart(part.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Nome da peça *"
-                    value={part.part_name}
-                    onChange={e => handleUpdateNewPart(i, 'part_name', e.target.value)}
-                    className="text-sm h-8"
-                  />
-                  <Input
-                    placeholder="Código"
-                    value={part.part_code}
-                    onChange={e => handleUpdateNewPart(i, 'part_code', e.target.value)}
-                    className="text-sm h-8"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="Qtd"
-                    value={part.quantity}
-                    onChange={e => handleUpdateNewPart(i, 'quantity', parseInt(e.target.value) || 1)}
-                    className="text-sm h-8"
-                  />
-                  <Input
-                    placeholder="Notas"
-                    value={part.notes}
-                    onChange={e => handleUpdateNewPart(i, 'notes', e.target.value)}
-                    className="text-sm h-8"
-                  />
-                </div>
+              ))}
+
+              {newParts.filter(p => !p.is_requested).map((part, i) => (
+                <PartFormRow
+                  key={`new-used-${i}`}
+                  part={part}
+                  onUpdate={(f, v) => handleUpdateNewPart(newParts.indexOf(part), f, v)}
+                  onRemove={() => handleRemoveNewPart(newParts.indexOf(part))}
+                />
+              ))}
+            </div>
+
+            <Separator />
+
+            {/* 2. Requested Parts */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" /> Solicitar Encomenda
+                </h3>
+                <Button variant="outline" size="sm" onClick={() => handleAddNewPart(true)} className="gap-1 text-[10px] h-7 border-amber-200 text-amber-700 hover:bg-amber-50">
+                  <Plus className="h-3 w-3" /> Solicitar
+                </Button>
               </div>
-            ))}
+
+              <div className="bg-amber-50/30 border border-amber-100/50 rounded-lg p-3 mb-2">
+                <p className="text-[10px] text-amber-700 leading-tight italic">
+                  Pedidos de peças aparecem automaticamente no painel administrativo.
+                </p>
+              </div>
+
+              {existingParts.filter(p => p.is_requested).map(part => (
+                <div
+                  key={part.id}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-md border text-sm transition-opacity",
+                    partsToDelete.includes(part.id) ? 'opacity-40 line-through bg-destructive/5' : 'bg-amber-50/20 border-amber-100'
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-amber-900">{part.part_name}</span>
+                    {part.part_code && <span className="text-muted-foreground ml-1 text-xs">({part.part_code})</span>}
+                    <span className="text-muted-foreground ml-2 font-mono text-xs">x{part.quantity || 1}</span>
+                    {part.arrived && <Badge className="ml-2 bg-green-500 text-[9px] h-4">Chegou</Badge>}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => handleToggleDeletePart(part.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+
+              {newParts.filter(p => p.is_requested).map((part, i) => (
+                <PartFormRow
+                  key={`new-req-${i}`}
+                  part={part}
+                  isRequested
+                  onUpdate={(f, v) => handleUpdateNewPart(newParts.indexOf(part), f, v)}
+                  onRemove={() => handleRemoveNewPart(newParts.indexOf(part))}
+                />
+              ))}
+            </div>
 
             {existingParts.length === 0 && newParts.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma peça registada</p>
+              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma peça ou encomenda registada</p>
             )}
           </section>
         </div>
@@ -307,11 +353,67 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSubmitting}>
+          <Button onClick={handleSave} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
             {isSubmitting ? 'A guardar...' : 'Guardar Alterações'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
+  part: NewPart;
+  onUpdate: (field: keyof NewPart, value: any) => void;
+  onRemove: () => void;
+  isRequested?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "space-y-2 p-3 rounded-md border border-dashed",
+      isRequested ? "border-amber-300 bg-amber-50/20" : "border-green-300 bg-green-50/20"
+    )}>
+      <div className="flex items-center justify-between">
+        <span className={cn("text-[10px] font-bold uppercase", isRequested ? "text-amber-700" : "text-green-700")}>
+          {isRequested ? "Nova Encomenda" : "Nova Peça Usada"}
+        </span>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onRemove}>
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          placeholder="Nome da peça *"
+          value={part.part_name}
+          onChange={e => onUpdate('part_name', e.target.value)}
+          className="text-xs h-8"
+        />
+        <Input
+          placeholder="Código/Ref"
+          value={part.part_code}
+          onChange={e => onUpdate('part_code', e.target.value)}
+          className="text-xs h-8"
+        />
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="col-span-1">
+          <Input
+            type="number"
+            min={1}
+            value={part.quantity}
+            onChange={e => onUpdate('quantity', parseInt(e.target.value) || 1)}
+            className="text-xs h-8 px-1 text-center"
+          />
+        </div>
+        <div className="col-span-3">
+          <Input
+            placeholder="Observações..."
+            value={part.notes}
+            onChange={e => onUpdate('notes', e.target.value)}
+            className="text-xs h-8"
+          />
+        </div>
+      </div>
+    </div>
   );
 }

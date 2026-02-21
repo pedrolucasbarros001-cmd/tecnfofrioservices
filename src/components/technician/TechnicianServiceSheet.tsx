@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -42,7 +41,6 @@ export function TechnicianServiceSheet({
   const { user } = useAuth();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState('details');
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   // content addition state
@@ -63,7 +61,6 @@ export function TechnicianServiceSheet({
     if (open) {
       setNewNote('');
       setCapturedPhotos([]);
-      setActiveTab('details');
     }
   }, [open, service?.id]);
 
@@ -79,22 +76,6 @@ export function TechnicianServiceSheet({
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
       return data as ServicePhoto[];
-    },
-    enabled: !!service?.id && open,
-  });
-
-  // Fetch activity logs
-  const { data: activityLogs = [] } = useQuery({
-    queryKey: ['activity-logs', service?.id],
-    queryFn: async () => {
-      if (!service?.id) return [];
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .eq('service_id', service.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
     },
     enabled: !!service?.id && open,
   });
@@ -170,8 +151,6 @@ export function TechnicianServiceSheet({
 
   if (!service) return null;
 
-  const statusConfig = SERVICE_STATUS_CONFIG[service.status];
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md p-0 flex flex-col h-full bg-background" side="right">
@@ -187,105 +166,94 @@ export function TechnicianServiceSheet({
           </div>
         </SheetHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-4 pt-2 shrink-0">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Detalhes</TabsTrigger>
-              <TabsTrigger value="history">Histórico</TabsTrigger>
-            </TabsList>
-          </div>
+        <ScrollArea className="flex-1">
+          <div className="space-y-6 p-4">
+            {/* Edit button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+              onClick={() => setEditModalOpen(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Editar Serviço
+            </Button>
 
-          <TabsContent value="details" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-2">
-            <ScrollArea className="flex-1">
-              <div className="space-y-6 p-4">
-                {/* Edit button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2"
-                  onClick={() => setEditModalOpen(true)}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar Serviço
-                </Button>
-                {(service.customer || service.contact_name) && (
-                  <div className="space-y-1">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cliente</div>
-                    <div className="font-medium text-lg">{service.contact_name || service.customer?.name}</div>
-                    {(service.contact_phone || service.customer?.phone) && <div className="text-sm text-muted-foreground">{service.contact_phone || service.customer?.phone}</div>}
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Equipamento</div>
-                  <div className="font-medium text-base">
-                    {[service.appliance_type, service.brand, service.model]
-                      .filter(Boolean)
-                      .join(' ') || 'Não especificado'}
-                  </div>
-                </div>
-
-                {service.fault_description && (
-                  <div className="space-y-1">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Avaria Reportada</div>
-                    <div className="text-sm bg-muted/50 p-3 rounded-md italic">"{service.fault_description}"</div>
-                  </div>
-                )}
-
-                {service.work_performed && (
-                  <div className="space-y-1">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Trabalho Realizado</div>
-                    <div className="text-sm border-l-2 border-primary/50 pl-3 py-1">{service.work_performed}</div>
-                  </div>
-                )}
-
-                {/* Photos gallery preview */}
-                {servicePhotos && servicePhotos.length > 0 && (
-                  <div className="pt-2">
-                    <Separator className="mb-4" />
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-sm font-medium">Fotos ({servicePhotos.length})</div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {servicePhotos.map((photo, index) => (
-                        <button
-                          key={photo.id}
-                          className="relative aspect-square group rounded-md overflow-hidden bg-muted"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setGalleryIndex(index);
-                            setGalleryOpen(true);
-                          }}
-                        >
-                          <img
-                            src={photo.file_url}
-                            alt={photo.description || 'Foto do serviço'}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {(service.customer || service.contact_name) && (
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cliente</div>
+                <div className="font-medium text-lg">{service.contact_name || service.customer?.name}</div>
+                {(service.contact_phone || service.customer?.phone) && <div className="text-sm text-muted-foreground">{service.contact_phone || service.customer?.phone}</div>}
               </div>
-            </ScrollArea>
-          </TabsContent>
+            )}
 
-          <TabsContent value="history" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0 bg-muted/10">
-            {/* Input Area */}
-            <div className="p-4 bg-background border-b shadow-sm space-y-3 shrink-0">
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Equipamento</div>
+              <div className="font-medium text-base">
+                {[service.appliance_type, service.brand, service.model]
+                  .filter(Boolean)
+                  .join(' ') || 'Não especificado'}
+              </div>
+            </div>
+
+            {service.fault_description && (
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Avaria Reportada</div>
+                <div className="text-sm bg-muted/50 p-3 rounded-md italic">"{service.fault_description}"</div>
+              </div>
+            )}
+
+            {service.work_performed && (
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Trabalho Realizado</div>
+                <div className="text-sm border-l-2 border-primary/50 pl-3 py-1">{service.work_performed}</div>
+              </div>
+            )}
+
+            {/* Photos gallery preview */}
+            {servicePhotos && servicePhotos.length > 0 && (
+              <div className="pt-2">
+                <Separator className="mb-4" />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-medium">Fotos ({servicePhotos.length})</div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {servicePhotos.map((photo, index) => (
+                    <button
+                      key={photo.id}
+                      className="relative aspect-square group rounded-md overflow-hidden bg-muted"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGalleryIndex(index);
+                        setGalleryOpen(true);
+                      }}
+                    >
+                      <img
+                        src={photo.file_url}
+                        alt={photo.description || 'Foto do serviço'}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Note Area (Instead of a tab) */}
+            <Separator />
+            <div className="space-y-3">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Adicionar Observação</div>
               <Textarea
                 placeholder="Escreva uma observação..."
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                className="min-h-[80px] resize-none focus-visible:ring-1"
+                className="min-h-[80px] resize-none focus-visible:ring-1 text-sm"
               />
 
-              {/* Photos preview - multi-photo */}
               {capturedPhotos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {capturedPhotos.map((photo, i) => (
-                    <div key={i} className="relative inline-block border rounded-md overflow-hidden h-20 w-20">
+                    <div key={i} className="relative inline-block border rounded-md overflow-hidden h-16 w-16">
                       <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         onClick={() => setCapturedPhotos(prev => prev.filter((_, idx) => idx !== i))}
@@ -304,66 +272,24 @@ export function TechnicianServiceSheet({
                   size="sm"
                   onClick={() => setShowCamera(true)}
                   disabled={capturedPhotos.length >= MAX_PHOTOS}
-                  className={cn("gap-2 text-xs", capturedPhotos.length > 0 ? "text-primary border-primary bg-primary/5" : "")}
+                  className={cn("gap-2 text-[10px] h-8", capturedPhotos.length > 0 ? "text-primary border-primary bg-primary/5" : "")}
                 >
-                  <Camera className="h-4 w-4" />
-                  {capturedPhotos.length > 0 ? `${capturedPhotos.length}/${MAX_PHOTOS} fotos` : 'Adicionar Foto'}
+                  <Camera className="h-3.5 w-3.5" />
+                  {capturedPhotos.length > 0 ? `${capturedPhotos.length} fotos` : 'Foto'}
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleAddStart}
                   disabled={(!newNote.trim() && capturedPhotos.length === 0) || isSubmitting}
-                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
+                  className="gap-2 text-[10px] h-8 px-4"
                 >
-                  {isSubmitting ? 'A enviar...' : 'Publicar'}
+                  {isSubmitting ? '...' : 'Publicar'}
                   <Send className="h-3 w-3" />
                 </Button>
               </div>
             </div>
-
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-6 pb-4">
-                {activityLogs.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8 text-sm flex flex-col items-center gap-2">
-                    <MessageSquare className="h-8 w-8 text-muted-foreground/30" />
-                    Nenhuma atividade registada ainda.
-                  </div>
-                ) : (
-                  activityLogs.map((log: any, index: number) => {
-                    const isNote = log.action_type === 'nota_adicionada';
-                    return (
-                      <div key={log.id} className="relative pl-6 pb-6 last:pb-0 group">
-                        {/* Timeline line */}
-                        {index !== activityLogs.length - 1 && (
-                          <div className="absolute left-[9px] top-7 bottom-0 w-px bg-border group-last:hidden" />
-                        )}
-
-                        {/* Timeline dot */}
-                        <div className={cn(
-                          "absolute left-0 top-1 h-[19px] w-[19px] rounded-full flex items-center justify-center border-[3px] border-background shadow-sm z-10",
-                          isNote ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" : "bg-muted text-muted-foreground"
-                        )}>
-                          {isNote ? <MessageSquare className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">
-                              {log.created_at ? format(new Date(log.created_at), "d MMM HH:mm", { locale: pt }) : '-'}
-                            </span>
-                          </div>
-                          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                            {log.description}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </ScrollArea>
       </SheetContent>
 
       {servicePhotos && servicePhotos.length > 0 && (
