@@ -693,6 +693,7 @@ export type Database = {
           parts_cost: number | null
           pending_pricing: boolean | null
           pickup_date: string | null
+          pnc: string | null
           pricing_description: string | null
           scheduled_date: string | null
           scheduled_shift: string | null
@@ -735,6 +736,7 @@ export type Database = {
           parts_cost?: number | null
           pending_pricing?: boolean | null
           pickup_date?: string | null
+          pnc?: string | null
           pricing_description?: string | null
           scheduled_date?: string | null
           scheduled_shift?: string | null
@@ -777,6 +779,7 @@ export type Database = {
           parts_cost?: number | null
           pending_pricing?: boolean | null
           pickup_date?: string | null
+          pnc?: string | null
           pricing_description?: string | null
           scheduled_date?: string | null
           scheduled_shift?: string | null
