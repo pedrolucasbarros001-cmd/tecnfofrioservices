@@ -59,7 +59,7 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md w-[95vw]">
+        <DialogContent className="sm:max-w-md max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>

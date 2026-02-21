@@ -310,7 +310,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Criar Orçamento</DialogTitle>
           </DialogHeader>

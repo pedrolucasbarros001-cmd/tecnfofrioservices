@@ -151,7 +151,7 @@ export function FieldPaymentStep({
 
     return (
         <Dialog open={open} onOpenChange={() => handleSkip()}>
-            <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+            <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6">
                 {/* Header */}
                 <DialogHeader className="p-0 mb-3">
                     <div className={cn(headerBg, headerText, 'px-4 py-2 rounded-lg -mx-6 -mt-6 mb-3')}>

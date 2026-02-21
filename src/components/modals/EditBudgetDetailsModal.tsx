@@ -144,7 +144,7 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="sm:max-w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Editar Artigos do Orçamento</DialogTitle>
         </DialogHeader>
