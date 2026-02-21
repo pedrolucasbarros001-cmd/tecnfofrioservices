@@ -46,6 +46,7 @@ import type { Service, PhotoType } from "@/types/database";
 // Steps for repair services (reparacao)
 type RepairModalStep =
   | "resumo"
+  | "resumo_continuacao"
   | "deslocacao"
   | "foto_aparelho"
   | "foto_etiqueta"
@@ -54,10 +55,11 @@ type RepairModalStep =
   | "diagnostico"
   | "decisao"
   | "pecas_usadas"
-  | "pedir_peca";
+  | "pedir_peca"
+  | "confirmacao_peca";
 
 // Steps for other services (original flow)
-type OtherModalStep = "resumo" | "deslocacao" | "foto" | "produto" | "diagnostico" | "decisao" | "pecas_usadas" | "pedir_peca";
+type OtherModalStep = "resumo" | "resumo_continuacao" | "deslocacao" | "foto" | "produto" | "diagnostico" | "decisao" | "pecas_usadas" | "pedir_peca" | "confirmacao_peca";
 
 type ModalStep = RepairModalStep | OtherModalStep;
 type DecisionType = "reparar_local" | "levantar_oficina";
@@ -99,6 +101,7 @@ interface VisitFormData {
   productSerial: string;
   productPNC: string;
   productType: string;
+  partInstalled: boolean;
   [key: string]: unknown;
 }
 
@@ -123,6 +126,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     productSerial: "",
     productPNC: "",
     productType: "",
+    partInstalled: false,
   });
   const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -361,7 +365,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         // A função verifica que o utilizador é o técnico atribuído e
         // executa o UPDATE como dono da BD (bypassa o RLS WITH CHECK que
         // impede definir technician_id=null a partir do cliente).
-        const { error: rpcError } = await supabase.rpc('lift_service_to_workshop', {
+        const { error: rpcError } = await (supabase.rpc as any)('lift_service_to_workshop', {
           _service_id: service.id,
           _detected_fault: formData.detectedFault || null,
         });
@@ -497,7 +501,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       productPNC: "",
       productType: "",
       partInstalled: false,
-    });
+    } as VisitFormData);
     onClose();
   };
 
@@ -656,7 +660,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
       <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
             step="Passo 1"
@@ -720,7 +724,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 2: Deslocação */}
       <Dialog open={currentStep === "deslocacao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
           <div className="space-y-4">
@@ -758,7 +762,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           open={currentStep === "foto_aparelho" && !showCamera && !showSignature}
           onOpenChange={(open) => !open && handleClose()}
         >
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Foto do Aparelho" step="Passo 3" />
 
             <div className="space-y-4">
@@ -814,7 +818,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           open={currentStep === "foto_etiqueta" && !showCamera && !showSignature}
           onOpenChange={(open) => !open && handleClose()}
         >
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
 
             <div className="space-y-4">
@@ -871,7 +875,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           open={currentStep === "foto_estado" && !showCamera && !showSignature}
           onOpenChange={(open) => !open && handleClose()}
         >
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Estado do Aparelho" step="Passo 5" />
 
             <div className="space-y-4">
@@ -934,7 +938,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
       {!isReparacao && (
         <Dialog open={currentStep === "foto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Tirar Foto" step="Passo 3" />
 
             <div className="space-y-4">
@@ -983,7 +987,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       {needsProductStep && (
         <Dialog open={currentStep === "produto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
-          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+          <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
             <div className="space-y-4">
@@ -1061,7 +1065,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal 4/6: Diagnóstico */}
       <Dialog open={currentStep === "diagnostico" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
 
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
           <div className="space-y-4">
@@ -1097,7 +1101,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 5/7: Decisão */}
       <Dialog open={currentStep === "decisao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
 
           <p className="text-sm text-muted-foreground mb-4">Qual será o próximo passo?</p>
@@ -1168,7 +1172,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
       <Dialog open={currentStep === "pecas_usadas" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Peças Usadas" step={isReparacao ? "Passo 8" : "Passo 6"} />
 
           <div className="space-y-4">
@@ -1258,7 +1262,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 7/9: Pedir Peça? (only for reparar_local) */}
       <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? "Passo 9" : "Passo 7"} />
 
           <div className="space-y-4">
@@ -1351,7 +1355,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 3d: Confirmação Peça */}
       <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
           <div className="space-y-4 py-4">

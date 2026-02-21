@@ -75,6 +75,7 @@ const formSchema = z.object({
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
+  pnc: z.string().optional(),
   fault_description: z.string().min(1, 'Avaria é obrigatória'),
 
   // Options
@@ -540,6 +541,53 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                             <FormLabel>Marca</FormLabel>
                             <FormControl>
                               <Input placeholder="Ex: Samsung" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Row 4b: Modelo + Nº Série */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="model"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Modelo</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: WAT24469ES" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="serial_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nº de Série</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Número de série" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Row 4c: PNC */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="pnc"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>PNC</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Product Number Code" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
