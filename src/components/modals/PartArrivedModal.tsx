@@ -131,7 +131,8 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
         scheduled_shift: (scheduledShift as any) || null,
         notes: notes ? `${service.notes || ''}\n[Peça chegou] ${notes}`.trim() : service.notes,
-        last_status_before_part_request: null, // Clear the saved status
+        // Keep last_status_before_part_request so UI shows "Continuar" button
+        // It will be cleared when the technician completes the continuation flow
         skipToast: true,
       });
 

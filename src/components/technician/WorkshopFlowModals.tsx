@@ -286,6 +286,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
+      // Clear continuation flag separately (RPC COALESCE won't set null)
+      if (mode === "continuacao_peca") {
+        await supabase.from("services").update({ last_status_before_part_request: null }).eq("id", service.id);
+      }
+
       // Log activity
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
