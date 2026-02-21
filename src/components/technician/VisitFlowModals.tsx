@@ -546,7 +546,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const canProceedFromConfirmarPeca = formData.partInstalled === true;
 
   // Check if product info step is needed (for repairs or if info missing)
-  const needsProductStep = !(service.brand || formData.productBrand) || !(service.model || formData.productModel);
+  const needsProductStep = !service.brand || !service.model;
 
   // Get step list based on service type and mode
   const getSteps = (): string[] => {
@@ -992,8 +992,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       )}
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      {needsProductStep && (
-        <Dialog open={currentStep === "produto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "produto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
@@ -1067,7 +1066,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
 
       {/* Modal 4/6: Diagnóstico */}
       <Dialog open={currentStep === "diagnostico" && !showCamera} onOpenChange={(open) => !open && handleClose()}>

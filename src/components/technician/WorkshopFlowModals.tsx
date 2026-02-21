@@ -330,7 +330,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   // Check if product info step is needed
   // We check both the service prop (DB state) and formData (local state) to avoid repetition
-  const needsProductStep = !(service.brand || formData.productBrand) || !(service.model || formData.productModel);
+  const needsProductStep = !service.brand || !service.model;
 
   const handleProductoConfirm = async () => {
     try {
@@ -633,8 +633,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      {needsProductStep && (
-        <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Informação do Produto" step="Passo 2" />
 
@@ -708,7 +707,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
 
       {/* Modal 2: Diagnóstico Complementar */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
