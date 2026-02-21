@@ -1,93 +1,99 @@
 
-# Plano Actualizado: Melhorias UX Tecnicos + Scroll + Morada Inteligente
+# Auditoria e Padronizacao Visual de Modais
 
-## 1. Corrigir Scroll nos Modais de Criacao de Servico
+## Diagnostico
 
-O `CreateServiceModal.tsx` ja tem a estrutura `flex flex-col` + `overflow-y-auto`, mas o scroll pode falhar porque a `DialogContent` nao tem `overflow-hidden` e o conteudo pode "escapar". O `CustomerDetailSheet.tsx` usa `ScrollArea` que pode ter problemas semelhantes.
+Analisei todos os modais do sistema e confirmei que **o codigo ja garanta que todos os utilizadores do mesmo cargo (role) veem exactamente a mesma interface**. Nao existe logica por utilizador individual -- apenas por `role` (`dono`, `secretaria`, `tecnico`). Dois tecnicos verao sempre os mesmos modais, e o mesmo aplica-se a administradores e secretarias.
 
-**Correcao**: Em ambos os modais, garantir que:
-- `DialogContent` tem `overflow-hidden` alem de `flex flex-col`
-- O container de scroll tem `min-h-0` para que o flex shrink funcione
-- Testar com conteudo extenso (campos de garantia abertos + fotos)
+As diferencas visiveis entre contas de cargos diferentes sao intencionais (permissoes), mas encontrei **inconsistencias de estilo entre modais** que devem ser padronizadas:
 
-**Ficheiros**: `CreateServiceModal.tsx`, `CustomerDetailSheet.tsx`
+## Inconsistencias Encontradas
 
-## 2. Logica Inteligente de Morada (Fallback para Perfil do Cliente)
+### Larguras de modais inconsistentes
+Cada modal usa uma largura diferente sem razao aparente:
 
-**Problema actual**: O `CreateServiceModal` copia SEMPRE a morada do cliente para `service_address` (linhas 274-276), duplicando os dados. O `CustomerDetailSheet` pre-preenche os campos com a morada do cliente nos defaultValues (linhas 568-570), e grava o que estiver nos campos -- mesmo que seja a mesma morada.
+| Modal | Largura actual |
+|---|---|
+| RegisterPaymentModal | `sm:max-w-[425px]` |
+| ContactClientModal | `sm:max-w-[400px]` |
+| PartArrivedModal | `sm:max-w-[450px]` |
+| RescheduleServiceModal | `sm:max-w-[500px]` |
+| CreateUserModal / EditUserModal | `sm:max-w-[500px]` |
+| RequestTransferModal / SendTaskModal | `sm:max-w-md` |
+| ConvertBudgetModal | `sm:max-w-lg` |
+| CreateServiceModal | `sm:max-w-lg` |
+| CreateBudgetModal / SetPriceModal | `sm:max-w-[900px]` |
+| Modais tecnicos (todos) | `max-w-md w-[95vw]` |
 
-**Logica desejada**: Se o utilizador NAO preencher morada alternativa, o sistema deve guardar `null` nos campos `service_address/service_postal_code/service_city`. Ao exibir, se estes campos forem `null`, usa a morada do perfil do cliente como fallback.
+### Estruturas de scroll inconsistentes
+- Alguns modais usam `flex flex-col` + `overflow-y-auto` com `p-0` (padrao correcto)
+- Outros usam `overflow-y-auto` directamente no `DialogContent` sem flex
+- Modais de tecnico usam `w-[95vw]` para mobile mas os de admin nao
 
-**Implementacao**:
+### Padding e header inconsistentes
+- Modais de tecnico: `p-6` no DialogContent + `ModalHeader` customizado
+- Modais de admin: padding default do DialogContent + `DialogHeader` padrao
 
-### CreateServiceModal.tsx
-- Remover a copia automatica de `customer_address` -> `service_address` no submit (linhas 274-276)
-- Adicionar uma seccao "Morada do Servico" com checkbox/toggle: "Morada diferente do cliente?"
-- Se desactivado: nao mostrar campos de morada, gravar `null`
-- Se activado: mostrar campos editaveis (morada, codigo postal, cidade), gravar os valores
+## Plano de Padronizacao
 
-### CustomerDetailSheet.tsx
-- Remover o pre-preenchimento de morada nos defaultValues (linhas 568-570) -- comecar vazio
-- Mesma logica: toggle "Morada diferente?" que revela campos de morada
-- Se vazio/desactivado: gravar `null` (fallback para perfil do cliente)
-- Se preenchido: gravar a morada alternativa
+### Regra: 3 tamanhos padrao
 
-### Exibicao (ServiceDetailSheet, impressao, etc.)
-- Ja funciona com fallback (`contact_phone || customer?.phone`) conforme a memoria do sistema. A morada segue a mesma regra: `service_address || customer?.address`
+1. **Pequeno** (`sm:max-w-md w-[95vw]`): modais simples com poucos campos -- ContactClient, SendTask, RequestTransfer, ServiceTag
+2. **Medio** (`sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0`): modais com formularios -- RegisterPayment, PartArrived, RescheduleService, CreateUser, EditUser, ForceState, AssignTechnician, ConvertBudget, EditServiceDetails, RequestPart, ConfirmPartOrder, UsedParts
+3. **Grande** (`sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0`): modais com tabelas/listas -- CreateBudget, SetPrice, CreateService, CreateDelivery, CreateInstallation
+4. **Modais tecnicos**: manter `max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6` (ja consistentes entre si)
 
-## 3. Melhorias UX Tecnicos (do plano anterior)
+### Regra: estrutura de scroll padrao
 
-### 3a. Tap-to-Call nos Cards
-- `ServicosPage.tsx`: Adicionar telefone clicavel (`<a href="tel:...">`) no `ServiceCard`
-- Modais de fluxo (`VisitFlowModals`, `InstallationFlowModals`, `DeliveryFlowModals`): Telefone clicavel nos resumos
+Todos os modais medios e grandes seguem:
 
-### 3b. Debounce no saveStateToDb
-- `useFlowPersistence.ts`: Adicionar debounce de 2 segundos com `setTimeout`/`clearTimeout` via `useRef`
+```text
+DialogContent (flex flex-col, max-h-[90vh], overflow-hidden, p-0)
+  DialogHeader (px-6 pt-6 pb-4, flex-shrink-0)
+  div.flex-1.overflow-y-auto.min-h-0.px-6 (conteudo com scroll)
+  DialogFooter (px-6 py-4, border-t, flex-shrink-0)
+```
 
-### 3c. Remover Paginas Legacy
-- Eliminar `TechnicianVisitFlow.tsx`, `TechnicianInstallationFlow.tsx`, `TechnicianDeliveryFlow.tsx`
-- `App.tsx`: Redirecionar rotas `/tecnico/visita/:id`, `/tecnico/instalacao/:id`, `/tecnico/entrega/:id` para `/servicos`
+### Regra: `w-[95vw]` em todos
 
-### 3d. PhotoType -- Adicionar tipos em falta
-- `database.ts`: Adicionar `'instalacao_antes' | 'instalacao_depois'` ao `PhotoType` e ao `PHOTO_TYPE_LABELS`
+Adicionar `w-[95vw]` a todos os modais para garantir que em mobile ocupam a largura correcta, independentemente do cargo.
 
-### 3e. Loading nos Botoes de Submissao
-- `VisitFlowModals.tsx`, `WorkshopFlowModals.tsx`, `DeliveryFlowModals.tsx`: `disabled={isSubmitting}` + texto "A processar..." nos botoes finais
-
-### 3f. Historico do Tecnico com Badges
-- `TechnicianHistoryPage.tsx`: Adicionar badges de tipo de servico e tags de urgencia/garantia
-
-## Resumo de Ficheiros
+## Ficheiros a Alterar
 
 | Ficheiro | Alteracao |
 |---|---|
-| `CreateServiceModal.tsx` | Scroll fix + morada inteligente (toggle) |
-| `CustomerDetailSheet.tsx` | Scroll fix + morada inteligente (toggle) |
-| `ServicosPage.tsx` | Tap-to-call no card |
-| `useFlowPersistence.ts` | Debounce 2s no saveStateToDb |
-| `VisitFlowModals.tsx` | Tap-to-call + loading buttons |
-| `InstallationFlowModals.tsx` | Tap-to-call |
-| `DeliveryFlowModals.tsx` | Tap-to-call + loading button |
-| `WorkshopFlowModals.tsx` | Loading buttons |
-| `TechnicianHistoryPage.tsx` | Badges tipo servico |
-| `database.ts` | PhotoType instalacao_antes/depois |
-| `App.tsx` | Remover rotas legacy, redirecionar |
-| `TechnicianVisitFlow.tsx` | ELIMINAR |
-| `TechnicianInstallationFlow.tsx` | ELIMINAR |
-| `TechnicianDeliveryFlow.tsx` | ELIMINAR |
+| `RegisterPaymentModal.tsx` | `sm:max-w-[425px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar header/scroll/footer |
+| `ContactClientModal.tsx` | `sm:max-w-[400px]` -> `sm:max-w-md w-[95vw]` |
+| `PartArrivedModal.tsx` | `sm:max-w-[450px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `RescheduleServiceModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `CreateUserModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `EditUserModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `ForceStateModal.tsx` | Adicionar `w-[95vw]` + reestruturar scroll |
+| `ConvertBudgetModal.tsx` | `sm:max-w-lg` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `RequestPartModal.tsx` | Padronizar para medio |
+| `ConfirmPartOrderModal.tsx` | Padronizar para medio |
+| `UsedPartsModal.tsx` | `max-w-md w-[95vw]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
+| `ServicePrintModal.tsx` | Padronizar |
+| `ServiceTagModal.tsx` | `sm:max-w-sm` -> `sm:max-w-md w-[95vw]` |
+| `SendTaskModal.tsx` | Adicionar `w-[95vw]` |
+| `RequestTransferModal.tsx` | Adicionar `w-[95vw]` |
+| `CreateServiceModal.tsx` | Verificar que ja tem a estrutura correcta |
+| `CreateDeliveryModal.tsx` | Verificar que ja tem a estrutura correcta |
+| `CreateInstallationModal.tsx` | Verificar que ja tem a estrutura correcta |
+| `SetPriceModal.tsx` | Verificar que ja tem a estrutura correcta |
+| `CreateBudgetModal.tsx` | Verificar que ja tem a estrutura correcta |
+| `EditBudgetDetailsModal.tsx` | Padronizar |
+| `AssignDeliveryModal.tsx` | Padronizar |
+| `DeliveryManagementModal.tsx` | Padronizar |
 
-## Detalhe Tecnico: Morada Inteligente
+## Modais de Tecnico (ja consistentes)
 
-```text
-Criacao de Servico:
-  [x] Morada diferente do cliente?
-      Se NAO marcado -> service_address = null (usa perfil)
-      Se SIM marcado -> mostra campos editaveis -> grava valores
+Os modais de fluxo do tecnico (`VisitFlowModals`, `WorkshopFlowModals`, `InstallationFlowModals`, `DeliveryFlowModals`) ja usam todos o mesmo padrao `max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6`. Nao precisam de alteracao.
 
-Exibicao/Impressao:
-  morada = service.service_address || customer.address
-  cidade = service.service_city || customer.city
-  codigo_postal = service.service_postal_code || customer.postal_code
-```
+## Resultado Esperado
 
-Esta logica ja existe parcialmente no sistema (memoria `logic/service-contact-overrides`). A mudanca e garantir que NAO se duplicam dados quando a morada e a mesma.
+Apos esta padronizacao:
+- Todos os modais terao largura e comportamento de scroll consistentes
+- Em mobile, todos ocuparao 95% da largura do ecra
+- A estrutura visual (header fixo, conteudo com scroll, footer fixo) sera identica em todos
+- Nenhuma diferenca visual entre contas do mesmo cargo ou entre contas de cargos diferentes (excepto botoes de permissao)
