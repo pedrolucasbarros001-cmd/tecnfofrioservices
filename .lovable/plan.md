@@ -1,99 +1,100 @@
 
-# Auditoria e Padronizacao Visual de Modais
 
-## Diagnostico
+# Plano: Fotos na Ficha + Edicao de Servico pelo Tecnico + Fotos na Criacao + Scroll Final
 
-Analisei todos os modais do sistema e confirmei que **o codigo ja garanta que todos os utilizadores do mesmo cargo (role) veem exactamente a mesma interface**. Nao existe logica por utilizador individual -- apenas por `role` (`dono`, `secretaria`, `tecnico`). Dois tecnicos verao sempre os mesmos modais, e o mesmo aplica-se a administradores e secretarias.
+## 1. Fotos do Tecnico na Ficha de Consulta (ServiceDetailSheet)
 
-As diferencas visiveis entre contas de cargos diferentes sao intencionais (permissoes), mas encontrei **inconsistencias de estilo entre modais** que devem ser padronizadas:
+**Diagnostico**: A ficha lateral (`ServiceDetailSheet.tsx`) ja carrega e exibe TODAS as fotos da tabela `service_photos` (linha 689-715), incluindo fotos tiradas pelo tecnico via fluxo de execucao e via historico (`TechnicianServiceSheet`). Se as fotos nao estao a aparecer, o problema e que as fotos adicionadas pelo historico sao guardadas como **base64 data URLs** directamente no campo `file_url` (linha 115-118 do `TechnicianServiceSheet`), o que funciona mas pode causar problemas de performance ou display.
 
-## Inconsistencias Encontradas
+**Solucao**: As fotos adicionadas via historico do tecnico devem ser carregadas para o bucket `service-photos` do Supabase Storage (tal como as fotos de oficina no `CreateServiceModal`), em vez de guardar base64 directamente na base de dados. Isto garante:
+- Exibicao consistente na ficha lateral
+- Melhor performance (URLs publicas em vez de base64 enorme)
+- Consistencia com o resto do sistema
 
-### Larguras de modais inconsistentes
-Cada modal usa uma largura diferente sem razao aparente:
+**Ficheiro**: `src/components/technician/TechnicianServiceSheet.tsx`
+- Converter `capturedPhotos` de base64 para upload ao bucket `service-photos`
+- Gerar URL publica e guardar essa URL no `file_url`
 
-| Modal | Largura actual |
-|---|---|
-| RegisterPaymentModal | `sm:max-w-[425px]` |
-| ContactClientModal | `sm:max-w-[400px]` |
-| PartArrivedModal | `sm:max-w-[450px]` |
-| RescheduleServiceModal | `sm:max-w-[500px]` |
-| CreateUserModal / EditUserModal | `sm:max-w-[500px]` |
-| RequestTransferModal / SendTaskModal | `sm:max-w-md` |
-| ConvertBudgetModal | `sm:max-w-lg` |
-| CreateServiceModal | `sm:max-w-lg` |
-| CreateBudgetModal / SetPriceModal | `sm:max-w-[900px]` |
-| Modais tecnicos (todos) | `max-w-md w-[95vw]` |
+## 2. Edicao de Servico pelo Tecnico
 
-### Estruturas de scroll inconsistentes
-- Alguns modais usam `flex flex-col` + `overflow-y-auto` com `p-0` (padrao correcto)
-- Outros usam `overflow-y-auto` directamente no `DialogContent` sem flex
-- Modais de tecnico usam `w-[95vw]` para mobile mas os de admin nao
+**Problema**: O tecnico nao tem forma eficiente de corrigir dados do servico (equipamento, pecas usadas, adicionar mais pecas). A unica opcao actual e ir ao historico e adicionar uma nota.
 
-### Padding e header inconsistentes
-- Modais de tecnico: `p-6` no DialogContent + `ModalHeader` customizado
-- Modais de admin: padding default do DialogContent + `DialogHeader` padrao
+**Solucao**: Adicionar um botao "Editar Servico" na ficha do tecnico (`TechnicianServiceSheet`) que abre um modal dedicado com as seguintes opcoes editaveis:
 
-## Plano de Padronizacao
+### Modal `TechnicianEditServiceModal` (novo ficheiro)
+- **Dados do Equipamento**: marca, modelo, numero de serie (campos que o tecnico preenche/corrige no campo)
+- **Avaria Detectada**: campo de texto para corrigir/complementar o diagnostico
+- **Trabalho Realizado**: campo de texto para corrigir/complementar
+- **Pecas Usadas**: lista editavel das pecas ja registadas + botao para adicionar mais pecas
+  - Cada peca: nome, codigo, quantidade, notas
+  - Possibilidade de remover pecas adicionadas por engano
+- **Pedido de Nova Peca**: botao para solicitar nova peca (reutiliza logica existente do `RequestPartModal`)
 
-### Regra: 3 tamanhos padrao
+### Permissoes
+- O tecnico so pode editar servicos que lhe estao atribuidos (ja garantido pelo RLS)
+- Campos financeiros (preco, pagamento) NAO aparecem para o tecnico (regra do sistema)
+- Cada edicao gera um registo no `activity_logs` para rastreabilidade
 
-1. **Pequeno** (`sm:max-w-md w-[95vw]`): modais simples com poucos campos -- ContactClient, SendTask, RequestTransfer, ServiceTag
-2. **Medio** (`sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0`): modais com formularios -- RegisterPayment, PartArrived, RescheduleService, CreateUser, EditUser, ForceState, AssignTechnician, ConvertBudget, EditServiceDetails, RequestPart, ConfirmPartOrder, UsedParts
-3. **Grande** (`sm:max-w-[900px] w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0`): modais com tabelas/listas -- CreateBudget, SetPrice, CreateService, CreateDelivery, CreateInstallation
-4. **Modais tecnicos**: manter `max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6` (ja consistentes entre si)
+### Ficheiros
+- **Novo**: `src/components/technician/TechnicianEditServiceModal.tsx`
+- **Editar**: `src/components/technician/TechnicianServiceSheet.tsx` (adicionar botao "Editar" no tab "Detalhes")
 
-### Regra: estrutura de scroll padrao
+## 3. Upload de Fotos na Criacao de Servico (Oficina)
 
-Todos os modais medios e grandes seguem:
+**Diagnostico**: O `CreateServiceModal.tsx` ja tem a funcionalidade de upload de fotos para servicos de oficina (linhas 632-672). A secao "Fotos do Equipamento (max. 5)" ja aparece quando `serviceLocation === 'oficina'` e as fotos sao carregadas para o bucket `service-photos` no submit (linhas 283-307).
 
-```text
-DialogContent (flex flex-col, max-h-[90vh], overflow-hidden, p-0)
-  DialogHeader (px-6 pt-6 pb-4, flex-shrink-0)
-  div.flex-1.overflow-y-auto.min-h-0.px-6 (conteudo com scroll)
-  DialogFooter (px-6 py-4, border-t, flex-shrink-0)
-```
+**Resultado**: Esta funcionalidade ja esta implementada e disponivel para todos os utilizadores com permissao de criar servicos (dono e secretaria). Nao e necessaria nenhuma alteracao adicional.
 
-### Regra: `w-[95vw]` em todos
+## 4. Correcao Final de Scroll nos Modais
 
-Adicionar `w-[95vw]` a todos os modais para garantir que em mobile ocupam a largura correcta, independentemente do cargo.
+**Diagnostico**: O `ServicePrintModal.tsx` usa a classe `print-modal-a4` sem as classes padrao de scroll. Precisa de verificacao.
 
-## Ficheiros a Alterar
+**Modais a verificar/corrigir**:
+
+| Modal | Estado | Accao |
+|---|---|---|
+| `ServicePrintModal.tsx` | Usa classe especial `print-modal-a4` | Verificar se tem scroll, adicionar `max-w-[95vw]` se necessario |
+| Todos os outros | Ja padronizados com `max-w-[95vw]` | Confirmado OK |
+
+O `ServicePrintModal` e o unico modal que nao segue o padrao. Tem uma classe CSS customizada `print-modal-a4` que precisa incluir `max-w-[95vw]` e scroll vertical para mobile.
+
+**Ficheiro**: `src/components/modals/ServicePrintModal.tsx` -- adicionar `max-w-[95vw]` a classe do DialogContent
+
+## Resumo de Ficheiros
 
 | Ficheiro | Alteracao |
 |---|---|
-| `RegisterPaymentModal.tsx` | `sm:max-w-[425px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar header/scroll/footer |
-| `ContactClientModal.tsx` | `sm:max-w-[400px]` -> `sm:max-w-md w-[95vw]` |
-| `PartArrivedModal.tsx` | `sm:max-w-[450px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `RescheduleServiceModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `CreateUserModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `EditUserModal.tsx` | `sm:max-w-[500px]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `ForceStateModal.tsx` | Adicionar `w-[95vw]` + reestruturar scroll |
-| `ConvertBudgetModal.tsx` | `sm:max-w-lg` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `RequestPartModal.tsx` | Padronizar para medio |
-| `ConfirmPartOrderModal.tsx` | Padronizar para medio |
-| `UsedPartsModal.tsx` | `max-w-md w-[95vw]` -> `sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0` + reestruturar |
-| `ServicePrintModal.tsx` | Padronizar |
-| `ServiceTagModal.tsx` | `sm:max-w-sm` -> `sm:max-w-md w-[95vw]` |
-| `SendTaskModal.tsx` | Adicionar `w-[95vw]` |
-| `RequestTransferModal.tsx` | Adicionar `w-[95vw]` |
-| `CreateServiceModal.tsx` | Verificar que ja tem a estrutura correcta |
-| `CreateDeliveryModal.tsx` | Verificar que ja tem a estrutura correcta |
-| `CreateInstallationModal.tsx` | Verificar que ja tem a estrutura correcta |
-| `SetPriceModal.tsx` | Verificar que ja tem a estrutura correcta |
-| `CreateBudgetModal.tsx` | Verificar que ja tem a estrutura correcta |
-| `EditBudgetDetailsModal.tsx` | Padronizar |
-| `AssignDeliveryModal.tsx` | Padronizar |
-| `DeliveryManagementModal.tsx` | Padronizar |
+| `TechnicianServiceSheet.tsx` | Upload fotos para Storage (em vez de base64) + botao "Editar" |
+| `TechnicianEditServiceModal.tsx` | **NOVO** -- modal de edicao de servico para tecnico |
+| `ServicePrintModal.tsx` | Adicionar `max-w-[95vw]` para mobile |
 
-## Modais de Tecnico (ja consistentes)
+## Detalhe Tecnico: Upload de Fotos (TechnicianServiceSheet)
 
-Os modais de fluxo do tecnico (`VisitFlowModals`, `WorkshopFlowModals`, `InstallationFlowModals`, `DeliveryFlowModals`) ja usam todos o mesmo padrao `max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-6`. Nao precisam de alteracao.
+```text
+Actual:
+  foto capturada -> base64 -> INSERT service_photos(file_url = base64)
 
-## Resultado Esperado
+Novo:
+  foto capturada -> base64 -> converter para Blob -> upload bucket 'service-photos'
+  -> obter URL publica -> INSERT service_photos(file_url = publicUrl)
+```
 
-Apos esta padronizacao:
-- Todos os modais terao largura e comportamento de scroll consistentes
-- Em mobile, todos ocuparao 95% da largura do ecra
-- A estrutura visual (header fixo, conteudo com scroll, footer fixo) sera identica em todos
-- Nenhuma diferenca visual entre contas do mesmo cargo ou entre contas de cargos diferentes (excepto botoes de permissao)
+## Detalhe Tecnico: Modal de Edicao do Tecnico
+
+```text
+TechnicianEditServiceModal
+  Tab/Seccao 1: Equipamento
+    - brand, model, serial_number (editaveis)
+    - detected_fault (textarea)
+    - work_performed (textarea)
+
+  Tab/Seccao 2: Pecas
+    - Lista de pecas existentes (editavel: quantidade, notas)
+    - Botao "Adicionar Peca" (nome, codigo, quantidade)
+    - Botao "Remover" em cada peca
+
+  Accoes:
+    - Guardar: UPDATE services + UPSERT service_parts + log activity
+    - Cancelar: fechar sem guardar
+```
+
