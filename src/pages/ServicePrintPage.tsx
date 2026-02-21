@@ -291,7 +291,7 @@ export default function ServicePrintPage() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
             <div>
               <span className="text-muted-foreground">Nome:</span>{' '}
-              <span className="font-medium">{service.customer?.name || 'N/A'}</span>
+              <span className="font-medium">{service.contact_name || service.customer?.name || 'N/A'}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Contribuinte:</span>{' '}
@@ -299,16 +299,16 @@ export default function ServicePrintPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Telefone:</span>{' '}
-              <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
+              <span className="font-medium">{service.contact_phone || service.customer?.phone || 'N/A'}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Email:</span>{' '}
-              <span className="font-medium">{service.customer?.email || 'N/A'}</span>
+              <span className="font-medium">{service.contact_email || service.customer?.email || 'N/A'}</span>
             </div>
             <div className="col-span-2">
               <span className="text-muted-foreground">Morada:</span>{' '}
               <span className="font-medium">
-                {[service.customer?.address, service.customer?.postal_code, service.customer?.city]
+                {[service.service_address || service.customer?.address, service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city]
                   .filter(Boolean)
                   .join(', ') || 'N/A'}
               </span>

@@ -133,6 +133,9 @@ export interface Service {
   service_address: string | null;
   service_postal_code: string | null;
   service_city: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
   notes: string | null;
   last_status_before_part_request: string | null;
   pricing_description: string | null;

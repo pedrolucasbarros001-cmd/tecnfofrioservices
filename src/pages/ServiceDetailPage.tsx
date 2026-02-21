@@ -254,23 +254,23 @@ export default function ServiceDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div>
               <span className="text-muted-foreground">Nome: </span>
-              <span className="font-medium">{service.customer?.name || "N/A"}</span>
+              <span className="font-medium">{service.contact_name || service.customer?.name || "N/A"}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Telefone: </span>
-              <span className="font-medium">{service.customer?.phone || "N/A"}</span>
+              <span className="font-medium">{service.contact_phone || service.customer?.phone || "N/A"}</span>
             </div>
-            {service.customer?.email && (
+            {(service.contact_email || service.customer?.email) && (
               <div>
                 <span className="text-muted-foreground">Email: </span>
-                <span className="font-medium">{service.customer.email}</span>
+                <span className="font-medium">{service.contact_email || service.customer?.email}</span>
               </div>
             )}
-            {(service.customer?.address || service.customer?.city) && (
+            {(service.service_address || service.customer?.address || service.customer?.city) && (
               <div className="flex items-start gap-1">
                 <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <span className="font-medium">
-                  {[service.customer?.address, service.customer?.postal_code, service.customer?.city]
+                  {[service.service_address || service.customer?.address, service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city]
                     .filter(Boolean)
                     .join(", ")}
                 </span>
