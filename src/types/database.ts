@@ -29,6 +29,8 @@ export type PhotoType =
   | 'oficina'
   | 'entrega'
   | 'instalacao'
+  | 'instalacao_antes'
+  | 'instalacao_depois'
   | 'antes'
   | 'depois';
 
@@ -41,6 +43,8 @@ export const PHOTO_TYPE_LABELS: Record<PhotoType, string> = {
   oficina: 'Oficina',
   entrega: 'Entrega',
   instalacao: 'Instalação',
+  instalacao_antes: 'Antes (Instalação)',
+  instalacao_depois: 'Depois (Instalação)',
   antes: 'Antes',
   depois: 'Depois',
 };

@@ -293,7 +293,13 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Telefone</p>
-                <p className="font-medium">{service.customer?.phone || 'N/A'}</p>
+                {(service.contact_phone || service.customer?.phone) ? (
+                  <a href={`tel:${service.contact_phone || service.customer?.phone}`} className="font-medium text-primary hover:underline">
+                    {service.contact_phone || service.customer?.phone}
+                  </a>
+                ) : (
+                  <p className="font-medium">N/A</p>
+                )}
               </div>
             </div>
             <div>

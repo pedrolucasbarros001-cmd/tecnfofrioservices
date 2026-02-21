@@ -271,9 +271,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         service_type: 'reparacao',
         status: initialStatus,
         pending_pricing: true,
-        service_address: values.customer_address,
-        service_postal_code: values.customer_postal_code,
-        service_city: values.customer_city,
+        service_address: null,
+        service_postal_code: null,
+        service_city: null,
         contact_name: values.customer_name,
         contact_phone: values.customer_phone,
         contact_email: values.customer_email || null,
@@ -343,7 +343,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">
               {step === 'location' ? 'Tipo de Serviço' : 'Criar Novo Serviço'}
