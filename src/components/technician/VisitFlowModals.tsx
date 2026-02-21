@@ -409,6 +409,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           pending_pricing: true,
           detected_fault: formData.detectedFault,
           work_performed: mode === "continuacao_peca" ? "Peça instalada e serviço concluído" : "Reparado no local do cliente",
+          last_status_before_part_request: null, // Clear continuation flag
           skipToast: true,
         });
 
