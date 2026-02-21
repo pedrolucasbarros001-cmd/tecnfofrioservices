@@ -459,7 +459,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="print-modal-a4">
+      <DialogContent className="print-modal-a4 max-w-[95vw]">
         {/* Header com botões - escondido na impressão */}
         <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
           <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>

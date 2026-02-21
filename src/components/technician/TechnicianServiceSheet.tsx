@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, Send, User, MessageSquare, X } from 'lucide-react';
+import { Camera, Send, User, MessageSquare, X, Pencil } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
+import { TechnicianEditServiceModal } from '@/components/technician/TechnicianEditServiceModal';
 
 interface TechnicianServiceSheetProps {
   service: Service | null;
@@ -42,6 +43,7 @@ export function TechnicianServiceSheet({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('details');
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // content addition state
   const [newNote, setNewNote] = useState('');
@@ -109,13 +111,33 @@ export function TechnicianServiceSheet({
     try {
       let noteText = newNote.trim();
 
-      // Upload all photos
+      // Upload all photos to Storage bucket
       if (capturedPhotos.length > 0) {
         for (const photoData of capturedPhotos) {
+          // Convert base64 to Blob
+          const base64Data = photoData.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+          const fileName = `${service.id}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
+          const { error: uploadError } = await supabase.storage
+            .from('service-photos')
+            .upload(fileName, blob, { contentType: 'image/jpeg' });
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from('service-photos')
+            .getPublicUrl(fileName);
+
           const { error: photoError } = await supabase.from('service_photos').insert({
             service_id: service.id,
             photo_type: photoType,
-            file_url: photoData,
+            file_url: urlData.publicUrl,
             description: noteText || 'Foto de observação',
             uploaded_by: user?.id
           });
@@ -176,6 +198,16 @@ export function TechnicianServiceSheet({
           <TabsContent value="details" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-2">
             <ScrollArea className="flex-1">
               <div className="space-y-6 p-4">
+                {/* Edit button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  onClick={() => setEditModalOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar Serviço
+                </Button>
                 {(service.customer || service.contact_name) && (
                   <div className="space-y-1">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cliente</div>
@@ -348,6 +380,12 @@ export function TechnicianServiceSheet({
         onOpenChange={setShowCamera}
         onCapture={handlePhotoCapture}
         title="Registar Foto"
+      />
+
+      <TechnicianEditServiceModal
+        service={service}
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
       />
     </Sheet>
   );

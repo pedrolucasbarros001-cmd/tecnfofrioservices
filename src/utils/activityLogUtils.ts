@@ -18,7 +18,8 @@ export type ActivityActionType =
   | 'transferencia_aceite'
   | 'transferencia_recusada'
   | 'nota_adicionada'
-  | 'criacao';
+  | 'criacao'
+  | 'servico_editado';
 
 export interface ActivityLogData {
   serviceId?: string;
