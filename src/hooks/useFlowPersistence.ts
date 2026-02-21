@@ -247,7 +247,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
 
   const saveStateToDb = useCallback(async (currentStep: string, formData?: T) => {
     try {
-      const { error } = await supabase.rpc('technician_update_service', {
+      const { error } = await (supabase.rpc as any)('technician_update_service', {
         _service_id: serviceId,
         _flow_step: currentStep,
         _flow_data: formData || null,

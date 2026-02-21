@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
-import type { Service, ServiceStatus } from '@/types/database';
+import type { Service, ServiceStatus, ServicePart, ServicePhoto, ServiceSignature, ServicePayment } from '@/types/database';
 import { toast } from 'sonner';
 
 // Helper para invalidar TODAS as queries de serviços

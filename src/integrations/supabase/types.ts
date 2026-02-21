@@ -1094,6 +1094,25 @@ export type Database = {
       is_monitor: { Args: { _user_id: string }; Returns: boolean }
       is_secretaria: { Args: { _user_id: string }; Returns: boolean }
       is_tecnico: { Args: { _user_id: string }; Returns: boolean }
+      lift_service_to_workshop: {
+        Args: { _detected_fault?: string; _service_id: string }
+        Returns: undefined
+      }
+      start_workshop_service: {
+        Args: { _service_id: string }
+        Returns: undefined
+      }
+      technician_update_service: {
+        Args: {
+          _detected_fault?: string
+          _last_status_before_part_request?: string
+          _pending_pricing?: boolean
+          _service_id: string
+          _status?: string
+          _work_performed?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "dono" | "secretaria" | "tecnico" | "monitor"
