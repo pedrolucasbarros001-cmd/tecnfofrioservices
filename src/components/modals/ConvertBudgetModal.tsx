@@ -207,13 +207,14 @@ export function ConvertBudgetModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">Converter Orçamento em Serviço</DialogTitle>
           <p className="text-sm text-muted-foreground">Ao converter, será criado um serviço com os dados deste orçamento.</p>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6">
+         <div className="space-y-6 py-4">
           {/* Service Type Selection */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Tipo de Serviço</Label>
@@ -379,9 +380,10 @@ export function ConvertBudgetModal({
               <strong>Aparelho:</strong> {budget.appliance_type || '-'}
             </p>
           </div>
+         </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancelar
           </Button>

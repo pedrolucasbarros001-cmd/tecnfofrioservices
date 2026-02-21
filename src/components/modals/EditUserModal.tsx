@@ -216,14 +216,16 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Editar Utilizador</DialogTitle>
             <p className="text-sm text-muted-foreground">Altere os dados do perfil. O nível de acesso define as permissões no sistema.</p>
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+             <div className="flex-1 overflow-y-auto min-h-0 px-6">
+              <div className="space-y-4 py-4">
               {/* Email (read-only) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
@@ -304,7 +306,9 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
                 />
               )}
 
-              <DialogFooter className="pt-4">
+              </div>
+             </div>
+              <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button type="button" variant="outline" onClick={handleClose}>
                   Cancelar
                 </Button>

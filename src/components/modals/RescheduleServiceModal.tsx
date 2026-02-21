@@ -126,8 +126,8 @@ export function RescheduleServiceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
             Reagendar Serviço - {service.code}
@@ -135,7 +135,9 @@ export function RescheduleServiceModal({
           <p className="text-sm text-muted-foreground">Selecione nova data e hora. O técnico será notificado da alteração.</p>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+         <div className="flex-1 overflow-y-auto min-h-0 px-6">
+          <div className="space-y-6 py-4">
           {/* Current Assignment Info */}
           <div className="rounded-lg bg-muted/50 p-4 space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Atribuição Atual</p>
@@ -242,7 +244,9 @@ export function RescheduleServiceModal({
             />
           </div>
 
-          <DialogFooter>
+          </div>
+         </div>
+          <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

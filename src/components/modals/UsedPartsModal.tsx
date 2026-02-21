@@ -70,8 +70,8 @@ export function UsedPartsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
             {title}
@@ -79,7 +79,8 @@ export function UsedPartsModal({
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6">
+         <div className="space-y-4 py-4">
           <div className="space-y-3">
             {parts.map((part, idx) => (
               <div 
@@ -141,9 +142,10 @@ export function UsedPartsModal({
             <Plus className="h-4 w-4 mr-1" />
             Adicionar outro item
           </Button>
+         </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0 gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleClose}>
             Cancelar
           </Button>

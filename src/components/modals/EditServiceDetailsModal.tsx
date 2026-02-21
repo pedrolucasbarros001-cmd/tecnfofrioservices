@@ -96,7 +96,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Editar Detalhes do Serviço</DialogTitle>
         </DialogHeader>
