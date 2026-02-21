@@ -527,6 +527,7 @@ const serviceFormSchema = z.object({
   brand: z.string().optional(),
   model: z.string().optional(),
   serial_number: z.string().optional(),
+  pnc: z.string().optional(),
   fault_description: z.string().min(1, 'Descrição é obrigatória'),
   is_warranty: z.boolean().default(false),
   warranty_brand: z.string().optional(),
@@ -551,6 +552,7 @@ function CreateServiceFromCustomerModal({
   onSuccess,
 }: CreateServiceFromCustomerModalProps) {
   const [step, setStep] = useState<'type' | 'location' | 'form'>('type');
+  const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
   const { data: technicians = [] } = useTechnicians();
   const createService = useCreateService();
 
@@ -588,6 +590,7 @@ function CreateServiceFromCustomerModal({
         brand: values.brand,
         model: values.model,
         serial_number: values.serial_number,
+        pnc: values.pnc,
         fault_description: values.fault_description,
         is_warranty: values.is_warranty,
         warranty_brand: values.warranty_brand,
@@ -606,10 +609,47 @@ function CreateServiceFromCustomerModal({
         contact_name: customer.name,
         contact_phone: customer.phone || null,
         contact_email: customer.email || null,
-        // Using a simpler logic for pricing
         pending_pricing: values.is_warranty ? false : undefined,
         final_price: values.is_warranty ? 0 : undefined,
       });
+
+      // Upload workshop photos if any
+      if (workshopPhotos.length > 0 && values.service_location === 'oficina') {
+        // Get the created service to find its ID
+        const { data: createdServices } = await supabase
+          .from('services')
+          .select('id')
+          .eq('customer_id', customer.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const serviceId = createdServices?.[0]?.id;
+        if (serviceId) {
+          for (const file of workshopPhotos) {
+            try {
+              const fileExt = file.name.split('.').pop();
+              const filePath = `${serviceId}/${crypto.randomUUID()}.${fileExt}`;
+              const { error: uploadError } = await supabase.storage
+                .from('service-photos')
+                .upload(filePath, file);
+
+              if (!uploadError) {
+                const { data: urlData } = supabase.storage
+                  .from('service-photos')
+                  .getPublicUrl(filePath);
+
+                await supabase.from('service_photos').insert({
+                  service_id: serviceId,
+                  file_url: urlData.publicUrl,
+                  photo_type: 'aparelho',
+                });
+              }
+            } catch (photoErr) {
+              console.error('Error uploading photo:', photoErr);
+            }
+          }
+        }
+      }
 
       toast.success('Serviço criado com sucesso!');
       handleClose();
@@ -624,6 +664,7 @@ function CreateServiceFromCustomerModal({
     onOpenChange(false);
     form.reset();
     setStep('type');
+    setWorkshopPhotos([]);
   };
 
   return (
@@ -776,6 +817,53 @@ function CreateServiceFromCustomerModal({
                     />
                   </div>
 
+                  {/* Model + Serial Number */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="model"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Modelo</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: WAT24469ES" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="serial_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nº de Série</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Número de série" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* PNC */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="pnc"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>PNC</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Product Number Code" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="fault_description"
@@ -845,6 +933,50 @@ function CreateServiceFromCustomerModal({
                             </FormItem>
                           )}
                         />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Workshop Photo Upload */}
+                  {form.watch('service_location') === 'oficina' && (
+                    <div className="p-4 bg-orange-50/50 rounded-lg border border-orange-100 space-y-3">
+                      <h4 className="font-medium text-orange-800 flex items-center gap-2 text-sm">
+                        <Paperclip className="h-4 w-4" />
+                        Fotos do Equipamento (máx. 5)
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {workshopPhotos.map((file, idx) => (
+                          <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setWorkshopPhotos(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {workshopPhotos.length < 5 && (
+                          <label className="w-20 h-20 rounded-lg border-2 border-dashed border-orange-300 flex items-center justify-center cursor-pointer hover:bg-orange-100/50 transition-colors">
+                            <Plus className="h-6 w-6 text-orange-400" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                setWorkshopPhotos(prev => [...prev, ...files].slice(0, 5));
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1004,10 +1136,10 @@ function CreateServiceFromCustomerModal({
                       name="scheduled_shift"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Turno / Hora</FormLabel>
+                          <FormLabel>Hora</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Ex: 14:00 ou Manhã"
+                              type="time"
                               {...field}
                             />
                           </FormControl>

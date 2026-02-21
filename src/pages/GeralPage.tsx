@@ -33,7 +33,7 @@ import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { usePaginatedServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
-import { SERVICE_STATUS_CONFIG, SHIFT_CONFIG, type Service, type ServiceStatus } from '@/types/database';
+import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -298,7 +298,7 @@ export default function GeralPage() {
                     <TableHead>Estado</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Técnico</TableHead>
-                    <TableHead>Data + Turno</TableHead>
+                    <TableHead>Data + Hora</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -400,7 +400,7 @@ export default function GeralPage() {
                         </div> : <span className="text-muted-foreground text-sm">-</span>}
                       </TableCell>
 
-                      {/* Data + Turno */}
+                      {/* Data + Hora */}
                       <TableCell>
                         {service.scheduled_date ? <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm">
@@ -409,8 +409,8 @@ export default function GeralPage() {
                               locale: pt
                             })}
                           </div>
-                          {service.scheduled_shift && <Badge variant="outline" className="text-xs capitalize">
-                            {SHIFT_CONFIG[service.scheduled_shift as keyof typeof SHIFT_CONFIG]?.label || service.scheduled_shift}
+                          {service.scheduled_shift && <Badge variant="outline" className="text-xs">
+                            {service.scheduled_shift}
                           </Badge>}
                         </div> : <span className="text-muted-foreground text-sm">-</span>}
                       </TableCell>

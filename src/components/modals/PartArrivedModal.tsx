@@ -95,7 +95,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
     }
 
     if (!scheduledShift) {
-      toast.error('Por favor, selecione o turno.');
+      toast.error('Por favor, selecione a hora.');
       return;
     }
 

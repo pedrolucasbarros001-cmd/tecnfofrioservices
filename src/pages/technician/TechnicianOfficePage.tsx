@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Sun, Moon, Sunrise, Play, UserPlus, Package, AlertCircle, ArrowRightLeft } from 'lucide-react';
+import { Wrench, Play, UserPlus, Package, AlertCircle, ArrowRightLeft, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,6 @@ import { useUpdateService, prefetchFullServiceData } from '@/hooks/useServices';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
 
-const SHIFT_ICONS: Record<string, { icon: typeof Sun; color: string }> = {
-  manha: { icon: Sunrise, color: 'text-amber-500' },
-  tarde: { icon: Sun, color: 'text-orange-500' },
-  noite: { icon: Moon, color: 'text-indigo-500' },
-};
 
 export default function TechnicianOfficePage() {
   const { profile } = useAuth();
@@ -145,8 +140,6 @@ export default function TechnicianOfficePage() {
 
   // Service card component for reuse
   const ServiceCard = ({ service, isAvailable = false }: { service: Service; isAvailable?: boolean }) => {
-    const shiftInfo = service.scheduled_shift ? SHIFT_ICONS[service.scheduled_shift] : null;
-    const ShiftIcon = shiftInfo?.icon || Sun;
 
     const handleTransferClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -240,8 +233,8 @@ export default function TechnicianOfficePage() {
                 )}
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ShiftIcon className={cn('h-3.5 w-3.5', shiftInfo?.color)} />
-                <span className="capitalize">{service.scheduled_shift || 'Sem turno'}</span>
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{service.scheduled_shift || 'Sem hora'}</span>
               </div>
             </div>
 

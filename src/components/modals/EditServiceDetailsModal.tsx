@@ -37,12 +37,12 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
+  const [pnc, setPnc] = useState('');
   const [faultDescription, setFaultDescription] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (open && service) {
-      // Contact - use service-level fields with customer fallback
       setContactName(service.contact_name || service.customer?.name || '');
       setContactPhone(service.contact_phone || service.customer?.phone || '');
       setContactEmail(service.contact_email || service.customer?.email || '');
@@ -50,11 +50,11 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
       setServicePostalCode(service.service_postal_code || service.customer?.postal_code || '');
       setServiceCity(service.service_city || service.customer?.city || '');
 
-      // Equipment
       setApplianceType(service.appliance_type || '');
       setBrand(service.brand || '');
       setModel(service.model || '');
       setSerialNumber(service.serial_number || '');
+      setPnc(service.pnc || '');
       setFaultDescription(service.fault_description || '');
       setNotes(service.notes || '');
     }
@@ -76,6 +76,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           brand: brand || null,
           model: model || null,
           serial_number: serialNumber || null,
+          pnc: pnc || null,
           fault_description: faultDescription || null,
           notes: notes || null,
         })
@@ -95,83 +96,89 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle>Editar Detalhes do Serviço</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Contact Section */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Contacto nesta ficha</h3>
-            <p className="text-xs text-muted-foreground">Estes dados são específicos desta ficha e não alteram o perfil do cliente.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Nome</Label>
-                <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Nome de contacto" />
+        <div className="flex-1 overflow-y-auto px-6">
+          <div className="space-y-5 pb-4">
+            {/* Contact Section */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Contacto nesta ficha</h3>
+              <p className="text-xs text-muted-foreground">Estes dados são específicos desta ficha e não alteram o perfil do cliente.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Nome</Label>
+                  <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Nome de contacto" />
+                </div>
+                <div>
+                  <Label>Telefone</Label>
+                  <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Telefone" />
+                </div>
               </div>
               <div>
-                <Label>Telefone</Label>
-                <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Telefone" />
+                <Label>Email</Label>
+                <Input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" />
               </div>
-            </div>
-            <div>
-              <Label>Email</Label>
-              <Input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Morada</Label>
+                  <Input value={serviceAddress} onChange={e => setServiceAddress(e.target.value)} placeholder="Morada" />
+                </div>
+                <div>
+                  <Label>Código Postal</Label>
+                  <Input value={servicePostalCode} onChange={e => setServicePostalCode(e.target.value)} placeholder="Código Postal" />
+                </div>
+              </div>
               <div>
-                <Label>Morada</Label>
-                <Input value={serviceAddress} onChange={e => setServiceAddress(e.target.value)} placeholder="Morada" />
-              </div>
-              <div>
-                <Label>Código Postal</Label>
-                <Input value={servicePostalCode} onChange={e => setServicePostalCode(e.target.value)} placeholder="Código Postal" />
+                <Label>Cidade</Label>
+                <Input value={serviceCity} onChange={e => setServiceCity(e.target.value)} placeholder="Cidade" />
               </div>
             </div>
-            <div>
-              <Label>Cidade</Label>
-              <Input value={serviceCity} onChange={e => setServiceCity(e.target.value)} placeholder="Cidade" />
-            </div>
-          </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Equipment Section */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Equipamento</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Tipo de Aparelho</Label>
-                <Input value={applianceType} onChange={e => setApplianceType(e.target.value)} placeholder="Ex: Ar Condicionado" />
+            {/* Equipment Section */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Equipamento</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Tipo de Aparelho</Label>
+                  <Input value={applianceType} onChange={e => setApplianceType(e.target.value)} placeholder="Ex: Ar Condicionado" />
+                </div>
+                <div>
+                  <Label>Marca</Label>
+                  <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ex: Samsung" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Modelo</Label>
+                  <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Ex: AR12" />
+                </div>
+                <div>
+                  <Label>Nº Série</Label>
+                  <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Ex: SN12345" />
+                </div>
               </div>
               <div>
-                <Label>Marca</Label>
-                <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ex: Samsung" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Modelo</Label>
-                <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Ex: AR12" />
+                <Label>PNC</Label>
+                <Input value={pnc} onChange={e => setPnc(e.target.value)} placeholder="Product Number Code" />
               </div>
               <div>
-                <Label>Nº Série</Label>
-                <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Ex: SN12345" />
+                <Label>Descrição da Avaria</Label>
+                <Textarea value={faultDescription} onChange={e => setFaultDescription(e.target.value)} placeholder="Descreva a avaria..." rows={3} />
               </div>
-            </div>
-            <div>
-              <Label>Descrição da Avaria</Label>
-              <Textarea value={faultDescription} onChange={e => setFaultDescription(e.target.value)} placeholder="Descreva a avaria..." rows={3} />
-            </div>
-            <div>
-              <Label>Notas</Label>
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas adicionais..." rows={2} />
+              <div>
+                <Label>Notas</Label>
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas adicionais..." rows={2} />
+              </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
           <Button onClick={handleSave} disabled={isLoading}>
             {isLoading ? 'A guardar...' : 'Guardar'}

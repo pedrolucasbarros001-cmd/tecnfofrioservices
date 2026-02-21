@@ -126,7 +126,7 @@ export function ConvertBudgetModal({
 
     // Validation: if technician selected, date and shift are required
     if (technicianId && (!scheduledDate || !scheduledShift)) {
-      toast.warning('Ao atribuir um técnico, a data e o turno são obrigatórios.');
+      toast.warning('Ao atribuir um técnico, a data e a hora são obrigatórias.');
       return;
     }
 
