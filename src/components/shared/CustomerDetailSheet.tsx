@@ -603,6 +603,9 @@ function CreateServiceFromCustomerModal({
         service_address: values.service_address || null,
         service_postal_code: values.service_postal_code || null,
         service_city: values.service_city || null,
+        contact_name: customer.name,
+        contact_phone: customer.phone || null,
+        contact_email: customer.email || null,
         // Using a simpler logic for pricing
         pending_pricing: values.is_warranty ? false : undefined,
         final_price: values.is_warranty ? 0 : undefined,
