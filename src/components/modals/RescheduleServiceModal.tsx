@@ -132,7 +132,7 @@ export function RescheduleServiceModal({
             <CalendarIcon className="h-5 w-5" />
             Reagendar Serviço - {service.code}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">Selecione nova data e turno. O técnico será notificado da alteração.</p>
+          <p className="text-sm text-muted-foreground">Selecione nova data e hora. O técnico será notificado da alteração.</p>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">

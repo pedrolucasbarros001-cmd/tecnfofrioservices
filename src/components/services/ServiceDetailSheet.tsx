@@ -494,11 +494,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     </span>
                   </div>
                   {service.scheduled_shift && (
-                    <Badge variant="secondary" className="capitalize">
-                      {service.scheduled_shift === 'manha' ? 'Manhã' :
-                        service.scheduled_shift === 'tarde' ? 'Tarde' :
-                          service.scheduled_shift === 'noite' ? 'Noite' :
-                            service.scheduled_shift}
+                    <Badge variant="secondary">
+                      {service.scheduled_shift}
                     </Badge>
                   )}
                 </div>

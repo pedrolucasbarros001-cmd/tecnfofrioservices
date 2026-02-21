@@ -110,6 +110,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
+  const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
@@ -256,6 +257,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         brand: values.brand,
         model: values.model,
         serial_number: values.serial_number,
+        pnc: values.pnc,
         fault_description: values.fault_description,
         is_warranty: values.is_warranty,
         warranty_brand: values.warranty_brand,
@@ -276,6 +278,33 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         contact_phone: values.customer_phone,
         contact_email: values.customer_email || null,
       });
+
+      // Upload workshop photos if any
+      if (workshopPhotos.length > 0 && values.service_location === 'oficina' && newService?.id) {
+        for (const file of workshopPhotos) {
+          try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newService.id}/${crypto.randomUUID()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('service-photos')
+              .upload(filePath, file);
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('service-photos')
+                .getPublicUrl(filePath);
+
+              await supabase.from('service_photos').insert({
+                service_id: newService.id,
+                file_url: urlData.publicUrl,
+                photo_type: 'aparelho',
+              });
+            }
+          } catch (photoErr) {
+            console.error('Error uploading photo:', photoErr);
+          }
+        }
+      }
 
       if (newService && newService.id) {
         await logServiceCreation(
@@ -308,6 +337,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
     setFoundCustomer(null);
     setShowFoundCustomerBox(false);
     setPendingFormValues(null);
+    setWorkshopPhotos([]);
   };
 
   return (
@@ -598,6 +628,49 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
 
+                    {/* Workshop Photo Upload */}
+                    {serviceLocation === 'oficina' && (
+                      <div className="p-4 bg-orange-50/50 rounded-lg border border-orange-100 space-y-3">
+                        <h4 className="font-medium text-orange-800 flex items-center gap-2 text-sm">
+                          Fotos do Equipamento (máx. 5)
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {workshopPhotos.map((file, idx) => (
+                            <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Foto ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setWorkshopPhotos(prev => prev.filter((_, i) => i !== idx))}
+                                className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          {workshopPhotos.length < 5 && (
+                            <label className="w-20 h-20 rounded-lg border-2 border-dashed border-orange-300 flex items-center justify-center cursor-pointer hover:bg-orange-100/50 transition-colors">
+                              <UserPlus className="h-6 w-6 text-orange-400" />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  setWorkshopPhotos(prev => [...prev, ...files].slice(0, 5));
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Row 5: Avaria (full width) */}
                     <FormField
                       control={form.control}
@@ -715,7 +788,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       )}
                     />
 
-                    {/* Row 8: Data + Turno */}
+                    {/* Row 8: Data + Hora */}
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
