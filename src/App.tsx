@@ -26,9 +26,7 @@ import SecretaryConcluidosPage from "@/pages/secretary/SecretaryConcluidosPage";
 import SecretaryDebitoPage from "@/pages/secretary/SecretaryDebitoPage";
 import SecretaryPrecificarPage from "@/pages/secretary/SecretaryPrecificarPage";
 import TechnicianOfficePage from "@/pages/technician/TechnicianOfficePage";
-import TechnicianVisitFlow from "@/pages/technician/TechnicianVisitFlow";
-import TechnicianInstallationFlow from "@/pages/technician/TechnicianInstallationFlow";
-import TechnicianDeliveryFlow from "@/pages/technician/TechnicianDeliveryFlow";
+// Legacy flow pages removed — routes redirect to /servicos
 import TechnicianHistoryPage from "@/pages/technician/TechnicianHistoryPage";
 import ServiceRedirect from "@/pages/technician/ServiceRedirect";
 import ServiceConsultPage from "@/pages/ServiceConsultPage";
@@ -207,21 +205,9 @@ const App = () => (
                           <TechnicianHistoryPage />
                         </ProtectedRoute>
                       } />
-                      <Route path="/technician/visit/:serviceId" element={
-                        <ProtectedRoute allowedRoles={['tecnico']}>
-                          <TechnicianVisitFlow />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="/technician/installation/:serviceId" element={
-                        <ProtectedRoute allowedRoles={['tecnico']}>
-                          <TechnicianInstallationFlow />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="/technician/delivery/:serviceId" element={
-                        <ProtectedRoute allowedRoles={['tecnico']}>
-                          <TechnicianDeliveryFlow />
-                        </ProtectedRoute>
-                      } />
+                      <Route path="/technician/visit/:serviceId" element={<Navigate to="/servicos" replace />} />
+                      <Route path="/technician/installation/:serviceId" element={<Navigate to="/servicos" replace />} />
+                      <Route path="/technician/delivery/:serviceId" element={<Navigate to="/servicos" replace />} />
                       <Route path="/technician/service/:serviceId" element={
                         <ProtectedRoute allowedRoles={['tecnico']}>
                           <ServiceRedirect />

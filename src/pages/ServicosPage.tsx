@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, Phone } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -179,10 +179,22 @@ export default function ServicosPage() {
               </Badge>
             </div>
 
-            {/* Client Name */}
-            <p className="font-medium text-base">
-              {service.customer?.name || 'Cliente'}
-            </p>
+            {/* Client Name + Phone */}
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-base">
+                {service.customer?.name || 'Cliente'}
+              </p>
+              {(service.contact_phone || service.customer?.phone) && (
+                <a
+                  href={`tel:${service.contact_phone || service.customer?.phone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {service.contact_phone || service.customer?.phone}
+                </a>
+              )}
+            </div>
 
             {/* Appliance + Fault */}
             <p className="text-sm text-muted-foreground line-clamp-2">

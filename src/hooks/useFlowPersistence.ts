@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface FlowState<T = Record<string, unknown>> {
@@ -245,18 +245,35 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
   }, [serviceId, flowType]);
 
-  const saveStateToDb = useCallback(async (currentStep: string, formData?: T) => {
-    try {
-      const { error } = await (supabase.rpc as any)('technician_update_service', {
-        _service_id: serviceId,
-        _flow_step: currentStep,
-        _flow_data: formData || null,
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error persisting flow state to DB:', error);
+  const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveStateToDb = useCallback((currentStep: string, formData?: T) => {
+    // Debounce: cancel previous pending save and schedule a new one in 2s
+    if (dbSaveTimerRef.current) {
+      clearTimeout(dbSaveTimerRef.current);
     }
+    dbSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const { error } = await (supabase.rpc as any)('technician_update_service', {
+          _service_id: serviceId,
+          _flow_step: currentStep,
+          _flow_data: formData || null,
+        });
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error persisting flow state to DB:', error);
+      }
+    }, 2000);
   }, [serviceId]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dbSaveTimerRef.current) {
+        clearTimeout(dbSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const clearState = useCallback(() => {
     try {

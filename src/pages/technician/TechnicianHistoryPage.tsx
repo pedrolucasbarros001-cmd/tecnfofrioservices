@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { History, Search, ChevronRight } from 'lucide-react';
+import { History, Search, ChevronRight, Wrench, Settings, Truck, Shield, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -134,6 +134,30 @@ export default function TechnicianHistoryPage() {
                                             <h3 className="font-bold text-base mt-0.5">{service.customer?.name || 'Cliente'}</h3>
                                         </div>
                                         {getStatusBadge(service.status || 'por_fazer')}
+                                    </div>
+
+                                    {/* Service type + tags */}
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <Badge variant="secondary" className={cn('text-[10px] px-1.5 py-0 h-5', {
+                                            'bg-blue-100 text-blue-700': service.service_type === 'reparacao',
+                                            'bg-yellow-100 text-yellow-700': service.service_type === 'instalacao',
+                                            'bg-green-100 text-green-700': service.service_type === 'entrega',
+                                            'bg-slate-100 text-slate-700': service.service_type === 'manutencao',
+                                        })}>
+                                            {service.service_type === 'reparacao' ? 'Reparação' :
+                                             service.service_type === 'instalacao' ? 'Instalação' :
+                                             service.service_type === 'entrega' ? 'Entrega' : 'Manutenção'}
+                                        </Badge>
+                                        {service.is_urgent && (
+                                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">
+                                                Urgente
+                                            </Badge>
+                                        )}
+                                        {service.is_warranty && (
+                                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-green-500 text-green-700">
+                                                Garantia
+                                            </Badge>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/30 p-2 rounded-md">

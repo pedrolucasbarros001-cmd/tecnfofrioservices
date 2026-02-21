@@ -565,9 +565,9 @@ function CreateServiceFromCustomerModal({
       is_warranty: false,
       is_urgent: false,
       service_location: 'cliente',
-      service_address: customer.address || '',
-      service_postal_code: customer.postal_code || '',
-      service_city: customer.city || '',
+      service_address: '',
+      service_postal_code: '',
+      service_city: '',
     },
   });
 
@@ -669,7 +669,7 @@ function CreateServiceFromCustomerModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
             {step === 'type'
@@ -886,54 +886,82 @@ function CreateServiceFromCustomerModal({
                     )}
                   />
 
-                  {/* Address fields */}
+                  {/* Smart Address Toggle */}
                   {form.watch('service_location') === 'cliente' && (
-                    <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-4">
-                      <h4 className="font-medium text-blue-800 flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4" />
-                        Morada do Serviço
-                      </h4>
-                      <FormField
-                        control={form.control}
-                        name="service_address"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">Rua / Morada</FormLabel>
-                            <FormControl>
-                              <Input {...field} className="h-8 text-sm" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+                        <Checkbox
+                          id="different_address_cust"
+                          checked={!!(form.watch('service_address') || form.watch('service_postal_code') || form.watch('service_city'))}
+                          onCheckedChange={(checked) => {
+                            if (!checked) {
+                              form.setValue('service_address', '');
+                              form.setValue('service_postal_code', '');
+                              form.setValue('service_city', '');
+                            } else {
+                              // Pre-fill with a space to trigger visibility
+                              form.setValue('service_address', ' ');
+                            }
+                          }}
+                        />
+                        <Label htmlFor="different_address_cust" className="cursor-pointer text-sm">
+                          Morada diferente do cliente?
+                        </Label>
+                        {customer.address && (
+                          <span className="text-xs text-muted-foreground ml-auto truncate max-w-[200px]">
+                            Perfil: {customer.address}
+                          </span>
                         )}
-                      />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="service_postal_code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Código Postal</FormLabel>
-                              <FormControl>
-                                <Input {...field} className="h-8 text-sm" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="service_city"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Cidade</FormLabel>
-                              <FormControl>
-                                <Input {...field} className="h-8 text-sm" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
+                      {(form.watch('service_address') || form.watch('service_postal_code') || form.watch('service_city')) ? (
+                        <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-4">
+                          <h4 className="font-medium text-blue-800 flex items-center gap-2 text-sm">
+                            <MapPin className="h-4 w-4" />
+                            Morada Alternativa
+                          </h4>
+                          <FormField
+                            control={form.control}
+                            name="service_address"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Rua / Morada</FormLabel>
+                                <FormControl>
+                                  <Input {...field} className="h-8 text-sm" placeholder="Morada do serviço" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="service_postal_code"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Código Postal</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} className="h-8 text-sm" placeholder="0000-000" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="service_city"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Cidade</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} className="h-8 text-sm" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
