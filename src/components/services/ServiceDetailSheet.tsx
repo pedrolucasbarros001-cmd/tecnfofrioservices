@@ -384,37 +384,35 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               >
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {service.customer?.name || 'Sem cliente'}
+                  {service.contact_name || service.customer?.name || 'Sem cliente'}
                 </h3>
-                {service.customer && (
-                  <div className="space-y-1 mt-2 text-sm">
-                    {service.customer.nif && (
-                      <p className="text-muted-foreground">NIF: {service.customer.nif}</p>
-                    )}
-                    {service.customer.phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <span>{service.customer.phone}</span>
-                      </div>
-                    )}
-                    {service.customer.email && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{service.customer.email}</span>
-                      </div>
-                    )}
-                    {service.customer.address && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>
-                          {[service.customer.address, service.customer.postal_code, service.customer.city]
-                            .filter(Boolean)
-                            .join(', ')}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="space-y-1 mt-2 text-sm">
+                  {service.customer?.nif && (
+                    <p className="text-muted-foreground">NIF: {service.customer.nif}</p>
+                  )}
+                  {(service.contact_phone || service.customer?.phone) && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      <span>{service.contact_phone || service.customer?.phone}</span>
+                    </div>
+                  )}
+                  {(service.contact_email || service.customer?.email) && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span>{service.contact_email || service.customer?.email}</span>
+                    </div>
+                  )}
+                  {(service.service_address || service.customer?.address) && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>
+                        {[service.service_address || service.customer?.address, service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </Section>
 
               {/* Equipment Info */}

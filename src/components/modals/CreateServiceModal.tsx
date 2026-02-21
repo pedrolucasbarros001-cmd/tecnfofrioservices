@@ -272,6 +272,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
+        contact_name: values.customer_name,
+        contact_phone: values.customer_phone,
+        contact_email: values.customer_email || null,
       });
 
       if (newService && newService.id) {

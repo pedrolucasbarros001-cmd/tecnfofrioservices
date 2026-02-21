@@ -672,6 +672,9 @@ export type Database = {
           appliance_type: string | null
           brand: string | null
           code: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           customer_id: string | null
           delivery_date: string | null
@@ -715,6 +718,9 @@ export type Database = {
           appliance_type?: string | null
           brand?: string | null
           code?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           customer_id?: string | null
           delivery_date?: string | null
@@ -758,6 +764,9 @@ export type Database = {
           appliance_type?: string | null
           brand?: string | null
           code?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           customer_id?: string | null
           delivery_date?: string | null
