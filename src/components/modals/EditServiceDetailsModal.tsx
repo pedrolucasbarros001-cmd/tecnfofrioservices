@@ -175,6 +175,8 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
     }
   };
 
+  if (!service) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -268,7 +270,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
                       />
                     </div>
                     <div className="col-span-2 md:col-span-2 flex justify-center">
-                      <Badge variant={part.is_requested ? "warning" : "success"} className="text-[9px] h-5 px-1 uppercase tracking-tighter">
+                      <Badge variant={part.is_requested ? "subtle-urgent" : "outline"} className="text-[9px] h-5 px-1 uppercase tracking-tighter">
                         {part.is_requested ? "Pedida" : "Usada"}
                       </Badge>
                     </div>
