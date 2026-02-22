@@ -1,49 +1,53 @@
 
 
-# Correcao: Modal de Produto fecha ao escrever "Modelo"
+# Correcao: Crash na Pagina Geral + Erro de Build
 
-## Causa Raiz
+## Causa Raiz Confirmada (sem teorias)
 
-O problema NAO e de interaccao externa (onPointerDownOutside). O problema e logico:
+### Problema 1: Crash na pagina Geral (erro visivel no ecra)
+
+**Ficheiro**: `src/components/modals/EditServiceDetailsModal.tsx`, **linha 184**
 
 ```
-const needsProductStep = !(service.brand || formData.productBrand) || !(service.model || formData.productModel);
+Editar Servico {service.code}
 ```
 
-Esta variavel e recalculada a cada render. Quando o tecnico preenche o campo "Modelo", `formData.productModel` fica com valor, e se a marca tambem ja estiver preenchida, `needsProductStep` muda para `false`. Como o Dialog esta dentro de `{needsProductStep && (...)}`, o componente e **removido do DOM** instantaneamente.
+O componente `EditServiceDetailsModal` e renderizado na `GeralPage` (linha 456) com `service={currentService}`. O valor inicial de `currentService` e `null`. O Radix Dialog renderiza o conteudo internamente mesmo quando `open={false}`, e a linha 184 acede a `service.code` sem verificar se `service` e `null`. Isto causa:
 
-O mesmo acontece se preencher primeiro a marca e depois o modelo -- basta ambos terem valor para o modal desaparecer.
+```
+TypeError: null is not an object (evaluating 'r.code')
+```
+
+Este erro e capturado pelo `ErrorBoundary` que envolve a pagina, mostrando o ecra "Ocorreu um erro".
+
+### Problema 2: Erro de Build (TypeScript)
+
+**Ficheiro**: `src/components/modals/EditServiceDetailsModal.tsx`, **linha 271**
+
+```tsx
+<Badge variant={part.is_requested ? "warning" : "success"}>
+```
+
+Os variants `"warning"` e `"success"` NAO existem no componente `Badge`. Os variants disponiveis sao: `default`, `destructive`, `outline`, `secondary`, `subtle`, `subtle-debit`, `subtle-pricing`, `subtle-urgent`, `subtle-warranty`, `type-entrega`, `type-instalacao`, `type-oficina`, `type-visita`.
 
 ## Solucao
 
-Separar a logica em duas variaveis:
+### Correcao 1: Guard de null no service
 
-1. **`needsProductStep`** -- calculada apenas uma vez na abertura do fluxo (baseada nos dados do servico vindos da BD, sem considerar formData). Controla se o passo "produto" aparece na lista de steps.
+Adicionar verificacao no inicio do render para retornar `null` quando `service` nao existe:
 
-2. **Renderizacao do Dialog** -- usar `currentStep === "produto"` directamente em vez de `{needsProductStep && (...)}`. Se o step actual e "produto", o modal deve estar visivel independentemente do que o utilizador esta a escrever.
+```tsx
+// Linha 178, antes do return
+if (!service) return null;
+```
 
-## Alteracoes
+### Correcao 2: Substituir variants inexistentes
 
-### Ficheiro 1: `src/components/technician/WorkshopFlowModals.tsx`
+Linha 271, substituir:
+- `"warning"` por `"subtle-urgent"` (badge amarelo/vermelho para pecas pedidas)
+- `"success"` por `"outline"` (badge neutro para pecas usadas)
 
-- Linha 333: Mudar `needsProductStep` para usar apenas `service.brand` e `service.model` (dados da BD), ignorando `formData`:
-  ```
-  const needsProductStep = !service.brand || !service.model;
-  ```
-- Linha 636: Remover o wrapper `{needsProductStep && (...)}` do Dialog do produto. Manter apenas a condicao `open={currentStep === "produto" ...}` que ja controla a visibilidade.
+## Ficheiro Unico a Alterar
 
-### Ficheiro 2: `src/components/technician/VisitFlowModals.tsx`
-
-- Linha 549: Mesma correcao -- usar apenas dados da BD:
-  ```
-  const needsProductStep = !service.brand || !service.model;
-  ```
-- Linha 995: Remover o wrapper `{needsProductStep && (...)}` do Dialog do produto.
-
-## Resultado
-
-- O modal de produto aparece quando a BD nao tem marca/modelo preenchidos
-- O tecnico pode preencher todos os campos sem que o modal feche
-- Os dados so sao gravados quando clica "Continuar"
-- Se o servico ja tem marca e modelo na BD, o passo e saltado (comportamento actual mantido)
+`src/components/modals/EditServiceDetailsModal.tsx` -- 2 correcoes, 2 linhas
 
