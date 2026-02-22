@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -15,23 +16,27 @@ interface ServiceStatusBadgeProps {
  * exibe um badge "A Precificar" a laranja COEXISTINDO com o estado de execução.
  * Não substitui nem bloqueia nenhum fluxo.
  */
-export function ServiceStatusBadge({ service, className }: ServiceStatusBadgeProps) {
-    const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
-        ?? { label: service.status, color: 'bg-muted text-muted-foreground' };
+export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatusBadgeProps>(
+    ({ service, className }, ref) => {
+        const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
+            ?? { label: service.status, color: 'bg-muted text-muted-foreground' };
 
-    const needsPricing =
-        service.pending_pricing === true && (service.final_price ?? 0) === 0;
+        const needsPricing =
+            service.pending_pricing === true && (service.final_price ?? 0) === 0;
 
-    return (
-        <span className={cn('inline-flex flex-wrap items-center gap-1', className)}>
-            <Badge className={cn('text-xs font-medium', statusConfig.color)}>
-                {statusConfig.label}
-            </Badge>
-            {needsPricing && (
-                <Badge className="text-xs bg-orange-100 text-orange-700 border border-orange-300">
-                    Orçamentar
+        return (
+            <span ref={ref} className={cn('inline-flex flex-wrap items-center gap-1', className)}>
+                <Badge className={cn('text-xs font-medium', statusConfig.color)}>
+                    {statusConfig.label}
                 </Badge>
-            )}
-        </span>
-    );
-}
+                {needsPricing && (
+                    <Badge className="text-xs bg-orange-100 text-orange-700 border border-orange-300">
+                        Orçamentar
+                    </Badge>
+                )}
+            </span>
+        );
+    }
+);
+
+ServiceStatusBadge.displayName = 'ServiceStatusBadge';

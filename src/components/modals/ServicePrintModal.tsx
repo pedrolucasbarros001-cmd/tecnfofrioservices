@@ -105,6 +105,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
     }
   };
 
+  if (!service) return null;
+
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
 
   const usedParts = parts.filter(p => !p.is_requested);
