@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Service } from '@/types/database';
+import { formatShiftLabel } from '@/utils/dateUtils';
 
 interface AgendaDrawerProps {
   date: Date | null;
@@ -138,7 +139,7 @@ function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
         <span className="font-mono font-semibold text-sm">{service.code}</span>
         {service.scheduled_shift && (
           <span className="ml-auto text-[10px] text-muted-foreground">
-            {service.scheduled_shift}
+            {formatShiftLabel(service.scheduled_shift)}
           </span>
         )}
         {service.is_urgent && (

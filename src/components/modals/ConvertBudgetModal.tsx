@@ -357,12 +357,16 @@ export function ConvertBudgetModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Hora</Label>
-                  <Input
-                    type="time"
-                    value={scheduledShift}
-                    onChange={(e) => setScheduledShift(e.target.value)}
-                  />
+                  <Label className="text-xs text-muted-foreground">Turno</Label>
+                  <Select value={scheduledShift} onValueChange={setScheduledShift}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manha">Manhã</SelectItem>
+                      <SelectItem value="tarde">Tarde</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}

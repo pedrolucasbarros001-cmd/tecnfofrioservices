@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import type { Service } from '@/types/database';
+import { formatShiftLabel } from '@/utils/dateUtils';
 
 interface RescheduleServiceModalProps {
   service: Service | null;
@@ -151,8 +152,8 @@ export function RescheduleServiceModal({
                 {service.scheduled_date 
                   ? format(new Date(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
                   : 'Sem data'}
-                {service.scheduled_shift && (
-                  <> • <span className="capitalize">{service.scheduled_shift}</span></>
+            {service.scheduled_shift && (
+                  <> • <span>{formatShiftLabel(service.scheduled_shift)}</span></>
                 )}
               </span>
             </div>
@@ -234,14 +235,21 @@ export function RescheduleServiceModal({
             )}
           </div>
 
-          {/* New Time */}
+          {/* New Shift */}
           <div className="space-y-2">
-            <Label>Nova Hora</Label>
-            <Input
-              type="time"
+            <Label>Novo Turno</Label>
+            <Select
               value={form.watch('scheduled_shift') || ''}
-              onChange={(e) => form.setValue('scheduled_shift', e.target.value)}
-            />
+              onValueChange={(value) => form.setValue('scheduled_shift', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar turno" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manha">Manhã</SelectItem>
+                <SelectItem value="tarde">Tarde</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           </div>

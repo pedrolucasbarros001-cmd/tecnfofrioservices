@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { format, addDays, subDays, isSameDay, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { formatShiftLabel } from '@/utils/dateUtils';
 import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
 import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
@@ -206,7 +207,7 @@ export default function ServicosPage() {
               <div className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  {service.scheduled_shift || 'Sem hora'}
+                  {formatShiftLabel(service.scheduled_shift)}
                 </span>
               </div>
               <div className="flex gap-1">

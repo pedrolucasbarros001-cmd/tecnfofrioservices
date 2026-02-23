@@ -1,6 +1,17 @@
 /**
- * Date utilities for business day calculations
+ * Date utilities for business day calculations and shift formatting
  */
+
+/**
+ * Formats a shift value for display (capitalizes properly)
+ * Handles legacy time-string data gracefully
+ */
+export function formatShiftLabel(shift: string | null | undefined): string {
+  if (!shift) return 'Sem turno';
+  if (shift === 'manha') return 'Manhã';
+  if (shift === 'tarde') return 'Tarde';
+  return shift; // fallback for legacy time data
+}
 
 /**
  * Adds business days to a date (excludes Saturdays and Sundays)

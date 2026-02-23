@@ -133,13 +133,16 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="deliveryTime">Hora</Label>
-              <Input
-                id="deliveryTime"
-                type="time"
-                value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
-              />
+              <Label htmlFor="deliveryTime">Turno</Label>
+              <Select value={deliveryTime} onValueChange={setDeliveryTime}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar turno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manha">Manhã</SelectItem>
+                  <SelectItem value="tarde">Tarde</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
          </div>

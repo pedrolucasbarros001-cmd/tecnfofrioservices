@@ -153,7 +153,8 @@ export function AssignTechnicianModal({
         toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
       } else {
         const dateStr = format(values.scheduled_date, "dd/MM", { locale: pt });
-        const timeLabel = values.scheduled_shift || 'sem hora';
+        const { formatShiftLabel } = await import('@/utils/dateUtils');
+        const timeLabel = formatShiftLabel(values.scheduled_shift);
         toast.success(`${techName} agendado para ${dateStr}, ${timeLabel}.`);
       }
 
@@ -262,10 +263,18 @@ export function AssignTechnicianModal({
               name="scheduled_shift"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Hora</FormLabel>
-                  <FormControl>
-                    <Input type="time" value={field.value || ''} onChange={field.onChange} />
-                  </FormControl>
+                  <FormLabel>Turno</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar turno" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="manha">Manhã</SelectItem>
+                      <SelectItem value="tarde">Tarde</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
