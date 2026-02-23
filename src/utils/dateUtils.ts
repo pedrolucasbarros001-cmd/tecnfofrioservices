@@ -3,23 +3,12 @@
  */
 
 /**
- * Formats a shift value for display (capitalizes properly)
- * Handles legacy time-string data gracefully
- */
-export function formatShiftLabel(shift: string | null | undefined): string {
-  if (!shift) return 'Sem turno';
-  if (shift === 'manha') return 'Manhã';
-  if (shift === 'tarde') return 'Tarde';
-  return shift; // fallback for legacy time data
-}
-
-/**
  * Adds business days to a date (excludes Saturdays and Sundays)
  */
 export function addBusinessDays(date: Date, days: number): Date {
   const result = new Date(date);
   let addedDays = 0;
-  
+
   while (addedDays < days) {
     result.setDate(result.getDate() + 1);
     const dayOfWeek = result.getDay();
@@ -28,7 +17,7 @@ export function addBusinessDays(date: Date, days: number): Date {
       addedDays++;
     }
   }
-  
+
   return result;
 }
 
@@ -39,10 +28,10 @@ export function addBusinessDays(date: Date, days: number): Date {
 export function getBusinessDaysRemaining(targetDate: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const target = new Date(targetDate);
   target.setHours(0, 0, 0, 0);
-  
+
   if (target <= today) {
     // Calculate overdue business days (negative)
     let days = 0;
@@ -56,7 +45,7 @@ export function getBusinessDaysRemaining(targetDate: Date): number {
     }
     return days;
   }
-  
+
   // Calculate remaining business days (positive)
   let days = 0;
   const current = new Date(today);
@@ -68,4 +57,18 @@ export function getBusinessDaysRemaining(targetDate: Date): number {
     }
   }
   return days;
+}
+
+/**
+ * Formats the scheduled_shift value for display.
+ * Maps 'manha' to 'Manhã' and 'tarde' to 'Tarde'.
+ * Regular time strings (e.g. "14:30") are returned as-is.
+ * Returns 'Sem turno' for null/undefined/empty values.
+ */
+export function formatShiftLabel(shift: string | null | undefined): string {
+  if (!shift) return 'Sem turno';
+  const s = shift.toLowerCase();
+  if (s === 'manha') return 'Manhã';
+  if (s === 'tarde') return 'Tarde';
+  return shift;
 }

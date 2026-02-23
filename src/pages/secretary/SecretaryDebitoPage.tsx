@@ -58,7 +58,7 @@ export default function SecretaryDebitoPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div data-tour="debito-header">
+      <div data-tour="debito-header" data-demo="debito-header">
         <h1 className="text-2xl font-bold tracking-tight">Em Débito</h1>
         <p className="text-muted-foreground">
           Serviços com preço definido e saldo pendente.
@@ -103,7 +103,7 @@ export default function SecretaryDebitoPage() {
                   const pending = finalPrice - amountPaid;
 
                   return (
-                    <TableRow 
+                    <TableRow
                       key={service.id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => {
@@ -173,7 +173,7 @@ export default function SecretaryDebitoPage() {
         open={showContactModal}
         onOpenChange={setShowContactModal}
       />
-      
+
       {/* Service Detail Sheet */}
       <ServiceDetailSheet
         service={selectedService}

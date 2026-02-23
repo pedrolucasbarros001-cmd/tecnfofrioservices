@@ -162,7 +162,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Status Cards Grid - 5 columns x 2 rows - Lit/Dim Logic */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" data-tour="dashboard-cards">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" data-tour="dashboard-cards" data-demo="dashboard-cards">
         {DASHBOARD_CARDS.map((card) => {
           const Icon = card.icon;
           const count = stats[card.key as keyof DashboardStats];
@@ -196,7 +196,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Activity History Section */}
-      <Card data-tour="activity-history">
+      <Card data-tour="activity-history" data-demo="activity-history">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5 text-muted-foreground" />

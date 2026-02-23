@@ -165,6 +165,7 @@ export default function ServicosPage() {
       <Card
         className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder)}
         data-tour="service-cards"
+        data-demo="service-cards"
         onMouseEnter={() => prefetchFullServiceData(queryClient, service.id)}
         onTouchStart={() => prefetchFullServiceData(queryClient, service.id)}
       >
@@ -207,7 +208,7 @@ export default function ServicosPage() {
               <div className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  {formatShiftLabel(service.scheduled_shift)}
+                  {formatShiftLabel(service.scheduled_shift) || 'Sem turno'}
                 </span>
               </div>
               <div className="flex gap-1">
@@ -243,6 +244,7 @@ export default function ServicosPage() {
               <Button
                 size="sm"
                 className={cn('w-full h-9 text-sm mt-2', serviceConfig.buttonColor)}
+                data-demo="start-service-btn"
                 onClick={(e) => handleStartFlow(service, e, isContinuation ? "continuacao_peca" : "normal")}
               >
                 <Play className="h-4 w-4 mr-1.5" />
@@ -257,7 +259,7 @@ export default function ServicosPage() {
 
 
   return (
-    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-hidden" data-tour="servicos-agenda">
+    <div className="p-4 md:p-6 space-y-6 h-full flex flex-col overflow-hidden" data-tour="servicos-agenda" data-demo="servicos-agenda">
       {/* Header with Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">

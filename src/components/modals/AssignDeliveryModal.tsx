@@ -20,6 +20,9 @@ import {
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
+import { formatShiftLabel } from '@/utils/dateUtils';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 import type { Service } from '@/types/database';
 
 interface AssignDeliveryModalProps {
@@ -43,18 +46,19 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
     }
 
     try {
-      const deliveryDateTime = deliveryTime 
-        ? `${deliveryDate}T${deliveryTime}:00`
-        : `${deliveryDate}T09:00:00`;
-
       await updateService.mutateAsync({
         id: service.id,
         delivery_method: 'technician_delivery',
         delivery_technician_id: technicianId,
-        delivery_date: deliveryDateTime,
+        delivery_date: deliveryDate,
+        scheduled_shift: deliveryTime, // Using scheduled_shift for consistency if needed, or just delivery_date
       });
 
-      toast.success('Entrega agendada com sucesso!');
+      const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
+      const dateStr = format(new Date(deliveryDate), "dd/MM", { locale: pt });
+      const shiftStr = formatShiftLabel(deliveryTime);
+
+      toast.success(`Entrega agendada: ${techName} (${dateStr}, ${shiftStr})`);
       onOpenChange(false);
       resetForm();
     } catch (error) {
@@ -85,67 +89,69 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-         <div className="space-y-4 py-4">
-          {service && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              <p className="font-medium">{service.code}</p>
-              <p className="text-muted-foreground">{service.customer?.name}</p>
-              {service.customer?.address && (
-                <p className="text-muted-foreground text-xs mt-1">
-                  📍 {service.customer.address}, {service.customer.city}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="technician">Técnico *</Label>
-            <Select value={technicianId} onValueChange={setTechnicianId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar técnico" />
-              </SelectTrigger>
-              <SelectContent>
-                {technicians.map((tech) => (
-                  <SelectItem key={tech.id} value={tech.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: tech.color || '#3B82F6' }}
-                      />
-                      {tech.profile?.full_name || 'Técnico'}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="deliveryDate">Data *</Label>
-              <Input
-                id="deliveryDate"
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
+          <div className="space-y-4 py-4">
+            {service && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p className="font-medium">{service.code}</p>
+                <p className="text-muted-foreground">{service.customer?.name}</p>
+                {service.customer?.address && (
+                  <p className="text-muted-foreground text-xs mt-1">
+                    📍 {service.customer.address}, {service.customer.city}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="deliveryTime">Turno</Label>
-              <Select value={deliveryTime} onValueChange={setDeliveryTime}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar turno" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manha">Manhã</SelectItem>
-                  <SelectItem value="tarde">Tarde</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label htmlFor="technician">Técnico *</Label>
+                <Select value={technicianId} onValueChange={setTechnicianId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar técnico" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: tech.color || '#3B82F6' }}
+                          />
+                          {tech.profile?.full_name || 'Técnico'}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryDate">Data *</Label>
+                  <Input
+                    id="deliveryDate"
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryShift">Turno *</Label>
+                  <Select value={deliveryTime} onValueChange={setDeliveryTime}>
+                    <SelectTrigger id="deliveryShift">
+                      <SelectValue placeholder="Selecionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manha">Manhã</SelectItem>
+                      <SelectItem value="tarde">Tarde</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </div>
-         </div>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">

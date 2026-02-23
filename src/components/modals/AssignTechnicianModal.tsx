@@ -44,6 +44,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
 import { notifyServiceAssigned } from '@/utils/notificationUtils';
 import { logTechnicianAssignment } from '@/utils/activityLogUtils';
+import { formatShiftLabel } from '@/utils/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Service, ServiceStatus } from '@/types/database';
@@ -92,7 +93,7 @@ export function AssignTechnicianModal({
       // - Cliente: não alterar status (manter como está)
       const advancedStates = ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'];
       const isAdvancedState = advancedStates.includes(service.status);
-      
+
       let newStatus: ServiceStatus | undefined;
       if (!isAdvancedState) {
         if (service.service_location === 'oficina') {
@@ -153,8 +154,7 @@ export function AssignTechnicianModal({
         toast.success(`${techName} atribuído! Serviço na oficina, aguarda início.`);
       } else {
         const dateStr = format(values.scheduled_date, "dd/MM", { locale: pt });
-        const { formatShiftLabel } = await import('@/utils/dateUtils');
-        const timeLabel = formatShiftLabel(values.scheduled_shift);
+        const timeLabel = formatShiftLabel(values.scheduled_shift) || 'sem turno';
         toast.success(`${techName} agendado para ${dateStr}, ${timeLabel}.`);
       }
 
@@ -180,105 +180,105 @@ export function AssignTechnicianModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
             <div className="space-y-6 px-6 py-4">
-            <FormField
-              control={form.control}
-              name="technician_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Técnico *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar técnico" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {technicians.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          Nenhum técnico disponível
-                        </SelectItem>
-                      ) : (
-                        technicians.map((tech) => (
-                          <SelectItem key={tech.id} value={tech.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: tech.color || '#3B82F6' }}
-                              />
-                              {tech.profile?.full_name || 'Técnico'}
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="scheduled_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data *</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+              <FormField
+                control={form.control}
+                name="technician_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Técnico *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, 'dd/MM/yyyy', { locale: pt })
-                          ) : (
-                            <span>Selecionar data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar técnico" />
+                        </SelectTrigger>
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <SelectContent>
+                        {technicians.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            Nenhum técnico disponível
+                          </SelectItem>
+                        ) : (
+                          technicians.map((tech) => (
+                            <SelectItem key={tech.id} value={tech.id}>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: tech.color || '#3B82F6' }}
+                                />
+                                {tech.profile?.full_name || 'Técnico'}
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="scheduled_shift"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Turno</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ''}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar turno" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="manha">Manhã</SelectItem>
-                      <SelectItem value="tarde">Tarde</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="scheduled_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy', { locale: pt })
+                            ) : (
+                              <span>Selecionar data</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="scheduled_shift"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Turno</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar turno" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="manha">Manhã</SelectItem>
+                        <SelectItem value="tarde">Tarde</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
             </div>
 

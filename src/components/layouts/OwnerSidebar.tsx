@@ -52,11 +52,11 @@ export function OwnerSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-4">
-        <SidebarMenu data-tour="sidebar-menu">
+        <SidebarMenu data-tour="sidebar-menu" data-demo="sidebar-menu">
           {menuItems.map(item => (
             <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton 
-                isActive={isActive(item.url)} 
+              <SidebarMenuButton
+                isActive={isActive(item.url)}
                 tooltip={item.title}
                 onClick={() => handleNavClick(item.url)}
                 className={cn(
@@ -83,12 +83,12 @@ export function OwnerSidebar() {
             <p className="text-xs text-sidebar-foreground/70">Proprietário</p>
           </div>
         )}
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className={cn(
             'w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
             isCollapsed && 'justify-center px-2'
-          )} 
+          )}
           onClick={signOut}
         >
           <LogOut className="h-5 w-5 shrink-0" />

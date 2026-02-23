@@ -110,7 +110,7 @@ export default function ColaboradoresPage() {
       const usersWithRoles: UserWithRole[] = profilesRes.data.map((profile) => {
         const userRole = rolesRes.data.find((r) => r.user_id === profile.user_id);
         const technician = techniciansRes.data.find((t) => t.profile_id === profile.id);
-        
+
         return {
           id: profile.id,
           user_id: profile.user_id,
@@ -181,7 +181,7 @@ export default function ColaboradoresPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="colaboradores-header">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-tour="colaboradores-header" data-demo="colaboradores-header">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gestão de Utilizadores</h1>
           <p className="text-muted-foreground">Gerir acessos e colaboradores</p>
@@ -237,7 +237,7 @@ export default function ColaboradoresPage() {
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              {searchTerm || roleFilter !== 'all' 
+              {searchTerm || roleFilter !== 'all'
                 ? 'Nenhum colaborador corresponde aos filtros.'
                 : 'Nenhum colaborador registado.'}
             </div>
@@ -311,9 +311,8 @@ export default function ColaboradoresPage() {
                               onClick={() => handleToggleActive(user)}
                             >
                               <Power
-                                className={`h-4 w-4 ${
-                                  user.is_active ? 'text-destructive' : 'text-green-500'
-                                }`}
+                                className={`h-4 w-4 ${user.is_active ? 'text-destructive' : 'text-green-500'
+                                  }`}
                               />
                             </Button>
                           )}

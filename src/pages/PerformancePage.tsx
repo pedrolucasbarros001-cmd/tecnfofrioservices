@@ -48,10 +48,10 @@ export default function PerformancePage() {
     const hasData = techServices.length > 0;
     const chartData = hasData
       ? [
-          { name: 'Entregas', value: entregas.length, color: '#10b981' },
-          { name: 'Instalações', value: instalacoes.length, color: '#f59e0b' },
-          { name: 'Reparações', value: reparacoes.length, color: '#3b82f6' },
-        ].filter((item) => item.value > 0)
+        { name: 'Entregas', value: entregas.length, color: '#10b981' },
+        { name: 'Instalações', value: instalacoes.length, color: '#f59e0b' },
+        { name: 'Reparações', value: reparacoes.length, color: '#3b82f6' },
+      ].filter((item) => item.value > 0)
       : [{ name: 'Sem serviços', value: 1, color: 'hsl(var(--muted))' }];
 
     return {
@@ -112,7 +112,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Technicians Grid */}
-      <div className="space-y-6" data-tour="performance-cards">
+      <div className="space-y-6" data-tour="performance-cards" data-demo="performance-cards">
         {techniciansWithData.map((tech) => (
           <Card key={tech.id} className="overflow-hidden">
             <CardHeader className="pb-4">
@@ -224,8 +224,8 @@ export default function PerformancePage() {
                                   service.status === 'concluidos' || service.status === 'finalizado'
                                     ? 'border-green-500 text-green-700'
                                     : service.status === 'em_debito'
-                                    ? 'border-orange-500 text-orange-700'
-                                    : 'border-blue-500 text-blue-700'
+                                      ? 'border-orange-500 text-orange-700'
+                                      : 'border-blue-500 text-blue-700'
                                 }
                               >
                                 {STATUS_LABELS[service.status] || service.status}

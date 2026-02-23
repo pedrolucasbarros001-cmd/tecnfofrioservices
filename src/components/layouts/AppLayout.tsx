@@ -9,6 +9,8 @@ import { SecretarySidebar } from './SecretarySidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { GuidedTour } from '@/components/onboarding/GuidedTour';
+import { DemoRunner } from '@/components/onboarding/DemoRunner';
+import { useDemo } from '@/contexts/DemoContext';
 import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 export function AppLayout() {
   const { role, user } = useAuth();
   const { isOpen: isOnboardingOpen } = useOnboarding();
+  const { isActive: isDemoActive } = useDemo();
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Query for unread notifications count
@@ -23,7 +26,7 @@ export function AppLayout() {
     queryKey: ['unread-notifications', user?.id],
     queryFn: async () => {
       if (!user?.id) return 0;
-      
+
       const { count, error } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -61,9 +64,9 @@ export function AppLayout() {
           <SidebarTrigger className="-ml-1">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
-          
+
           <div className="flex-1" />
-          
+
           {/* Notifications */}
           <Button
             variant="ghost"
@@ -71,6 +74,7 @@ export function AppLayout() {
             className="relative h-9 w-9 rounded-full"
             onClick={() => setShowNotifications(true)}
             data-tour="notifications-btn"
+            data-demo="notifications-btn"
           >
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
@@ -92,7 +96,9 @@ export function AppLayout() {
       />
 
       {/* Guided Tour */}
-      {isOnboardingOpen && <GuidedTour />}
+      {isOnboardingOpen && !isDemoActive && <GuidedTour />}
+      {/* Interactive Demo */}
+      {isDemoActive && <DemoRunner />}
     </SidebarProvider>
   );
 }

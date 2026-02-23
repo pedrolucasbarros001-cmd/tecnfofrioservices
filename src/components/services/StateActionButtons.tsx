@@ -335,9 +335,18 @@ export function StateActionButtons({
           )}
 
           {/* Dono only actions */}
+          {/* Actions restricted to Dono or shared with Secretaria */}
+          {(isDono || isSecretaria) && onEditDetails && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditDetails(); }}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar Detalhes
+            </DropdownMenuItem>
+          )}
+
+          {/* Dono only actions */}
           {isDono && (
             <>
-              {!(isDono || isSecretaria) || !onEditDetails ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuSeparator />
               {onForceState && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onForceState(); }} className="text-amber-600">
                   <AlertTriangle className="h-4 w-4 mr-2" />

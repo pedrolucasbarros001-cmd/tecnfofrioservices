@@ -85,7 +85,7 @@ export default function ClientesPage() {
       }
     >
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" data-demo="clientes-header">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
             <p className="text-muted-foreground">Gerir clientes do sistema</p>

@@ -70,7 +70,7 @@ export default function SecretaryConcluidosPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div data-tour="concluidos-header">
+      <div data-tour="concluidos-header" data-demo="concluidos-header">
         <h1 className="text-2xl font-bold tracking-tight">Oficina Reparados</h1>
         <p className="text-muted-foreground">
           Serviços reparados na oficina aguardando entrega ou recolha

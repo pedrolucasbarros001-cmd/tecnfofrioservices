@@ -837,7 +837,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Turno</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Selecionar turno" />

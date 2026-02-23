@@ -32,6 +32,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatShiftLabel } from '@/utils/dateUtils';
 import type { Service, ServicePart, ScheduledShift } from '@/types/database';
 
 interface PartArrivedModalProps {
@@ -95,7 +96,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
     }
 
     if (!scheduledShift) {
-      toast.error('Por favor, selecione a hora.');
+      toast.error('Por favor, selecione o turno.');
       return;
     }
 
@@ -141,7 +142,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
       queryClient.invalidateQueries({ queryKey: ['services'] });
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
-      toast.success(`Peça chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} (${techName}).`);
+      toast.success(`Peça chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} - ${formatShiftLabel(scheduledShift)} (${techName}).`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error marking part arrived:', error);
@@ -166,121 +167,121 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-         <div className="space-y-4 py-4">
-          {/* Service Info */}
-          {service && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              <p className="font-medium">{service.code}</p>
-              <p className="text-muted-foreground">
-                {service.appliance_type} {service.brand} {service.model}
-              </p>
-            </div>
-          )}
-
-          {/* Arrived Parts */}
-          {pendingParts.length > 0 && (
-            <div className="space-y-2">
-              <Label>Peças que Chegaram</Label>
-              <div className="space-y-1">
-                {pendingParts.map((part) => (
-                  <div key={part.id} className="p-2 bg-green-50 border border-green-200 rounded text-sm flex justify-between items-center">
-                    <span className="text-green-800">{part.part_name}</span>
-                    <span className="text-green-600">x{part.quantity}</span>
-                  </div>
-                ))}
+          <div className="space-y-4 py-4">
+            {/* Service Info */}
+            {service && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p className="font-medium">{service.code}</p>
+                <p className="text-muted-foreground">
+                  {service.appliance_type} {service.brand} {service.model}
+                </p>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Technician Selection */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Técnico *
-            </Label>
-            <Select value={technicianId} onValueChange={setTechnicianId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o técnico" />
-              </SelectTrigger>
-              <SelectContent>
-                {technicians.map((tech) => (
-                  <SelectItem key={tech.id} value={tech.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: tech.color || '#3B82F6' }}
-                      />
-                      {tech.profile?.full_name || 'Técnico'}
+            {/* Arrived Parts */}
+            {pendingParts.length > 0 && (
+              <div className="space-y-2">
+                <Label>Peças que Chegaram</Label>
+                <div className="space-y-1">
+                  {pendingParts.map((part) => (
+                    <div key={part.id} className="p-2 bg-green-50 border border-green-200 rounded text-sm flex justify-between items-center">
+                      <span className="text-green-800">{part.part_name}</span>
+                      <span className="text-green-600">x{part.quantity}</span>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {/* Schedule Date */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Data *
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !scheduledDate && 'text-muted-foreground'
-                  )}
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {scheduledDate
-                    ? format(scheduledDate, 'PPP', { locale: pt })
-                    : 'Selecione a data'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={scheduledDate}
-                  onSelect={setScheduledDate}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+            {/* Technician Selection */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Técnico *
+              </Label>
+              <Select value={technicianId} onValueChange={setTechnicianId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o técnico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {technicians.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: tech.color || '#3B82F6' }}
+                        />
+                        {tech.profile?.full_name || 'Técnico'}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Shift Selection */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Turno
-            </Label>
-            <Select value={scheduledShift} onValueChange={setScheduledShift}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar turno" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manha">Manhã</SelectItem>
-                <SelectItem value="tarde">Tarde</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Schedule Date */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Data *
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !scheduledDate && 'text-muted-foreground'
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {scheduledDate
+                      ? format(scheduledDate, 'PPP', { locale: pt })
+                      : 'Selecione a data'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={scheduledDate}
+                    onSelect={setScheduledDate}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
-          {/* Notes (optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas</Label>
-            <Textarea
-              id="notes"
-              placeholder="Observações adicionais..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-            />
+            {/* Shift Selection */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Turno
+              </Label>
+              <Select value={scheduledShift || undefined} onValueChange={setScheduledShift}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar turno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manha">Manhã</SelectItem>
+                  <SelectItem value="tarde">Tarde</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Notes (optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas</Label>
+              <Textarea
+                id="notes"
+                placeholder="Observações adicionais..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
           </div>
-         </div>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">

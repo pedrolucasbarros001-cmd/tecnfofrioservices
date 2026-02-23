@@ -17,9 +17,7 @@ import {
 } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { AgendaDrawer } from './AgendaDrawer';
+import { formatShiftLabel } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface WeeklyAgendaProps {
@@ -27,8 +25,6 @@ interface WeeklyAgendaProps {
   onServiceClick: (service: Service) => void;
 }
 
-// Use centralized shift label formatter
-import { formatShiftLabel } from '@/utils/dateUtils';
 
 type ViewMode = 'week' | 'month';
 
@@ -182,9 +178,9 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                     {sortedServices.slice(0, 5).map(service => (
                       <div key={service.id}>
                         {service.scheduled_shift && (
-                          <p className="text-[9px] text-muted-foreground mb-0.5">
+                          <span className="text-[10px] text-muted-foreground">
                             {formatShiftLabel(service.scheduled_shift)}
-                          </p>
+                          </span>
                         )}
                         <ServiceCard
                           service={service}

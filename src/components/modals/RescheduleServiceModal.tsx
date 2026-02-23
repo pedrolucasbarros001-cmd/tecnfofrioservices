@@ -35,8 +35,8 @@ import { useUpdateService } from '@/hooks/useServices';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
-import type { Service } from '@/types/database';
 import { formatShiftLabel } from '@/utils/dateUtils';
+import type { Service } from '@/types/database';
 
 interface RescheduleServiceModalProps {
   service: Service | null;
@@ -63,7 +63,7 @@ export function RescheduleServiceModal({
   const { data: technicians = [] } = useTechnicians();
   const updateService = useUpdateService();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -82,8 +82,8 @@ export function RescheduleServiceModal({
       form.reset({
         change_technician: false,
         technician_id: service.technician_id || '',
-        scheduled_date: service.scheduled_date 
-          ? new Date(service.scheduled_date) 
+        scheduled_date: service.scheduled_date
+          ? new Date(service.scheduled_date)
           : undefined,
         scheduled_shift: service.scheduled_shift || '',
       });
@@ -137,123 +137,123 @@ export function RescheduleServiceModal({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-          <div className="space-y-6 py-4">
-          {/* Current Assignment Info */}
-          <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Atribuição Atual</p>
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{currentTechnicianName}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CalendarIcon className="h-4 w-4" />
-              <span>
-                {service.scheduled_date 
-                  ? format(new Date(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
-                  : 'Sem data'}
-            {service.scheduled_shift && (
-                  <> • <span>{formatShiftLabel(service.scheduled_shift)}</span></>
-                )}
-              </span>
-            </div>
-          </div>
+          <div className="flex-1 overflow-y-auto min-h-0 px-6">
+            <div className="space-y-6 py-4">
+              {/* Current Assignment Info */}
+              <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Atribuição Atual</p>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{currentTechnicianName}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span>
+                    {service.scheduled_date
+                      ? format(new Date(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
+                      : 'Sem data'}
+                    {service.scheduled_shift && (
+                      <> • {formatShiftLabel(service.scheduled_shift)}</>
+                    )}
+                  </span>
+                </div>
+              </div>
 
-          {/* Change Technician Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="change_technician"
-              checked={changeTechnician}
-              onCheckedChange={(checked) => form.setValue('change_technician', checked === true)}
-            />
-            <Label htmlFor="change_technician" className="cursor-pointer">
-              Alterar Técnico
-            </Label>
-          </div>
-
-          {/* Technician Select - Only visible when checkbox is checked */}
-          {changeTechnician && (
-            <div className="space-y-2">
-              <Label>Novo Técnico</Label>
-              <Select
-                value={form.watch('technician_id')}
-                onValueChange={(value) => form.setValue('technician_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar técnico" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {technicians.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: tech.color || '#3B82F6' }} 
-                        />
-                        {tech.profile?.full_name || 'Técnico'}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* New Date */}
-          <div className="space-y-2">
-            <Label>Nova Data *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !form.watch('scheduled_date') && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {form.watch('scheduled_date') 
-                    ? format(form.watch('scheduled_date'), "dd 'de' MMMM 'de' yyyy", { locale: pt })
-                    : 'Selecionar data'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={form.watch('scheduled_date')}
-                  onSelect={(date) => date && form.setValue('scheduled_date', date)}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                  locale={pt}
-                  className="pointer-events-auto"
+              {/* Change Technician Checkbox */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="change_technician"
+                  checked={changeTechnician}
+                  onCheckedChange={(checked) => form.setValue('change_technician', checked === true)}
                 />
-              </PopoverContent>
-            </Popover>
-            {form.formState.errors.scheduled_date && (
-              <p className="text-sm text-destructive">{form.formState.errors.scheduled_date.message}</p>
-            )}
-          </div>
+                <Label htmlFor="change_technician" className="cursor-pointer">
+                  Alterar Técnico
+                </Label>
+              </div>
 
-          {/* New Shift */}
-          <div className="space-y-2">
-            <Label>Novo Turno</Label>
-            <Select
-              value={form.watch('scheduled_shift') || ''}
-              onValueChange={(value) => form.setValue('scheduled_shift', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar turno" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manha">Manhã</SelectItem>
-                <SelectItem value="tarde">Tarde</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Technician Select - Only visible when checkbox is checked */}
+              {changeTechnician && (
+                <div className="space-y-2">
+                  <Label>Novo Técnico</Label>
+                  <Select
+                    value={form.watch('technician_id')}
+                    onValueChange={(value) => form.setValue('technician_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar técnico" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {technicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: tech.color || '#3B82F6' }}
+                            />
+                            {tech.profile?.full_name || 'Técnico'}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
+              {/* New Date */}
+              <div className="space-y-2">
+                <Label>Nova Data *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !form.watch('scheduled_date') && 'text-muted-foreground'
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {form.watch('scheduled_date')
+                        ? format(form.watch('scheduled_date'), "dd 'de' MMMM 'de' yyyy", { locale: pt })
+                        : 'Selecionar data'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.watch('scheduled_date')}
+                      onSelect={(date) => date && form.setValue('scheduled_date', date)}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      locale={pt}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                {form.formState.errors.scheduled_date && (
+                  <p className="text-sm text-destructive">{form.formState.errors.scheduled_date.message}</p>
+                )}
+              </div>
+
+              {/* New Shift */}
+              <div className="space-y-2">
+                <Label>Novo Turno</Label>
+                <Select
+                  value={form.watch('scheduled_shift') || undefined}
+                  onValueChange={(v) => form.setValue('scheduled_shift', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar turno" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manha">Manhã</SelectItem>
+                    <SelectItem value="tarde">Tarde</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+            </div>
           </div>
-         </div>
           <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar

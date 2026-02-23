@@ -126,7 +126,7 @@ export function ConvertBudgetModal({
 
     // Validation: if technician selected, date and shift are required
     if (technicianId && (!scheduledDate || !scheduledShift)) {
-      toast.warning('Ao atribuir um técnico, a data e a hora são obrigatórias.');
+      toast.warning('Ao atribuir um técnico, a data e o turno são obrigatórios.');
       return;
     }
 
@@ -214,177 +214,180 @@ export function ConvertBudgetModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-         <div className="space-y-6 py-4">
-          {/* Service Type Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Tipo de Serviço</Label>
-            <RadioGroup
-              value={serviceType}
-              onValueChange={(value) => setServiceType(value as ServiceType)}
-              className="grid gap-3"
-            >
-              {SERVICE_TYPES.map((type) => (
-                <label
-                  key={type.value}
-                  className={cn(
-                    "flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                    serviceType === type.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <RadioGroupItem value={type.value} id={type.value} />
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    <type.icon className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{type.label}</p>
-                    <p className="text-sm text-muted-foreground">{type.description}</p>
-                  </div>
-                </label>
-              ))}
-            </RadioGroup>
-          </div>
-
-          {/* Service Location Selection - only for reparacao */}
-          {serviceType === 'reparacao' && (
+          <div className="space-y-6 py-4">
+            {/* Service Type Selection */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Local do Serviço</Label>
+              <Label className="text-sm font-medium">Tipo de Serviço</Label>
               <RadioGroup
-                value={serviceLocation}
-                onValueChange={(value) => setServiceLocation(value as ServiceLocation)}
-                className="grid grid-cols-2 gap-3"
+                value={serviceType}
+                onValueChange={(value) => setServiceType(value as ServiceType)}
+                className="grid gap-3"
               >
-                {SERVICE_LOCATIONS.map((location) => (
+                {SERVICE_TYPES.map((type) => (
                   <label
-                    key={location.value}
+                    key={type.value}
                     className={cn(
-                      "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                      serviceLocation === location.value
+                      "flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                      serviceType === type.value
                         ? "border-primary bg-primary/5"
                         : "border-border hover:border-primary/50"
                     )}
                   >
-                    <RadioGroupItem value={location.value} id={location.value} />
-                    <location.icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">{location.label}</span>
+                    <RadioGroupItem value={type.value} id={type.value} />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      <type.icon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{type.label}</p>
+                      <p className="text-sm text-muted-foreground">{type.description}</p>
+                    </div>
                   </label>
                 ))}
               </RadioGroup>
             </div>
-          )}
 
-          {/* Address fields */}
-          {(true) && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Morada</Label>
-                <Input
-                  placeholder="Morada do serviço"
-                  value={serviceAddress}
-                  onChange={(e) => setServiceAddress(e.target.value)}
-                />
+            {/* Service Location Selection - only for reparacao */}
+            {serviceType === 'reparacao' && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Local do Serviço</Label>
+                <RadioGroup
+                  value={serviceLocation}
+                  onValueChange={(value) => setServiceLocation(value as ServiceLocation)}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  {SERVICE_LOCATIONS.map((location) => (
+                    <label
+                      key={location.value}
+                      className={cn(
+                        "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                        serviceLocation === location.value
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <RadioGroupItem value={location.value} id={location.value} />
+                      <location.icon className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">{location.label}</span>
+                    </label>
+                  ))}
+                </RadioGroup>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Código Postal</Label>
-                <Input
-                  placeholder="0000-000"
-                  value={servicePostalCode}
-                  onChange={(e) => setServicePostalCode(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Technician + Scheduling Section */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Atribuir Técnico (Opcional)</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Ao atribuir um técnico, o serviço será agendado na agenda dele.
-            </p>
-
-            <Select value={technicianId} onValueChange={(val) => {
-              setTechnicianId(val === '__none__' ? '' : val);
-              if (val === '__none__') {
-                setScheduledDate(undefined);
-                setScheduledShift('');
-              }
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sem técnico atribuído" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sem técnico</SelectItem>
-                {technicians.map((tech) => (
-                  <SelectItem key={tech.id} value={tech.id}>
-                    {tech.profile?.full_name || tech.profile?.email || 'Técnico'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Date + Shift (only if technician selected) */}
-            {technicianId && (
+            {/* Address fields */}
+            {(true) && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Data *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !scheduledDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : 'Selecionar'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={scheduledDate}
-                        onSelect={setScheduledDate}
-                        locale={pt}
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Label className="text-xs text-muted-foreground">Morada</Label>
+                  <Input
+                    placeholder="Morada do serviço"
+                    value={serviceAddress}
+                    onChange={(e) => setServiceAddress(e.target.value)}
+                  />
                 </div>
-
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Turno</Label>
-                  <Select value={scheduledShift} onValueChange={setScheduledShift}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar turno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manha">Manhã</SelectItem>
-                      <SelectItem value="tarde">Tarde</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs text-muted-foreground">Código Postal</Label>
+                  <Input
+                    placeholder="0000-000"
+                    value={servicePostalCode}
+                    onChange={(e) => setServicePostalCode(e.target.value)}
+                  />
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Budget Info */}
-          <div className="rounded-lg bg-muted/50 p-4 text-sm">
-            <p className="text-muted-foreground">
-              <strong>Orçamento:</strong> {budget.code}
-            </p>
-            <p className="text-muted-foreground">
-              <strong>Cliente:</strong> {budget.customer?.name || 'Sem cliente'}
-            </p>
-            <p className="text-muted-foreground">
-              <strong>Aparelho:</strong> {budget.appliance_type || '-'}
-            </p>
+            {/* Technician + Scheduling Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Atribuir Técnico (Opcional)</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ao atribuir um técnico, o serviço será agendado na agenda dele.
+              </p>
+
+              <Select value={technicianId} onValueChange={(val) => {
+                setTechnicianId(val === '__none__' ? '' : val);
+                if (val === '__none__') {
+                  setScheduledDate(undefined);
+                  setScheduledShift('');
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem técnico atribuído" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sem técnico</SelectItem>
+                  {technicians.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.profile?.full_name || tech.profile?.email || 'Técnico'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Date + Shift (only if technician selected) */}
+              {technicianId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Data *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !scheduledDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : 'Selecionar'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduledDate}
+                          onSelect={setScheduledDate}
+                          locale={pt}
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Turno</Label>
+                    <Select
+                      value={scheduledShift || undefined}
+                      onValueChange={setScheduledShift}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manha">Manhã</SelectItem>
+                        <SelectItem value="tarde">Tarde</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Budget Info */}
+            <div className="rounded-lg bg-muted/50 p-4 text-sm">
+              <p className="text-muted-foreground">
+                <strong>Orçamento:</strong> {budget.code}
+              </p>
+              <p className="text-muted-foreground">
+                <strong>Cliente:</strong> {budget.customer?.name || 'Sem cliente'}
+              </p>
+              <p className="text-muted-foreground">
+                <strong>Aparelho:</strong> {budget.appliance_type || '-'}
+              </p>
+            </div>
           </div>
-         </div>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">

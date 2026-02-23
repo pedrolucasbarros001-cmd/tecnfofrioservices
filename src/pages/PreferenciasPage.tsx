@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Bell, Lock, Globe, Info, BellRing, AlertTriangle, Package, BookOpen } from 'lucide-react';
+import { Moon, Sun, Bell, Lock, Globe, Info, BellRing, AlertTriangle, Package, BookOpen, GraduationCap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useDemo } from '@/contexts/DemoContext';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,8 @@ export default function PreferenciasPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const { openOnboarding } = useOnboarding();
+  const { startDemo } = useDemo();
+  const { role } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -87,7 +90,7 @@ export default function PreferenciasPage() {
     try {
       // Get current session token
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         toast.error('Sessão expirada. Por favor, faça login novamente.');
         setIsChangingPassword(false);
@@ -289,16 +292,38 @@ export default function PreferenciasPage() {
             Guia do Sistema
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Tutorial</Label>
+              <Label>Tutorial em Diapositivos</Label>
               <p className="text-sm text-muted-foreground">
                 Rever o guia de utilização do sistema
               </p>
             </div>
             <Button variant="outline" onClick={openOnboarding}>
               Ver Guia
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Demo Interativa
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Percorrer o sistema passo a passo com explicações
+              </p>
+            </div>
+            <Button
+              onClick={() => role && startDemo(role as any)}
+              className="bg-[#2B4F84] hover:bg-[#2B4F84]/90 text-white"
+              disabled={!role}
+            >
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Iniciar Demo
             </Button>
           </div>
         </CardContent>

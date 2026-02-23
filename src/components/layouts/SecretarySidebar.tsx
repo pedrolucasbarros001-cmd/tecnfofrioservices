@@ -73,7 +73,7 @@ export function SecretarySidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-4">
-        <SidebarMenu data-tour="sidebar-menu">
+        <SidebarMenu data-tour="sidebar-menu" data-demo="sidebar-menu">
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.url}>
               <SidebarMenuButton

@@ -580,7 +580,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Turno</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecionar turno" />
