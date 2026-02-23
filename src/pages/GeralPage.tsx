@@ -39,7 +39,6 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { formatShiftLabel } from '@/utils/dateUtils';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -106,7 +105,7 @@ export default function GeralPage() {
     searchTerm: debouncedSearch || undefined,
   });
 
-  const services = result?.data || [];
+  const services = (result?.data || []).filter(Boolean);
   const totalCount = result?.totalCount || 0;
   const totalPages = result?.totalPages || 0;
 
@@ -279,7 +278,7 @@ export default function GeralPage() {
 
         {/* Weekly Agenda - only show when no status filter */}
         {selectedStatus === 'all' && selectedLocation === 'all' && !searchTerm && (
-          <WeeklyAgenda services={services} onServiceClick={handleServiceClick} data-demo="weekly-agenda" />
+          <WeeklyAgenda services={services} onServiceClick={handleServiceClick} />
         )}
 
         {/* Services Table */}
@@ -306,6 +305,7 @@ export default function GeralPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredServices.map(service => {
+                    if (!service) return null;
                     const statusConfig = SERVICE_STATUS_CONFIG[service.status] || {
                       label: service.status,
                       color: 'bg-gray-500 text-white'
@@ -407,9 +407,13 @@ export default function GeralPage() {
                         {service.scheduled_date ? <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                            {format(new Date(service.scheduled_date), 'dd/MM/yy', {
-                              locale: pt
-                            })}
+                            {(() => {
+                              try {
+                                return format(new Date(service.scheduled_date), 'dd/MM/yy', { locale: pt });
+                              } catch (e) {
+                                return '-';
+                              }
+                            })()}
                           </div>
                           {service.scheduled_shift && <Badge variant="outline" className="text-xs">
                             {formatShiftLabel(service.scheduled_shift)}
@@ -419,7 +423,7 @@ export default function GeralPage() {
 
                       {/* Ações */}
                       <TableCell className="text-right">
-                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} onEditDetails={() => handleEditDetails(service)} viewContext={selectedStatus} data-demo="action-buttons" />
+                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} onEditDetails={() => handleEditDetails(service)} viewContext={selectedStatus} />
                       </TableCell>
                     </TableRow>;
                   })}

@@ -17,8 +17,11 @@ import {
 } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { formatShiftLabel } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
+import { AgendaDrawer } from './AgendaDrawer';
 
 interface WeeklyAgendaProps {
   services: Service[];
@@ -66,10 +69,15 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
   const goToToday = () => setCurrentDate(new Date());
 
   const getServicesForDay = (date: Date) => {
+    if (!services || !Array.isArray(services)) return [];
     return services.filter(service => {
-      if (!service.scheduled_date) return false;
-      const serviceDate = parseISO(service.scheduled_date);
-      return isSameDay(serviceDate, date);
+      if (!service || !service.scheduled_date) return false;
+      try {
+        const serviceDate = parseISO(service.scheduled_date);
+        return isSameDay(serviceDate, date);
+      } catch (e) {
+        return false;
+      }
     });
   };
 
@@ -97,7 +105,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
 
   return (
     <>
-      <div className="bg-card rounded-xl border shadow-sm" data-tour="weekly-agenda">
+      <div className="bg-card rounded-xl border shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
@@ -277,6 +285,13 @@ interface ServiceCardProps {
 
 // Get service type configuration for colors and icons
 function getServiceTypeConfig(service: Service) {
+  if (!service) return {
+    bg: 'bg-gray-50',
+    borderColor: '#ccc',
+    iconColor: 'text-gray-400',
+    Icon: Settings
+  };
+
   if (service.service_type === 'instalacao') {
     return {
       bg: 'bg-yellow-50',
@@ -311,6 +326,7 @@ function getServiceTypeConfig(service: Service) {
 }
 
 function ServiceCard({ service, onClick }: ServiceCardProps) {
+  if (!service) return null;
   const config = getServiceTypeConfig(service);
   const techColor = service.technician?.color;
 

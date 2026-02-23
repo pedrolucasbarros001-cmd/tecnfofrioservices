@@ -284,37 +284,23 @@ export default function PreferenciasPage() {
         </CardContent>
       </Card>
 
-      {/* Guide Card */}
+      {/* Demo Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Guia do Sistema
+            <GraduationCap className="h-5 w-5" />
+            Demonstração Interativa
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Tutorial em Diapositivos</Label>
-              <p className="text-sm text-muted-foreground">
-                Rever o guia de utilização do sistema
-              </p>
-            </div>
-            <Button variant="outline" onClick={openOnboarding}>
-              Ver Guia
-            </Button>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
               <Label className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
-                Demo Interativa
+                Demo Prática
               </Label>
               <p className="text-sm text-muted-foreground">
-                Percorrer o sistema passo a passo com explicações
+                Percorrer o sistema passo a passo com explicações reais
               </p>
             </div>
             <Button

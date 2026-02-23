@@ -334,14 +334,6 @@ export function StateActionButtons({
             </>
           )}
 
-          {/* Dono only actions */}
-          {/* Actions restricted to Dono or shared with Secretaria */}
-          {(isDono || isSecretaria) && onEditDetails && (
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditDetails(); }}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Editar Detalhes
-            </DropdownMenuItem>
-          )}
 
           {/* Dono only actions */}
           {isDono && (

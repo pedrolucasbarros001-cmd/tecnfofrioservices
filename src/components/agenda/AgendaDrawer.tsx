@@ -32,7 +32,7 @@ export function AgendaDrawer({
   if (!date) return null;
 
   // sort services by scheduled_shift (time string) ascending
-  const sortedServices = [...services].sort((a, b) => {
+  const sortedServices = [...(services || []).filter(s => !!s)].sort((a, b) => {
     const aTime = a.scheduled_shift || 'zzz';
     const bTime = b.scheduled_shift || 'zzz';
     return aTime.localeCompare(bTime);
@@ -83,6 +83,14 @@ interface ServiceDrawerCardProps {
 
 // Get service type configuration for colors and icons
 function getServiceTypeConfig(service: Service) {
+  if (!service) return {
+    bg: 'bg-gray-50',
+    hoverBg: 'hover:bg-gray-100',
+    borderColor: '#ccc',
+    iconColor: 'text-gray-400',
+    Icon: Settings
+  };
+
   if (service.service_type === 'instalacao') {
     return {
       bg: 'bg-yellow-50',
@@ -121,6 +129,7 @@ function getServiceTypeConfig(service: Service) {
 }
 
 function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
+  if (!service) return null;
   const config = getServiceTypeConfig(service);
   const techColor = service.technician?.color;
 
