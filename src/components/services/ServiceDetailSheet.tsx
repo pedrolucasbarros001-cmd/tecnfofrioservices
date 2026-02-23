@@ -67,6 +67,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+import { formatShiftLabel } from '@/utils/dateUtils';
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -495,7 +496,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   </div>
                   {service.scheduled_shift && (
                     <Badge variant="secondary">
-                      {service.scheduled_shift}
+                      {formatShiftLabel(service.scheduled_shift)}
                     </Badge>
                   )}
                 </div>

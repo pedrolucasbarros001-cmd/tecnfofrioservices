@@ -150,7 +150,7 @@ const DONO_STEPS: OnboardingStepContent[] = [
       'Badge de Estado: cor distinta para cada fase do fluxo',
       'Tags coexistentes: um serviço pode ser Urgente + Garantia + A Precificar ao mesmo tempo',
       'O técnico aparece com avatar colorido',
-      'Data e turno (Manhã/Tarde/Noite) com ícone',
+      'Data e turno (Manhã/Tarde) com ícone',
     ],
     fallbackIcon: ClipboardList,
     page: '/geral',
@@ -204,7 +204,7 @@ const DONO_STEPS: OnboardingStepContent[] = [
     details: [
       'Lista de técnicos activos com avatar colorido',
       'Campo de data com calendário',
-      'Selecção de turno: Manhã, Tarde ou Noite',
+      'Selecção de turno: Manhã ou Tarde',
       'Ao confirmar, o técnico é notificado',
     ],
     fallbackIcon: UserPlus,
@@ -513,7 +513,7 @@ const TECNICO_STEPS: OnboardingStepContent[] = [
     description: 'Os seus serviços aparecem organizados por dia. Navegue entre dias com as setas.',
     details: [
       'Botão central mostra a data actual (destacado quando é hoje)',
-      'Secções por turno: Manhã (sol nascente), Tarde (sol), Noite (lua)',
+      'Secções por turno: Manhã (sol nascente) e Tarde (sol)',
       'Cada secção mostra o total de serviços',
       'Se não há serviços, mensagem "Sem serviços para este dia"',
     ],

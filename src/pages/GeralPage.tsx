@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBoundaryFallbackContent } from '@/components/ErrorBoundaryFallbackContent';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { formatShiftLabel } from '@/utils/dateUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -410,7 +411,7 @@ export default function GeralPage() {
                             })}
                           </div>
                           {service.scheduled_shift && <Badge variant="outline" className="text-xs">
-                            {service.scheduled_shift}
+                            {formatShiftLabel(service.scheduled_shift)}
                           </Badge>}
                         </div> : <span className="text-muted-foreground text-sm">-</span>}
                       </TableCell>

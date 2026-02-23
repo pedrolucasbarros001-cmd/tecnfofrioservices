@@ -836,10 +836,18 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                         name="scheduled_shift"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Hora</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
+                            <FormLabel>Turno</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecionar turno" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="manha">Manhã</SelectItem>
+                                <SelectItem value="tarde">Tarde</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}

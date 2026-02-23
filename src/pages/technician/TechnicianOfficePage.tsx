@@ -12,6 +12,7 @@ import { RequestTransferModal } from '@/components/modals/RequestTransferModal';
 import { useUpdateService, prefetchFullServiceData } from '@/hooks/useServices';
 import { toast } from 'sonner';
 import type { Service } from '@/types/database';
+import { formatShiftLabel } from '@/utils/dateUtils';
 
 
 export default function TechnicianOfficePage() {
@@ -234,7 +235,7 @@ export default function TechnicianOfficePage() {
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{service.scheduled_shift || 'Sem hora'}</span>
+                <span>{formatShiftLabel(service.scheduled_shift)}</span>
               </div>
             </div>
 

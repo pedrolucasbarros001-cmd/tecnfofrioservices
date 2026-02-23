@@ -27,10 +27,8 @@ interface WeeklyAgendaProps {
   onServiceClick: (service: Service) => void;
 }
 
-// Helper to display shift/time values (now simply the time string)
-const formatShiftLabel = (shift: string | null | undefined): string => {
-  return shift || 'Sem hora';
-};
+// Use centralized shift label formatter
+import { formatShiftLabel } from '@/utils/dateUtils';
 
 type ViewMode = 'week' | 'month';
 

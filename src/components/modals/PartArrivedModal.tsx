@@ -252,17 +252,21 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
             </Popover>
           </div>
 
-          {/* Time Selection */}
+          {/* Shift Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Hora
+              Turno
             </Label>
-            <Input
-              type="time"
-              value={scheduledShift}
-              onChange={(e) => setScheduledShift(e.target.value)}
-            />
+            <Select value={scheduledShift} onValueChange={setScheduledShift}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar turno" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manha">Manhã</SelectItem>
+                <SelectItem value="tarde">Tarde</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Notes (optional) */}

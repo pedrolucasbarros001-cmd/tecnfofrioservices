@@ -260,7 +260,7 @@ export function StateActionButtons({
               Atribuir Técnico
             </DropdownMenuItem>
           )}
-          {service.technician_id && service.status !== 'finalizado' && isDono && (
+          {service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignTechnician(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Reatribuir Técnico
@@ -323,16 +323,21 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
+          {/* Edit Details - Dono or Secretaria */}
+          {(isDono || isSecretaria) && onEditDetails && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditDetails(); }}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar Detalhes
+              </DropdownMenuItem>
+            </>
+          )}
+
           {/* Dono only actions */}
           {isDono && (
             <>
-              <DropdownMenuSeparator />
-              {onEditDetails && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditDetails(); }}>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Editar Detalhes
-                </DropdownMenuItem>
-              )}
+              {!(isDono || isSecretaria) || !onEditDetails ? <DropdownMenuSeparator /> : null}
               {onForceState && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onForceState(); }} className="text-amber-600">
                   <AlertTriangle className="h-4 w-4 mr-2" />
