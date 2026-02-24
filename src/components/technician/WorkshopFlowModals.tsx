@@ -530,7 +530,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <span>Tire uma foto geral do aparelho</span>
               <span className="text-destructive">*</span>
             </div>
-            {formData.photoAparelho ? (
+            {formData.photoAparelho && formData.photoAparelho !== '__photo_exists__' ? (
               <div className="relative">
                 <img
                   src={formData.photoAparelho}
@@ -545,6 +545,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 >
                   Nova Foto
                 </Button>
+              </div>
+            ) : formData.photoAparelho === '__photo_exists__' ? (
+              <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <span>Foto já registada</span>
+                <Button variant="outline" size="sm" onClick={() => setShowCamera(true)}>Tirar Nova</Button>
               </div>
             ) : (
               <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => setShowCamera(true)}>
@@ -581,7 +587,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <span>Tire uma foto da etiqueta serial</span>
               <span className="text-destructive">*</span>
             </div>
-            {formData.photoEtiqueta ? (
+            {formData.photoEtiqueta && formData.photoEtiqueta !== '__photo_exists__' ? (
               <div className="relative">
                 <img
                   src={formData.photoEtiqueta}
@@ -596,6 +602,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 >
                   Nova Foto
                 </Button>
+              </div>
+            ) : formData.photoEtiqueta === '__photo_exists__' ? (
+              <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <span>Foto já registada</span>
+                <Button variant="outline" size="sm" onClick={() => setShowCamera(true)}>Tirar Nova</Button>
               </div>
             ) : (
               <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => setShowCamera(true)}>
@@ -630,12 +642,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <span className="text-destructive">*</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {formData.photosEstado.map((p, idx) => (
+              {formData.photosEstado.filter(p => p !== '__photo_exists__').map((p, idx) => (
                 <div key={idx} className="relative aspect-square">
                   <img src={p} alt={`Estado ${idx}`} className="w-full h-full object-cover rounded-lg" />
                 </div>
               ))}
-              {formData.photosEstado.length < 3 && (
+              {formData.photosEstado.some(p => p === '__photo_exists__') && (
+                <div className="flex items-center justify-center aspect-square rounded-lg border bg-muted/50">
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                </div>
+              )}
+              {formData.photosEstado.filter(p => p !== '__photo_exists__').length < 3 && (
                 <Button
                   variant="outline"
                   className="aspect-square flex-col gap-2 p-0"
@@ -1015,19 +1032,15 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
             await ensureValidSession();
 
-            await supabase.from("service_photos").insert({
-              service_id: service.id,
-              photo_type: photoType,
-              file_url: imageData,
-              description: `Foto de ${photoType} na oficina`,
-            });
+            const { uploadServicePhoto } = await import('@/utils/photoUpload');
+            const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, `Foto de ${photoType} na oficina`);
 
             if (currentStep === "foto_aparelho") {
-              setFormData((prev) => ({ ...prev, photoAparelho: imageData }));
+              setFormData((prev) => ({ ...prev, photoAparelho: publicUrl }));
             } else if (currentStep === "foto_etiqueta") {
-              setFormData((prev) => ({ ...prev, photoEtiqueta: imageData }));
+              setFormData((prev) => ({ ...prev, photoEtiqueta: publicUrl }));
             } else if (currentStep === "foto_estado") {
-              setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, imageData] }));
+              setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, publicUrl] }));
             }
 
             queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });

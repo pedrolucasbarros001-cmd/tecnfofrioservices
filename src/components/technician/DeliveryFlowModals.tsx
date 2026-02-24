@@ -140,14 +140,10 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const handlePhotoCapture = async (imageData: string) => {
     try {
       await ensureValidSession();
-      await supabase.from('service_photos').insert({
-        service_id: service.id,
-        photo_type: 'entrega',
-        file_url: imageData,
-        description: 'Foto da entrega',
-      });
+      const { uploadServicePhoto } = await import('@/utils/photoUpload');
+      const publicUrl = await uploadServicePhoto(service.id, imageData, 'entrega', 'Foto da entrega');
       queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-      setFormData(prev => ({ ...prev, photoFile: imageData }));
+      setFormData(prev => ({ ...prev, photoFile: publicUrl }));
       setShowCamera(false);
       toast.success('Foto guardada!');
     } catch (error) {
@@ -207,7 +203,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       onComplete();
     } catch (error) {
       console.error('Error completing delivery:', error);
-      toast.error('Erro ao concluir entrega');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -367,7 +363,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
               Tire uma foto da entrega para documentação <span className="text-muted-foreground/60">(opcional)</span>.
             </p>
 
-            {formData.photoFile ? (
+            {formData.photoFile && formData.photoFile !== '__photo_exists__' ? (
               <div className="relative">
                 <img
                   src={formData.photoFile}
@@ -382,6 +378,12 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
                 >
                   Nova Foto
                 </Button>
+              </div>
+            ) : formData.photoFile === '__photo_exists__' ? (
+              <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <span>Foto já registada</span>
+                <Button variant="outline" size="sm" onClick={() => setShowCamera(true)}>Tirar Nova</Button>
               </div>
             ) : (
               <Button

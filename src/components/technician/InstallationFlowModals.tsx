@@ -7,7 +7,8 @@ import {
   ArrowRight,
   ImageIcon,
   Package,
-  FileText
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
 import {
   Dialog,
@@ -152,19 +153,17 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const handlePhotoCapture = async (imageData: string) => {
     try {
       await ensureValidSession();
-      await supabase.from('service_photos').insert({
-        service_id: service.id,
-        photo_type: cameraMode === 'antes' ? 'instalacao_antes' : 'instalacao_depois',
-        file_url: imageData,
-        description: cameraMode === 'antes' ? 'Foto antes da instalação' : 'Foto após instalação',
-      });
+      const photoType = cameraMode === 'antes' ? 'instalacao_antes' : 'instalacao_depois';
+      const description = cameraMode === 'antes' ? 'Foto antes da instalação' : 'Foto após instalação';
+      const { uploadServicePhoto } = await import('@/utils/photoUpload');
+      const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, description);
 
       queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
 
       if (cameraMode === 'antes') {
-        setFormData(prev => ({ ...prev, photoAntes: imageData }));
+        setFormData(prev => ({ ...prev, photoAntes: publicUrl }));
       } else {
-        setFormData(prev => ({ ...prev, photoDepois: imageData }));
+        setFormData(prev => ({ ...prev, photoDepois: publicUrl }));
       }
 
       setShowCamera(false);
@@ -301,6 +300,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   // Validation
   const canProceedFromFotoAntes = formData.photoAntes !== null;
   const canProceedFromFotoDepois = formData.photoDepois !== null;
+  const isRealPhoto = (p: string | null) => p !== null && p !== '__photo_exists__';
 
   // Progress calculation (6 steps after resumo)
   const stepIndex = ['deslocacao', 'foto_antes', 'materiais', 'trabalho', 'foto_depois', 'finalizacao'].indexOf(currentStep);
@@ -451,10 +451,10 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               Tire uma foto do local <strong>antes</strong> de iniciar a instalação.
             </p>
 
-            {formData.photoAntes ? (
+            {isRealPhoto(formData.photoAntes) ? (
               <div className="relative">
                 <img
-                  src={formData.photoAntes}
+                  src={formData.photoAntes!}
                   alt="Foto antes"
                   className="w-full h-48 object-cover rounded-lg"
                 />
@@ -466,6 +466,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
                 >
                   Nova Foto
                 </Button>
+              </div>
+            ) : formData.photoAntes === '__photo_exists__' ? (
+              <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <span>Foto já registada</span>
+                <Button variant="outline" size="sm" onClick={openCameraAntes}>Tirar Nova</Button>
               </div>
             ) : (
               <Button
@@ -602,12 +608,17 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   <ImageIcon className="h-3 w-3" /> Antes
                 </p>
-                {formData.photoAntes && (
+                {isRealPhoto(formData.photoAntes) && (
                   <img
-                    src={formData.photoAntes}
+                    src={formData.photoAntes!}
                     alt="Foto antes"
                     className="w-full h-24 object-cover rounded-lg opacity-70"
                   />
+                )}
+                {formData.photoAntes === '__photo_exists__' && (
+                  <div className="w-full h-24 flex items-center justify-center rounded-lg border bg-muted/50">
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  </div>
                 )}
               </div>
 
@@ -616,13 +627,17 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   <ImageIcon className="h-3 w-3" /> Depois
                 </p>
-                {formData.photoDepois ? (
+                {isRealPhoto(formData.photoDepois) ? (
                   <div className="relative">
                     <img
-                      src={formData.photoDepois}
+                      src={formData.photoDepois!}
                       alt="Foto depois"
                       className="w-full h-24 object-cover rounded-lg"
                     />
+                  </div>
+                ) : formData.photoDepois === '__photo_exists__' ? (
+                  <div className="w-full h-24 flex items-center justify-center rounded-lg border bg-muted/50">
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
                   </div>
                 ) : (
                   <Button
