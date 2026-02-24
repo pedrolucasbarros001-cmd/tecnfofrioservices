@@ -3,6 +3,15 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { AppRole, Profile } from '@/types/database';
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Query'): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`TIMEOUT: ${label} excedeu ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -115,13 +124,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[AuthContext] Fetching profile for:', userId);
 
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
+      // Fetch profile with timeout
+      const { data: profileData, error: profileError } = await withTimeout(
+        Promise.resolve(supabase.from('profiles').select('*').eq('user_id', userId).single()),
+        10000,
+        'profiles'
+      );
       if (profileError) {
         if (profileError.code !== 'PGRST116') {
           console.error('[AuthContext] Error fetching profile:', profileError);
@@ -129,17 +137,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('[AuthContext] No profile found for user');
         }
       }
-
       setProfile(profileData as Profile | null);
 
-      // Fetch role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      // Fetch role with timeout
+      const { data: roleData, error: roleError } = await withTimeout(
+        Promise.resolve(supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()),
+        10000,
+        'user_roles'
+      );
 
       if (roleError) {
         console.error('[AuthContext] Error fetching role:', roleError);

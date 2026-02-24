@@ -54,6 +54,18 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, role, loading, navigate, location.state]);
 
+  // Safety: if authenticated but no role loaded (DB timeout), give feedback
+  useEffect(() => {
+    if (isAuthenticated && !loading && !role) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar perfil',
+        description: 'Não foi possível carregar as suas permissões. Recarregue a página ou tente novamente.',
+      });
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, loading, role]);
+
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
 
@@ -90,21 +102,10 @@ export default function LoginPage() {
         return;
       }
 
-      // If we're here, sign in was successful.
-      // Redirection is handled by useEffect when role is loaded.
-      // But let's add a timeout to unblock the UI if role load hangs.
+      // Safety timeout: unblock UI if role loading hangs
       setTimeout(() => {
-        if (isLoading) {
-          setIsLoading(false);
-          if (!role && isAuthenticated) {
-            toast({
-              variant: 'default',
-              title: 'Autenticado',
-              description: 'A carregar as suas permissões... Por favor, aguarde.',
-            });
-          }
-        }
-      }, 5000);
+        setIsLoading(false);
+      }, 20000);
     } catch (error: any) {
       console.error('Login error:', error);
       const isTimeout = error?.message === 'TIMEOUT';
