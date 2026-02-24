@@ -1,113 +1,103 @@
 
 
-# Plano: Corrigir Scroll nos Modais e Adicionar Pecas no ConfirmPartOrderModal
+# Plano: Alinhar Mapa com Morada Real e Auditoria Geral de Fluxos/Modais
 
-## Diagnostico
+## Problema 1: Mapa nao alinhado com a morada
 
-O problema de scroll persiste porque o componente `ScrollArea` do Radix UI nao esta a funcionar corretamente dentro do layout flex dos modais. O `ScrollAreaPrimitive.Viewport` interno depende de estilos inline do Radix para `overflow: scroll`, mas isso nao esta a resultar de forma fiavel neste contexto (flex container com `flex-1 min-h-0`).
+### Diagnostico
 
-**Solucao definitiva:** Substituir `<ScrollArea>` por um `<div>` nativo com `overflow-y-auto` em todos os modais afetados. Isto e 100% fiavel, independente do Radix, e resolve o scroll de forma permanente.
+Os tres fluxos do tecnico (Visita, Instalacao, Entrega) abrem o Google Maps usando apenas o campo `service_address` ou `customer.address`, **sem incluir cidade, codigo postal ou "Portugal"**. Exemplo:
 
-## Alteracoes
+- Morada guardada: `Rua Padre Americo nº58`
+- Google Maps recebe: `Rua Padre Americo nº58` (sem contexto geografico)
+- Resultado: Google Maps pode resolver para uma rua com nome semelhante em Cascais, Lisboa ou qualquer outro sitio
 
-### 1. Modais de criacao de servico a partir do perfil do cliente
+### Solucao
 
-**Ficheiro: `src/components/shared/CustomerDetailSheet.tsx`** (linha ~778)
+Criar uma funcao utilitaria `buildFullAddress` que concatena todos os campos disponiveis (morada + codigo postal + cidade + "Portugal") para garantir que o Google Maps resolve corretamente.
 
-Substituir:
+**Novo ficheiro: `src/utils/addressUtils.ts`**
+
 ```typescript
-<ScrollArea className="flex-1 min-h-0 px-6">
-  <div className="space-y-4 py-4 pr-4">
-```
-Por:
-```typescript
-<div className="flex-1 min-h-0 overflow-y-auto px-6">
-  <div className="space-y-4 py-4">
-```
-
-### 2. CreateServiceModal
-
-**Ficheiro: `src/components/modals/CreateServiceModal.tsx`** (linha ~396)
-
-Mesma substituicao: `ScrollArea` -> `div overflow-y-auto`.
-
-### 3. CreateInstallationModal
-
-**Ficheiro: `src/components/modals/CreateInstallationModal.tsx`** (linha ~278)
-
-Mesma substituicao.
-
-### 4. CreateDeliveryModal
-
-**Ficheiro: `src/components/modals/CreateDeliveryModal.tsx`**
-
-Mesma substituicao.
-
-### 5. RequestPartModal (solicitar peca - tecnico)
-
-**Ficheiro: `src/components/modals/RequestPartModal.tsx`** (linha 168)
-
-Substituir `<ScrollArea>` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`.
-
-### 6. ConfirmPartOrderModal (registar pedido - admin)
-
-**Ficheiro: `src/components/modals/ConfirmPartOrderModal.tsx`**
-
-Duas alteracoes:
-
-**a) Corrigir scroll:** Substituir `<ScrollArea>` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`.
-
-**b) Adicionar funcionalidade de adicionar pecas novas:**
-
-Adicionar state para novas pecas (mesmo padrao do `RequestPartModal`):
-```typescript
-const [newParts, setNewParts] = useState<{name: string, code: string, quantity: string}[]>([]);
-```
-
-Na UI, apos a lista de pecas solicitadas, adicionar botao "Adicionar Peca" que permite ao admin:
-- Inserir nome, codigo/referencia e quantidade de pecas adicionais
-- Remover pecas adicionadas por engano
-- Estas novas pecas serao inseridas na tabela `service_parts` no momento do submit, junto com a atualizacao das pecas existentes
-
-No `handleSubmit`, alem de atualizar as pecas pendentes, tambem inserir as novas pecas:
-```typescript
-if (newParts.length > 0) {
-  const validNew = newParts.filter(p => p.name.trim());
-  if (validNew.length > 0) {
-    await supabase.from('service_parts').insert(
-      validNew.map(p => ({
-        service_id: service.id,
-        part_name: p.name.trim(),
-        part_code: p.code.trim() || null,
-        quantity: parseInt(p.quantity) || 1,
-        is_requested: true,
-        arrived: false,
-        estimated_arrival: estimatedArrival,
-        cost: cost ? parseCurrencyInput(cost) : null,
-        iva_rate: parseFloat(ivaRate),
-        supplier: supplier || null,
-      }))
-    );
-  }
+export function buildFullAddress(parts: {
+  address?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+}): string | null {
+  const { address, postalCode, city } = parts;
+  if (!address) return null;
+  const segments = [address];
+  if (postalCode) segments.push(postalCode);
+  if (city) segments.push(city);
+  segments.push('Portugal');
+  return segments.join(', ');
 }
 ```
+
+**Atualizar `handleNavigateToClient` nos 3 ficheiros:**
+
+- `src/components/technician/VisitFlowModals.tsx` (linha 223-231)
+- `src/components/technician/DeliveryFlowModals.tsx` (linha 130-138)
+- `src/components/technician/InstallationFlowModals.tsx` (linha 143-151)
+
+Logica atualizada (igual nos 3):
+```typescript
+const handleNavigateToClient = () => {
+  const fullAddress = buildFullAddress({
+    address: service.service_address || service.customer?.address,
+    postalCode: service.service_postal_code || service.customer?.postal_code,
+    city: service.service_city || service.customer?.city,
+  });
+  if (fullAddress) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`, '_blank');
+  } else {
+    toast.error('Morada nao disponivel');
+  }
+};
+```
+
+**Atualizar tambem a exibicao da morada no modal de deslocacao** para mostrar endereco completo (morada + codigo postal + cidade) em vez de so a rua:
+
+Nos 3 ficheiros, onde aparece:
+```
+<p className="font-medium">{service.service_address || service.customer?.address || 'N/A'}</p>
+```
+Substituir por:
+```
+<p className="font-medium">
+  {service.service_address || service.customer?.address || 'N/A'}
+</p>
+{(service.service_postal_code || service.customer?.postal_code || service.service_city || service.customer?.city) && (
+  <p className="text-muted-foreground text-xs mt-1">
+    {[service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city].filter(Boolean).join(', ')}
+  </p>
+)}
+```
+
+## Problema 2: Auditoria geral de fluxos e modais
+
+Apos revisao completa dos ficheiros, confirmo que os restantes fluxos e modais estao nos conformes:
+
+- Todos os `DialogContent` possuem `max-w-[95vw]` e `max-h-[90vh]`
+- Scroll nativo (`overflow-y-auto`) ja aplicado em todos os modais de criacao e pedido de pecas (corrigido na mensagem anterior)
+- Guardas de submissao (`isSubmitting`) presentes em todos os botoes finais
+- Overlay protection (`pointer-events-none` no estado closed) ja aplicada
+- Propagacao de eventos interrompida nos menus de acao
+
+**Nenhuma alteracao adicional necessaria alem da correcao do mapa.**
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/components/shared/CustomerDetailSheet.tsx` | ScrollArea -> div overflow-y-auto |
-| `src/components/modals/CreateServiceModal.tsx` | ScrollArea -> div overflow-y-auto |
-| `src/components/modals/CreateInstallationModal.tsx` | ScrollArea -> div overflow-y-auto |
-| `src/components/modals/CreateDeliveryModal.tsx` | ScrollArea -> div overflow-y-auto |
-| `src/components/modals/RequestPartModal.tsx` | ScrollArea -> div overflow-y-auto |
-| `src/components/modals/ConfirmPartOrderModal.tsx` | ScrollArea -> div overflow-y-auto + adicionar pecas novas |
+| `src/utils/addressUtils.ts` | **Novo** - funcao `buildFullAddress` |
+| `src/components/technician/VisitFlowModals.tsx` | Usar `buildFullAddress` no `handleNavigateToClient` + mostrar cidade/CP no modal |
+| `src/components/technician/DeliveryFlowModals.tsx` | Idem |
+| `src/components/technician/InstallationFlowModals.tsx` | Idem |
 
 ## Resultado
 
-- Scroll funciona em todos os modais de criacao de servico (reparacao, instalacao, entrega)
-- Scroll funciona no modal de solicitar peca (tecnico)
-- Scroll funciona no modal de registar pedido de peca (admin)
-- Admin pode adicionar pecas extras no momento de registar o pedido
-- Sem dependencia do Radix ScrollArea para scroll em modais
+- Google Maps abre centrado na morada correta em Braganca (ou arredores)
+- Morada completa visivel no passo de deslocacao (rua + codigo postal + cidade)
+- Todos os fluxos e modais mantidos estaveis sem alteracoes adicionais
 
