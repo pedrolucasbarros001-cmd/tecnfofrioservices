@@ -1,120 +1,114 @@
 
-# Plano: Eliminar Leak de Realtime e Polling Redundante
 
-## Causa Raiz Confirmada
+# Plano: Ajustar Estrategia de Atualizacao por Area
 
-O hook `useRealtime.ts` (linha 46) tem `queryKeys` no array de dependencias do `useEffect`. Como cada componente passa um array inline (ex: `[['services-paginated'], ['all-pending-parts']]`), o React cria uma **nova referencia a cada render**, o que faz o `useEffect` executar cleanup + re-subscribe em loop infinito.
+## Resumo das Mudancas
 
-Resultado: milhares de chamadas `realtime.list_changes` por hora.
+Cada area do sistema tera uma estrategia de atualizacao especifica conforme pedido:
 
-### Subscriptions ativas (4 total, mas re-criadas milhares de vezes):
-
-| Pagina | Tabela | Query Keys |
+| Area | Estrategia Atual | Nova Estrategia |
 |---|---|---|
-| GeralPage | services | services-paginated, all-pending-parts |
-| GeralPage | service_parts | all-pending-parts, services-paginated |
-| TVMonitorPage | services | tv-monitor-services |
-| TVMonitorPage | activity_logs | public-activity-logs |
+| TV Monitor (servicos) | Realtime em TODA a tabela `services` | Realtime filtrado: so `service_location=eq.oficina` |
+| TV Monitor (atividade) | Realtime em `activity_logs` | Polling leve a cada 60s |
+| Dashboard | Fetch ao abrir (sem polling/realtime) | Manter + adicionar polling 60s |
+| Lista Geral (GeralPage) | Realtime em `services` | Remover realtime. Fetch ao abrir + refetchOnWindowFocus |
 
-### Polling ativo em paralelo (6 timers):
+## Detalhes Tecnicos
 
-| Ficheiro | Intervalo |
-|---|---|
-| useServices.ts (useAllServices) | 5 min |
-| useServices.ts (usePaginatedServices) | 5 min |
-| ServicosPage.tsx | 1 min |
-| TechnicianOfficePage.tsx | 1 min |
-| useServiceTransfers.ts | 1 min |
-| useActivityLogs.ts (public) | 1 min |
+### 1. TV Monitor -- Realtime filtrado (so oficina)
 
-## Solucao
+**Ficheiro:** `src/pages/TVMonitorPage.tsx`
 
-### 1. Corrigir `src/hooks/useRealtime.ts`
-
-Tres mudancas criticas:
-
-- Mover `queryKeys` para `useRef` e remover do dependency array -- isto impede a re-criacao do channel a cada render
-- Adicionar throttle de 5 segundos -- impede cascata de invalidacoes quando varias mudancas acontecem seguidas
-- Usar nome de channel unico por `table:event` -- evita conflitos entre subscriptions
-- Remover `console.log` -- cada log tambem consome recursos
+Remover as 2 chamadas `useRealtime()` e substituir por uma subscription direta com filtro:
 
 ```typescript
-import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+// ANTES (reage a QUALQUER mudanca em services):
+useRealtime('services', [['tv-monitor-services']]);
+useRealtime('activity_logs', [['public-activity-logs']]);
 
-const THROTTLE_MS = 5000;
+// DEPOIS (reage APENAS a mudancas em servicos de oficina):
+useEffect(() => {
+  const channel = supabase
+    .channel('tv-monitor-oficina')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'services',
+      filter: 'service_location=eq.oficina'
+    }, () => {
+      queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
+    })
+    .subscribe();
 
-export function useRealtime(
-  table: string,
-  queryKeys: string[][] = [['services'], ['services-paginated']],
-  event: 'INSERT' | 'UPDATE' | 'DELETE' | '*' = '*'
-) {
-  const queryClient = useQueryClient();
-  const queryKeysRef = useRef(queryKeys);
-  queryKeysRef.current = queryKeys;
-  const lastInvalidationRef = useRef<number>(0);
+  return () => { supabase.removeChannel(channel); };
+}, [queryClient]);
+```
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`rt:${table}:${event}`)
-      .on('postgres_changes', { event, schema: 'public', table }, () => {
-        const now = Date.now();
-        if (now - lastInvalidationRef.current < THROTTLE_MS) return;
-        lastInvalidationRef.current = now;
-        queryKeysRef.current.forEach(key => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
-      })
-      .subscribe();
+Para o historico de atividade, trocar Realtime por polling leve de 60s:
 
-    return () => { supabase.removeChannel(channel); };
-  }, [table, event, queryClient]);
+```typescript
+const { data: activityLogs = [] } = usePublicActivityLogs(10);
+// Adicionar refetchInterval: 60000 no usePublicActivityLogs
+```
+
+### 2. Activity Logs -- Polling para TV Monitor
+
+**Ficheiro:** `src/hooks/useActivityLogs.ts`
+
+Adicionar parametro opcional para ativar polling apenas quando necessario (ex: TV Monitor):
+
+```typescript
+export function usePublicActivityLogs(limit = 10, pollingInterval?: number) {
+  return useQuery({
+    queryKey: ['public-activity-logs', limit],
+    queryFn: async () => { /* ... mesmo codigo ... */ },
+    refetchInterval: pollingInterval || false,
+  });
 }
 ```
 
-### 2. Remover polling redundante (5 ficheiros)
+No TVMonitorPage: `usePublicActivityLogs(10, 60000)` -- polling a cada 60s.
+No DashboardPage: `useActivityLogs({ limit: 10 })` -- sem polling (ja e assim).
 
-O Realtime ja cobre as atualizacoes. Manter apenas `refetchOnWindowFocus: true` (que ja e default do React Query).
+### 3. Dashboard -- Manter como esta + adicionar 60s
 
-**`src/hooks/useServices.ts`** -- remover `refetchInterval: 300000` de `useAllServices` e `usePaginatedServices`
+**Ficheiro:** `src/pages/DashboardPage.tsx`
 
-**`src/pages/ServicosPage.tsx`** -- remover `refetchInterval: 60000`
-
-**`src/pages/technician/TechnicianOfficePage.tsx`** -- remover `refetchInterval: 60000`
-
-**`src/hooks/useServiceTransfers.ts`** -- remover `refetchInterval: 60000`
-
-**`src/hooks/useActivityLogs.ts`** -- remover `refetchInterval: 60000` do modo public
-
-**`src/components/layouts/AppLayout.tsx`** -- manter `refetchInterval: 120000` para notificacoes (nao tem Realtime)
-
-### 3. Consolidar subscriptions na GeralPage
-
-**`src/pages/GeralPage.tsx`** -- remover a segunda subscription (`service_parts`) porque updates em pecas ja sao cobertos pelo Realtime na tabela `services` (o trigger `updated_at = now()` atualiza o servico):
+O dashboard ja faz fetch apenas ao abrir (via `useEffect` + `fetchStats()`). Adicionar um intervalo de 60s:
 
 ```typescript
-// Manter apenas 1:
-useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
-// Remover: useRealtime('service_parts', ...)
+useEffect(() => {
+  fetchStats();
+  const interval = setInterval(fetchStats, 60000);
+  return () => clearInterval(interval);
+}, [role, navigate]);
 ```
+
+### 4. Lista Geral -- Remover Realtime
+
+**Ficheiro:** `src/pages/GeralPage.tsx`
+
+Remover a linha:
+```typescript
+useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
+```
+
+O React Query ja tem `refetchOnWindowFocus: true` por defeito, entao ao trocar de aba ou voltar a pagina os dados atualizam automaticamente. Alem disso, qualquer acao (criar servico, atribuir tecnico, etc.) ja invalida as queries manualmente apos sucesso.
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/hooks/useRealtime.ts` | queryKeys para useRef + throttle 5s + channel unico |
-| `src/hooks/useServices.ts` | Remover 2x refetchInterval |
-| `src/pages/ServicosPage.tsx` | Remover refetchInterval |
-| `src/pages/technician/TechnicianOfficePage.tsx` | Remover refetchInterval |
-| `src/hooks/useServiceTransfers.ts` | Remover refetchInterval |
-| `src/hooks/useActivityLogs.ts` | Remover refetchInterval public |
-| `src/pages/GeralPage.tsx` | Remover 2a subscription duplicada |
+| `src/pages/TVMonitorPage.tsx` | Remover 2x `useRealtime`, adicionar 1 subscription filtrada `service_location=eq.oficina`, usar polling 60s para atividade |
+| `src/hooks/useActivityLogs.ts` | Adicionar parametro `pollingInterval` ao `usePublicActivityLogs` |
+| `src/pages/DashboardPage.tsx` | Adicionar `setInterval(fetchStats, 60000)` |
+| `src/pages/GeralPage.tsx` | Remover `useRealtime('services', ...)` |
 
-## Resultado Esperado
+## Resultado
 
-- De ~10,000 chamadas `realtime.list_changes` para ~50/hora (reducao de 99%)
-- Disk IO cai drasticamente -- o alerta deve desaparecer em poucas horas
-- 6 timers de polling eliminados -- menos queries a BD
-- Atualizacoes continuam em tempo real (4 subscriptions estaveis, sem re-criacao)
-- Zero impacto funcional -- tudo continua a atualizar quando muda na BD
+- TV Monitor: 1 unica subscription filtrada (so oficina) em vez de 2 subscriptions globais
+- Historico de atividade no monitor: polling leve a cada 60s em vez de Realtime
+- Dashboard: atualiza ao abrir + a cada 60s
+- Lista geral: atualiza ao abrir pagina, ao voltar de outra aba, ou apos qualquer acao
+- Reducao massiva de chamadas `realtime.list_changes`
+
