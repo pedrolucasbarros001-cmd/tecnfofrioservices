@@ -17,6 +17,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
+import { technicianUpdateService } from '@/utils/technicianRpc';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import type { Service, ServicePart } from '@/types/database';
@@ -116,10 +117,10 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
       // Use technician_update_service RPC for status-safe fields
       if (detectedFault !== (service.detected_fault || '') || workPerformed !== (service.work_performed || '')) {
-        const { error: rpcError } = await supabase.rpc('technician_update_service', {
-          _service_id: service.id,
-          _detected_fault: detectedFault || undefined,
-          _work_performed: workPerformed || undefined,
+        const { error: rpcError } = await technicianUpdateService({
+          serviceId: service.id,
+          detectedFault: detectedFault || null,
+          workPerformed: workPerformed || null,
         });
         if (rpcError) throw rpcError;
         if (detectedFault !== (service.detected_fault || '')) changes.push('Diagnóstico atualizado');

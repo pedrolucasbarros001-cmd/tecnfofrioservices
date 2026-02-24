@@ -36,6 +36,7 @@ import { logWorkshopPickup, logPartRequest, logServiceCompletion } from "@/utils
 import { supabase, ensureValidSession } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { humanizeError } from "@/utils/errorMessages";
+import { technicianUpdateService } from "@/utils/technicianRpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
@@ -198,10 +199,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const handleStartVisit = async () => {
     try {
       await ensureValidSession();
-      // Mark service as em_execucao on server (visit flow was missing this)
-      const { error } = await (supabase.rpc as any)('technician_update_service', {
-        _service_id: service.id,
-        _status: 'em_execucao',
+      // Mark service as em_execucao on server
+      const { error } = await technicianUpdateService({
+        serviceId: service.id,
+        status: 'em_execucao',
       });
       if (error) throw error;
 

@@ -371,11 +371,13 @@ export type Database = {
           estimated_arrival: string | null
           id: string
           is_requested: boolean | null
+          iva_rate: number | null
           notes: string | null
           part_code: string | null
           part_name: string
           quantity: number | null
           service_id: string
+          supplier: string | null
         }
         Insert: {
           arrived?: boolean | null
@@ -384,11 +386,13 @@ export type Database = {
           estimated_arrival?: string | null
           id?: string
           is_requested?: boolean | null
+          iva_rate?: number | null
           notes?: string | null
           part_code?: string | null
           part_name: string
           quantity?: number | null
           service_id: string
+          supplier?: string | null
         }
         Update: {
           arrived?: boolean | null
@@ -397,11 +401,13 @@ export type Database = {
           estimated_arrival?: string | null
           id?: string
           is_requested?: boolean | null
+          iva_rate?: number | null
           notes?: string | null
           part_code?: string | null
           part_name?: string
           quantity?: number | null
           service_id?: string
+          supplier?: string | null
         }
         Relationships: [
           {
