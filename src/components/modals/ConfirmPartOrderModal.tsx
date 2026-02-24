@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, DollarSign, Info } from 'lucide-react';
+import { Package, DollarSign, Info, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -23,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
@@ -36,6 +36,14 @@ interface ConfirmPartOrderModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface NewPartEntry {
+  name: string;
+  code: string;
+  quantity: string;
+}
+
+const emptyNewPart = (): NewPartEntry => ({ name: '', code: '', quantity: '1' });
+
 const BUSINESS_DAYS_ESTIMATE = 5;
 
 export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPartOrderModalProps) {
@@ -45,6 +53,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
   const [partReference, setPartReference] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newParts, setNewParts] = useState<NewPartEntry[]>([]);
 
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
@@ -72,19 +81,25 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
     if (open) {
       setSupplier('');
       setCost('');
-      setIvaRate('23'); // Default IVA in Portugal usually 23%
+      setIvaRate('23');
       setPartReference('');
       setNotes('');
+      setNewParts([]);
     }
   }, [open]);
 
-  // Calculate estimated arrival date (5 business days from today)
   const estimatedArrivalDate = addBusinessDays(new Date(), BUSINESS_DAYS_ESTIMATE);
   const estimatedArrivalFormatted = format(estimatedArrivalDate, 'dd/MM/yyyy', { locale: pt });
 
   const baseCost = cost ? parseCurrencyInput(cost) : 0;
   const ivaAmount = baseCost * (parseFloat(ivaRate) / 100);
   const totalCost = baseCost + ivaAmount;
+
+  const addNewPart = () => setNewParts(prev => [...prev, emptyNewPart()]);
+  const removeNewPart = (index: number) => setNewParts(prev => prev.filter((_, i) => i !== index));
+  const updateNewPart = (index: number, field: keyof NewPartEntry, value: string) => {
+    setNewParts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
 
   const handleSubmit = async () => {
     if (!service) return;
@@ -109,6 +124,28 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             .eq('id', part.id)
         );
         await Promise.all(updatePromises);
+      }
+
+      // Insert new parts added by admin
+      const validNewParts = newParts.filter(p => p.name.trim());
+      if (validNewParts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('service_parts')
+          .insert(
+            validNewParts.map(p => ({
+              service_id: service.id,
+              part_name: p.name.trim(),
+              part_code: p.code.trim() || null,
+              quantity: parseInt(p.quantity) || 1,
+              is_requested: true,
+              arrived: false,
+              estimated_arrival: estimatedArrival,
+              cost: cost ? parseCurrencyInput(cost) : null,
+              iva_rate: parseFloat(ivaRate),
+              supplier: supplier || null,
+            }))
+          );
+        if (insertError) throw insertError;
       }
 
       // Update service status to em_espera_de_peca
@@ -147,8 +184,8 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
           <p className="text-sm text-muted-foreground">Confirme os detalhes do pedido. A previsão de chegada serve como termómetro de urgência.</p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6">
-          <div className="space-y-4 py-4 pr-3">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
+          <div className="space-y-4 py-4">
             {/* Service Info */}
             {service && (
               <div className="p-3 bg-muted rounded-lg text-sm">
@@ -173,6 +210,61 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                 </div>
               </div>
             )}
+
+            {/* New Parts Section */}
+            {newParts.length > 0 && (
+              <div className="space-y-3">
+                <Separator />
+                <Label>Peças Adicionais</Label>
+                {newParts.map((part, index) => (
+                  <div key={index} className="space-y-2 p-3 border border-dashed rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Peça {index + 1}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => removeNewPart(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder="Nome da peça *"
+                      value={part.name}
+                      onChange={(e) => updateNewPart(index, 'name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Código/Referência"
+                        value={part.code}
+                        onChange={(e) => updateNewPart(index, 'code', e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Qtd"
+                        value={part.quantity}
+                        onChange={(e) => updateNewPart(index, 'quantity', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Part Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full border-dashed"
+              onClick={addNewPart}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Peça
+            </Button>
 
             {/* Estimated Arrival Info */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -272,7 +364,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
               />
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>

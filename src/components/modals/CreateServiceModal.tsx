@@ -393,8 +393,8 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-                <ScrollArea className="flex-1 min-h-0 px-6">
-                  <div className="space-y-4 py-4 pr-3">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                  <div className="space-y-4 py-4">
                     {/* Customer Selected Box */}
                     {selectedCustomer && (
                       <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -855,7 +855,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
 
                 <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>

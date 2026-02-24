@@ -275,8 +275,8 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 min-h-0 px-6">
-                <div className="space-y-6 py-4 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <div className="space-y-6 py-4">
                   {/* Customer Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Informações do Cliente</h3>
@@ -649,7 +649,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                     />
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
 
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button type="button" variant="outline" onClick={handleClose}>
