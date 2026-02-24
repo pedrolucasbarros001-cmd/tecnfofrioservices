@@ -131,7 +131,7 @@ export function StateActionButtons({
         return null;
 
       case 'para_pedir_peca':
-        if (isDono && onConfirmPartOrder) {
+        if ((isDono || isSecretaria) && onConfirmPartOrder) {
           return {
             label: 'Registar Pedido',
             icon: Package,
@@ -142,7 +142,7 @@ export function StateActionButtons({
         return null;
 
       case 'em_espera_de_peca':
-        if (isDono && onMarkPartArrived) {
+        if ((isDono || isSecretaria) && onMarkPartArrived) {
           return {
             label: 'Peça Chegou',
             icon: CheckCircle,
@@ -276,7 +276,7 @@ export function StateActionButtons({
           )}
 
           {/* Request Part - Technician or Dono during execution */}
-          {(service.status === 'em_execucao' || service.status === 'na_oficina') && onRequestPart && (isTecnico || isDono) && (
+          {(service.status === 'em_execucao' || service.status === 'na_oficina') && onRequestPart && (isTecnico || isDono || isSecretaria) && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRequestPart(); }}>
               <Package className="h-4 w-4 mr-2" />
               Solicitar Peça
