@@ -1,110 +1,94 @@
 
-# Plano: Corrigir Login Bloqueado por Timeout de Base de Dados
+# Plano: Tornar o Sistema Resiliente a Lentidao do Supabase
 
-## Problema Raiz
+## Diagnostico Real (dos logs)
 
-O login falha para TODOS os utilizadores porque, apos a autenticacao bem-sucedida, as queries a base de dados (`profiles` e `user_roles`) ficam penduradas indefinidamente quando a BD esta lenta. O SDK do Supabase nao tem timeout para queries, entao `loading` nunca passa a `false` e o utilizador fica preso na pagina de login.
+A base de dados Supabase esta a sofrer timeouts intermitentes ao nivel da infraestrutura:
 
 ```text
-Fluxo actual (com BD lenta):
-
-signInWithPassword -----> OK (auth service separado)
-  |
-  v
-onAuthStateChange fires
-  |
-  v
-fetchUserData() chamado
-  |
-  v
-query profiles ---------> PENDE PARA SEMPRE (DB timeout)
-  |
-  v
-loading = true PARA SEMPRE
-  |
-  v
-LoginPage useEffect: isAuthenticated=true, role=null, loading=true
-  --> NAO redireciona
-  --> Botao preso em "A entrar..."
+11:16:50 - Auth /token -> 500: "error finding user: timeout: context canceled"
+11:11:29 - Auth /token -> 504: "dial tcp [::1]:5432: i/o timeout"
+11:12:49 - Auth /token -> 200 mas demorou 9.7 SEGUNDOS
+11:11:37 - Auth /token -> 200 mas demorou 6.1 SEGUNDOS
+DB logs: multiplos "canceling statement due to statement timeout"
 ```
+
+O problema nao e do codigo -- e o servico Supabase que perde conexao com a propria base de dados. Mas o sistema pode ser **muito mais inteligente** a lidar com isto.
+
+## Problemas Actuais no Codigo
+
+1. **signIn nao faz retry**: se o Supabase Auth retorna 500/504, o login falha imediatamente sem tentar novamente
+2. **Mensagem de erro generica**: o utilizador ve "Erro de autenticacao" quando na verdade e "servidor sobrecarregado, tente de novo"
+3. **Sem deteccao proactiva**: a pagina de login nao avisa o utilizador quando o servidor esta lento ANTES de tentar logar
 
 ## Solucao (2 ficheiros)
 
 ### Ficheiro 1: `src/contexts/AuthContext.tsx`
 
-**Problema:** `fetchUserData` nao tem timeout. Se a BD estiver lenta, as queries pendem para sempre.
-
-**Correcao:**
-- Criar funcao helper `withTimeout` que envolve qualquer Promise com um tempo limite (10 segundos)
-- Aplicar `withTimeout` as queries de `profiles` e `user_roles` dentro de `fetchUserData`
-- Se o timeout disparar, definir `loading = false` com `role = null` e `profile = null` (o utilizador fica autenticado mas sem role carregada)
-- Adicionar uma flag para evitar chamadas duplicadas de `fetchUserData` (o `getSession` e o `onAuthStateChange` podem ambos chamar a funcao)
+Adicionar retry automatico ao `signIn`:
 
 ```text
-fetchUserData (modificado):
-
-  try {
-    profileData = await withTimeout(query profiles, 10000)
-    roleData = await withTimeout(query user_roles, 10000)
-  } catch (timeout) {
-    console.error('Timeout ao carregar dados do utilizador')
-    // loading = false mesmo assim, para nao bloquear a UI
-  } finally {
-    setLoading(false)
-  }
+signIn (modificado):
+  tentativa 1: signInWithPassword (timeout 12s)
+  se erro 500/504/timeout:
+    espera 2 segundos
+    tentativa 2: signInWithPassword (timeout 12s)
+    se erro novamente:
+      retorna erro ao utilizador
+  se sucesso:
+    retorna normalmente
 ```
+
+- Detectar erros de servidor (500, "Database error", "timeout", "context canceled") vs erros de credenciais (401, "Invalid login credentials")
+- So fazer retry em erros de servidor, NAO em credenciais invalidas
+- Maximo de 1 retry (total 2 tentativas)
 
 ### Ficheiro 2: `src/pages/LoginPage.tsx`
 
-**Problema:** Apos `signIn` bem-sucedido, `isLoading` nunca e redefinido para `false` (o codigo assume que o redirect vai acontecer). Se o redirect nao acontecer (porque `loading` ficou preso), o botao fica desabilitado para sempre.
+Melhorias na experiencia do utilizador:
 
-**Correcoes:**
-1. Apos signIn sem erro, definir um safety timeout de 20 segundos que:
-   - Redefine `isLoading = false`
-   - Mostra toast informando que houve problema ao carregar dados
-2. Adicionar um `useEffect` que observa `isAuthenticated` + `loading`: se autenticado e `loading=false` mas sem `role`, mostrar toast com erro claro e redefinir `isLoading`
-3. Garantir que TODOS os caminhos de codigo terminam com `setIsLoading(false)`
-
-```text
-LoginPage onSubmit (modificado):
-
-  const { error } = await Promise.race([signIn, timeout])
-  
-  if (error) {
-    // ... toast de erro (ja existente)
-    setIsLoading(false)  // ja existente
-    return
-  }
-
-  // Sucesso: safety timeout
-  setTimeout(() => {
-    setIsLoading(false)
-    // Se ainda nao redirecionou, algo correu mal
-  }, 20000)
-```
+1. **Deteccao proactiva de saude do servidor**: ao carregar a pagina de login, fazer um "health check" silencioso (query simples ao Supabase) e mostrar um banner amarelo se o servidor estiver lento
+2. **Mensagens de erro especificas**: distinguir entre "servidor sobrecarregado" (com opcao de tentar novamente) e "credenciais invalidas"
+3. **Feedback de progresso**: durante o login, mostrar texto que muda conforme o tempo passa:
+   - 0-3s: "A entrar..."
+   - 3-8s: "A conectar ao servidor..."
+   - 8s+: "O servidor esta lento, por favor aguarde..."
+4. **Botao "Tentar novamente"**: se o login falhar por timeout, mostrar botao para repetir em vez de obrigar o utilizador a preencher tudo de novo
 
 ```text
-Novo useEffect:
+LoginPage (modificado):
 
-  // Se autenticado sem role (BD timeout), dar feedback
-  if (isAuthenticated && !loading && !role) {
-    toast.warning('Nao foi possivel carregar perfil. Tente recarregar.')
-    setIsLoading(false)
-  }
+  // Health check ao montar
+  useEffect -> fetch simples ao Supabase
+    se demorar > 3s ou falhar -> mostrar banner "Servidor lento"
+
+  // Feedback progressivo
+  useEffect (durante isLoading):
+    setTimeout 3s -> "A conectar ao servidor..."
+    setTimeout 8s -> "O servidor está lento..."
+
+  // Mensagens de erro melhoradas
+  onSubmit:
+    se erro.message inclui "Database error" ou "timeout":
+      toast: "Servidor temporariamente indisponível. A tentar novamente..."
+      // O retry ja acontece no AuthContext
+    se erro.message inclui "Invalid login":
+      toast: "Credenciais inválidas"
 ```
 
 ## Resultado
 
-- Se a BD responder normalmente: login funciona como antes (< 2 segundos)
-- Se a BD estiver lenta (timeout): o utilizador ve uma mensagem clara em vez de ficar preso
-- O botao "Entrar" NUNCA fica preso indefinidamente
-- `loading` NUNCA fica `true` para sempre
+- Login com retry automatico: se o servidor falhar na 1a tentativa, tenta novamente automaticamente
+- O utilizador sabe ANTES de logar se o servidor esta lento (banner amarelo)
+- Mensagens de erro claras: "servidor sobrecarregado" vs "senha errada"
+- Feedback visual progressivo durante o login
+- O botao "Entrar" NUNCA fica preso (timeouts + safety resets ja existentes)
 
 ## Secao Tecnica
 
-- `withTimeout` usa `Promise.race` com um `setTimeout` que rejeita apos N ms
-- As queries de `profiles` e `user_roles` sao independentes, mas o timeout cobre ambas
-- O `finally` garante que `setLoading(false)` e SEMPRE chamado
-- A flag de `fetchInProgress` (useRef) previne chamadas concorrentes de `getSession` + `onAuthStateChange`
-- Nao altera a logica de autenticacao do Supabase (signIn/signOut continuam iguais)
-- Nao requer alteracoes na base de dados
+- O retry so acontece para erros de servidor (500, 504, timeout, "Database error"), nunca para credenciais invalidas
+- O health check usa uma query leve (`supabase.from('profiles').select('count', { count: 'exact', head: true }).limit(0)`) que nao carrega dados
+- O timeout do health check e 5 segundos -- se demorar mais, mostra banner
+- As queries React Query ja tem `retry: 1` configurado globalmente no QueryClient
+- Os timeouts existentes (10s para queries, 15s safety) continuam activos
+- A base de dados tem 227MB e apenas 19 servicos -- os timeouts sao da infraestrutura Supabase, nao do volume de dados
