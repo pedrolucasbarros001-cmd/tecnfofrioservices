@@ -1,210 +1,148 @@
 
 
-# Plano: Corrigir Todos os Bugs nos Fluxos de Servico do Tecnico
+# Plano: Migrar Fotos para Storage e Eliminar Bloqueios nos Fluxos
 
-## Problemas Identificados
+## Diagnostico Final
 
-Apos analise completa dos 4 fluxos (Visita, Oficina, Instalacao, Entrega) e componentes partilhados, identifiquei os seguintes problemas concretos:
+Analisei a base de dados real e o codigo de todos os fluxos. O problema raiz que causa TODOS os sintomas reportados e um so:
 
-### BUG 1: InstallationFlowModals -- Assinatura NAO e idempotente (CRASH em duplo-clique)
+**As fotos sao guardadas como base64 de 4.5MB diretamente na tabela `service_photos`.**
 
-**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linha 205
+Isto causa uma reacao em cadeia:
 
-O `handleSignatureComplete` insere a assinatura diretamente sem verificar se ja existe:
-```typescript
-await supabase.from('service_signatures').insert({...});
+```text
+Tecnico abre servico
+  -> deriveStepFromDb() busca file_url de TODAS as fotos
+  -> 3 fotos = 15MB de transferencia so para saber "em que passo retomar"
+  -> Timeout / loading infinito
+  -> isResuming = true para sempre
+  -> Botoes de "Iniciar" ficam desativados
+  -> Tecnico nao consegue fazer nada
 ```
 
-O `VisitFlowModals` e o `DeliveryFlowModals` JA foram corrigidos com `.maybeSingle()` antes do insert. A Instalacao ficou para tras. Resultado: duplo-clique gera registos duplicados ou erro de constraint.
+**Prova da base de dados (dados reais):**
 
-**Correcao:** Adicionar verificacao `maybeSingle()` antes do insert, seguindo o mesmo padrao dos outros fluxos.
+| foto | tamanho |
+|---|---|
+| estado | 4,545,135 bytes (4.5MB) |
+| etiqueta | 4,532,815 bytes (4.5MB) |
+| aparelho | 4,892,883 bytes (4.9MB) |
 
-### BUG 2: InstallationFlowModals -- Materiais NAO sao idempotentes (duplicados)
+Enquanto isso, o `TechnicianServiceSheet` (painel de observacoes) JA usa o padrao correto: upload para o bucket `service-photos` do Storage, guardando apenas o URL publico (~100 bytes).
 
-**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linhas 177-198
+## Solucao
 
-O `handleMaterialsConfirm` insere materiais sem verificar se ja existem:
-```typescript
-for (const material of materials) {
-  await supabase.from('service_parts').insert({...});
-}
+### 1. Criar utilitario centralizado de upload (NOVO ficheiro)
+
+**Ficheiro:** `src/utils/photoUpload.ts`
+
+Funcao reutilizavel que:
+- Converte base64 para Blob
+- Faz upload para o bucket `service-photos` (ja existe, ja e publico)
+- Retorna o URL publico (~100 bytes)
+
+Baseia-se no codigo ja existente no `TechnicianServiceSheet` (linhas 96-126), extraido para ser reutilizado em todos os fluxos.
+
+```text
+Base64 (4.5MB) -> Blob -> Storage bucket -> URL publico (100 bytes)
 ```
 
-Resultado: Se o tecnico clicar "Registar Materiais" duas vezes, ou se a rede falhar no meio e ele retentar, os materiais sao duplicados.
+### 2. Remover fetch de file_url no deriveStepFromDb
 
-**Correcao:** Antes de inserir, verificar se ja existem pecas com o mesmo nome para este servico (mesmo padrao usado no `saveUsedParts` do VisitFlowModals).
+**Ficheiro:** `src/hooks/useFlowPersistence.ts`
 
-### BUG 3: InstallationFlowModals -- Falta ensureValidSession em handleMaterialsConfirm
+O bloco das linhas 93-104 busca `file_url` (os base64 gigantes) da tabela `service_photos` so para preencher `formDataOverrides`. Isto e completamente desnecessario -- a logica de "em que passo retomar" so precisa saber SE a foto existe (ja disponivel na primeira query de metadata, linha 44-53).
 
-**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linha 177
+**Antes (linhas 93-104):** Segunda query que busca `file_url` com 4.5MB cada
+**Depois:** Usar marcador `__photo_exists__` construido a partir da metadata ja carregada. Zero transferencia extra.
 
-A funcao nao valida a sessao antes de fazer INSERT na base de dados. Se a sessao expirou, da erro de RLS sem mensagem clara.
+Adicionalmente, envolver o `deriveStepFromDb` num timeout de 8 segundos para que, mesmo que algo falhe, o `isResuming` nunca fique bloqueado eternamente.
 
-**Correcao:** Adicionar `await ensureValidSession()` no inicio e envolver em try/catch com `humanizeError`.
+### 3. Migrar TODOS os fluxos para usar Storage
 
-### BUG 4: InstallationFlowModals -- Mensagens de erro genericas em vez de humanizeError
+**4 ficheiros afetados:**
 
-**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`
+| Ficheiro | Onde muda |
+|---|---|
+| `WorkshopFlowModals.tsx` | onCapture da camera (linhas 1009-1040) |
+| `VisitFlowModals.tsx` | handlePhotoCapture (linhas 233-261) |
+| `InstallationFlowModals.tsx` | handlePhotoCapture (linhas 152-176) |
+| `DeliveryFlowModals.tsx` | handlePhotoCapture (linhas 140-157) |
 
-Multiplos handlers usam strings fixas em vez de `humanizeError`:
-- Linha 136: `toast.error('Erro ao iniciar instalacao')`
-- Linha 172: `toast.error('Erro ao guardar foto')`
-- Linha 240: `toast.error('Erro ao concluir instalacao')`
-
-Resultado: O tecnico ve mensagens genericas quando o problema real e sessao expirada ou RLS.
-
-**Correcao:** Substituir por `toast.error(humanizeError(error))` e importar `humanizeError`.
-
-### BUG 5: VisitFlowModals -- "confirmacao_peca" sem scroll responsivo (UI cortada em mobile)
-
-**Ficheiro:** `src/components/technician/VisitFlowModals.tsx`, linha 1414
-
-O dialog de confirmacao de peca usa `className="max-w-md p-6"` sem as classes responsivas padrao.
-
-**Correcao:** Mudar para `className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"`.
-
-### BUG 6: SignatureCanvas -- Sem classes responsivas (cortado em telemoveis pequenos)
-
-**Ficheiro:** `src/components/shared/SignatureCanvas.tsx`, linha 119
-
-O DialogContent usa apenas `className="sm:max-w-[500px]"` sem `max-w-[95vw] max-h-[90vh] overflow-y-auto`.
-
-Resultado: Em telemoveis pequenos (360px), o modal de assinatura fica cortado e o botao "Confirmar Assinatura" pode ficar inacessivel. Este componente e PARTILHADO por TODOS os fluxos (Visita, Instalacao, Entrega), portanto a correcao beneficia todo o sistema.
-
-**Correcao:** Adicionar `max-w-[95vw] max-h-[90vh] overflow-y-auto`.
-
-### BUG 7: DeliveryFlowModals -- handlePhotoCapture usa erro generico
-
-**Ficheiro:** `src/components/technician/DeliveryFlowModals.tsx`, linha 155
-
-Usa `toast.error('Erro ao guardar foto')` em vez de `humanizeError(error)`.
-
-**Correcao:** Substituir por `toast.error(humanizeError(error))`.
-
-## Detalhes da Correcao por Ficheiro
-
-### 1. `src/components/technician/InstallationFlowModals.tsx`
-
-**a) Importar humanizeError:**
+**Padrao atual (todos iguais):**
 ```typescript
-import { humanizeError } from '@/utils/errorMessages';
+await supabase.from("service_photos").insert({
+  file_url: imageData, // 4.5MB base64 direto na BD!
+});
+setFormData(prev => ({ ...prev, photoAparelho: imageData })); // 4.5MB no state!
 ```
 
-**b) handleStartInstallation (linha 136):**
+**Padrao novo:**
+```typescript
+import { uploadServicePhoto } from '@/utils/photoUpload';
+
+const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, description);
+setFormData(prev => ({ ...prev, photoAparelho: publicUrl })); // 100 bytes no state
+```
+
+### 4. Adaptar UI para marcador `__photo_exists__`
+
+Nos modais, quando `formData.photoAparelho === '__photo_exists__'` (retomando de DB sem localStorage), mostrar indicador "Foto ja registada" em vez de tentar renderizar um `<img src="__photo_exists__">`.
+
+Padrao simples nos componentes de foto:
+```typescript
+const hasRealUrl = photo && photo !== '__photo_exists__';
+const photoExists = photo === '__photo_exists__';
+
+{hasRealUrl ? <img src={photo} /> : photoExists ? <span>Foto ja registada</span> : <Button>Tirar Foto</Button>}
+```
+
+### 5. Adicionar verificacao de erro em INSERTs criticos
+
+Varios INSERT de fotos e assinaturas nao verificam o resultado. Se o INSERT falhar (rede, RLS), o fluxo continua como se nada fosse e o dado perde-se.
+
+**Antes:**
+```typescript
+await supabase.from("service_photos").insert({...});
+// sem verificacao - falha silenciosa
+```
+
+**Depois:**
+```typescript
+const { error } = await supabase.from("service_photos").insert({...});
+if (error) throw error;
+```
+
+### 6. Corrigir mensagem de erro generica no VisitFlowModals
+
+**Ficheiro:** `src/components/technician/VisitFlowModals.tsx`, linha 219
+
 ```typescript
 // DE:
-toast.error('Erro ao iniciar instalacao');
-// PARA:
-toast.error(humanizeError(error));
-```
-
-**c) handlePhotoCapture (linha 172):**
-```typescript
-// DE:
-toast.error('Erro ao guardar foto');
-// PARA:
-toast.error(humanizeError(error));
-```
-
-**d) handleMaterialsConfirm (linhas 177-198):** Reescrever com ensureValidSession, try/catch, idempotencia:
-```typescript
-const handleMaterialsConfirm = async (materials: PartEntry[]) => {
-  try {
-    await ensureValidSession();
-    
-    // Idempotent: fetch existing parts
-    const { data: existing } = await supabase
-      .from('service_parts')
-      .select('part_name')
-      .eq('service_id', service.id)
-      .eq('is_requested', false);
-    
-    const existingNames = new Set(
-      (existing || []).map((p: any) => p.part_name?.toLowerCase().trim())
-    );
-    
-    for (const material of materials) {
-      if (material.name.trim() && 
-          !existingNames.has(material.name.toLowerCase().trim())) {
-        await supabase.from('service_parts').insert({...});
-      }
-    }
-    
-    // ... rest stays the same
-  } catch (error) {
-    console.error('Error confirming materials:', error);
-    toast.error(humanizeError(error));
-  }
-};
-```
-
-**e) handleSignatureComplete (linhas 200-244):** Adicionar idempotencia:
-```typescript
-// Antes do insert da assinatura, verificar se ja existe:
-const { data: existingSig } = await supabase
-  .from('service_signatures')
-  .select('id')
-  .eq('service_id', service.id)
-  .eq('signature_type', 'instalacao')
-  .maybeSingle();
-
-if (!existingSig) {
-  await supabase.from('service_signatures').insert({...});
-}
-```
-
-E mudar a mensagem de erro:
-```typescript
-// DE:
-toast.error('Erro ao concluir instalacao');
-// PARA:
-toast.error(humanizeError(error));
-```
-
-### 2. `src/components/technician/VisitFlowModals.tsx`
-
-**Linha 1414 -- confirmacao_peca dialog:**
-```typescript
-// DE:
-<DialogContent className="max-w-md p-6" ...>
-// PARA:
-<DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" ...>
-```
-
-### 3. `src/components/shared/SignatureCanvas.tsx`
-
-**Linha 119 -- DialogContent:**
-```typescript
-// DE:
-<DialogContent className="sm:max-w-[500px]">
-// PARA:
-<DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
-```
-
-### 4. `src/components/technician/DeliveryFlowModals.tsx`
-
-**Linha 155 -- handlePhotoCapture erro:**
-```typescript
-// DE:
-toast.error('Erro ao guardar foto');
+toast.error("Erro ao iniciar visita. Verifique a sua sessão.");
 // PARA:
 toast.error(humanizeError(error));
 ```
 
 ## Ficheiros Alterados
 
-| Ficheiro | Alteracao |
-|---|---|
-| `src/components/technician/InstallationFlowModals.tsx` | Importar humanizeError, idempotencia assinatura + materiais, ensureValidSession, mensagens de erro |
-| `src/components/technician/VisitFlowModals.tsx` | Scroll no confirmacao_peca dialog |
-| `src/components/shared/SignatureCanvas.tsx` | Scroll responsivo (afeta TODOS os fluxos) |
-| `src/components/technician/DeliveryFlowModals.tsx` | humanizeError na foto |
+| Ficheiro | Tipo | Alteracao |
+|---|---|---|
+| `src/utils/photoUpload.ts` | NOVO | Helper centralizado de upload para Storage |
+| `src/hooks/useFlowPersistence.ts` | EDIT | Remover fetch de file_url + timeout de 8s + usar `__photo_exists__` |
+| `src/components/technician/WorkshopFlowModals.tsx` | EDIT | Usar uploadServicePhoto + UI foto existente + error check |
+| `src/components/technician/VisitFlowModals.tsx` | EDIT | Usar uploadServicePhoto + UI foto existente + error check + humanizeError |
+| `src/components/technician/InstallationFlowModals.tsx` | EDIT | Usar uploadServicePhoto + UI foto existente + error check |
+| `src/components/technician/DeliveryFlowModals.tsx` | EDIT | Usar uploadServicePhoto + error check |
 
-## Resultado
+## Resultado Esperado
 
-- Zero duplicacoes de assinaturas ou materiais ao clicar duas vezes
-- Sessoes expiradas mostram mensagens claras em todos os fluxos
-- Modais de assinatura e confirmacao de peca funcionam em todos os tamanhos de tela
-- Padrao consistente entre os 4 fluxos (todos com idempotencia + humanizeError + ensureValidSession)
-- Nenhum impacto funcional nos fluxos existentes (todas as correcoes sao aditivas/defensivas)
+- **"Fica carregando para sempre"**: Eliminado -- deriveStepFromDb deixa de transferir 15-25MB de base64, passa a usar so metadata (poucos KB) + timeout de 8s como seguranca
+- **"Erro ao iniciar"**: Eliminado -- sem timeout de rede, sem loading infinito, botao fica ativo imediatamente
+- **"Fotos tiradas mas nao aparecem"**: Eliminado -- upload para Storage e fiavel e rapido vs INSERT de 4.5MB via REST API
+- **"Botao nao disponivel"**: Eliminado -- isResuming nunca fica preso (timeout garante)
+- **"Assinatura registada mas nao envia"**: Eliminado -- erros de INSERT sao capturados e mostrados
+- **Performance geral**: Drasticamente melhor -- cada foto ocupa ~100 bytes de URL em vez de 4.5MB de base64
+- **Fotos antigas continuam a funcionar**: URLs base64 ja guardados continuam validos como `src` de img
+- **Zero impacto funcional**: Mesmos passos, mesma sequencia, mesma experiencia visual
 
