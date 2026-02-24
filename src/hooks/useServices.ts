@@ -37,8 +37,6 @@ export function useServices(options: UseServicesOptions = {}) {
           customer:customers(*),
           technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
         `)
-        .order('scheduled_date', { ascending: true, nullsFirst: false })
-        .order('scheduled_shift', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (status === 'pending_pricing') {
@@ -207,18 +205,27 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
       if (searchTerm) {
         // First, search for customers matching the search term
         let customerIds: string[] = [];
+        let technicianIds: string[] = [];
         try {
-          const { data: matchingCustomers, error: customerError } = await supabase
-            .from('customers')
-            .select('id')
-            .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+          const [customersResult, techniciansResult] = await Promise.all([
+            supabase
+              .from('customers')
+              .select('id')
+              .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`),
+            supabase
+              .from('technicians')
+              .select('id, profile:profiles!inner(full_name)')
+              .ilike('profile.full_name' as any, `%${searchTerm}%`),
+          ]);
 
-          if (!customerError && matchingCustomers) {
-            customerIds = matchingCustomers.map(c => c.id);
+          if (!customersResult.error && customersResult.data) {
+            customerIds = customersResult.data.map(c => c.id);
+          }
+          if (!techniciansResult.error && techniciansResult.data) {
+            technicianIds = (techniciansResult.data as any[]).map(t => t.id);
           }
         } catch (err) {
-          // If customer search fails, continue with service field search only
-          console.warn('Error searching customers:', err);
+          console.warn('Error searching customers/technicians:', err);
         }
 
         // Helper function to build a fresh query with all filters
@@ -250,51 +257,39 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
 
         // Query 1: Services matching searchTerm in service fields
         let serviceFieldsQuery = buildFilteredQuery()
-          .or(`code.ilike.%${searchTerm}%,appliance_type.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,fault_description.ilike.%${searchTerm}%`);
+          .or(`code.ilike.%${searchTerm}%,appliance_type.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,serial_number.ilike.%${searchTerm}%,fault_description.ilike.%${searchTerm}%,detected_fault.ilike.%${searchTerm}%,work_performed.ilike.%${searchTerm}%`);
 
         const { data: servicesByFields, error: error1 } = await serviceFieldsQuery;
         if (error1) throw error1;
 
         // Query 2: Services with matching customer_id (if any customers matched)
-        let servicesByCustomer: Service[] = [];
-        if (customerIds.length > 0) {
-          let customerQuery = buildFilteredQuery().in('customer_id', customerIds);
-          const { data: servicesByCustomerData, error: error2 } = await customerQuery;
-          if (error2) throw error2;
-          servicesByCustomer = (servicesByCustomerData as unknown as Service[]) || [];
-        }
+        // Query 3: Services with matching technician_id (if any technicians matched)
+        const [servicesByCustomerResult, servicesByTechResult] = await Promise.all([
+          customerIds.length > 0
+            ? buildFilteredQuery().in('customer_id', customerIds).then(r => { if (r.error) throw r.error; return (r.data as unknown as Service[]) || []; })
+            : Promise.resolve([] as Service[]),
+          technicianIds.length > 0
+            ? buildFilteredQuery().in('technician_id', technicianIds).then(r => { if (r.error) throw r.error; return (r.data as unknown as Service[]) || []; })
+            : Promise.resolve([] as Service[]),
+        ]);
 
         // Combine and deduplicate results
         const serviceMap = new Map<string, Service>();
         (servicesByFields || []).forEach(s => {
           if (s && s.id) serviceMap.set(s.id, s as Service);
         });
-        servicesByCustomer.forEach(s => {
+        servicesByCustomerResult.forEach(s => {
+          if (s && s.id) serviceMap.set(s.id, s);
+        });
+        servicesByTechResult.forEach(s => {
           if (s && s.id) serviceMap.set(s.id, s);
         });
 
         allServices = Array.from(serviceMap.values());
         totalCount = allServices.length;
 
-        // Sort combined results with total safety
+        // Sort by created_at descending (newest first)
         allServices.sort((a, b) => {
-          // 1. scheduled_date
-          const dateA = a.scheduled_date ? new Date(a.scheduled_date).getTime() : Infinity;
-          const dateB = b.scheduled_date ? new Date(b.scheduled_date).getTime() : Infinity;
-
-          const timeA = isNaN(dateA) ? Infinity : dateA;
-          const timeB = isNaN(dateB) ? Infinity : dateB;
-
-          if (timeA !== timeB) return timeA - timeB;
-
-          // 2. scheduled_shift
-          const shiftOrder: Record<string, number> = { manha: 1, tarde: 2, noite: 3 };
-          const orderA = shiftOrder[a.scheduled_shift || ''] || 99;
-          const orderB = shiftOrder[b.scheduled_shift || ''] || 99;
-
-          if (orderA !== orderB) return orderA - orderB;
-
-          // 3. created_at
           const createA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const createB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return (isNaN(createB) ? 0 : createB) - (isNaN(createA) ? 0 : createA);
@@ -317,8 +312,6 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
             customer:customers(*),
             technician:technicians!services_technician_id_fkey(*, profile:profiles(*))
           `, { count: 'exact' })
-          .order('scheduled_date', { ascending: true, nullsFirst: false })
-          .order('scheduled_shift', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: false })
           .range(from, to);
 
