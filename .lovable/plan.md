@@ -1,31 +1,87 @@
 
+# Plano: Corrigir Scroll e Responsividade nos Modais de Criacao de Servico e Pedido de Peca
 
-# Plano: Migrar Fotos para Storage e Eliminar Bloqueios nos Fluxos
+## Problemas Identificados
 
-## Estado: ✅ IMPLEMENTADO
+### 1. Modal de criar servico a partir do perfil do cliente (CustomerDetailSheet.tsx)
 
-Todas as alterações foram aplicadas com sucesso.
+**Ficheiro:** `src/components/shared/CustomerDetailSheet.tsx`, linha 672
 
-## Resumo das Alterações
+O `DialogContent` usa:
+```
+className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden"
+```
 
-### 1. `src/utils/photoUpload.ts` (NOVO)
-- Helper centralizado: base64 → Blob → Storage bucket → URL público (~100 bytes)
+Falta `max-w-[95vw]` -- em telemoveis, o modal pode ultrapassar a largura do ecra e cortar conteudo/botoes. Todos os outros modais do sistema ja usam `max-w-[95vw]` como padrao.
 
-### 2. `src/hooks/useFlowPersistence.ts`
-- Removida segunda query que buscava `file_url` (4-5MB cada)
-- Usa marcador `__photo_exists__` construído a partir da metadata já carregada
-- Timeout de 8 segundos para evitar loading infinito
+### 2. RequestPartModal -- sem ScrollArea padrao
 
-### 3. Todos os 4 fluxos migrados para Storage
-- `WorkshopFlowModals.tsx` — usa `uploadServicePhoto`
-- `VisitFlowModals.tsx` — usa `uploadServicePhoto` + `humanizeError` no iniciar visita
-- `InstallationFlowModals.tsx` — usa `uploadServicePhoto`
-- `DeliveryFlowModals.tsx` — usa `uploadServicePhoto` + `humanizeError` na conclusão
+**Ficheiro:** `src/components/modals/RequestPartModal.tsx`, linha 126/135
 
-### 4. UI adaptada para `__photo_exists__`
-- Todos os modais mostram "Foto já registada" com ícone verde quando retomam de DB
-- Botão "Tirar Nova" disponível para substituir
+O modal usa um `<div className="flex-1 overflow-y-auto">` em vez do componente `ScrollArea` padrao usado em todos os outros modais. O `overflow-y-auto` nativo pode nao mostrar a scrollbar visivel em alguns dispositivos moveis, dando a impressao de que nao ha scroll. O padrao do sistema e usar `ScrollArea` do Radix para garantir scrollbar visivel e consistente.
 
-### 5. Verificação de erros em INSERTs
-- `uploadServicePhoto` verifica erros de upload e de INSERT
-- Mensagens de erro claras via `humanizeError` em todos os fluxos
+### 3. ConfirmPartOrderModal -- falta max-w-[95vw]
+
+**Ficheiro:** `src/components/modals/ConfirmPartOrderModal.tsx`, linha 141
+
+Ja tem `ScrollArea` e `max-h-[95vh]`, mas falta `max-w-[95vw]` para responsividade mobile.
+
+## Alteracoes
+
+### Ficheiro 1: `src/components/shared/CustomerDetailSheet.tsx`
+
+**Linha 672** -- Adicionar `max-w-[95vw]`:
+
+```
+// DE:
+<DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+
+// PARA:
+<DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+```
+
+### Ficheiro 2: `src/components/modals/RequestPartModal.tsx`
+
+**Linha 126** -- Adicionar `max-w-[95vw]` (ja tem `max-w-[95vw]`, confirmar consistencia com max-h):
+
+**Linhas 135-217** -- Substituir `<div className="flex-1 overflow-y-auto min-h-0 px-6">` por `<ScrollArea>` padrao:
+
+```typescript
+// DE:
+<div className="flex-1 overflow-y-auto min-h-0 px-6">
+  <div className="space-y-4 py-4">
+    ...conteudo...
+  </div>
+</div>
+
+// PARA:
+<ScrollArea className="flex-1 px-6">
+  <div className="space-y-4 py-4 pr-3">
+    ...conteudo... (sem alteracoes ao conteudo)
+  </div>
+</ScrollArea>
+```
+
+Adicionar import do `ScrollArea`:
+```typescript
+import { ScrollArea } from '@/components/ui/scroll-area';
+```
+
+### Ficheiro 3: `src/components/modals/ConfirmPartOrderModal.tsx`
+
+Ja esta correto -- usa `ScrollArea` e tem `max-h-[95vh]`. Apenas falta `max-w-[95vw]` para mobile (embora `sm:max-w-lg` cubra desktop).
+
+Nao e necessaria alteracao, ja tem a estrutura correta.
+
+## Ficheiros Alterados
+
+| Ficheiro | Alteracao |
+|---|---|
+| `src/components/shared/CustomerDetailSheet.tsx` | Adicionar `max-w-[95vw]` ao DialogContent (linha 672) |
+| `src/components/modals/RequestPartModal.tsx` | Substituir div overflow-y-auto por ScrollArea padrao + import |
+
+## Resultado
+
+- Modal de criar servico a partir do perfil do cliente funciona corretamente em mobile (390px)
+- RequestPartModal mostra scrollbar visivel em todos os dispositivos
+- Consistencia visual com todos os outros modais do sistema
