@@ -29,6 +29,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
 import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
+import { technicianUpdateService } from '@/utils/technicianRpc';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto' | 'finalizacao';
@@ -101,6 +102,29 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       saveStateToDb(currentStep, formData);
     }
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
+
+  const handleStartDelivery = async () => {
+    try {
+      await ensureValidSession();
+      const { error } = await technicianUpdateService({
+        serviceId: service.id,
+        status: 'em_execucao',
+      });
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+
+      if (derivedResumeStep && derivedResumeStep !== 'resumo') {
+        setCurrentStep(derivedResumeStep);
+      } else {
+        setCurrentStep('deslocacao');
+      }
+    } catch (error) {
+      console.error('Error starting delivery:', error);
+      toast.error('Erro ao iniciar entrega');
+    }
+  };
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -268,13 +292,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
             </Button>
             <Button
               className="flex-1 bg-green-500 hover:bg-green-600 font-bold"
-              onClick={() => {
-                if (derivedResumeStep && derivedResumeStep !== 'resumo') {
-                  setCurrentStep(derivedResumeStep);
-                } else {
-                  setCurrentStep('deslocacao');
-                }
-              }}
+              onClick={handleStartDelivery}
               disabled={isResuming}
             >
               {isResuming ? "A carregar..." : "Iniciar Entrega"}

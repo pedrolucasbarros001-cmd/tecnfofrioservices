@@ -296,6 +296,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
 
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPersistedStepRef = useRef<string | null>(null);
+  const lastPersistedPayloadRef = useRef<string | null>(null);
 
   // Sanitize formData: replace base64 photo strings with placeholder to avoid huge DB payloads
   const sanitizeFormData = useCallback((formData?: T): Record<string, unknown> | null => {
@@ -327,9 +328,19 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
   }, [serviceId, sanitizeFormData]);
 
   const saveStateToDb = useCallback((currentStep: string | null, formData?: T) => {
+    const serializedPayload = JSON.stringify(sanitizeFormData(formData));
+    const hasSameStep = currentStep === lastPersistedStepRef.current;
+    const hasSamePayload = serializedPayload === lastPersistedPayloadRef.current;
+
+    // Avoid redundant writes for identical state (reduces lag / trigger queue)
+    if (hasSameStep && hasSamePayload) {
+      return;
+    }
+
     // Persist immediately when a new step is reached (prevents "passo fantasma")
-    if (currentStep !== lastPersistedStepRef.current) {
+    if (!hasSameStep) {
       lastPersistedStepRef.current = currentStep;
+      lastPersistedPayloadRef.current = serializedPayload;
       persistStepToDb(currentStep, formData).catch((error) => {
         console.error('Error persisting flow step to DB:', error);
       });
@@ -343,11 +354,13 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     dbSaveTimerRef.current = setTimeout(async () => {
       try {
         await persistStepToDb(currentStep, formData);
+        lastPersistedStepRef.current = currentStep;
+        lastPersistedPayloadRef.current = serializedPayload;
       } catch (error) {
         console.error('Error persisting flow state to DB:', error);
       }
-    }, 600);
-  }, [persistStepToDb]);
+    }, 450);
+  }, [persistStepToDb, sanitizeFormData]);
 
   // Flush immediately (no debounce) — call when modal closes
   const flushStateToDb = useCallback(async (currentStep: string | null, formData?: T) => {
