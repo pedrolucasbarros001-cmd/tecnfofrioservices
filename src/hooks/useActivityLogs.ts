@@ -43,7 +43,7 @@ export function useActivityLogs(options: UseActivityLogsOptions = {}) {
       if (error) throw error;
       return (data as ActivityLog[]) || [];
     },
-    refetchInterval: publicOnly ? 60000 : undefined, // 1 min for public feed; others use windowFocus only
+    // Realtime handles updates — no polling needed
   });
 }
 

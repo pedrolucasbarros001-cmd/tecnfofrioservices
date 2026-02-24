@@ -66,7 +66,7 @@ export default function ServicosPage() {
       return (data as Service[]) || [];
     },
     enabled: !!profile,
-    refetchInterval: 60000,
+    // Realtime handles updates — no polling needed
   });
 
   // Navigation functions

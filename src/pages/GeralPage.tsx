@@ -122,8 +122,8 @@ export default function GeralPage() {
   const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
 
   // Realtime updates: Invalidate queries when data changes
-  useRealtime('services', [['services-paginated'], ['all-pending-parts']]);
-  useRealtime('service_parts', [['all-pending-parts'], ['services-paginated']]);
+  // Single consolidated realtime subscription (service_parts changes trigger services.updated_at via DB trigger)
+  useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
 
   const {
     data: result,

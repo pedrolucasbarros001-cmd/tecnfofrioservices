@@ -83,7 +83,7 @@ export function usePendingTransferRequests() {
       return (data as unknown as TransferRequestWithDetails[]) || [];
     },
     enabled: !!technicianId,
-    refetchInterval: 60000, // Refresh every 60 seconds
+    // Realtime handles updates — no polling needed
   });
 }
 
