@@ -684,6 +684,8 @@ export type Database = {
           discount: number | null
           fault_description: string | null
           final_price: number | null
+          flow_data: Json | null
+          flow_step: string | null
           id: string
           is_installation: boolean | null
           is_sale: boolean | null
@@ -730,6 +732,8 @@ export type Database = {
           discount?: number | null
           fault_description?: string | null
           final_price?: number | null
+          flow_data?: Json | null
+          flow_step?: string | null
           id?: string
           is_installation?: boolean | null
           is_sale?: boolean | null
@@ -776,6 +780,8 @@ export type Database = {
           discount?: number | null
           fault_description?: string | null
           final_price?: number | null
+          flow_data?: Json | null
+          flow_step?: string | null
           id?: string
           is_installation?: boolean | null
           is_sale?: boolean | null
@@ -1114,17 +1120,31 @@ export type Database = {
         Args: { _service_id: string }
         Returns: undefined
       }
-      technician_update_service: {
-        Args: {
-          _detected_fault?: string
-          _last_status_before_part_request?: string
-          _pending_pricing?: boolean
-          _service_id: string
-          _status?: string
-          _work_performed?: string
-        }
-        Returns: undefined
-      }
+      technician_update_service:
+        | {
+            Args: {
+              _detected_fault?: string
+              _last_status_before_part_request?: string
+              _pending_pricing?: boolean
+              _service_id: string
+              _status?: string
+              _work_performed?: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _detected_fault?: string
+              _flow_data?: Json
+              _flow_step?: string
+              _last_status_before_part_request?: string
+              _pending_pricing?: boolean
+              _service_id: string
+              _status?: string
+              _work_performed?: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       app_role: "dono" | "secretaria" | "tecnico" | "monitor"

@@ -252,6 +252,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       );
 
       clearState();
+      saveStateToDb(null as any);
       queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
       toast.success(`Peça solicitada! ${service.code} aguarda aprovação.`);
       onComplete();
@@ -295,6 +296,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
       clearState();
+      saveStateToDb(null as any);
       toast.success(`${service.code} concluído! Aguarda precificação.`);
       onComplete();
     } catch (error) {
