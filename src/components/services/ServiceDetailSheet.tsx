@@ -65,6 +65,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus, type ServicePart, type ServicePayment, type ServicePhoto, type ServiceSignature } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
 import { formatShiftLabel } from '@/utils/dateUtils';
@@ -112,6 +113,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+// LazyImage: shows skeleton until image loads, then fades in
+function LazyImage({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [loaded, setLoaded] = React.useState(false);
+  return (
+    <div className="relative">
+      {!loaded && <Skeleton className={cn("absolute inset-0", className)} />}
+      <img
+        src={src}
+        alt={alt}
+        className={cn(className, "transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        {...props}
+      />
+    </div>
+  );
+}
 
 interface ServiceDetailSheetProps {
   service: Service | null;
@@ -703,32 +722,42 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               )}
 
               {/* Service Photos */}
-              {servicePhotos.length > 0 && (
+              {(isLoadingFull || servicePhotos.length > 0) && (
                 <Section
                   title="Fotos do Serviço"
                   bgColor="bg-indigo-50"
                   borderColor="border-l-indigo-500"
                 >
-                  <div className="grid grid-cols-3 gap-2">
-                    {servicePhotos.map((photo, idx) => (
-                      <div key={photo.id} className="flex flex-col gap-1">
-                        <div className="relative cursor-pointer" onClick={() => setSelectedPhotoIndex(idx)}>
-                          <img
-                            src={photo.file_url}
-                            alt={photo.description || 'Foto do serviço'}
-                            className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity"
-                          />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
-                            {getPhotoTypeLabel(photo.photo_type)}
+                  {isLoadingFull ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="w-full h-20 rounded" />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        {servicePhotos.map((photo, idx) => (
+                          <div key={photo.id} className="flex flex-col gap-1">
+                            <div className="relative cursor-pointer" onClick={() => setSelectedPhotoIndex(idx)}>
+                              <LazyImage
+                                src={photo.file_url}
+                                alt={photo.description || 'Foto do serviço'}
+                                className="w-full h-20 object-cover rounded border hover:opacity-80 transition-opacity"
+                              />
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b text-center capitalize">
+                                {getPhotoTypeLabel(photo.photo_type)}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                    <Camera className="h-3 w-3" />
-                    {servicePhotos.length} foto{servicePhotos.length !== 1 ? 's' : ''} • Clique para ampliar
-                  </p>
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                        <Camera className="h-3 w-3" />
+                        {servicePhotos.length} foto{servicePhotos.length !== 1 ? 's' : ''} • Clique para ampliar
+                      </p>
+                    </>
+                  )}
                 </Section>
               )}
 
@@ -743,7 +772,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     {serviceSignatures.map((sig) => (
                       <div key={sig.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border">
                         <a href={sig.file_url} target="_blank" rel="noopener noreferrer">
-                          <img
+                          <LazyImage
                             src={sig.file_url}
                             alt="Assinatura"
                             className="w-24 h-14 object-contain border rounded bg-gray-50 hover:opacity-80 transition-opacity cursor-pointer"

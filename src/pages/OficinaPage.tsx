@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Wrench, Send, UserPlus, Clock, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { SendTaskModal } from '@/components/modals/SendTaskModal';
-import { useServices } from '@/hooks/useServices';
+import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,12 @@ export default function OficinaPage() {
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const queryClient = useQueryClient();
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
+
+  const handlePrefetch = useCallback((serviceId: string) => {
+    prefetchFullServiceData(queryClient, serviceId);
+  }, [queryClient]);
 
   const filteredServices = useMemo(() => {
     if (!searchTerm.trim()) return services;
@@ -109,6 +115,8 @@ export default function OficinaPage() {
                   service.is_urgent ? "border-l-red-500" : "border-l-purple-500"
                 )}
                 onClick={() => handleServiceClick(service)}
+                onMouseEnter={() => handlePrefetch(service.id)}
+                onTouchStart={() => handlePrefetch(service.id)}
               >
                 <CardContent className="p-5">
                   {/* Header */}
