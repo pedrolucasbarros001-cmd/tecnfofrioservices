@@ -1,114 +1,88 @@
 
 
-# Plano: Ajustar Estrategia de Atualizacao por Area
+# Plano: Adicionar Scroll Padronizado a Todos os Modais
 
-## Resumo das Mudancas
+## Problema
 
-Cada area do sistema tera uma estrategia de atualizacao especifica conforme pedido:
+Varios modais do sistema nao possuem suporte a scroll quando o conteudo excede a altura da tela, especialmente em dispositivos moveis. Isto causa conteudo cortado e botoes inacessiveis (como visivel no screenshot do "Registar Pedido de Peca").
 
-| Area | Estrategia Atual | Nova Estrategia |
-|---|---|---|
-| TV Monitor (servicos) | Realtime em TODA a tabela `services` | Realtime filtrado: so `service_location=eq.oficina` |
-| TV Monitor (atividade) | Realtime em `activity_logs` | Polling leve a cada 60s |
-| Dashboard | Fetch ao abrir (sem polling/realtime) | Manter + adicionar polling 60s |
-| Lista Geral (GeralPage) | Realtime em `services` | Remover realtime. Fetch ao abrir + refetchOnWindowFocus |
+## Modais que Precisam de Correcao
 
-## Detalhes Tecnicos
+### Grupo 1 -- Modais sem qualquer scroll (6 ficheiros)
 
-### 1. TV Monitor -- Realtime filtrado (so oficina)
+| Modal | Problema |
+|---|---|
+| `SendTaskModal.tsx` | Sem max-h, sem scroll |
+| `ServiceTypeSelector.tsx` | Sem max-w-[95vw], sem max-h, sem scroll |
+| `DeliveryManagementModal.tsx` | Sem max-h, sem scroll |
+| `ContactClientModal.tsx` | Sem max-h, sem scroll |
+| `ServiceTagModal.tsx` | Sem max-h, sem scroll |
+| `RequestTransferModal.tsx` | Sem max-h, sem scroll |
 
-**Ficheiro:** `src/pages/TVMonitorPage.tsx`
+### Grupo 2 -- Modal com scroll fora do padrao (1 ficheiro)
 
-Remover as 2 chamadas `useRealtime()` e substituir por uma subscription direta com filtro:
+| Modal | Problema |
+|---|---|
+| `EditServiceDetailsModal.tsx` | Usa `overflow-y-auto` direto no DialogContent em vez do padrao com header fixo + ScrollArea + footer fixo |
 
-```typescript
-// ANTES (reage a QUALQUER mudanca em services):
-useRealtime('services', [['tv-monitor-services']]);
-useRealtime('activity_logs', [['public-activity-logs']]);
+### Modais ja corretos (nao serao alterados)
 
-// DEPOIS (reage APENAS a mudancas em servicos de oficina):
-useEffect(() => {
-  const channel = supabase
-    .channel('tv-monitor-oficina')
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'services',
-      filter: 'service_location=eq.oficina'
-    }, () => {
-      queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
-    })
-    .subscribe();
+ConfirmPartOrderModal, CreateServiceModal, CreateCustomerModal, CreateDeliveryModal, SetPriceModal, CreateBudgetModal, ForceStateModal, RescheduleServiceModal, AssignDeliveryModal, UsedPartsModal, CreateUserModal, EditUserModal, PartArrivedModal, RegisterPaymentModal, RequestPartModal, ConvertBudgetModal, AssignTechnicianModal, CreateInstallationModal, EditBudgetDetailsModal, ServicePrintModal (modal especial de impressao).
 
-  return () => { supabase.removeChannel(channel); };
-}, [queryClient]);
+## Solucao
+
+Aplicar o padrao ja existente no projeto em todos os modais: `DialogContent` com `max-h-[90vh] flex flex-col overflow-hidden p-0`, header com `px-6 pt-6 pb-4 flex-shrink-0`, conteudo central com scroll, e footer com `px-6 py-4 border-t flex-shrink-0`.
+
+### Para modais mais simples (Grupo 1)
+
+Adicionar `max-h-[90vh]` e `overflow-y-auto` ao DialogContent (sem necessidade de separar header/footer pois o conteudo e curto, mas garante que em telas pequenas funcione):
+
+```
+DialogContent className="sm:max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto"
 ```
 
-Para o historico de atividade, trocar Realtime por polling leve de 60s:
+### Para EditServiceDetailsModal (Grupo 2)
 
-```typescript
-const { data: activityLogs = [] } = usePublicActivityLogs(10);
-// Adicionar refetchInterval: 60000 no usePublicActivityLogs
-```
+Converter para o padrao completo: header fixo, ScrollArea no meio, footer fixo. Isto garante que os botoes "Cancelar" e "Guardar" fiquem sempre visiveis.
 
-### 2. Activity Logs -- Polling para TV Monitor
+## Detalhes por Ficheiro
 
-**Ficheiro:** `src/hooks/useActivityLogs.ts`
+### `src/components/modals/SendTaskModal.tsx`
+- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
 
-Adicionar parametro opcional para ativar polling apenas quando necessario (ex: TV Monitor):
+### `src/components/modals/ServiceTypeSelector.tsx`
+- Adicionar `max-w-[95vw] max-h-[90vh] overflow-y-auto` ao DialogContent
 
-```typescript
-export function usePublicActivityLogs(limit = 10, pollingInterval?: number) {
-  return useQuery({
-    queryKey: ['public-activity-logs', limit],
-    queryFn: async () => { /* ... mesmo codigo ... */ },
-    refetchInterval: pollingInterval || false,
-  });
-}
-```
+### `src/components/modals/DeliveryManagementModal.tsx`
+- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
 
-No TVMonitorPage: `usePublicActivityLogs(10, 60000)` -- polling a cada 60s.
-No DashboardPage: `useActivityLogs({ limit: 10 })` -- sem polling (ja e assim).
+### `src/components/modals/ContactClientModal.tsx`
+- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
 
-### 3. Dashboard -- Manter como esta + adicionar 60s
+### `src/components/modals/ServiceTagModal.tsx`
+- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
 
-**Ficheiro:** `src/pages/DashboardPage.tsx`
+### `src/components/modals/RequestTransferModal.tsx`
+- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
 
-O dashboard ja faz fetch apenas ao abrir (via `useEffect` + `fetchStats()`). Adicionar um intervalo de 60s:
-
-```typescript
-useEffect(() => {
-  fetchStats();
-  const interval = setInterval(fetchStats, 60000);
-  return () => clearInterval(interval);
-}, [role, navigate]);
-```
-
-### 4. Lista Geral -- Remover Realtime
-
-**Ficheiro:** `src/pages/GeralPage.tsx`
-
-Remover a linha:
-```typescript
-useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
-```
-
-O React Query ja tem `refetchOnWindowFocus: true` por defeito, entao ao trocar de aba ou voltar a pagina os dados atualizam automaticamente. Alem disso, qualquer acao (criar servico, atribuir tecnico, etc.) ja invalida as queries manualmente apos sucesso.
+### `src/components/modals/EditServiceDetailsModal.tsx`
+- Converter de `overflow-y-auto` simples para o padrao completo com `p-0`, header fixo (`px-6 pt-6 pb-4 flex-shrink-0`), ScrollArea central, e DialogFooter fixo (`px-6 py-4 border-t flex-shrink-0`)
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/pages/TVMonitorPage.tsx` | Remover 2x `useRealtime`, adicionar 1 subscription filtrada `service_location=eq.oficina`, usar polling 60s para atividade |
-| `src/hooks/useActivityLogs.ts` | Adicionar parametro `pollingInterval` ao `usePublicActivityLogs` |
-| `src/pages/DashboardPage.tsx` | Adicionar `setInterval(fetchStats, 60000)` |
-| `src/pages/GeralPage.tsx` | Remover `useRealtime('services', ...)` |
+| `src/components/modals/SendTaskModal.tsx` | Adicionar max-h + overflow |
+| `src/components/modals/ServiceTypeSelector.tsx` | Adicionar max-w-[95vw] + max-h + overflow |
+| `src/components/modals/DeliveryManagementModal.tsx` | Adicionar max-h + overflow |
+| `src/components/modals/ContactClientModal.tsx` | Adicionar max-h + overflow |
+| `src/components/modals/ServiceTagModal.tsx` | Adicionar max-h + overflow |
+| `src/components/modals/RequestTransferModal.tsx` | Adicionar max-h + overflow |
+| `src/components/modals/EditServiceDetailsModal.tsx` | Refactor para padrao completo com ScrollArea |
 
 ## Resultado
 
-- TV Monitor: 1 unica subscription filtrada (so oficina) em vez de 2 subscriptions globais
-- Historico de atividade no monitor: polling leve a cada 60s em vez de Realtime
-- Dashboard: atualiza ao abrir + a cada 60s
-- Lista geral: atualiza ao abrir pagina, ao voltar de outra aba, ou apos qualquer acao
-- Reducao massiva de chamadas `realtime.list_changes`
-
+- Todos os modais terao scroll funcional em qualquer tamanho de tela
+- Botoes de acao (Cancelar, Confirmar) ficam sempre acessiveis
+- Padrao visual consistente em todo o sistema
+- Funciona identicamente para todos os cargos (dono, secretaria, tecnico)
