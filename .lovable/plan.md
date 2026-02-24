@@ -1,153 +1,90 @@
 
-# Plano Completo: 4 Funcionalidades
+# Plano: Corrigir Problemas de Credenciais e Troca de Nivel de Acesso
 
-Este plano cobre todas as alteracoes pedidas, organizadas por funcionalidade.
+## Problemas Identificados
 
----
+### 1. Troca de role nao e atomica (risco de perda de acesso)
+No `EditUserModal.tsx`, a troca de nivel de acesso faz **delete** da role antiga e depois **insert** da nova, tudo via cliente. Se o insert falhar (ex: erro de rede), o utilizador fica **sem role nenhuma** e nao consegue aceder ao sistema. Alem disso, a operacao de delete/insert de roles so funciona para o `dono` (RLS), o que esta correto mas nao ha tratamento de erro adequado.
 
-## Funcionalidade 1: Secretaria pode Editar Detalhes do Servico
+### 2. Nao existe opcao de redefinir palavra-passe pelo admin
+Quando um utilizador nao consegue entrar (palavra-passe esquecida ou errada), o admin nao tem forma de redefinir a senha pelo sistema -- tem de ir ao painel do Supabase manualmente.
 
-**Problema actual:** O botao "Editar Detalhes" no menu de accoes (3 pontos) so aparece para o role `dono`. A secretaria nao tem acesso.
-
-**Alteracoes:**
-
-### Ficheiro: `src/components/services/StateActionButtons.tsx`
-- **Linha 327:** Mudar o bloco `{isDono && (` para `{(isDono || isSecretaria) && (` -- isto permite que a secretaria veja as opcoes "Editar Detalhes" no dropdown
-- **Manter** as opcoes "Forcar Estado" e "Eliminar" exclusivas ao `dono` (separar as condicoes dentro do bloco)
+### 3. Criacao de conta pode falhar silenciosamente em partes
+No `invite-user`, a criacao do perfil depende de um trigger e de um `setTimeout(500ms)`. Se o trigger demorar mais, a role ou o registo de tecnico podem falhar sem que o admin saiba.
 
 ---
 
-## Funcionalidade 2: Secretaria pode Reatribuir Servicos
+## Solucao
 
-**Problema actual:** A opcao "Reatribuir Tecnico" no dropdown so aparece para `isDono` (linha 263).
+### Parte A: Edge Function `update-user-role` (novo)
 
-**Alteracoes:**
+Criar uma nova edge function que executa a troca de role de forma **atomica** usando o service role key:
 
-### Ficheiro: `src/components/services/StateActionButtons.tsx`
-- **Linha 263:** Mudar `service.technician_id && service.status !== 'finalizado' && isDono` para `service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria)`
+- Recebe: `user_id`, `new_role`, `specialization` (opcional)
+- Valida que o chamador e `dono`
+- Numa unica transacao logica:
+  1. Apaga todas as roles do utilizador
+  2. Insere a nova role
+  3. Se a nova role e `tecnico` e nao existe registo em `technicians`, cria-o
+  4. Se a nova role NAO e `tecnico` e existe registo em `technicians`, desativa-o (active=false)
+  5. Se a nova role e `tecnico` e ja existe registo inativo, reativa-o (active=true)
+- Retorna sucesso ou erro claro
 
----
+**Ficheiro:** `supabase/functions/update-user-role/index.ts`
 
-## Funcionalidade 3: Mudar de Horas para Turnos (Manha/Tarde)
+**Config:** Adicionar `[functions.update-user-role] verify_jwt = false` ao `supabase/config.toml`
 
-**Problema actual:** O sistema usa `<Input type="time">` para agendar servicos, guardando horarios como "14:34", "09:00" etc. O pedido e reverter para seleccao por turno com apenas duas opcoes: **Manha** e **Tarde** (sem Noite).
+### Parte B: Edge Function `reset-user-password` (novo)
 
-### Base de dados
-- Nao e necessaria migracao. O campo `scheduled_shift` e do tipo `text` e aceita qualquer valor. Os dados existentes com horarios (ex: "14:34") serao exibidos tal como estao; novos servicos usarao "manha" ou "tarde".
+Criar uma edge function para o admin redefinir a senha de qualquer utilizador:
 
-### Ficheiros a alterar (9 ficheiros):
+- Recebe: `user_id`, `new_password`
+- Valida que o chamador e `dono`
+- Valida forca da senha (min 8 chars, maiuscula, minuscula, numero)
+- Usa `admin.updateUserById` para redefinir
+- Retorna sucesso ou erro
 
-Todos os `<Input type="time">` serao substituidos por um `<Select>` com duas opcoes: "Manha" e "Tarde".
+**Ficheiro:** `supabase/functions/reset-user-password/index.ts`
 
-**1. `src/components/modals/CreateServiceModal.tsx`** (linha 834-845)
-- Substituir `<Input type="time" {...field} />` por Select com opcoes manha/tarde
-- Mudar label "Hora" para "Turno"
+**Config:** Adicionar `[functions.reset-user-password] verify_jwt = false` ao `supabase/config.toml`
 
-**2. `src/components/modals/CreateInstallationModal.tsx`** (linha 577-588)
-- Substituir `<Input type="time" {...field} />` por Select manha/tarde
-- Mudar label "Horario *" para "Turno"
+### Parte C: Atualizar `EditUserModal.tsx`
 
-**3. `src/components/modals/CreateDeliveryModal.tsx`** (linha 577-588)
-- Substituir `<Input type="time" {...field} />` por Select manha/tarde
-- Mudar label "Horario" para "Turno"
+- Substituir a logica de delete+insert de roles no cliente pela chamada a edge function `update-user-role`
+- Adicionar botao "Redefinir Palavra-passe" que abre um mini-formulario inline com campo de nova senha
+- Ao submeter, chama a edge function `reset-user-password`
+- Melhorar mensagens de erro e feedback
 
-**4. `src/components/modals/AssignTechnicianModal.tsx`** (linha 260-271)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label "Hora" para "Turno"
+### Parte D: Melhorar `invite-user` Edge Function
 
-**5. `src/components/modals/RescheduleServiceModal.tsx`** (linha 237-245)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label "Nova Hora" para "Novo Turno"
+- Aumentar o timeout de espera pelo trigger de 500ms para 1500ms
+- Adicionar verificacao explicita de que o perfil foi criado antes de continuar
+- Se o perfil nao existir apos o timeout, cria-lo manualmente via service role
+- Garantir que erros na criacao de role ou tecnico sao reportados ao admin
 
-**6. `src/components/modals/ConvertBudgetModal.tsx`** (linha 359-366)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label "Hora" para "Turno"
+### Parte E: Melhorar `LoginPage.tsx`
 
-**7. `src/components/modals/PartArrivedModal.tsx`** (linha 256-265)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label "Hora" para "Turno"
-
-**8. `src/components/shared/CustomerDetailSheet.tsx`** (linha 1162-1177)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label "Hora" para "Turno"
-
-**9. `src/components/modals/AssignDeliveryModal.tsx`** (linha 137-141)
-- Substituir `<Input type="time">` por Select manha/tarde
-- Mudar label correspondente para "Turno"
-
-### Exibicao de turnos (4 ficheiros):
-
-Os locais que exibem o valor de `scheduled_shift` actualmente mostram o valor em bruto (ex: "14:34" ou "manha"). Criar uma funcao helper `formatShiftLabel` centralizada para capitalizar correctamente:
-
-**Funcao helper** (em `src/utils/dateUtils.ts`):
-```
-export function formatShiftLabel(shift: string | null | undefined): string {
-  if (!shift) return 'Sem turno';
-  if (shift === 'manha') return 'Manha';
-  if (shift === 'tarde') return 'Tarde';
-  return shift; // fallback para dados antigos com horarios
-}
-```
-
-**Ficheiros de exibicao a actualizar:**
-- `src/pages/GeralPage.tsx` (linha 412-413): usar `formatShiftLabel`
-- `src/pages/ServicosPage.tsx` (linha 209): substituir `service.scheduled_shift || 'Sem hora'` por `formatShiftLabel(service.scheduled_shift)`
-- `src/pages/technician/TechnicianOfficePage.tsx` (linha 237): idem
-- `src/components/agenda/AgendaDrawer.tsx` (linha 140-142): idem
-- `src/components/agenda/WeeklyAgenda.tsx` (linha 31-33): actualizar funcao `formatShiftLabel` existente
-- `src/components/services/ServiceDetailSheet.tsx` (linha 496-499): usar `formatShiftLabel`
-- `src/components/modals/RescheduleServiceModal.tsx` (linha 154-156): usar `formatShiftLabel`
-- `src/components/modals/AssignTechnicianModal.tsx` (linha 156): substituir `values.scheduled_shift || 'sem hora'` por label do turno
-
-### Texto do onboarding:
-- `src/components/onboarding/onboardingContent.ts` (linhas 98, 153, 207, 516): substituir referencias a "Hora" por "Turno" e remover mencoes a "Noite"
+- Garantir que o botao "Entrar" mostra feedback visual imediato (spinner)
+- Garantir que erros de credenciais mostram toast visivel mesmo em caso de timeout de rede
+- Adicionar try/catch robusto para cobrir erros de rede
 
 ---
 
-## Funcionalidade 4: Onboarding Interactivo com Demo Pratica
+## Resumo de Ficheiros
 
-**Situacao actual:** O onboarding e informativo -- mostra tooltips com texto sobre cada seccao, mas nao obriga o utilizador a executar accoes reais. O pedido e transformar isto num tour interactivo onde o utilizador cria servicos demo, executa fluxos, etc.
-
-**Complexidade:** Esta funcionalidade e a mais complexa e requer uma reestruturacao significativa do sistema de onboarding. Dada a dimensao, proponho implementar as 3 primeiras funcionalidades agora e tratar o onboarding interactivo como uma fase separada.
-
-**Razoes:**
-- O onboarding interactivo requer criacao de dados demo na BD (servicos, clientes, tecnicos fictivos)
-- Requer logica de "modo demo" que intercepte accoes reais vs demo
-- Requer re-arquitectura completa do `GuidedTour` para suportar accoes obrigatorias (clicar botoes, abrir modais, preencher formularios)
-- Requer testes extensivos em cada nivel de acesso (dono, secretaria, tecnico)
-- O risco de introduzir bugs nas funcionalidades existentes e alto se feito tudo de uma vez
-
-**Proposta para o onboarding:** Implementar numa mensagem dedicada posterior, com plano proprio, apos as 3 funcionalidades acima estarem estaveis e testadas.
-
----
-
-## Resumo de Ficheiros a Alterar
-
-| Ficheiro | Alteracao |
-|----------|-----------|
-| `StateActionButtons.tsx` | Secretaria: editar detalhes + reatribuir |
-| `CreateServiceModal.tsx` | Input time -> Select turno |
-| `CreateInstallationModal.tsx` | Input time -> Select turno |
-| `CreateDeliveryModal.tsx` | Input time -> Select turno |
-| `AssignTechnicianModal.tsx` | Input time -> Select turno + label |
-| `RescheduleServiceModal.tsx` | Input time -> Select turno + label |
-| `ConvertBudgetModal.tsx` | Input time -> Select turno |
-| `PartArrivedModal.tsx` | Input time -> Select turno |
-| `CustomerDetailSheet.tsx` | Input time -> Select turno |
-| `AssignDeliveryModal.tsx` | Input time -> Select turno |
-| `dateUtils.ts` | Adicionar `formatShiftLabel` |
-| `GeralPage.tsx` | Exibir turno formatado |
-| `ServicosPage.tsx` | Exibir turno formatado |
-| `TechnicianOfficePage.tsx` | Exibir turno formatado |
-| `AgendaDrawer.tsx` | Exibir turno formatado |
-| `WeeklyAgenda.tsx` | Actualizar formatShiftLabel |
-| `ServiceDetailSheet.tsx` | Exibir turno formatado |
-| `onboardingContent.ts` | Corrigir textos (Hora->Turno) |
+| Ficheiro | Accao |
+|----------|-------|
+| `supabase/functions/update-user-role/index.ts` | Criar (novo) |
+| `supabase/functions/reset-user-password/index.ts` | Criar (novo) |
+| `supabase/config.toml` | Adicionar 2 funcoes |
+| `src/components/modals/EditUserModal.tsx` | Refazer logica de role + adicionar reset password |
+| `supabase/functions/invite-user/index.ts` | Melhorar robustez da criacao |
+| `src/pages/LoginPage.tsx` | Melhorar tratamento de erros |
 
 ## Secao Tecnica
 
-- Nao ha migracao de BD necessaria (campo `scheduled_shift` e `text`)
-- Dados existentes com horarios (ex: "14:34") continuam visiveis via fallback
-- Novos registos gravam "manha" ou "tarde"
-- O Select usa `<Select>` do Radix UI (ja importado nos modais)
-- Permissoes de secretaria para editar detalhes nao requerem alteracao de RLS (o update de servicos ja permite `is_secretaria`)
+- As edge functions usam `SUPABASE_SERVICE_ROLE_KEY` (ja configurado como secret)
+- `verify_jwt = false` permite validacao manual do token no codigo (padrao ja usado)
+- A troca de role via edge function garante atomicidade -- nao ha estado intermedio sem role
+- O reset de senha nao afeta a sessao do admin (usa `admin.updateUserById`, nao `signIn`)
+- Dados existentes na BD estao corretos (14 utilizadores, todos com exactamente 1 role, sem duplicados)
