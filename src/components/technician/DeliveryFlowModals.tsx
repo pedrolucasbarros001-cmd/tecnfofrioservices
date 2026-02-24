@@ -23,6 +23,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logDelivery } from '@/utils/activityLogUtils';
 import { supabase, ensureValidSession } from '@/integrations/supabase/client';
+import { humanizeError } from '@/utils/errorMessages';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
@@ -122,7 +123,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       }
     } catch (error) {
       console.error('Error starting delivery:', error);
-      toast.error('Erro ao iniciar entrega');
+      toast.error(humanizeError(error));
     }
   };
 
@@ -159,13 +160,26 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
     setIsSubmitting(true);
     try {
       await ensureValidSession();
-      // Save signature
-      await supabase.from('service_signatures').insert({
-        service_id: service.id,
-        signature_type: 'entrega',
-        file_url: signatureData,
-        signer_name: signerName || service.customer?.name,
-      });
+
+      // Idempotent: check if signature already exists
+      const { data: existingSig } = await supabase
+        .from('service_signatures')
+        .select('id')
+        .eq('service_id', service.id)
+        .eq('signature_type', 'entrega')
+        .maybeSingle();
+
+      if (!existingSig) {
+        await supabase.from('service_signatures').insert({
+          service_id: service.id,
+          signature_type: 'entrega',
+          file_url: signatureData,
+          signer_name: signerName || service.customer?.name,
+        });
+      }
+
+      // Ensure session is still valid before the update
+      await ensureValidSession();
 
       // Update service to finalizado
       await updateService.mutateAsync({

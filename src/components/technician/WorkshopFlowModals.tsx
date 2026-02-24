@@ -490,7 +490,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       {/* Modal 1b: Confirmação Peça */}
       <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
           <div className="space-y-4 py-4">
@@ -1007,31 +1007,36 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         open={showCamera}
         onOpenChange={setShowCamera}
         onCapture={async (imageData) => {
-          let photoType = "oficina";
-          if (currentStep === "foto_aparelho") photoType = "aparelho";
-          else if (currentStep === "foto_etiqueta") photoType = "etiqueta";
-          else if (currentStep === "foto_estado") photoType = "estado";
+          try {
+            let photoType = "oficina";
+            if (currentStep === "foto_aparelho") photoType = "aparelho";
+            else if (currentStep === "foto_etiqueta") photoType = "etiqueta";
+            else if (currentStep === "foto_estado") photoType = "estado";
 
-          await ensureValidSession();
+            await ensureValidSession();
 
-          await supabase.from("service_photos").insert({
-            service_id: service.id,
-            photo_type: photoType,
-            file_url: imageData,
-            description: `Foto de ${photoType} na oficina`,
-          });
+            await supabase.from("service_photos").insert({
+              service_id: service.id,
+              photo_type: photoType,
+              file_url: imageData,
+              description: `Foto de ${photoType} na oficina`,
+            });
 
-          if (currentStep === "foto_aparelho") {
-            setFormData((prev) => ({ ...prev, photoAparelho: imageData }));
-          } else if (currentStep === "foto_etiqueta") {
-            setFormData((prev) => ({ ...prev, photoEtiqueta: imageData }));
-          } else if (currentStep === "foto_estado") {
-            setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, imageData] }));
+            if (currentStep === "foto_aparelho") {
+              setFormData((prev) => ({ ...prev, photoAparelho: imageData }));
+            } else if (currentStep === "foto_etiqueta") {
+              setFormData((prev) => ({ ...prev, photoEtiqueta: imageData }));
+            } else if (currentStep === "foto_estado") {
+              setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, imageData] }));
+            }
+
+            queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
+            setShowCamera(false);
+            toast.success("Foto guardada!");
+          } catch (error) {
+            console.error("Error saving photo:", error);
+            toast.error(humanizeError(error));
           }
-
-          queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
-          setShowCamera(false);
-          toast.success("Foto guardada!");
         }}
         title="Foto do Aparelho"
       />

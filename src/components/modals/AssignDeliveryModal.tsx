@@ -51,7 +51,13 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
         delivery_method: 'technician_delivery',
         delivery_technician_id: technicianId,
         delivery_date: deliveryDate,
-        scheduled_shift: deliveryTime, // Using scheduled_shift for consistency if needed, or just delivery_date
+        scheduled_shift: deliveryTime,
+        // Critical: set these so the technician sees & can start the delivery
+        technician_id: technicianId,
+        service_type: 'entrega',
+        status: 'por_fazer',
+        scheduled_date: deliveryDate,
+        skipToast: true,
       });
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
