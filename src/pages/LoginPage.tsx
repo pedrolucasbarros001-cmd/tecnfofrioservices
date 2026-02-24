@@ -123,6 +123,9 @@ export default function LoginPage() {
     return lower.includes('database error') ||
       lower.includes('timeout') ||
       lower.includes('context canceled') ||
+      lower.includes('context deadline') ||
+      lower.includes('connection') ||
+      lower.includes('econnrefused') ||
       lower.includes('500') ||
       lower.includes('504') ||
       lower.includes('load failed') ||
