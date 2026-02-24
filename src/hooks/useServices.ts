@@ -53,12 +53,11 @@ export function useServices(options: UseServicesOptions = {}) {
         query = query.eq('technician_id', technicianId);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(200);
 
       if (error) throw error;
       return (data as unknown as Service[]) || [];
     },
-    refetchInterval: 30000,
   });
 }
 
@@ -77,8 +76,7 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
           parts:service_parts(*),
           photos:service_photos(*),
           signatures:service_signatures(*),
-          payments:service_payments(*),
-          logs:activity_logs(*, actor:profiles!activity_logs_actor_id_fkey(full_name))
+          payments:service_payments(*)
         `)
         .eq('id', serviceId)
         .single();
@@ -109,11 +107,7 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
           return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
         }),
         payments: safeSort(result.payments, 'payment_date'),
-        logs: (result.logs || []).sort((a: any, b: any) => {
-          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
-        }),
+        logs: [], // Loaded separately to reduce query weight
       } as Service & {
         parts: ServicePart[],
         photos: ServicePhoto[],
@@ -140,8 +134,7 @@ export function prefetchFullServiceData(queryClient: QueryClient, serviceId: str
           parts:service_parts(*),
           photos:service_photos(*),
           signatures:service_signatures(*),
-          payments:service_payments(*),
-          logs:activity_logs(*, actor:profiles!activity_logs_actor_id_fkey(full_name))
+          payments:service_payments(*)
         `)
         .eq('id', serviceId)
         .single();
@@ -161,9 +154,7 @@ export function prefetchFullServiceData(queryClient: QueryClient, serviceId: str
         payments: (result.payments || []).sort((a: any, b: any) =>
           new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
         ),
-        logs: (result.logs || []).sort((a: any, b: any) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        ),
+        logs: [],
       };
     },
     staleTime: 1000 * 30,
@@ -342,7 +333,6 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         totalPages: Math.ceil(totalCount / pageSize),
       };
     },
-    refetchInterval: 30000,
     placeholderData: (prev) => prev,
   });
 }
