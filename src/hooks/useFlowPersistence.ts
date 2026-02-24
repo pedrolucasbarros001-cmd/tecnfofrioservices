@@ -38,16 +38,24 @@ export async function deriveStepFromDb(
   flowType: FlowState['flowType'],
   service: Record<string, unknown>
 ): Promise<DbResumeResult> {
-  // Fetch photos for this service
-  // Fetch photo metadata first to determine presence and types without fetching large file_url data
-  const { data: photoMetadata = [] } = await supabase
-    .from('service_photos')
-    .select('id, photo_type, uploaded_at')
-    .eq('service_id', serviceId)
-    .order('uploaded_at', { ascending: false });
+  // Parallel fetch: photos metadata + parts
+  const [photoMetaResult, partsResult] = await Promise.all([
+    supabase
+      .from('service_photos')
+      .select('id, photo_type, uploaded_at')
+      .eq('service_id', serviceId)
+      .order('uploaded_at', { ascending: false }),
+    supabase
+      .from('service_parts')
+      .select('part_name, part_code, quantity, is_requested, arrived')
+      .eq('service_id', serviceId),
+  ]);
+
+  const photoMetadata = photoMetaResult.data ?? [];
+  const parts = partsResult.data ?? [];
 
   const photoMetadataByType: Record<string, { id: string; uploaded_at: string }[]> = {};
-  for (const photo of photoMetadata ?? []) {
+  for (const photo of photoMetadata) {
     if (!photoMetadataByType[photo.photo_type]) photoMetadataByType[photo.photo_type] = [];
     photoMetadataByType[photo.photo_type].push({ id: photo.id, uploaded_at: photo.uploaded_at });
   }
@@ -55,18 +63,12 @@ export async function deriveStepFromDb(
   const hasPhoto = (type: string) => (photoMetadataByType[type]?.length ?? 0) > 0;
   const hasAnyPhoto = photoMetadata.length > 0;
 
-  // Fetch parts for this service
-  const { data: parts = [] } = await supabase
-    .from('service_parts')
-    .select('part_name, part_code, quantity, is_requested, arrived')
-    .eq('service_id', serviceId);
-
-  const hasRequestedPart = (parts ?? []).some((p) => p.is_requested);
-  const usedPartsList = (parts ?? [])
+  const hasRequestedPart = parts.some((p) => p.is_requested);
+  const usedPartsList = parts
     .filter((p) => !p.is_requested)
     .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
 
-  // Identify photo IDs we actually need to fetch URLs for (latest of each relevant type, and max 3 'estado')
+  // Identify photo IDs we actually need to fetch URLs for
   const idsToFetch: string[] = [];
   const addLatestId = (type: string) => {
     if (photoMetadataByType[type]?.[0]) idsToFetch.push(photoMetadataByType[type][0].id);
@@ -89,7 +91,7 @@ export async function deriveStepFromDb(
   }
 
   const photosByType: Record<string, string[]> = {};
-  for (const photo of photos ?? []) {
+  for (const photo of photos) {
     if (!photosByType[photo.photo_type]) photosByType[photo.photo_type] = [];
     photosByType[photo.photo_type].push(photo.file_url);
   }

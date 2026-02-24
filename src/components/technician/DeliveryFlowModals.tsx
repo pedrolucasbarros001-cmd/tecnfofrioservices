@@ -155,8 +155,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
 
       queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
 
-      // Clear persisted state on completion
+      // Clear persisted state on completion (localStorage + DB)
       clearState();
+      saveStateToDb(null as any);
       setShowSignature(false);
       toast.success('Entrega concluída com sucesso!');
       onComplete();

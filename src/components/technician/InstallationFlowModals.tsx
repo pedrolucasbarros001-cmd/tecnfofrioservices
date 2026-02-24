@@ -202,8 +202,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
         user?.id
       );
 
-      // Clear persisted state
+      // Clear persisted state (localStorage + DB)
       clearState();
+      saveStateToDb(null as any);
 
       queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
       setShowSignature(false);

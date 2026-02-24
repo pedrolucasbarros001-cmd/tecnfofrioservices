@@ -422,8 +422,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         toast.success("Visita concluída com sucesso!");
       }
 
-      // Clear persisted state on completion
+      // Clear persisted state on completion (localStorage + DB)
       clearState();
+      saveStateToDb(null as any);
       setShowSignature(false);
       onComplete();
     } catch (error) {
@@ -766,7 +767,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal 3a: Foto do Aparelho (only for reparacao) */}
       {isReparacao && (
         <Dialog
-          open={currentStep === "foto_aparelho" && !showCamera && !showSignature}
+          open={currentStep === "foto_aparelho" && !showCamera && !showSignature && !showPayment}
           onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
@@ -822,7 +823,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal 3b: Foto da Etiqueta (only for reparacao) */}
       {isReparacao && (
         <Dialog
-          open={currentStep === "foto_etiqueta" && !showCamera && !showSignature}
+          open={currentStep === "foto_etiqueta" && !showCamera && !showSignature && !showPayment}
           onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
@@ -879,7 +880,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {/* Modal 3c: Foto do Estado (only for reparacao) */}
       {isReparacao && (
         <Dialog
-          open={currentStep === "foto_estado" && !showCamera && !showSignature}
+          open={currentStep === "foto_estado" && !showCamera && !showSignature && !showPayment}
           onOpenChange={(open) => !open && handleClose()}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
