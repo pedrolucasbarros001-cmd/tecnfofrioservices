@@ -1411,7 +1411,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 3d: Confirmação Peça */}
       <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-md p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
           <div className="space-y-4 py-4">

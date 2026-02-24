@@ -26,6 +26,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logServiceCompletion } from '@/utils/activityLogUtils';
 import { supabase, ensureValidSession } from '@/integrations/supabase/client';
+import { humanizeError } from '@/utils/errorMessages';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
@@ -134,7 +135,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       }
     } catch (error) {
       console.error('Error starting installation:', error);
-      toast.error('Erro ao iniciar instalação');
+      toast.error(humanizeError(error));
     }
   };
 
@@ -170,44 +171,73 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       toast.success('Foto guardada!');
     } catch (error) {
       console.error('Error saving photo:', error);
-      toast.error('Erro ao guardar foto');
+      toast.error(humanizeError(error));
     }
   };
 
   const handleMaterialsConfirm = async (materials: PartEntry[]) => {
-    // Save materials to database
-    for (const material of materials) {
-      await supabase.from('service_parts').insert({
-        service_id: service.id,
-        part_name: material.name,
-        part_code: material.reference || null,
-        quantity: material.quantity,
-        is_requested: false,
-        arrived: true,
-        cost: 0,
-      });
+    try {
+      await ensureValidSession();
+
+      // Idempotent: fetch existing parts to avoid duplicates
+      const { data: existing } = await supabase
+        .from('service_parts')
+        .select('part_name')
+        .eq('service_id', service.id)
+        .eq('is_requested', false);
+
+      const existingNames = new Set(
+        (existing || []).map((p: any) => p.part_name?.toLowerCase().trim())
+      );
+
+      for (const material of materials) {
+        if (material.name.trim() && !existingNames.has(material.name.toLowerCase().trim())) {
+          await supabase.from('service_parts').insert({
+            service_id: service.id,
+            part_name: material.name,
+            part_code: material.reference || null,
+            quantity: material.quantity,
+            is_requested: false,
+            arrived: true,
+            cost: 0,
+          });
+        }
+      }
+
+      setFormData(prev => ({ ...prev, usedMaterials: materials }));
+      setShowMaterialsModal(false);
+      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+      toast.success('Materiais registados!');
+
+      // Advance to next step
+      setCurrentStep('trabalho');
+    } catch (error) {
+      console.error('Error confirming materials:', error);
+      toast.error(humanizeError(error));
     }
-
-    setFormData(prev => ({ ...prev, usedMaterials: materials }));
-    setShowMaterialsModal(false);
-    queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
-    toast.success('Materiais registados!');
-
-    // Advance to next step
-    setCurrentStep('trabalho');
   };
 
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
       await ensureValidSession();
-      // Save signature
-      await supabase.from('service_signatures').insert({
-        service_id: service.id,
-        signature_type: 'instalacao',
-        file_url: signatureData,
-        signer_name: signerName || service.customer?.name,
-      });
+
+      // Idempotent: check if signature already exists
+      const { data: existingSig } = await supabase
+        .from('service_signatures')
+        .select('id')
+        .eq('service_id', service.id)
+        .eq('signature_type', 'instalacao')
+        .maybeSingle();
+
+      if (!existingSig) {
+        await supabase.from('service_signatures').insert({
+          service_id: service.id,
+          signature_type: 'instalacao',
+          file_url: signatureData,
+          signer_name: signerName || service.customer?.name,
+        });
+      }
 
       // Determine final status - installations go to a_precificar
       const needsPricing = !service.is_warranty && (service.final_price || 0) === 0;
@@ -238,7 +268,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       onComplete();
     } catch (error) {
       console.error('Error completing installation:', error);
-      toast.error('Erro ao concluir instalação');
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
