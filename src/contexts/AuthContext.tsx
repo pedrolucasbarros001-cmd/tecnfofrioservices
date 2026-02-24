@@ -181,15 +181,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function isServerError(error: { message?: string } | null): boolean {
+    if (!error) return false;
+    const msg = (error.message || '').toLowerCase();
+    return msg.includes('database error') ||
+      msg.includes('timeout') ||
+      msg.includes('context canceled') ||
+      msg.includes('context deadline') ||
+      msg.includes('500') ||
+      msg.includes('504') ||
+      msg.includes('load failed') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('networkerror');
+  }
+
   async function signIn(email: string, password: string) {
+    // Attempt 1
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error && isServerError(error)) {
+        console.warn('[AuthContext] Server error on signIn attempt 1, retrying in 2s...', error.message);
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Attempt 2
+        try {
+          const { error: error2 } = await supabase.auth.signInWithPassword({ email, password });
+          return { error: error2 };
+        } catch (retryErr) {
+          return { error: retryErr as Error };
+        }
+      }
+
       return { error };
     } catch (error) {
-      return { error: error as Error };
+      const err = error as Error;
+      if (isServerError(err)) {
+        console.warn('[AuthContext] Network error on signIn attempt 1, retrying in 2s...');
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const { error: error2 } = await supabase.auth.signInWithPassword({ email, password });
+          return { error: error2 };
+        } catch (retryErr) {
+          return { error: retryErr as Error };
+        }
+      }
+      return { error: err };
     }
   }
 
