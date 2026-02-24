@@ -152,7 +152,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       toast.success('Foto guardada!');
     } catch (error) {
       console.error('Error saving photo:', error);
-      toast.error('Erro ao guardar foto');
+      toast.error(humanizeError(error));
     }
   };
 
