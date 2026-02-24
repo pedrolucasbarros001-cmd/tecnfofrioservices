@@ -36,6 +36,7 @@ import { logWorkshopPickup, logPartRequest, logServiceCompletion } from "@/utils
 import { supabase, ensureValidSession } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { humanizeError } from "@/utils/errorMessages";
+import { buildFullAddress } from "@/utils/addressUtils";
 import { technicianUpdateService } from "@/utils/technicianRpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
@@ -221,10 +222,13 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   };
 
   const handleNavigateToClient = () => {
-    const address = service.service_address || service.customer?.address;
-    if (address) {
-      const encodedAddress = encodeURIComponent(address);
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, "_blank");
+    const fullAddress = buildFullAddress({
+      address: service.service_address || service.customer?.address,
+      postalCode: service.service_postal_code || service.customer?.postal_code,
+      city: service.service_city || service.customer?.city,
+    });
+    if (fullAddress) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`, "_blank");
     } else {
       toast.error("Morada não disponível");
     }
@@ -790,6 +794,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                 <MapPin className="h-3 w-3" /> Morada do Cliente
               </p>
               <p className="font-medium">{service.service_address || service.customer?.address || "N/A"}</p>
+              {(service.service_postal_code || service.customer?.postal_code || service.service_city || service.customer?.city) && (
+                <p className="text-muted-foreground text-xs mt-1">
+                  {[service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city].filter(Boolean).join(', ')}
+                </p>
+              )}
               <p className="text-muted-foreground mt-2">{service.customer?.phone || ""}</p>
             </div>
 
