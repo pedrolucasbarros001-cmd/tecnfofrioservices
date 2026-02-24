@@ -1,97 +1,113 @@
 
-Objetivo: resolver o congelamento de interação (“clica e nada acontece”) para o José Alves e qualquer utilizador após tempo parado na mesma tela.
 
-Diagnóstico técnico (com evidências)
-- A conta está válida (perfil existe, role em `user_roles` = `dono`, onboarding completo).
-- As chamadas de rede continuam a funcionar em loop (services/budgets/notifications 200), ou seja, a app não está “morta”.
-- O sintoma descrito (“tudo visível, mas nenhum botão responde”) é típico de camada de overlay invisível capturando clique.
-- O projeto usa vários overlays de tela cheia (Radix Dialog/Sheet + GuidedTour/Demo) com `position: fixed; inset: 0`.
-- Em `DialogOverlay` e `SheetOverlay`, não há proteção explícita para desabilitar eventos quando estado está fechado (`data-state=closed`), o que pode deixar uma camada a bloquear interações após idle/retorno de aba.
+# Plano: Corrigir Scroll nos Modais e Adicionar Pecas no ConfirmPartOrderModal
 
-Do I know what the issue is?
-- Sim, com alta confiança: bloqueio global de pointer events por overlay residual (Dialog/Sheet/Tour/Demo) após inatividade/retomada de aba.
-- A parte de sessão pode coexistir noutros fluxos, mas não explica “sidebar e botões não navegam” com app ainda renderizando e API respondendo.
+## Diagnostico
 
-Plano de implementação
+O problema de scroll persiste porque o componente `ScrollArea` do Radix UI nao esta a funcionar corretamente dentro do layout flex dos modais. O `ScrollAreaPrimitive.Viewport` interno depende de estilos inline do Radix para `overflow: scroll`, mas isso nao esta a resultar de forma fiavel neste contexto (flex container com `flex-1 min-h-0`).
 
-1) Blindagem de overlays Radix (correção principal)
-- Ficheiro: `src/components/ui/dialog.tsx`
-  - Ajustar classes do `DialogOverlay` para:
-    - `data-[state=open]:pointer-events-auto`
-    - `data-[state=closed]:pointer-events-none`
-- Ficheiro: `src/components/ui/sheet.tsx`
-  - Mesmo ajuste no `SheetOverlay`.
+**Solucao definitiva:** Substituir `<ScrollArea>` por um `<div>` nativo com `overflow-y-auto` em todos os modais afetados. Isto e 100% fiavel, independente do Radix, e resolve o scroll de forma permanente.
 
-Resultado esperado:
-- Mesmo que o overlay feche e permaneça momentaneamente no DOM, não bloqueará cliques quando `closed`.
+## Alteracoes
 
-2) Failsafe global por CSS (defesa em profundidade)
-- Ficheiro: `src/index.css`
-- Adicionar regra global de segurança:
-  - `[data-radix-dialog-overlay][data-state="closed"] { pointer-events: none !important; }`
-  - `[vaul-overlay][data-state="closed"] { pointer-events: none !important; }` (se aplicável)
-- Manter sem mexer nas regras de print já existentes.
+### 1. Modais de criacao de servico a partir do perfil do cliente
 
-Resultado esperado:
-- Camadas residuais “fantasma” deixam de capturar input, mesmo fora dos componentes principais.
+**Ficheiro: `src/components/shared/CustomerDetailSheet.tsx`** (linha ~778)
 
-3) Recuperação automática ao voltar de inatividade (robustez)
-- Ficheiro: `src/components/layouts/AppLayout.tsx`
-- Adicionar efeito leve em `visibilitychange` e `focus` para:
-  - Fechar painel de notificações (`setShowNotifications(false)`), evitando sheet aberto residual após tab idle.
-  - Remover classes de estado órfãs de tour/demo no `body` se não houver UI ativa correspondente.
-- Não alterar lógica funcional de negócio; apenas sanitização de UI global.
+Substituir:
+```typescript
+<ScrollArea className="flex-1 min-h-0 px-6">
+  <div className="space-y-4 py-4 pr-4">
+```
+Por:
+```typescript
+<div className="flex-1 min-h-0 overflow-y-auto px-6">
+  <div className="space-y-4 py-4">
+```
 
-Resultado esperado:
-- Após ficar horas parado, ao voltar para a aba a interface volta clicável.
+### 2. CreateServiceModal
 
-4) Hardening do overlay de tour/demo (sem quebrar onboarding)
-- Ficheiros:
-  - `src/components/onboarding/GuidedTour.tsx`
-  - `src/components/onboarding/DemoRunner.tsx`
-- Adicionar fallback de timeout defensivo para sair de estado “navigating” prolongado (ex.: >5s) e desmontar overlay se seletor alvo não existir.
-- Garantir cleanup completo de listeners/refs em mudança de aba.
+**Ficheiro: `src/components/modals/CreateServiceModal.tsx`** (linha ~396)
 
-Resultado esperado:
-- Overlay de tutorial/demo não fica preso em tela cheia bloqueando tudo.
+Mesma substituicao: `ScrollArea` -> `div overflow-y-auto`.
 
-5) Observabilidade mínima para confirmar correção
-- Adicionar logs temporários de debug (curtos) quando houver:
-  - Overlay `open/closed`
-  - `visibilitychange` -> rotina de recuperação
-  - Detecção de overlay órfão
-- Objetivo: confirmar no próximo relato sem adivinhação.
+### 3. CreateInstallationModal
 
-Validação (E2E)
-- Cenário A (desktop, dono):
-  1. Login como José.
-  2. Navegar por sidebar (Dashboard → Geral → Clientes → Oficina).
-  3. Deixar aba inativa por 20-60 min.
-  4. Voltar e clicar em sidebar, cards e botões de ação.
-  5. Confirmar que URL muda e páginas abrem normalmente.
-- Cenário B (com modal):
-  1. Abrir/fechar Sheet de notificações.
-  2. Abrir/fechar modais de serviço.
-  3. Confirmar que após fechar tudo, a tela continua clicável.
-- Cenário C (tour/demo):
-  1. Iniciar e interromper tour/demo.
-  2. Trocar aba e voltar.
-  3. Confirmar ausência de bloqueio global.
+**Ficheiro: `src/components/modals/CreateInstallationModal.tsx`** (linha ~278)
 
-Ficheiros previstos para alteração
-- `src/components/ui/dialog.tsx`
-- `src/components/ui/sheet.tsx`
-- `src/index.css`
-- `src/components/layouts/AppLayout.tsx`
-- `src/components/onboarding/GuidedTour.tsx`
-- `src/components/onboarding/DemoRunner.tsx`
+Mesma substituicao.
 
-Risco e mitigação
-- Risco: interferir no comportamento legítimo de bloqueio quando modal está aberto.
-- Mitigação: só desabilitar pointer-events no estado `closed`; estado `open` permanece bloqueante como esperado.
-- Risco: cleanup de body classes remover estado válido.
-- Mitigação: validar antes por presença real de componentes ativos.
+### 4. CreateDeliveryModal
 
-Critério de pronto
-- Não existe mais estado em que a UI fica visível porém “morta” ao clique.
-- Sidebar e botões voltam a responder imediatamente após períodos longos de inatividade.
+**Ficheiro: `src/components/modals/CreateDeliveryModal.tsx`**
+
+Mesma substituicao.
+
+### 5. RequestPartModal (solicitar peca - tecnico)
+
+**Ficheiro: `src/components/modals/RequestPartModal.tsx`** (linha 168)
+
+Substituir `<ScrollArea>` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`.
+
+### 6. ConfirmPartOrderModal (registar pedido - admin)
+
+**Ficheiro: `src/components/modals/ConfirmPartOrderModal.tsx`**
+
+Duas alteracoes:
+
+**a) Corrigir scroll:** Substituir `<ScrollArea>` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`.
+
+**b) Adicionar funcionalidade de adicionar pecas novas:**
+
+Adicionar state para novas pecas (mesmo padrao do `RequestPartModal`):
+```typescript
+const [newParts, setNewParts] = useState<{name: string, code: string, quantity: string}[]>([]);
+```
+
+Na UI, apos a lista de pecas solicitadas, adicionar botao "Adicionar Peca" que permite ao admin:
+- Inserir nome, codigo/referencia e quantidade de pecas adicionais
+- Remover pecas adicionadas por engano
+- Estas novas pecas serao inseridas na tabela `service_parts` no momento do submit, junto com a atualizacao das pecas existentes
+
+No `handleSubmit`, alem de atualizar as pecas pendentes, tambem inserir as novas pecas:
+```typescript
+if (newParts.length > 0) {
+  const validNew = newParts.filter(p => p.name.trim());
+  if (validNew.length > 0) {
+    await supabase.from('service_parts').insert(
+      validNew.map(p => ({
+        service_id: service.id,
+        part_name: p.name.trim(),
+        part_code: p.code.trim() || null,
+        quantity: parseInt(p.quantity) || 1,
+        is_requested: true,
+        arrived: false,
+        estimated_arrival: estimatedArrival,
+        cost: cost ? parseCurrencyInput(cost) : null,
+        iva_rate: parseFloat(ivaRate),
+        supplier: supplier || null,
+      }))
+    );
+  }
+}
+```
+
+## Ficheiros Alterados
+
+| Ficheiro | Alteracao |
+|---|---|
+| `src/components/shared/CustomerDetailSheet.tsx` | ScrollArea -> div overflow-y-auto |
+| `src/components/modals/CreateServiceModal.tsx` | ScrollArea -> div overflow-y-auto |
+| `src/components/modals/CreateInstallationModal.tsx` | ScrollArea -> div overflow-y-auto |
+| `src/components/modals/CreateDeliveryModal.tsx` | ScrollArea -> div overflow-y-auto |
+| `src/components/modals/RequestPartModal.tsx` | ScrollArea -> div overflow-y-auto |
+| `src/components/modals/ConfirmPartOrderModal.tsx` | ScrollArea -> div overflow-y-auto + adicionar pecas novas |
+
+## Resultado
+
+- Scroll funciona em todos os modais de criacao de servico (reparacao, instalacao, entrega)
+- Scroll funciona no modal de solicitar peca (tecnico)
+- Scroll funciona no modal de registar pedido de peca (admin)
+- Admin pode adicionar pecas extras no momento de registar o pedido
+- Sem dependencia do Radix ScrollArea para scroll em modais
+
