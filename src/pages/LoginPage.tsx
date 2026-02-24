@@ -58,24 +58,47 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(data.email, data.password);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+      );
+
+      const signInPromise = signIn(data.email, data.password);
+      const { error } = await Promise.race([signInPromise, timeoutPromise]);
 
       if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro de autenticação',
-          description: 'Email ou palavra-passe incorretos.',
-        });
+        const msg = error.message?.toLowerCase() || '';
+        if (msg.includes('invalid') || msg.includes('credentials')) {
+          toast({
+            variant: 'destructive',
+            title: 'Credenciais inválidas',
+            description: 'Email ou palavra-passe incorretos. Verifique e tente novamente.',
+          });
+        } else if (msg.includes('email') && msg.includes('confirm')) {
+          toast({
+            variant: 'destructive',
+            title: 'Email não confirmado',
+            description: 'Confirme o seu email antes de entrar.',
+          });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Erro de autenticação',
+            description: error.message || 'Erro ao fazer login.',
+          });
+        }
         setIsLoading(false);
         return;
       }
       // Redirection is handled by useEffect when role is loaded
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      const isTimeout = error?.message === 'TIMEOUT';
       toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: 'Ocorreu um erro ao fazer login. Tente novamente.',
+        title: isTimeout ? 'Tempo esgotado' : 'Erro de ligação',
+        description: isTimeout
+          ? 'O servidor demorou a responder. Verifique a sua ligação e tente novamente.'
+          : 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
       });
       setIsLoading(false);
     }

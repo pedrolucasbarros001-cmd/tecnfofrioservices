@@ -126,11 +126,44 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Wait for the trigger to create the profile
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for the trigger to create the profile, with retries
+    let profileExists = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const { data: profileCheck } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('user_id', newUser.id)
+        .maybeSingle();
+      if (profileCheck) {
+        profileExists = true;
+        break;
+      }
+    }
 
-    // Update profile with phone
-    if (phone) {
+    // If profile still doesn't exist after retries, create it manually
+    if (!profileExists) {
+      console.log('Profile not created by trigger, creating manually');
+      const { error: manualProfileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          user_id: newUser.id,
+          email: email,
+          full_name: full_name,
+          phone: phone || null,
+        });
+      if (manualProfileError) {
+        console.error('Error creating profile manually:', manualProfileError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Utilizador criado mas houve erro ao criar o perfil. Contacte o suporte.',
+            user_id: newUser.id,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (phone) {
+      // Update profile with phone if trigger created it
       await supabaseAdmin
         .from('profiles')
         .update({ phone })
@@ -147,6 +180,13 @@ Deno.serve(async (req) => {
 
     if (roleInsertError) {
       console.error('Error creating user role:', roleInsertError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Utilizador criado mas houve erro ao atribuir o nível de acesso: ' + roleInsertError.message,
+          user_id: newUser.id,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // If technician, create technician record

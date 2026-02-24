@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { AppRole } from '@/types/database';
@@ -73,6 +74,12 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
   const [pendingRole, setPendingRole] = useState<AppRole | null>(null);
   const [technicianData, setTechnicianData] = useState<{ id: string; specialization: string | null } | null>(null);
 
+  // Password reset state
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -85,7 +92,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
 
   const currentRole = form.watch('role');
 
-  // Load technician data if user is a technician
   useEffect(() => {
     if (user && user.role === 'tecnico') {
       loadTechnicianData();
@@ -94,7 +100,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
 
   const loadTechnicianData = async () => {
     if (!user) return;
-
     const { data, error } = await supabase
       .from('technicians')
       .select('id, specialization')
@@ -107,7 +112,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
     }
   };
 
-  // Reset form when user changes
   useEffect(() => {
     if (user) {
       form.reset({
@@ -116,6 +120,8 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
         role: user.role || 'tecnico',
         specialization: technicianData?.specialization || '',
       });
+      setShowPasswordReset(false);
+      setNewPassword('');
     }
   }, [user, technicianData, form]);
 
@@ -152,44 +158,28 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
 
       if (profileError) throw profileError;
 
-      // Update role if changed
+      // Update role if changed - use edge function for atomicity
       if (values.role !== user.role) {
-        // Delete old role
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', user.user_id);
+        const session = await ensureValidSession();
 
-        // Insert new role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
+        const response = await supabase.functions.invoke('update-user-role', {
+          body: {
             user_id: user.user_id,
-            role: values.role,
-          });
+            new_role: values.role,
+            specialization: values.specialization || null,
+          },
+        });
 
-        if (roleError) throw roleError;
-
-        // Handle technician record
-        if (values.role === 'tecnico' && !technicianData) {
-          // Create technician record
-          await supabase
-            .from('technicians')
-            .insert({
-              profile_id: user.id,
-              specialization: values.specialization || null,
-            });
-        } else if (values.role !== 'tecnico' && technicianData) {
-          // Deactivate technician record
-          await supabase
-            .from('technicians')
-            .update({ active: false })
-            .eq('id', technicianData.id);
+        if (response.error) {
+          throw new Error(response.error.message || 'Erro ao alterar nível de acesso');
         }
-      }
 
-      // Update technician specialization if still a technician
-      if (values.role === 'tecnico' && technicianData) {
+        const data = response.data;
+        if (data && !data.success) {
+          throw new Error(data.error || 'Erro ao alterar nível de acesso');
+        }
+      } else if (values.role === 'tecnico' && technicianData) {
+        // Update technician specialization if role didn't change
         await supabase
           .from('technicians')
           .update({ specialization: values.specialization || null })
@@ -207,10 +197,46 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!user || !newPassword) return;
+
+    setIsResettingPassword(true);
+    try {
+      await ensureValidSession();
+
+      const response = await supabase.functions.invoke('reset-user-password', {
+        body: {
+          user_id: user.user_id,
+          new_password: newPassword,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao redefinir palavra-passe');
+      }
+
+      const data = response.data;
+      if (data && !data.success) {
+        throw new Error(data.error || 'Erro ao redefinir palavra-passe');
+      }
+
+      toast.success('Palavra-passe redefinida com sucesso.');
+      setShowPasswordReset(false);
+      setNewPassword('');
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      toast.error(humanizeError(error));
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const handleClose = () => {
     onOpenChange(false);
     form.reset();
     setTechnicianData(null);
+    setShowPasswordReset(false);
+    setNewPassword('');
   };
 
   return (
@@ -306,6 +332,66 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
                 />
               )}
 
+              {/* Password Reset Section */}
+              <div className="border-t pt-4 mt-4">
+                {!showPasswordReset ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowPasswordReset(true)}
+                  >
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Redefinir Palavra-passe
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Nova Palavra-passe</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Mín. 8 chars, maiúscula, minúscula, número"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!newPassword || newPassword.length < 8 || isResettingPassword}
+                        onClick={handleResetPassword}
+                      >
+                        {isResettingPassword ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Redefinir'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Mínimo 8 caracteres, com maiúscula, minúscula e número.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setShowPasswordReset(false); setNewPassword(''); }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               </div>
              </div>
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
@@ -313,7 +399,14 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'A guardar...' : 'Guardar Alterações'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      A guardar...
+                    </>
+                  ) : (
+                    'Guardar Alterações'
+                  )}
                 </Button>
               </DialogFooter>
             </form>
