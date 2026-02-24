@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Navigation,
   MapPin,
@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logServiceCompletion } from '@/utils/activityLogUtils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
@@ -73,14 +73,21 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const [isResuming, setIsResuming] = useState(false);
 
   // Flow persistence
-  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence(service.id, 'instalacao');
+  const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence(service.id, 'instalacao');
+
+  // Stable initialization ref
+  const hasInitialized = useRef(false);
 
   // Load saved state on mount
   useEffect(() => {
     if (!isOpen) {
+      hasInitialized.current = false;
       setIsResuming(false);
       return;
     }
+
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
     const savedState = loadState();
     if (savedState) {
@@ -90,21 +97,14 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     }
 
     setIsResuming(true);
-    // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'instalacao', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
       setDerivedResumeStep(resumeStep as ModalStep);
-
-      // Show Resumo first
       setCurrentStep('resumo');
-
-      setFormData((prev) => ({
-        ...prev,
-        ...formDataOverrides,
-      }));
+      setFormData((prev) => ({ ...prev, ...formDataOverrides }));
       setIsResuming(false);
     }).catch(() => setIsResuming(false));
-  }, [isOpen, loadState, service]);
+  }, [isOpen, service.id]);
 
   // Save state on step/formData change
   useEffect(() => {
@@ -126,6 +126,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
   const handlePhotoCapture = async (imageData: string) => {
     try {
+      await ensureValidSession();
       await supabase.from('service_photos').insert({
         service_id: service.id,
         photo_type: cameraMode === 'antes' ? 'instalacao_antes' : 'instalacao_depois',
@@ -175,6 +176,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
+      await ensureValidSession();
       // Save signature
       await supabase.from('service_signatures').insert({
         service_id: service.id,
@@ -219,6 +221,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   };
 
   const handleClose = () => {
+    if (currentStep !== 'resumo') {
+      flushStateToDb(currentStep, formData);
+    }
     setCurrentStep('resumo');
     setFormData({
       photoAntes: null,

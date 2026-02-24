@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Navigation,
   MapPin,
@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logDelivery } from '@/utils/activityLogUtils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
@@ -61,14 +61,21 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const [isResuming, setIsResuming] = useState(false);
 
   // Flow persistence
-  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
+  const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
+
+  // Stable initialization ref
+  const hasInitialized = useRef(false);
 
   // Load saved state or reset when opened
   useEffect(() => {
     if (!isOpen) {
+      hasInitialized.current = false;
       setIsResuming(false);
       return;
     }
+
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
     const savedState = loadState();
     if (savedState) {
@@ -78,17 +85,14 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
     }
 
     setIsResuming(true);
-    // No localStorage → derive step from DB (handles phone/browser restart)
     deriveStepFromDb(service.id, 'entrega', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? 'resumo' : step;
       setDerivedResumeStep(resumeStep as ModalStep);
-
-      // Show Resumo first
       setCurrentStep('resumo');
       setFormData((prev) => ({ ...prev, ...formDataOverrides }));
       setIsResuming(false);
     }).catch(() => setIsResuming(false));
-  }, [isOpen, loadState, service]);
+  }, [isOpen, service.id]);
 
   // Auto-save state on step/data changes
   useEffect(() => {
@@ -110,6 +114,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
 
   const handlePhotoCapture = async (imageData: string) => {
     try {
+      await ensureValidSession();
       await supabase.from('service_photos').insert({
         service_id: service.id,
         photo_type: 'entrega',
@@ -129,6 +134,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
+      await ensureValidSession();
       // Save signature
       await supabase.from('service_signatures').insert({
         service_id: service.id,
@@ -170,10 +176,11 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   };
 
   const handleClose = () => {
+    if (currentStep !== 'resumo') {
+      flushStateToDb(currentStep, formData);
+    }
     setCurrentStep('resumo');
-    setFormData({
-      photoFile: null,
-    });
+    setFormData({ photoFile: null });
     onClose();
   };
 

@@ -279,6 +279,24 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
 
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sanitize formData: replace base64 photo strings with placeholder to avoid huge DB payloads
+  const sanitizeFormData = useCallback((formData?: T): Record<string, unknown> | null => {
+    if (!formData) return null;
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(formData)) {
+      if (typeof value === 'string' && value.startsWith('data:image/')) {
+        cleanData[key] = '__photo_exists__';
+      } else if (Array.isArray(value) && value.some(v => typeof v === 'string' && (v as string).startsWith('data:image/'))) {
+        cleanData[key] = value.map(v =>
+          typeof v === 'string' && v.startsWith('data:image/') ? '__photo_exists__' : v
+        );
+      } else {
+        cleanData[key] = value;
+      }
+    }
+    return cleanData;
+  }, []);
+
   const saveStateToDb = useCallback((currentStep: string, formData?: T) => {
     // Debounce: cancel previous pending save and schedule a new one in 2s
     if (dbSaveTimerRef.current) {
@@ -286,17 +304,36 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     }
     dbSaveTimerRef.current = setTimeout(async () => {
       try {
+        const cleanData = sanitizeFormData(formData);
         const { error } = await (supabase.rpc as any)('technician_update_service', {
           _service_id: serviceId,
           _flow_step: currentStep,
-          _flow_data: formData || null,
+          _flow_data: cleanData,
         });
         if (error) throw error;
       } catch (error) {
         console.error('Error persisting flow state to DB:', error);
       }
     }, 2000);
-  }, [serviceId]);
+  }, [serviceId, sanitizeFormData]);
+
+  // Flush immediately (no debounce) — call when modal closes
+  const flushStateToDb = useCallback(async (currentStep: string, formData?: T) => {
+    if (dbSaveTimerRef.current) {
+      clearTimeout(dbSaveTimerRef.current);
+      dbSaveTimerRef.current = null;
+    }
+    try {
+      const cleanData = sanitizeFormData(formData);
+      await (supabase.rpc as any)('technician_update_service', {
+        _service_id: serviceId,
+        _flow_step: currentStep,
+        _flow_data: cleanData,
+      });
+    } catch (error) {
+      console.error('Error flushing flow state to DB:', error);
+    }
+  }, [serviceId, sanitizeFormData]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -325,5 +362,5 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     setIsLoaded(true);
   }, []);
 
-  return { isLoaded, loadState, saveState, saveStateToDb, clearState, hasSavedState };
+  return { isLoaded, loadState, saveState, saveStateToDb, flushStateToDb, clearState, hasSavedState };
 }
