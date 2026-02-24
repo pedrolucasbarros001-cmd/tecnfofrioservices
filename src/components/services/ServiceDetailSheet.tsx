@@ -187,14 +187,30 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
-  // Consolidate status, parts, payments, photos, signatures, and activity logs into one request
+  // Consolidate status, parts, payments, photos, signatures into one request (logs loaded separately)
   const { data: fullData, isLoading: isLoadingFull } = useFullServiceData(service?.id, open);
+
+  // Load activity logs separately to reduce main query weight
+  const { data: activityLogsData } = useQuery({
+    queryKey: ['activity-logs', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*, actor:profiles!activity_logs_actor_id_fkey(full_name)')
+        .eq('service_id', service.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!service?.id && open,
+  });
 
   const serviceParts = fullData?.parts || [];
   const servicePayments = fullData?.payments || [];
   const servicePhotos = fullData?.photos || [];
   const serviceSignatures = fullData?.signatures || [];
-  const activityLogs = fullData?.logs || [];
+  const activityLogs = activityLogsData || [];
 
   const handleDeletePhoto = async (photoId: string) => {
     try {

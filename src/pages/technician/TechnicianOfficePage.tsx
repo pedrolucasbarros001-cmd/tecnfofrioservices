@@ -53,7 +53,7 @@ export default function TechnicianOfficePage() {
       return (data as Service[]) || [];
     },
     enabled: !!profile,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // Query for available services (no technician assigned)

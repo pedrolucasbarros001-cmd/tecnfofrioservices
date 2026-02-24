@@ -44,9 +44,9 @@ import ImportPage from "@/pages/ImportPage";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 30, // 30 seconds - Reduce unnecessary refetches
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours - Keep unused data in cache for 24h
-      refetchOnWindowFocus: true, // Always refetch when coming back to window
+      staleTime: 1000 * 60 * 2, // 2 minutes - Reduce DB load significantly
+      gcTime: 1000 * 60 * 30, // 30 minutes - Free memory sooner
+      refetchOnWindowFocus: true, // Primary freshness mechanism
       refetchOnReconnect: true, // Refetch when network reconnects (mobile)
       retry: 1,
     },

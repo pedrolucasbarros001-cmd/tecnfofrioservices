@@ -40,7 +40,7 @@ export function AppLayout() {
       return count || 0;
     },
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 120000, // Refetch every 2 minutes
   });
 
   const getSidebar = () => {
