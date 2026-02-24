@@ -44,7 +44,7 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  // Health check on mount
+  // Health check on mount — only warn for truly problematic latency
   useEffect(() => {
     const controller = new AbortController();
     const start = Date.now();
@@ -60,7 +60,7 @@ export default function LoginPage() {
         const elapsed = Date.now() - start;
         if (error) {
           setServerStatus('down');
-        } else if (elapsed > 3000) {
+        } else if (elapsed > 8000) {
           setServerStatus('slow');
         } else {
           setServerStatus('ok');
@@ -74,7 +74,7 @@ export default function LoginPage() {
       if (serverStatus === 'checking') {
         setServerStatus('slow');
       }
-    }, 5000);
+    }, 12000);
 
     check();
     return () => { controller.abort(); clearTimeout(timeout); };
@@ -106,15 +106,21 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, role, loading, navigate, location.state]);
 
-  // No role loaded after auth
+  // No role loaded after auth — wait a bit before warning (role may still be loading)
   useEffect(() => {
     if (isAuthenticated && !loading && !role) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao carregar perfil',
-        description: 'Não foi possível carregar as suas permissões. Recarregue a página ou tente novamente.',
-      });
-      setIsLoading(false);
+      const delay = setTimeout(() => {
+        // Re-check: role might have arrived during the delay
+        if (!role) {
+          toast({
+            variant: 'destructive',
+            title: 'Erro ao carregar perfil',
+            description: 'Não foi possível carregar as suas permissões. Recarregue a página ou tente novamente.',
+          });
+          setIsLoading(false);
+        }
+      }, 5000);
+      return () => clearTimeout(delay);
     }
   }, [isAuthenticated, loading, role]);
 
