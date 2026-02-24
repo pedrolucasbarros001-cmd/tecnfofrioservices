@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import {
@@ -21,7 +21,6 @@ import tecnofrioLogoIcon from "@/assets/tecnofrio-logo-icon.png";
 import { supabase } from "@/integrations/supabase/client";
 import { SERVICE_STATUS_CONFIG } from "@/types/database";
 import { usePublicActivityLogs } from "@/hooks/useActivityLogs";
-import { useRealtime } from "@/hooks/useRealtime";
 import { cn } from "@/lib/utils";
 
 // Tipo de Serviço para o Monitor
@@ -77,11 +76,26 @@ export default function TVMonitorPage() {
         refetchInterval: false // Desativado em favor do Realtime
     });
 
-    // Ativar Realtime para atualizações instantâneas sem polling
-    useRealtime('services', [['tv-monitor-services']]);
-    useRealtime('activity_logs', [['public-activity-logs']]);
+    // Realtime filtrado: só serviços de oficina
+    const queryClient = useQueryClient();
+    useEffect(() => {
+        const channel = supabase
+            .channel('tv-monitor-oficina')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'services',
+                filter: 'service_location=eq.oficina'
+            }, () => {
+                queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
+            })
+            .subscribe();
 
-    const { data: activityLogs = [] } = usePublicActivityLogs(10);
+        return () => { supabase.removeChannel(channel); };
+    }, [queryClient]);
+
+    // Atividade: polling leve a cada 60s (sem Realtime)
+    const { data: activityLogs = [] } = usePublicActivityLogs(10, 60000);
 
 
     // Carousel Logic: Split rows evenly

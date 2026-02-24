@@ -47,6 +47,20 @@ export function useActivityLogs(options: UseActivityLogsOptions = {}) {
   });
 }
 
-export function usePublicActivityLogs(limit = 10) {
-  return useActivityLogs({ publicOnly: true, limit });
+export function usePublicActivityLogs(limit = 10, pollingInterval?: number) {
+  return useQuery({
+    queryKey: ['public-activity-logs', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return (data as ActivityLog[]) || [];
+    },
+    refetchInterval: pollingInterval || false,
+  });
 }

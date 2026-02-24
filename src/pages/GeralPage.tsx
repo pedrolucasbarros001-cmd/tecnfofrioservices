@@ -40,7 +40,6 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRealtime } from '@/hooks/useRealtime';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,9 +120,7 @@ export default function GeralPage() {
   // Mapear "a_precificar" do URL para "pending_pricing" (todos com pending_pricing=true)
   const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
 
-  // Realtime updates: Invalidate queries when data changes
-  // Single consolidated realtime subscription (service_parts changes trigger services.updated_at via DB trigger)
-  useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
+  // Sem Realtime — atualiza ao abrir página, refetchOnWindowFocus, ou após ações manuais
 
   const {
     data: result,

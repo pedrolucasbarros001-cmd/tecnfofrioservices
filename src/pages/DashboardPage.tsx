@@ -73,6 +73,8 @@ export default function DashboardPage() {
     }
 
     fetchStats();
+    const interval = setInterval(fetchStats, 60000);
+    return () => clearInterval(interval);
   }, [role, navigate]);
 
   async function fetchStats() {
