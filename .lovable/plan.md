@@ -1,120 +1,52 @@
 
 
-# Plano: Resolver Sobrecarga da Base de Dados (CPU 94%, Disk I/O Esgotado)
+# Plano: Carregamento Rapido de Imagens e Detalhes na Ficha de Servico
 
-## Diagnostico
+## Problema
 
-As imagens do Supabase mostram:
-- **CPU a 94%** -- quase no limite
-- **Disco I/O prestes a esgotar** -- aviso critico do Supabase
-- **Multiplos erros "statement timeout"** -- 9+ queries canceladas na ultima hora
-- **Memoria a 408MB** -- constante e elevada
+1. **OficinaPage nao faz prefetch**: Ao clicar num card da oficina, o sistema so começa a carregar fotos, pecas, assinaturas e pagamentos DEPOIS de abrir o painel lateral. Nas paginas do tecnico (`ServicosPage`, `TechnicianOfficePage`) ja existe prefetch ao passar o rato/tocar -- mas na Oficina nao.
 
-### Causa Raiz: Polling Excessivo
+2. **Imagens carregam lentamente**: As fotos do Supabase Storage sao carregadas uma a uma pelo browser sem qualquer otimizacao. Nao ha `loading="lazy"` (para as que estao fora da vista) nem indicacao visual de carregamento.
 
-O sistema tem **7+ queries a disparar a cada 30 segundos** (e uma a cada 10 segundos), **simultaneamente**, para todos os utilizadores ligados:
-
-| Query | Intervalo | Peso |
-|---|---|---|
-| `useServices` (OficinaPage - SEM limite, carrega TODOS) | 30s | PESADO |
-| `usePaginatedServices` (GeralPage) | 30s | Medio |
-| `technician-services` (ServicosPage) | 30s | Medio |
-| `technician-office-services` (TechnicianOfficePage) | 30s | Medio |
-| `unread-notifications` (AppLayout - TODAS as paginas) | 30s | Leve |
-| `activity-logs` (DashboardPage - feed publico) | **10s** | Medio |
-| `useServiceTransfers` | 30s | Leve |
-| `TVMonitorPage` | 30s | Medio |
-
-Com 3-5 utilizadores ativos, isto gera **15-35 queries por minuto** constantemente, mesmo quando ninguem interage com o sistema.
-
-Alem disso:
-- `gcTime: 24 horas` mantem dados antigos em memoria do browser indefinidamente
-- `useServices` na OficinaPage carrega TODOS os servicos da oficina sem `.limit()` -- se houver 500 servicos, carrega tudo
-- O `useFullServiceData` faz JOIN de 6 tabelas (servicos + clientes + tecnicos + pecas + fotos + assinaturas + pagamentos + logs)
+3. **A ficha ja mostra os detalhes tecnicos (diagnostico, trabalho realizado)** -- estes campos (`detected_fault`, `work_performed`) estao presentes e visíveis. O que falta e os dados complementares (fotos, pecas) carregarem mais rapido.
 
 ## Solucao
 
-### 1. Reduzir polling drasticamente -- usar `refetchOnWindowFocus` como mecanismo principal
+### 1. Adicionar prefetch na OficinaPage (como ja existe nas paginas do tecnico)
 
-Em vez de bombardear a BD a cada 30s, o sistema atualiza quando o utilizador volta a janela (que ja esta ativo). Polling so para paginas criticas e com intervalo muito maior.
+Ao passar o rato ou tocar num card de servico na oficina, o sistema comeca a carregar os dados completos em background. Quando o utilizador clica, os dados ja estao prontos.
 
-**Ficheiros e alteracoes:**
+**Ficheiro: `src/pages/OficinaPage.tsx`**
+- Importar `prefetchFullServiceData` e `useQueryClient`
+- Adicionar `onMouseEnter` e `onTouchStart` nos cards de servico
 
-**`src/App.tsx`** -- Configuracao global do QueryClient:
-```
-staleTime: 1000 * 60 * 2    (2 minutos, em vez de 30s)
-gcTime: 1000 * 60 * 30      (30 minutos, em vez de 24 horas)
-refetchOnWindowFocus: true   (manter -- este e o mecanismo principal)
-```
+### 2. Adicionar skeleton/placeholder de carregamento nas fotos da ServiceDetailSheet
 
-**`src/hooks/useServices.ts`**:
-- `useServices()`: remover `refetchInterval: 30000` (usar apenas windowFocus)
-- `usePaginatedServices()`: remover `refetchInterval: 30000`
+Enquanto as fotos carregam, mostrar placeholders visuais (skeletons) em vez de espaco vazio. Isto da feedback imediato ao utilizador.
 
-**`src/hooks/useActivityLogs.ts`**:
-- Mudar `refetchInterval` de `10000/30000` para `60000` (1 minuto) no feed publico e remover nos restantes
+**Ficheiro: `src/components/services/ServiceDetailSheet.tsx`**
+- Mostrar skeleton grid enquanto `isLoadingFull` esta ativo na seccao de fotos
+- Adicionar `loading="lazy"` nas imagens de fotos e assinaturas que estao mais abaixo no scroll
 
-**`src/pages/ServicosPage.tsx`**:
-- Mudar `refetchInterval` de `30000` para `60000` (1 minuto) -- esta e a pagina do tecnico, precisa de alguma atualizacao
+### 3. Adicionar loading state visual nas imagens individuais
 
-**`src/pages/technician/TechnicianOfficePage.tsx`**:
-- Mudar `refetchInterval` de `30000` para `60000`
+Cada imagem mostra um skeleton ate carregar completamente, evitando o efeito de "imagens a aparecer de repente".
 
-**`src/components/layouts/AppLayout.tsx`**:
-- Notificacoes: mudar `refetchInterval` de `30000` para `120000` (2 minutos)
-
-**`src/pages/TVMonitorPage.tsx`**:
-- Manter `refetchInterval: 30000` -- este e um monitor dedicado que precisa de atualizacoes
-
-**`src/hooks/useServiceTransfers.ts`**:
-- Mudar `refetchInterval` de `30000` para `60000`
-
-### 2. Limitar a query da OficinaPage
-
-**`src/hooks/useServices.ts`** -- `useServices()`:
-- Adicionar `.limit(200)` para nunca carregar mais de 200 servicos de uma vez
-- Isto previne queries gigantes que causam timeouts
-
-### 3. Reduzir gcTime para libertar memoria
-
-**`src/App.tsx`**:
-- `gcTime: 1000 * 60 * 30` (30 minutos em vez de 24 horas)
-- Dados nao utilizados sao limpos apos 30 minutos, reduzindo a pressao de memoria
-
-### 4. Otimizar `useFullServiceData` -- nao carregar logs no JOIN
-
-**`src/hooks/useServices.ts`** -- `useFullServiceData()`:
-- Remover `logs:activity_logs(*)` do SELECT principal -- carregar logs separadamente apenas quando necessario
-- Isto reduz o peso da query mais pesada do sistema
-
-## Resumo de Impacto
-
-| Metrica | Antes | Depois |
-|---|---|---|
-| Queries/minuto (3 users) | ~35 | ~8 |
-| Intervalo minimo polling | 10s | 60s |
-| gcTime | 24h | 30min |
-| staleTime | 30s | 2min |
-| OficinaPage max rows | Ilimitado | 200 |
-| useFullServiceData JOINs | 7 tabelas | 6 tabelas (sem logs) |
+**Ficheiro: `src/components/services/ServiceDetailSheet.tsx`**
+- Componente interno `LazyImage` com estado `loaded` e skeleton enquanto carrega
+- Aplica-se a fotos e miniaturas de assinatura
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/App.tsx` | staleTime 2min, gcTime 30min |
-| `src/hooks/useServices.ts` | Remover refetchInterval; limit(200); remover logs do JOIN |
-| `src/hooks/useActivityLogs.ts` | refetchInterval 60s/remover |
-| `src/hooks/useServiceTransfers.ts` | refetchInterval 60s |
-| `src/pages/ServicosPage.tsx` | refetchInterval 60s |
-| `src/pages/technician/TechnicianOfficePage.tsx` | refetchInterval 60s |
-| `src/components/layouts/AppLayout.tsx` | refetchInterval 120s |
+| `src/pages/OficinaPage.tsx` | Adicionar prefetch nos cards (onMouseEnter/onTouchStart) |
+| `src/components/services/ServiceDetailSheet.tsx` | Skeletons de carregamento nas fotos; LazyImage com fade-in |
 
-## Resultado Esperado
+## Resultado
 
-- CPU deve cair de 94% para menos de 30%
-- Disk I/O volta ao normal
-- Sem mais erros "statement timeout"
-- O sistema continua responsivo porque `refetchOnWindowFocus` garante dados frescos quando o utilizador interage
-- Tecnicos nao notam diferenca porque os dados atualizam ao voltar a app
+- Ao clicar num servico na Oficina, os dados ja estao carregados (prefetch)
+- As fotos mostram um placeholder enquanto carregam, sem layout shifts
+- A percepcao de velocidade melhora drasticamente
+- Zero impacto na carga da base de dados (prefetch usa o cache existente)
 
