@@ -75,8 +75,8 @@ export function DemoRunner() {
                 setIsNavigating(false);
                 if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
                 onFound?.();
-            } else if (attempts > 30) {
-                // Timeout after 3s — show as central card without highlight
+            } else if (attempts > 50) {
+                // Timeout after 5s — show as central card without highlight
                 setTargetRect(null);
                 setIsNavigating(false);
                 if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
