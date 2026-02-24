@@ -281,7 +281,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Resumo da Instalação" step="Passo 1" />
 
@@ -346,7 +346,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -388,7 +388,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 3: Foto Antes */}
-      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto Antes da Instalação" step="Passo 3" />
 
@@ -441,7 +441,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 4: Materiais */}
-      <Dialog open={currentStep === 'materiais' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'materiais' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Materiais Utilizados" step="Passo 4" />
 
@@ -497,7 +497,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 5: Descrição do Trabalho */}
-      <Dialog open={currentStep === 'trabalho' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'trabalho' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Descrição do Trabalho" step="Passo 5" />
 
@@ -533,7 +533,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 6: Foto Depois */}
-      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature && !showMaterialsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto Após a Instalação" step="Passo 6" />
 
