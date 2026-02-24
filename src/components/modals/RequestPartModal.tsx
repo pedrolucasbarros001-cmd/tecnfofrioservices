@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient } from '@tanstack/react-query';
@@ -132,8 +133,8 @@ export function RequestPartModal({
           <p className="text-sm text-muted-foreground">Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.</p>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 px-6">
-         <div className="space-y-4 py-4">
+        <ScrollArea className="flex-1 px-6">
+         <div className="space-y-4 py-4 pr-3">
           {service && (
             <div className="p-3 bg-muted rounded-lg text-sm">
               <p className="font-medium">{service.code}</p>
@@ -215,7 +216,7 @@ export function RequestPartModal({
             </div>
           )}
          </div>
-        </div>
+        </ScrollArea>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>
