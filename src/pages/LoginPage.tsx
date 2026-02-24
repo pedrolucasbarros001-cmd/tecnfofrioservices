@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +27,7 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-type ServerStatus = 'checking' | 'ok' | 'slow' | 'down';
+
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export default function LoginPage() {
   const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [serverStatus, setServerStatus] = useState<ServerStatus>('checking');
+  
   const [loadingText, setLoadingText] = useState('A entrar...');
   const lastSubmittedData = useRef<LoginFormValues | null>(null);
 
@@ -44,41 +44,6 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  // Health check on mount — only warn for truly problematic latency
-  useEffect(() => {
-    const controller = new AbortController();
-    const start = Date.now();
-
-    const check = async () => {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .select('id', { count: 'exact', head: true })
-          .limit(0)
-          .abortSignal(controller.signal);
-
-        const elapsed = Date.now() - start;
-        if (error) {
-          setServerStatus('down');
-        } else if (elapsed > 8000) {
-          setServerStatus('slow');
-        } else {
-          setServerStatus('ok');
-        }
-      } catch {
-        setServerStatus('down');
-      }
-    };
-
-    const timeout = setTimeout(() => {
-      if (serverStatus === 'checking') {
-        setServerStatus('slow');
-      }
-    }, 12000);
-
-    check();
-    return () => { controller.abort(); clearTimeout(timeout); };
-  }, []);
 
   // Progressive loading text
   useEffect(() => {
@@ -106,12 +71,13 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, role, loading, navigate, location.state]);
 
-  // No role loaded after auth — wait a bit before warning (role may still be loading)
+  // No role loaded after auth — only warn after generous delay
+  const roleWarningShown = useRef(false);
   useEffect(() => {
-    if (isAuthenticated && !loading && !role) {
+    if (isAuthenticated && !loading && !role && !roleWarningShown.current) {
       const delay = setTimeout(() => {
-        // Re-check: role might have arrived during the delay
         if (!role) {
+          roleWarningShown.current = true;
           toast({
             variant: 'destructive',
             title: 'Erro ao carregar perfil',
@@ -119,9 +85,11 @@ export default function LoginPage() {
           });
           setIsLoading(false);
         }
-      }, 5000);
+      }, 10000);
       return () => clearTimeout(delay);
     }
+    // Reset flag when role arrives
+    if (role) roleWarningShown.current = false;
   }, [isAuthenticated, loading, role]);
 
   function isServerError(msg: string): boolean {
@@ -207,17 +175,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/10 backdrop-blur-xl">
         <CardHeader className="space-y-4 text-center pb-8">
-          {/* Server status banner */}
-          {(serverStatus === 'slow' || serverStatus === 'down') && (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 text-sm">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>
-                {serverStatus === 'down'
-                  ? 'O servidor está inacessível. O login pode falhar ou demorar.'
-                  : 'O servidor está lento. O login pode demorar mais que o normal.'}
-              </span>
-            </div>
-          )}
 
           <div className="mx-auto p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
             <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-20 w-20 object-contain" />
