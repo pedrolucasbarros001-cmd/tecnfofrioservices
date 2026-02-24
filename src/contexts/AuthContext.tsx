@@ -113,6 +113,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [initStarted]);
 
+  async function fetchUserDataOnce(userId: string): Promise<{ profile: Profile | null; role: AppRole | null }> {
+    console.log('[AuthContext] Fetching profile for:', userId);
+
+    let profileData: Profile | null = null;
+    let userRole: AppRole | null = null;
+
+    // Fetch profile with timeout
+    try {
+      const { data, error: profileError } = await withTimeout(
+        Promise.resolve(supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()),
+        10000,
+        'profiles'
+      );
+      if (profileError) {
+        console.error('[AuthContext] Error fetching profile:', profileError);
+      }
+      profileData = data as Profile | null;
+    } catch (e) {
+      console.warn('[AuthContext] Profile fetch failed:', e);
+    }
+
+    // Fetch role with timeout
+    try {
+      const { data: roleData, error: roleError } = await withTimeout(
+        Promise.resolve(supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()),
+        10000,
+        'user_roles'
+      );
+      if (roleError) {
+        console.error('[AuthContext] Error fetching role:', roleError);
+      }
+      userRole = (roleData?.role as AppRole) ?? null;
+    } catch (e) {
+      console.warn('[AuthContext] Role fetch failed:', e);
+    }
+
+    return { profile: profileData, role: userRole };
+  }
+
   async function fetchUserData(userId: string) {
     // Avoid redundant fetching for the same user
     if (fetchingRef.current === userId) {
@@ -122,38 +161,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchingRef.current = userId;
 
     try {
-      console.log('[AuthContext] Fetching profile for:', userId);
+      let result = await fetchUserDataOnce(userId);
 
-      // Fetch profile with timeout
-      const { data: profileData, error: profileError } = await withTimeout(
-        Promise.resolve(supabase.from('profiles').select('*').eq('user_id', userId).single()),
-        10000,
-        'profiles'
-      );
-      if (profileError) {
-        if (profileError.code !== 'PGRST116') {
-          console.error('[AuthContext] Error fetching profile:', profileError);
-        } else {
-          console.warn('[AuthContext] No profile found for user');
-        }
-      }
-      setProfile(profileData as Profile | null);
-
-      // Fetch role with timeout
-      const { data: roleData, error: roleError } = await withTimeout(
-        Promise.resolve(supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()),
-        10000,
-        'user_roles'
-      );
-
-      if (roleError) {
-        console.error('[AuthContext] Error fetching role:', roleError);
+      // If role is null, retry once after 3 seconds (transient DB issue)
+      if (!result.role) {
+        console.warn('[AuthContext] Role not loaded, retrying in 3s...');
+        await new Promise(r => setTimeout(r, 3000));
+        result = await fetchUserDataOnce(userId);
       }
 
-      const userRole = (roleData?.role as AppRole) ?? null;
-      console.log('[AuthContext] Loaded role:', userRole);
-      setRole(userRole);
-
+      setProfile(result.profile);
+      setRole(result.role);
+      console.log('[AuthContext] Loaded role:', result.role);
     } catch (error) {
       console.error('[AuthContext] Error in fetchUserData:', error);
     } finally {
