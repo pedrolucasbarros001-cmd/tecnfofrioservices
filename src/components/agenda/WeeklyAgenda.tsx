@@ -82,16 +82,32 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
   };
 
   const getServicesSortedByTime = (date: Date) => {
-    const dayServices = getServicesForDay(date);
-    // Sort by scheduled_shift (time string) ascending, nulls last
-    return dayServices.sort((a, b) => {
-      const aTime = a.scheduled_shift || 'zzz';
-      const bTime = b.scheduled_shift || 'zzz';
-      return aTime.localeCompare(bTime);
-    });
+    try {
+      const dayServices = getServicesForDay(date);
+      const shiftOrder: Record<string, number> = { manha: 1, tarde: 2, noite: 3 };
+
+      return [...dayServices].sort((a, b) => {
+        const orderA = shiftOrder[a.scheduled_shift || ''] || 99;
+        const orderB = shiftOrder[b.scheduled_shift || ''] || 99;
+        return orderA - orderB;
+      });
+    } catch (e) {
+      console.error("Error sorting services by time:", e);
+      return [];
+    }
   };
 
   const isToday = (date: Date) => isSameDay(date, new Date());
+
+  const safeFormat = (date: Date | number, formatStr: string, options?: any) => {
+    try {
+      if (!date || (date instanceof Date && isNaN(date.getTime()))) return '-';
+      return format(date, formatStr, options);
+    } catch (e) {
+      console.error("Format error in WeeklyAgenda:", e);
+      return '-';
+    }
+  };
 
   const handleDayClick = (day: Date) => {
     const dayServices = getServicesForDay(day);
@@ -100,8 +116,8 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
   };
 
   const dateRangeText = viewMode === 'week'
-    ? `${format(weekStart, "d MMM", { locale: pt })} - ${format(weekEnd, "d MMM yyyy", { locale: pt })}`
-    : format(currentDate, "MMMM 'de' yyyy", { locale: pt });
+    ? `${safeFormat(weekStart, "d MMM", { locale: pt })} - ${safeFormat(weekEnd, "d MMM yyyy", { locale: pt })}`
+    : safeFormat(currentDate, "MMMM 'de' yyyy", { locale: pt });
 
   return (
     <>
@@ -166,13 +182,13 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                     onClick={() => handleDayClick(day)}
                   >
                     <p className="text-xs text-muted-foreground uppercase">
-                      {format(day, 'EEE', { locale: pt })}
+                      {safeFormat(day, 'EEE', { locale: pt })}
                     </p>
                     <p className={cn(
                       "text-lg font-semibold",
                       isToday(day) && "text-primary"
                     )}>
-                      {format(day, 'd')}
+                      {safeFormat(day, 'd')}
                     </p>
                     {hasServices && (
                       <Badge variant="secondary" className="text-xs mt-1">
@@ -249,7 +265,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                           "text-sm font-medium",
                           isToday(day) && "text-primary"
                         )}>
-                          {format(day, 'd')}
+                          {safeFormat(day, 'd')}
                         </p>
                         {dayServices.length > 0 && (
                           <Badge variant="secondary" className="text-xs mt-1">

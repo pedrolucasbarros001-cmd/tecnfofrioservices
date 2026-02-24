@@ -43,7 +43,14 @@ export function AgendaDrawer({
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader className="border-b pb-4">
           <SheetTitle className="text-xl">
-            {format(date, "d 'de' MMMM", { locale: pt })}
+            {(() => {
+              try {
+                if (!date || isNaN(date.getTime())) return 'Agendamento';
+                return format(date, "d 'de' MMMM", { locale: pt });
+              } catch (e) {
+                return 'Agendamento';
+              }
+            })()}
           </SheetTitle>
           <p className="text-sm text-muted-foreground">
             {services.length} serviço{services.length !== 1 ? 's' : ''}

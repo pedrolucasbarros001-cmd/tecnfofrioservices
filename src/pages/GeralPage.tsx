@@ -58,13 +58,33 @@ export default function GeralPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Sync state with URL params
+  // Sync state with URL params - with sanitization
   useEffect(() => {
-    const statusParam = searchParams.get('status') as ServiceStatus || 'all';
-    const locationParam = searchParams.get('location') as any || 'all';
-    setSelectedStatus(statusParam);
-    setSelectedLocation(locationParam);
-  }, [searchParams]);
+    try {
+      const statusParam = searchParams.get('status') as any;
+      const validStatuses: (ServiceStatus | 'all')[] = [
+        'all', 'por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca',
+        'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'
+      ];
+
+      if (statusParam && validStatuses.includes(statusParam)) {
+        if (statusParam !== selectedStatus) setSelectedStatus(statusParam);
+      } else if (statusParam && !validStatuses.includes(statusParam)) {
+        // Reset invalid status to 'all'
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('status');
+        setSearchParams(newParams);
+      }
+
+      const locationParam = searchParams.get('location') as any;
+      const validLocations = ['all', 'cliente', 'oficina'];
+      if (locationParam && validLocations.includes(locationParam)) {
+        if (locationParam !== selectedLocation) setSelectedLocation(locationParam);
+      }
+    } catch (e) {
+      console.error("Error syncing URL params:", e);
+    }
+  }, [searchParams, selectedStatus, selectedLocation, setSearchParams]);
 
   // Current service for actions
   const [currentService, setCurrentService] = useState<Service | null>(null);
@@ -113,19 +133,29 @@ export default function GeralPage() {
   const { data: pendingPartsMap = {} } = useQuery({
     queryKey: ['all-pending-parts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('service_parts')
-        .select('service_id, estimated_arrival')
-        .eq('is_requested', true)
-        .eq('arrived', false);
-      if (error) throw error;
-      const map: Record<string, string | null> = {};
-      (data || []).forEach(part => {
-        if (!map[part.service_id] || (part.estimated_arrival && (!map[part.service_id] || part.estimated_arrival < map[part.service_id]!))) {
-          map[part.service_id] = part.estimated_arrival;
-        }
-      });
-      return map;
+      try {
+        const { data, error } = await supabase
+          .from('service_parts')
+          .select('service_id, estimated_arrival')
+          .eq('is_requested', true)
+          .eq('arrived', false);
+        if (error) throw error;
+
+        const map: Record<string, string | null> = {};
+        (data || []).forEach(part => {
+          if (part && part.service_id) {
+            const sid = part.service_id;
+            const currentEarliest = map[sid];
+            if (!currentEarliest || (part.estimated_arrival && (!currentEarliest || part.estimated_arrival < currentEarliest))) {
+              map[sid] = part.estimated_arrival;
+            }
+          }
+        });
+        return map;
+      } catch (e) {
+        console.error("Error fetching pending parts:", e);
+        return {};
+      }
     },
   });
 
@@ -330,7 +360,7 @@ export default function GeralPage() {
                     return <TableRow key={service.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleServiceClick(service)}>
                       {/* Tipo - discrete badge */}
                       <TableCell>
-                        <Badge variant={typeConfig.variant}>{typeConfig.label}</Badge>
+                        <Badge variant={typeConfig.variant as any}>{typeConfig.label}</Badge>
                       </TableCell>
 
                       {/* Código */}
@@ -371,12 +401,12 @@ export default function GeralPage() {
                         <div className="flex gap-1 flex-wrap">
                           {/* Urgente - subtle but noticeable */}
                           {service.is_urgent && (
-                            <Badge variant="subtle-urgent" className="text-xs">Urgente</Badge>
+                            <Badge variant={"subtle-urgent" as any} className="text-xs">Urgente</Badge>
                           )}
 
                           {/* Garantia - subtle */}
                           {service.is_warranty && (
-                            <Badge variant="subtle-warranty" className="text-xs">Garantia</Badge>
+                            <Badge variant={"subtle-warranty" as any} className="text-xs">Garantia</Badge>
                           )}
 
                           {/* A Precificar - gerido pelo ServiceStatusBadge na coluna Estado */}
@@ -385,7 +415,7 @@ export default function GeralPage() {
                           {service.status !== 'em_debito' &&
                             (service.final_price || 0) > 0 &&
                             (service.amount_paid || 0) < (service.final_price || 0) && (
-                              <Badge variant="subtle-debit" className="text-xs">Em Débito</Badge>
+                              <Badge variant={"subtle-debit" as any} className="text-xs">Em Débito</Badge>
                             )}
                         </div>
                       </TableCell>
@@ -415,7 +445,7 @@ export default function GeralPage() {
                               }
                             })()}
                           </div>
-                          {service.scheduled_shift && <Badge variant="outline" className="text-xs">
+                          {service.scheduled_shift && <Badge variant={"outline" as any} className="text-xs">
                             {formatShiftLabel(service.scheduled_shift)}
                           </Badge>}
                         </div> : <span className="text-muted-foreground text-sm">-</span>}

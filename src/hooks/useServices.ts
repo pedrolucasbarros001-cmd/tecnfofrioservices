@@ -89,21 +89,33 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
 
       // Ensure arrays are initialized even if empty
       const result = data as any;
+
+      const safeSort = (arr: any[], dateKey: string) => {
+        return (arr || []).sort((a, b) => {
+          const timeA = a[dateKey] ? new Date(a[dateKey]).getTime() : 0;
+          const timeB = b[dateKey] ? new Date(b[dateKey]).getTime() : 0;
+          if (isNaN(timeA) && isNaN(timeB)) return 0;
+          if (isNaN(timeA)) return 1;
+          if (isNaN(timeB)) return -1;
+          return timeB - timeA; // Descending
+        });
+      };
+
       return {
         ...result,
         parts: result.parts || [],
-        photos: (result.photos || []).sort((a: any, b: any) =>
-          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
-        ),
-        signatures: (result.signatures || []).sort((a: any, b: any) =>
-          new Date(a.signed_at).getTime() - new Date(b.signed_at).getTime()
-        ),
-        payments: (result.payments || []).sort((a: any, b: any) =>
-          new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
-        ),
-        logs: (result.logs || []).sort((a: any, b: any) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        ),
+        photos: safeSort(result.photos, 'uploaded_at'),
+        signatures: (result.signatures || []).sort((a: any, b: any) => {
+          const tA = a.signed_at ? new Date(a.signed_at).getTime() : 0;
+          const tB = b.signed_at ? new Date(b.signed_at).getTime() : 0;
+          return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
+        }),
+        payments: safeSort(result.payments, 'payment_date'),
+        logs: (result.logs || []).sort((a: any, b: any) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
+        }),
       } as Service & {
         parts: ServicePart[],
         photos: ServicePhoto[],
@@ -254,31 +266,38 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
 
         // Combine and deduplicate results
         const serviceMap = new Map<string, Service>();
-        (servicesByFields || []).forEach(s => serviceMap.set(s.id, s as Service));
-        servicesByCustomer.forEach(s => serviceMap.set(s.id, s));
+        (servicesByFields || []).forEach(s => {
+          if (s && s.id) serviceMap.set(s.id, s as Service);
+        });
+        servicesByCustomer.forEach(s => {
+          if (s && s.id) serviceMap.set(s.id, s);
+        });
 
         allServices = Array.from(serviceMap.values());
         totalCount = allServices.length;
 
-        // Sort combined results
+        // Sort combined results with total safety
         allServices.sort((a, b) => {
-          // Sort by scheduled_date first
-          if (a.scheduled_date && b.scheduled_date) {
-            const dateDiff = new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
-            if (dateDiff !== 0) return dateDiff;
-          } else if (a.scheduled_date) return -1;
-          else if (b.scheduled_date) return 1;
+          // 1. scheduled_date
+          const dateA = a.scheduled_date ? new Date(a.scheduled_date).getTime() : Infinity;
+          const dateB = b.scheduled_date ? new Date(b.scheduled_date).getTime() : Infinity;
 
-          // Then by scheduled_shift
-          if (a.scheduled_shift && b.scheduled_shift) {
-            const shiftOrder = { manha: 1, tarde: 2, noite: 3 };
-            const shiftDiff = (shiftOrder[a.scheduled_shift as keyof typeof shiftOrder] || 0) -
-              (shiftOrder[b.scheduled_shift as keyof typeof shiftOrder] || 0);
-            if (shiftDiff !== 0) return shiftDiff;
-          }
+          const timeA = isNaN(dateA) ? Infinity : dateA;
+          const timeB = isNaN(dateB) ? Infinity : dateB;
 
-          // Finally by created_at
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          if (timeA !== timeB) return timeA - timeB;
+
+          // 2. scheduled_shift
+          const shiftOrder: Record<string, number> = { manha: 1, tarde: 2, noite: 3 };
+          const orderA = shiftOrder[a.scheduled_shift || ''] || 99;
+          const orderB = shiftOrder[b.scheduled_shift || ''] || 99;
+
+          if (orderA !== orderB) return orderA - orderB;
+
+          // 3. created_at
+          const createA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const createB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return (isNaN(createB) ? 0 : createB) - (isNaN(createA) ? 0 : createA);
         });
 
         // Apply pagination

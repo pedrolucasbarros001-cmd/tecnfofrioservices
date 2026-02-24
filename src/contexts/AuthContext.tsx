@@ -22,23 +22,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initStarted, setInitStarted] = useState(false);
+  const fetchingRef = React.useRef<string | null>(null);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Safety timeout: never hang forever
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('[AuthContext] Auth initialization safety timeout reached');
+        setLoading(false);
+      }
+    }, 15000); // 15 seconds
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event);
-        console.log('Session exists:', !!session);
-        console.log('User ID:', session?.user?.id);
-        console.log('Access token preview:', session?.access_token?.substring(0, 50) + '...');
+        console.log('[AuthContext] Auth state changed:', event);
+
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
+          fetchUserData(session.user.id);
         } else {
           setProfile(null);
           setRole(null);
@@ -47,41 +52,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Then check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    // Only perform initial check once
+    if (!initStarted) {
+      setInitStarted(true);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          fetchUserData(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      });
+    }
 
     // Session bridge listener: respond to print pages requesting session
     const handleSessionRequest = async (event: MessageEvent) => {
       // Security: only accept messages from same origin
       if (event.origin !== window.location.origin) return;
-      
+
       if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
         console.log('[AuthContext] Received session request from new tab');
-        
+
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session && event.source) {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+          if (currentSession && event.source) {
             console.log('[AuthContext] Sending session to new tab');
             (event.source as Window).postMessage(
               {
                 type: 'SUPABASE_SESSION',
-                access_token: session.access_token,
-                refresh_token: session.refresh_token,
+                access_token: currentSession.access_token,
+                refresh_token: currentSession.refresh_token,
               },
               window.location.origin
             );
-          } else {
-            console.log('[AuthContext] No session to share');
           }
         } catch (err) {
           console.error('[AuthContext] Error responding to session request:', err);
@@ -94,11 +100,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('message', handleSessionRequest);
+      clearTimeout(safetyTimeout);
     };
-  }, []);
+  }, [initStarted]);
 
   async function fetchUserData(userId: string) {
+    // Avoid redundant fetching for the same user
+    if (fetchingRef.current === userId) {
+      console.log('[AuthContext] Already fetching data for user:', userId);
+      return;
+    }
+    fetchingRef.current = userId;
+
     try {
+      console.log('[AuthContext] Fetching profile for:', userId);
+
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -106,10 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId)
         .single();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileError);
+      if (profileError) {
+        if (profileError.code !== 'PGRST116') {
+          console.error('[AuthContext] Error fetching profile:', profileError);
+        } else {
+          console.warn('[AuthContext] No profile found for user');
+        }
       }
-      
+
       setProfile(profileData as Profile | null);
 
       // Fetch role
@@ -119,16 +139,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId)
         .order('created_at', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (roleError && roleError.code !== 'PGRST116') {
-        console.error('Error fetching role:', roleError);
+      if (roleError) {
+        console.error('[AuthContext] Error fetching role:', roleError);
       }
 
-      setRole((roleData?.role as AppRole) ?? null);
+      const userRole = (roleData?.role as AppRole) ?? null;
+      console.log('[AuthContext] Loaded role:', userRole);
+      setRole(userRole);
+
     } catch (error) {
-      console.error('Error in fetchUserData:', error);
+      console.error('[AuthContext] Error in fetchUserData:', error);
     } finally {
+      fetchingRef.current = null;
       setLoading(false);
     }
   }

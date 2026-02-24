@@ -89,7 +89,22 @@ export default function LoginPage() {
         setIsLoading(false);
         return;
       }
-      // Redirection is handled by useEffect when role is loaded
+
+      // If we're here, sign in was successful.
+      // Redirection is handled by useEffect when role is loaded.
+      // But let's add a timeout to unblock the UI if role load hangs.
+      setTimeout(() => {
+        if (isLoading) {
+          setIsLoading(false);
+          if (!role && isAuthenticated) {
+            toast({
+              variant: 'default',
+              title: 'Autenticado',
+              description: 'A carregar as suas permissões... Por favor, aguarde.',
+            });
+          }
+        }
+      }, 5000);
     } catch (error: any) {
       console.error('Login error:', error);
       const isTimeout = error?.message === 'TIMEOUT';
@@ -109,9 +124,9 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/10 backdrop-blur-xl">
         <CardHeader className="space-y-4 text-center pb-8">
           <div className="mx-auto p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
-            <img 
-              src={tecnofrioLogoIcon} 
-              alt="TECNOFRIO" 
+            <img
+              src={tecnofrioLogoIcon}
+              alt="TECNOFRIO"
               className="h-20 w-20 object-contain"
             />
           </div>
@@ -168,9 +183,9 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button 
-                type="submit" 
-                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200" 
+              <Button
+                type="submit"
+                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -184,6 +199,17 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+          <div className="mt-6 pt-6 border-t border-white/10 text-center">
+            <button
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"
+            >
+              Problemas ao entrar? Limpar sessão local
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
