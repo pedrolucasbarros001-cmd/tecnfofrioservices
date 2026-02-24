@@ -167,6 +167,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleStartRepair = async () => {
+    setIsSubmitting(true);
     try {
       await ensureValidSession();
 
@@ -178,8 +179,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       // Usa RPC SECURITY DEFINER: atribui o técnico se necessário e
       // muda para em_execucao sem erro de RLS (funciona mesmo quando
       // technician_id era null antes do início).
-      setIsSubmitting(true);
-      await ensureValidSession();
       const { error: rpcError } = await (supabase.rpc as any)('start_workshop_service', {
         _service_id: service.id,
       });
@@ -203,6 +202,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     } catch (error) {
       console.error("Error starting repair:", error);
       toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

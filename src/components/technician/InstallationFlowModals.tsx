@@ -33,6 +33,7 @@ import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
 import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
+import { technicianUpdateService } from '@/utils/technicianRpc';
 import type { Service } from '@/types/database';
 
 type ModalStep = 'resumo' | 'deslocacao' | 'foto_antes' | 'materiais' | 'trabalho' | 'foto_depois' | 'finalizacao';
@@ -113,6 +114,29 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       saveStateToDb(currentStep, formData);
     }
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
+
+  const handleStartInstallation = async () => {
+    try {
+      await ensureValidSession();
+      const { error } = await technicianUpdateService({
+        serviceId: service.id,
+        status: 'em_execucao',
+      });
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+
+      if (derivedResumeStep && derivedResumeStep !== 'resumo') {
+        setCurrentStep(derivedResumeStep);
+      } else {
+        setCurrentStep('deslocacao');
+      }
+    } catch (error) {
+      console.error('Error starting installation:', error);
+      toast.error('Erro ao iniciar instalação');
+    }
+  };
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -336,13 +360,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
-              onClick={() => {
-                if (derivedResumeStep && derivedResumeStep !== 'resumo') {
-                  setCurrentStep(derivedResumeStep);
-                } else {
-                  setCurrentStep('deslocacao');
-                }
-              }}
+              onClick={handleStartInstallation}
               disabled={isResuming}
             >
               {isResuming ? "A carregar..." : "Iniciar Instalação"}

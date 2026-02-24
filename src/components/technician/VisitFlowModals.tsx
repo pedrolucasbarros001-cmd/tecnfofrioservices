@@ -668,11 +668,24 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   };
 
   const goToNextPhotoStep = () => {
-    if (currentStep === "foto_aparelho") setCurrentStep("foto_etiqueta");
-    else if (currentStep === "foto_etiqueta") setCurrentStep("foto_estado");
-    else if (currentStep === "foto_estado") setCurrentStep("produto"); // Always check product step
-    else if (currentStep === "foto") setCurrentStep("produto"); // Also for non-repair now for consistency
-    else if (currentStep === "produto") setCurrentStep("diagnostico");
+    if (currentStep === "foto_aparelho") {
+      setCurrentStep("foto_etiqueta");
+      return;
+    }
+
+    if (currentStep === "foto_etiqueta") {
+      setCurrentStep("foto_estado");
+      return;
+    }
+
+    if (currentStep === "foto_estado" || currentStep === "foto") {
+      setCurrentStep(needsProductStep ? "produto" : "diagnostico");
+      return;
+    }
+
+    if (currentStep === "produto") {
+      setCurrentStep("diagnostico");
+    }
   };
 
   // Save product info to service
