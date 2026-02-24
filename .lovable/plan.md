@@ -1,55 +1,110 @@
 
-
-# Plano: Corrigir Bugs de Modais, Dropdowns e Navegacao em Todo o Sistema
+# Plano: Corrigir Login Bloqueado por Timeout de Base de Dados
 
 ## Problema Raiz
 
-Quando um **Select dropdown** (nivel de acesso, turno, etc.) esta dentro de um **Dialog**, clicar nas opcoes do dropdown **fecha o modal** em vez de selecionar o valor. Isto acontece porque o Radix UI renderiza o dropdown num portal separado (fora do Dialog), e o Dialog interpreta isso como um "clique fora" e fecha-se.
-
-O mesmo problema afecta o botao **X de fechar** em alguns contextos -- se o Dialog fecha antes da interacao ser processada, o estado fica inconsistente.
-
-## Solucao Global (1 ficheiro, corrige TODOS os modais)
-
-Em vez de adicionar `onPointerDownOutside` e `onInteractOutside` modal a modal (como ja se fez nos fluxos de tecnico), a correcao sera feita **no componente base `dialog.tsx`**, garantindo que NENHUM modal do sistema sofra deste bug.
-
-### Ficheiro: `src/components/ui/dialog.tsx`
-
-**Alteracao no `DialogContent`:**
-- Adicionar handler `onPointerDownOutside` que verifica se o alvo do clique esta dentro de um portal Radix (Select, Popover, Dropdown, etc.)
-- Se estiver, previne o fecho do Dialog (`e.preventDefault()`)
-- Se nao estiver (clique real fora), permite o fecho normalmente
-- Adicionar `onInteractOutside` com a mesma logica
-
-A verificacao usa selectores CSS para identificar elementos de portais Radix:
-- `[data-radix-popper-content-wrapper]` (Select, Popover, DropdownMenu)
-- `[role="listbox"]` (Select options)
-- `[role="option"]` (Select items)
+O login falha para TODOS os utilizadores porque, apos a autenticacao bem-sucedida, as queries a base de dados (`profiles` e `user_roles`) ficam penduradas indefinidamente quando a BD esta lenta. O SDK do Supabase nao tem timeout para queries, entao `loading` nunca passa a `false` e o utilizador fica preso na pagina de login.
 
 ```text
-DialogContent (modificado)
-+-- onPointerDownOutside(e):
-|     se e.target esta dentro de portal Radix -> e.preventDefault()
-|     senao -> permite fechar normalmente
-+-- onInteractOutside(e):
-|     mesma logica
+Fluxo actual (com BD lenta):
+
+signInWithPassword -----> OK (auth service separado)
+  |
+  v
+onAuthStateChange fires
+  |
+  v
+fetchUserData() chamado
+  |
+  v
+query profiles ---------> PENDE PARA SEMPRE (DB timeout)
+  |
+  v
+loading = true PARA SEMPRE
+  |
+  v
+LoginPage useEffect: isAuthenticated=true, role=null, loading=true
+  --> NAO redireciona
+  --> Botao preso em "A entrar..."
 ```
 
-### Resultado
+## Solucao (2 ficheiros)
 
-- **CreateUserModal**: dropdown de nivel de acesso funciona correctamente
-- **EditUserModal**: dropdown de nivel de acesso funciona + confirmacao de role change funciona
-- **CreateServiceModal**, **CreateInstallationModal**, **CreateDeliveryModal**: dropdown de turno (Manha/Tarde) funciona
-- **AssignTechnicianModal**, **RescheduleServiceModal**: dropdowns funcionam
-- **ConvertBudgetModal**, **PartArrivedModal**, **AssignDeliveryModal**: dropdowns funcionam
-- **Todos os outros modais presentes e futuros**: protegidos automaticamente
-- Botao X continua a funcionar normalmente (usa `DialogClose`, nao e afectado)
-- Clicar fora do modal (no overlay escuro) continua a fechar normalmente quando nao ha dropdown aberto
+### Ficheiro 1: `src/contexts/AuthContext.tsx`
+
+**Problema:** `fetchUserData` nao tem timeout. Se a BD estiver lenta, as queries pendem para sempre.
+
+**Correcao:**
+- Criar funcao helper `withTimeout` que envolve qualquer Promise com um tempo limite (10 segundos)
+- Aplicar `withTimeout` as queries de `profiles` e `user_roles` dentro de `fetchUserData`
+- Se o timeout disparar, definir `loading = false` com `role = null` e `profile = null` (o utilizador fica autenticado mas sem role carregada)
+- Adicionar uma flag para evitar chamadas duplicadas de `fetchUserData` (o `getSession` e o `onAuthStateChange` podem ambos chamar a funcao)
+
+```text
+fetchUserData (modificado):
+
+  try {
+    profileData = await withTimeout(query profiles, 10000)
+    roleData = await withTimeout(query user_roles, 10000)
+  } catch (timeout) {
+    console.error('Timeout ao carregar dados do utilizador')
+    // loading = false mesmo assim, para nao bloquear a UI
+  } finally {
+    setLoading(false)
+  }
+```
+
+### Ficheiro 2: `src/pages/LoginPage.tsx`
+
+**Problema:** Apos `signIn` bem-sucedido, `isLoading` nunca e redefinido para `false` (o codigo assume que o redirect vai acontecer). Se o redirect nao acontecer (porque `loading` ficou preso), o botao fica desabilitado para sempre.
+
+**Correcoes:**
+1. Apos signIn sem erro, definir um safety timeout de 20 segundos que:
+   - Redefine `isLoading = false`
+   - Mostra toast informando que houve problema ao carregar dados
+2. Adicionar um `useEffect` que observa `isAuthenticated` + `loading`: se autenticado e `loading=false` mas sem `role`, mostrar toast com erro claro e redefinir `isLoading`
+3. Garantir que TODOS os caminhos de codigo terminam com `setIsLoading(false)`
+
+```text
+LoginPage onSubmit (modificado):
+
+  const { error } = await Promise.race([signIn, timeout])
+  
+  if (error) {
+    // ... toast de erro (ja existente)
+    setIsLoading(false)  // ja existente
+    return
+  }
+
+  // Sucesso: safety timeout
+  setTimeout(() => {
+    setIsLoading(false)
+    // Se ainda nao redirecionou, algo correu mal
+  }, 20000)
+```
+
+```text
+Novo useEffect:
+
+  // Se autenticado sem role (BD timeout), dar feedback
+  if (isAuthenticated && !loading && !role) {
+    toast.warning('Nao foi possivel carregar perfil. Tente recarregar.')
+    setIsLoading(false)
+  }
+```
+
+## Resultado
+
+- Se a BD responder normalmente: login funciona como antes (< 2 segundos)
+- Se a BD estiver lenta (timeout): o utilizador ve uma mensagem clara em vez de ficar preso
+- O botao "Entrar" NUNCA fica preso indefinidamente
+- `loading` NUNCA fica `true` para sempre
 
 ## Secao Tecnica
 
-- A correcao e feita no nivel mais baixo (componente UI base), garantindo cobertura total
-- Nao afecta o comportamento do botao X (que usa `DialogPrimitive.Close`)
-- Nao afecta o fecho por Escape (que usa evento de teclado, nao pointer)
-- Os modais de tecnico que ja tinham `onPointerDownOutside={(e) => e.preventDefault()}` continuam a funcionar (a prevencao total sobrepoe-se a parcial)
-- Apenas 1 ficheiro precisa de ser alterado: `src/components/ui/dialog.tsx`
-
+- `withTimeout` usa `Promise.race` com um `setTimeout` que rejeita apos N ms
+- As queries de `profiles` e `user_roles` sao independentes, mas o timeout cobre ambas
+- O `finally` garante que `setLoading(false)` e SEMPRE chamado
+- A flag de `fetchInProgress` (useRef) previne chamadas concorrentes de `getSession` + `onAuthStateChange`
+- Nao altera a logica de autenticacao do Supabase (signIn/signOut continuam iguais)
+- Nao requer alteracoes na base de dados
