@@ -1,80 +1,151 @@
 
-# Plano: Corrigir Erros nos Fluxos do Tecnico e Garantir Estabilidade
+
+# Plano: Corrigir Todos os Bugs nos Fluxos de Servico do Tecnico
 
 ## Problemas Identificados
 
-Apos analise detalhada do codigo, identifiquei 6 problemas concretos que causam erros, crashes e bloqueios no fluxo do tecnico.
+Apos analise completa dos 4 fluxos (Visita, Oficina, Instalacao, Entrega) e componentes partilhados, identifiquei os seguintes problemas concretos:
 
-### Problema 1: Entrega de Oficina -- Tecnico nao consegue iniciar (CRITICO)
+### BUG 1: InstallationFlowModals -- Assinatura NAO e idempotente (CRASH em duplo-clique)
 
-Quando a secretaria atribui uma entrega via `AssignDeliveryModal`, o modal:
-- Define `delivery_technician_id` (tecnico de entrega)
-- Define `delivery_method`, `delivery_date`, `scheduled_shift`
-- **NAO** define `technician_id` (campo usado pelo RPC)
-- **NAO** muda o `service_type` para `entrega`
-- **NAO** muda o `status` para `por_fazer`
+**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linha 205
 
-Resultado: O tecnico de entrega nunca ve o servico na sua lista (ServicosPage filtra por `technician_id`), e mesmo que visse, o RPC `technician_update_service` recusa porque verifica `technician_id`, nao `delivery_technician_id`.
-
-### Problema 2: DeliveryFlowModals -- Assinatura nao e idempotente (ERRO)
-
-No `handleSignatureComplete`, a assinatura e inserida sem verificar se ja existe (linha 163). Se o tecnico clicar duas vezes ou a rede falhar no meio, insere duplicadas ou da erro.
-
-Comparacao: `VisitFlowModals` JA faz a verificacao corretamente com `maybeSingle()` antes de inserir.
-
-### Problema 3: WorkshopFlowModals -- Camera sem try/catch (CRASH)
-
-O `onCapture` da camera (linhas 1009-1035) faz `await ensureValidSession()` e `await supabase.from("service_photos").insert(...)` diretamente sem try/catch. Se a sessao expirar ou falhar o upload, o erro nao e capturado e pode crashar a pagina.
-
-### Problema 4: WorkshopFlowModals -- "confirmacao_peca" sem scroll (UI)
-
-O dialog na linha 493 usa `className="max-w-md p-6"` sem `max-w-[95vw] max-h-[90vh] overflow-y-auto`, ao contrario de todos os outros dialogs do mesmo fluxo. Em telemoveis pequenos o conteudo fica cortado.
-
-### Problema 5: DeliveryFlowModals -- Falta ensureValidSession na assinatura (ERRO)
-
-No `handleSignatureComplete` (linha 161), chama `ensureValidSession()` mas NAO verifica a sessao antes do `updateService.mutateAsync` na linha 171. Se a sessao expirar entre a assinatura e a atualizacao, da erro de RLS.
-
-### Problema 6: Falta de try/catch em handleStartRepair no workshop (CRASH)
-
-A funcao `handleStartRepair` (linha 169) tem try/catch, mas no bloco `finally` faz `setIsSubmitting(false)` -- se o modo for `continuacao_peca`, o return na linha 176 ignora o finally e `isSubmitting` nunca volta a false. Na verdade, `finally` SEMPRE executa, entao este caso especifico esta ok. Mas o fluxo de continuacao salta diretamente para `confirmacao_peca` sem registar atividade, o que e correto.
-
-## Solucao
-
-### 1. Corrigir AssignDeliveryModal (ficheiro principal do bug de entrega)
-
-Ao atribuir um tecnico para entrega de oficina, tambem definir:
-- `technician_id` = tecnico selecionado (para que o RPC e a query do tecnico funcionem)
-- `service_type` = `'entrega'` (para que o fluxo correto seja iniciado)
-- `status` = `'por_fazer'` (para que o servico apareca como pendente)
-- `scheduled_date` = data da entrega
-
+O `handleSignatureComplete` insere a assinatura diretamente sem verificar se ja existe:
 ```typescript
-await updateService.mutateAsync({
-  id: service.id,
-  delivery_method: 'technician_delivery',
-  delivery_technician_id: technicianId,
-  delivery_date: deliveryDate,
-  scheduled_shift: deliveryTime,
-  // NOVAS LINHAS:
-  technician_id: technicianId,
-  service_type: 'entrega',
-  status: 'por_fazer',
-  scheduled_date: deliveryDate,
-  skipToast: true,
-});
+await supabase.from('service_signatures').insert({...});
 ```
 
-### 2. Tornar DeliveryFlowModals idempotente
+O `VisitFlowModals` e o `DeliveryFlowModals` JA foram corrigidos com `.maybeSingle()` antes do insert. A Instalacao ficou para tras. Resultado: duplo-clique gera registos duplicados ou erro de constraint.
 
-Adicionar verificacao `maybeSingle()` antes de inserir assinatura e usar o mesmo padrao do VisitFlowModals:
+**Correcao:** Adicionar verificacao `maybeSingle()` antes do insert, seguindo o mesmo padrao dos outros fluxos.
 
+### BUG 2: InstallationFlowModals -- Materiais NAO sao idempotentes (duplicados)
+
+**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linhas 177-198
+
+O `handleMaterialsConfirm` insere materiais sem verificar se ja existem:
 ```typescript
-// Verificar se assinatura ja existe
+for (const material of materials) {
+  await supabase.from('service_parts').insert({...});
+}
+```
+
+Resultado: Se o tecnico clicar "Registar Materiais" duas vezes, ou se a rede falhar no meio e ele retentar, os materiais sao duplicados.
+
+**Correcao:** Antes de inserir, verificar se ja existem pecas com o mesmo nome para este servico (mesmo padrao usado no `saveUsedParts` do VisitFlowModals).
+
+### BUG 3: InstallationFlowModals -- Falta ensureValidSession em handleMaterialsConfirm
+
+**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`, linha 177
+
+A funcao nao valida a sessao antes de fazer INSERT na base de dados. Se a sessao expirou, da erro de RLS sem mensagem clara.
+
+**Correcao:** Adicionar `await ensureValidSession()` no inicio e envolver em try/catch com `humanizeError`.
+
+### BUG 4: InstallationFlowModals -- Mensagens de erro genericas em vez de humanizeError
+
+**Ficheiro:** `src/components/technician/InstallationFlowModals.tsx`
+
+Multiplos handlers usam strings fixas em vez de `humanizeError`:
+- Linha 136: `toast.error('Erro ao iniciar instalacao')`
+- Linha 172: `toast.error('Erro ao guardar foto')`
+- Linha 240: `toast.error('Erro ao concluir instalacao')`
+
+Resultado: O tecnico ve mensagens genericas quando o problema real e sessao expirada ou RLS.
+
+**Correcao:** Substituir por `toast.error(humanizeError(error))` e importar `humanizeError`.
+
+### BUG 5: VisitFlowModals -- "confirmacao_peca" sem scroll responsivo (UI cortada em mobile)
+
+**Ficheiro:** `src/components/technician/VisitFlowModals.tsx`, linha 1414
+
+O dialog de confirmacao de peca usa `className="max-w-md p-6"` sem as classes responsivas padrao.
+
+**Correcao:** Mudar para `className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"`.
+
+### BUG 6: SignatureCanvas -- Sem classes responsivas (cortado em telemoveis pequenos)
+
+**Ficheiro:** `src/components/shared/SignatureCanvas.tsx`, linha 119
+
+O DialogContent usa apenas `className="sm:max-w-[500px]"` sem `max-w-[95vw] max-h-[90vh] overflow-y-auto`.
+
+Resultado: Em telemoveis pequenos (360px), o modal de assinatura fica cortado e o botao "Confirmar Assinatura" pode ficar inacessivel. Este componente e PARTILHADO por TODOS os fluxos (Visita, Instalacao, Entrega), portanto a correcao beneficia todo o sistema.
+
+**Correcao:** Adicionar `max-w-[95vw] max-h-[90vh] overflow-y-auto`.
+
+### BUG 7: DeliveryFlowModals -- handlePhotoCapture usa erro generico
+
+**Ficheiro:** `src/components/technician/DeliveryFlowModals.tsx`, linha 155
+
+Usa `toast.error('Erro ao guardar foto')` em vez de `humanizeError(error)`.
+
+**Correcao:** Substituir por `toast.error(humanizeError(error))`.
+
+## Detalhes da Correcao por Ficheiro
+
+### 1. `src/components/technician/InstallationFlowModals.tsx`
+
+**a) Importar humanizeError:**
+```typescript
+import { humanizeError } from '@/utils/errorMessages';
+```
+
+**b) handleStartInstallation (linha 136):**
+```typescript
+// DE:
+toast.error('Erro ao iniciar instalacao');
+// PARA:
+toast.error(humanizeError(error));
+```
+
+**c) handlePhotoCapture (linha 172):**
+```typescript
+// DE:
+toast.error('Erro ao guardar foto');
+// PARA:
+toast.error(humanizeError(error));
+```
+
+**d) handleMaterialsConfirm (linhas 177-198):** Reescrever com ensureValidSession, try/catch, idempotencia:
+```typescript
+const handleMaterialsConfirm = async (materials: PartEntry[]) => {
+  try {
+    await ensureValidSession();
+    
+    // Idempotent: fetch existing parts
+    const { data: existing } = await supabase
+      .from('service_parts')
+      .select('part_name')
+      .eq('service_id', service.id)
+      .eq('is_requested', false);
+    
+    const existingNames = new Set(
+      (existing || []).map((p: any) => p.part_name?.toLowerCase().trim())
+    );
+    
+    for (const material of materials) {
+      if (material.name.trim() && 
+          !existingNames.has(material.name.toLowerCase().trim())) {
+        await supabase.from('service_parts').insert({...});
+      }
+    }
+    
+    // ... rest stays the same
+  } catch (error) {
+    console.error('Error confirming materials:', error);
+    toast.error(humanizeError(error));
+  }
+};
+```
+
+**e) handleSignatureComplete (linhas 200-244):** Adicionar idempotencia:
+```typescript
+// Antes do insert da assinatura, verificar se ja existe:
 const { data: existingSig } = await supabase
   .from('service_signatures')
   .select('id')
   .eq('service_id', service.id)
-  .eq('signature_type', 'entrega')
+  .eq('signature_type', 'instalacao')
   .maybeSingle();
 
 if (!existingSig) {
@@ -82,72 +153,58 @@ if (!existingSig) {
 }
 ```
 
-### 3. Adicionar try/catch ao onCapture da camera no WorkshopFlowModals
-
-Envolver o handler em try/catch com `humanizeError`:
-
+E mudar a mensagem de erro:
 ```typescript
-onCapture={async (imageData) => {
-  try {
-    await ensureValidSession();
-    // ... insert photo ...
-    toast.success("Foto guardada!");
-  } catch (error) {
-    console.error("Error saving photo:", error);
-    toast.error(humanizeError(error));
-  }
-}}
+// DE:
+toast.error('Erro ao concluir instalacao');
+// PARA:
+toast.error(humanizeError(error));
 ```
 
-### 4. Adicionar scroll ao dialog "confirmacao_peca" no WorkshopFlowModals
+### 2. `src/components/technician/VisitFlowModals.tsx`
 
-Mudar linha 493 de:
-```
-className="max-w-md p-6"
-```
-Para:
-```
-className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"
-```
-
-### 5. Reforcar sessao no DeliveryFlowModals antes de updateService
-
-Adicionar `await ensureValidSession()` antes da chamada `updateService.mutateAsync` na assinatura:
-
+**Linha 1414 -- confirmacao_peca dialog:**
 ```typescript
-// Antes de atualizar status
-await ensureValidSession();
-await updateService.mutateAsync({
-  id: service.id,
-  status: 'finalizado',
-  ...
-});
+// DE:
+<DialogContent className="max-w-md p-6" ...>
+// PARA:
+<DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" ...>
 ```
 
-### 6. Adicionar ensureValidSession no handleStartDelivery
+### 3. `src/components/shared/SignatureCanvas.tsx`
 
-O `handleStartDelivery` ja tem `ensureValidSession()`, mas o `technicianUpdateService` pode falhar sem mensagem clara. Melhorar a mensagem de erro:
-
+**Linha 119 -- DialogContent:**
 ```typescript
-} catch (error) {
-  console.error('Error starting delivery:', error);
-  toast.error(humanizeError(error)); // Em vez de string fixa
-}
+// DE:
+<DialogContent className="sm:max-w-[500px]">
+// PARA:
+<DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
+```
+
+### 4. `src/components/technician/DeliveryFlowModals.tsx`
+
+**Linha 155 -- handlePhotoCapture erro:**
+```typescript
+// DE:
+toast.error('Erro ao guardar foto');
+// PARA:
+toast.error(humanizeError(error));
 ```
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/components/modals/AssignDeliveryModal.tsx` | Definir `technician_id`, `service_type`, `status`, `scheduled_date` ao atribuir entrega |
-| `src/components/technician/DeliveryFlowModals.tsx` | Idempotencia na assinatura + ensureValidSession + humanizeError |
-| `src/components/technician/WorkshopFlowModals.tsx` | try/catch na camera + scroll no confirmacao_peca |
+| `src/components/technician/InstallationFlowModals.tsx` | Importar humanizeError, idempotencia assinatura + materiais, ensureValidSession, mensagens de erro |
+| `src/components/technician/VisitFlowModals.tsx` | Scroll no confirmacao_peca dialog |
+| `src/components/shared/SignatureCanvas.tsx` | Scroll responsivo (afeta TODOS os fluxos) |
+| `src/components/technician/DeliveryFlowModals.tsx` | humanizeError na foto |
 
 ## Resultado
 
-- Entregas atribuidas aparecem na lista do tecnico e podem ser iniciadas sem erro
-- Cliques duplos em assinaturas nao geram registos duplicados
-- Sessoes expiradas durante fluxos mostram mensagens claras em vez de crashes
-- Camera que falha nao crashe a pagina inteira do tecnico
-- Todos os dialogs do fluxo funcionam corretamente em telemoveis pequenos
-- Zero impacto funcional nos outros fluxos (visita, instalacao, oficina)
+- Zero duplicacoes de assinaturas ou materiais ao clicar duas vezes
+- Sessoes expiradas mostram mensagens claras em todos os fluxos
+- Modais de assinatura e confirmacao de peca funcionam em todos os tamanhos de tela
+- Padrao consistente entre os 4 fluxos (todos com idempotencia + humanizeError + ensureValidSession)
+- Nenhum impacto funcional nos fluxos existentes (todas as correcoes sao aditivas/defensivas)
+
