@@ -39,6 +39,25 @@ export async function deriveStepFromDb(
   flowType: FlowState['flowType'],
   service: Record<string, unknown>
 ): Promise<DbResumeResult> {
+  // Wrap with 8s timeout to prevent infinite loading
+  const timeoutPromise = new Promise<DbResumeResult>((_, reject) =>
+    setTimeout(() => reject(new Error('deriveStepFromDb timeout')), 8000)
+  );
+
+  return Promise.race([
+    _deriveStepFromDbImpl(serviceId, flowType, service),
+    timeoutPromise,
+  ]).catch((error) => {
+    console.error('deriveStepFromDb failed or timed out:', error);
+    return { step: 'resumo', formDataOverrides: {} };
+  });
+}
+
+async function _deriveStepFromDbImpl(
+  serviceId: string,
+  flowType: FlowState['flowType'],
+  service: Record<string, unknown>
+): Promise<DbResumeResult> {
   try {
     // Parallel fetch: service snapshot + photos metadata + parts
     const [serviceResult, photoMetaResult, partsResult] = await Promise.all([
@@ -79,38 +98,13 @@ export async function deriveStepFromDb(
       .filter((p) => !p.is_requested)
       .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
 
-    // Identify photo IDs we actually need to fetch URLs for (latest of each relevant type, and max 3 'estado')
-    const idsToFetch: string[] = [];
-    const addLatestId = (type: string) => {
-      if (photoMetadataByType[type]?.[0]) idsToFetch.push(photoMetadataByType[type][0].id);
+    // Use __photo_exists__ markers instead of fetching actual file_url (avoids 4-5MB base64 transfers)
+    const PHOTO_MARKER = '__photo_exists__';
+    const latestPhoto = (type: string) => hasPhoto(type) ? PHOTO_MARKER : null;
+    const allPhotos = (type: string) => {
+      const count = photoMetadataByType[type]?.length ?? 0;
+      return count > 0 ? Array(Math.min(count, 3)).fill(PHOTO_MARKER) : [];
     };
-
-    ['aparelho', 'etiqueta', 'antes', 'depois', 'instalacao_antes', 'instalacao_depois', 'assinatura', 'entrega', 'verificacao', 'aparelho_recuperado', 'visita'].forEach(addLatestId);
-    if (photoMetadataByType['estado']) {
-      photoMetadataByType['estado'].slice(0, 3).forEach(p => idsToFetch.push(p.id));
-    }
-
-    // Fetch actual URLs for identified photos
-    let photos: any[] = [];
-    if (idsToFetch.length > 0) {
-      const { data: fetchedPhotos, error: fetchPhotosError } = await supabase
-        .from('service_photos')
-        .select('photo_type, file_url, uploaded_at')
-        .in('id', idsToFetch)
-        .order('uploaded_at', { ascending: false });
-
-      if (fetchPhotosError) throw fetchPhotosError;
-      photos = fetchedPhotos ?? [];
-    }
-
-    const photosByType: Record<string, string[]> = {};
-    for (const photo of photos) {
-      if (!photosByType[photo.photo_type]) photosByType[photo.photo_type] = [];
-      photosByType[photo.photo_type].push(photo.file_url);
-    }
-
-    const latestPhoto = (type: string) => photosByType[type]?.[0] ?? null;
-    const allPhotos = (type: string) => photosByType[type] ?? [];
 
     const detectedFault = (serviceSnapshot.detected_fault as string) || '';
     const workPerformed = (serviceSnapshot.work_performed as string) || '';

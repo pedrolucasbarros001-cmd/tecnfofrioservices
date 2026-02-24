@@ -216,7 +216,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       }
     } catch (error) {
       console.error("Error starting visit:", error);
-      toast.error("Erro ao iniciar visita. Verifique a sua sessão.");
+      toast.error(humanizeError(error));
     }
   };
 
@@ -233,23 +233,19 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const handlePhotoCapture = async (imageData: string) => {
     try {
       await ensureValidSession();
-      await supabase.from("service_photos").insert({
-        service_id: service.id,
-        photo_type: currentPhotoType,
-        file_url: imageData,
-        description: getPhotoDescription(currentPhotoType),
-      });
+      const { uploadServicePhoto } = await import('@/utils/photoUpload');
+      const publicUrl = await uploadServicePhoto(service.id, imageData, currentPhotoType, getPhotoDescription(currentPhotoType));
       queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
 
       // Update form data based on photo type
       if (currentPhotoType === "aparelho") {
-        setFormData((prev) => ({ ...prev, photoAparelho: imageData }));
+        setFormData((prev) => ({ ...prev, photoAparelho: publicUrl }));
       } else if (currentPhotoType === "etiqueta") {
-        setFormData((prev) => ({ ...prev, photoEtiqueta: imageData }));
+        setFormData((prev) => ({ ...prev, photoEtiqueta: publicUrl }));
       } else if (currentPhotoType === "estado") {
-        setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, imageData] }));
+        setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, publicUrl] }));
       } else {
-        setFormData((prev) => ({ ...prev, photoFile: imageData }));
+        setFormData((prev) => ({ ...prev, photoFile: publicUrl }));
       }
 
       setShowCamera(false);
@@ -581,9 +577,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   // Validation - for reparacao need aparelho and etiqueta photos
   const canProceedFromFotoAparelho = formData.photoAparelho !== null;
   const canProceedFromFotoEtiqueta = formData.photoEtiqueta !== null;
-  const canProceedFromFotoEstado = formData.photosEstado.length > 0; // Estado is now required
-  const canProceedFromFoto = formData.photoFile !== null; // Legacy for non-reparacao
+  const canProceedFromFotoEstado = formData.photosEstado.length > 0;
+  const canProceedFromFoto = formData.photoFile !== null;
   const canProceedFromDiagnostico = formData.detectedFault.trim().length > 0;
+
+  // Helper to check if a photo is a real displayable URL (not a marker)
+  const isRealPhoto = (p: string | null) => p !== null && p !== '__photo_exists__';
 
   // Continuation Flow: Check if part installed confirmed
   const canProceedFromConfirmarPeca = formData.partInstalled === true;
@@ -830,10 +829,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                 <span className="text-destructive">*</span>
               </div>
 
-              {formData.photoAparelho ? (
+              {isRealPhoto(formData.photoAparelho) ? (
                 <div className="relative">
                   <img
-                    src={formData.photoAparelho}
+                    src={formData.photoAparelho!}
                     alt="Foto do aparelho"
                     className="w-full h-48 object-cover rounded-lg"
                   />
@@ -845,6 +844,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   >
                     Nova Foto
                   </Button>
+                </div>
+              ) : formData.photoAparelho === '__photo_exists__' ? (
+                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  <span>Foto já registada</span>
+                  <Button variant="outline" size="sm" onClick={() => openCamera("aparelho")}>Tirar Nova</Button>
                 </div>
               ) : (
                 <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("aparelho")}>
@@ -887,10 +892,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               </div>
               <p className="text-xs text-muted-foreground">Capture a etiqueta com número de série, modelo, etc.</p>
 
-              {formData.photoEtiqueta ? (
+              {isRealPhoto(formData.photoEtiqueta) ? (
                 <div className="relative">
                   <img
-                    src={formData.photoEtiqueta}
+                    src={formData.photoEtiqueta!}
                     alt="Foto da etiqueta"
                     className="w-full h-48 object-cover rounded-lg"
                   />
@@ -902,6 +907,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   >
                     Nova Foto
                   </Button>
+                </div>
+              ) : formData.photoEtiqueta === '__photo_exists__' ? (
+                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  <span>Foto já registada</span>
+                  <Button variant="outline" size="sm" onClick={() => openCamera("etiqueta")}>Tirar Nova</Button>
                 </div>
               ) : (
                 <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("etiqueta")}>
@@ -946,7 +957,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
               {formData.photosEstado.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  {formData.photosEstado.map((photo, idx) => (
+                  {formData.photosEstado.filter(p => p !== '__photo_exists__').map((photo, idx) => (
                     <div key={idx} className="relative group">
                       <img src={photo} alt={`Estado ${idx + 1}`} className="w-full h-20 object-cover rounded-lg" />
                       <Button
@@ -959,6 +970,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                       </Button>
                     </div>
                   ))}
+                  {formData.photosEstado.some(p => p === '__photo_exists__') && (
+                    <div className="flex items-center justify-center h-20 rounded-lg border bg-muted/50">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    </div>
+                  )}
                   <button
                     onClick={() => openCamera("estado")}
                     className="flex flex-col items-center justify-center h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30 transition-colors"
@@ -1002,10 +1018,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Tire uma foto do aparelho antes de iniciar o diagnóstico.</p>
 
-              {formData.photoFile ? (
+              {isRealPhoto(formData.photoFile) ? (
                 <div className="relative">
                   <img
-                    src={formData.photoFile}
+                    src={formData.photoFile!}
                     alt="Foto do aparelho"
                     className="w-full h-48 object-cover rounded-lg"
                   />
@@ -1017,6 +1033,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   >
                     Nova Foto
                   </Button>
+                </div>
+              ) : formData.photoFile === '__photo_exists__' ? (
+                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  <span>Foto já registada</span>
+                  <Button variant="outline" size="sm" onClick={() => openCamera("visita")}>Tirar Nova</Button>
                 </div>
               ) : (
                 <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("visita")}>
