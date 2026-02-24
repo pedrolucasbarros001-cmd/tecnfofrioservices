@@ -215,7 +215,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Resumo da Entrega" step="Passo 1" />
 
@@ -276,7 +276,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -318,7 +318,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 3: Foto (opcional) */}
-      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto da Entrega" step="Passo 3" />
 

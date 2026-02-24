@@ -660,7 +660,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   return (
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature} onOpenChange={() => handleClose()}>
+      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={() => handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
@@ -730,7 +730,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === "deslocacao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "deslocacao" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -944,7 +944,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
       {!isReparacao && (
-        <Dialog open={currentStep === "foto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+        <Dialog open={currentStep === "foto" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Tirar Foto" step="Passo 3" />
 
@@ -992,7 +992,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       )}
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      <Dialog open={currentStep === "produto" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "produto" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
@@ -1068,7 +1068,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         </Dialog>
 
       {/* Modal 4/6: Diagnóstico */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
 
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
@@ -1105,7 +1105,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 5/7: Decisão */}
-      <Dialog open={currentStep === "decisao" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "decisao" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
 
@@ -1176,7 +1176,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
-      <Dialog open={currentStep === "pecas_usadas" && !showCamera} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "pecas_usadas" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Peças Usadas" step={isReparacao ? "Passo 8" : "Passo 6"} />
 
