@@ -1,60 +1,88 @@
 
+# Plano: Corrigir Persistencia e Fluxo do Tecnico
 
-# Plano: Ordenacao por Criacao e Pesquisa Completa nos Servicos
+## Problemas Identificados
 
-## Problema Atual
+### 1. Persistencia na BD nao funciona (CRITICO)
+A funcao `saveStateToDb` tenta gravar `flow_step` e `flow_data` via RPC `technician_update_service`, mas:
+- A tabela `services` **nao tem** as colunas `flow_step` nem `flow_data`
+- O RPC **nao aceita** os parametros `_flow_step` e `_flow_data`
+- Resultado: a gravacao falha silenciosamente, e quando o tecnico sai e volta, o sistema tenta derivar o passo a partir de fotos/campos, enviando-o para etapas ja concluidas
 
-1. **Ordenacao**: Os servicos sao ordenados por `scheduled_date ASC` (data agendada), o que coloca servicos antigos no topo. Servicos recem-criados ficam perdidos no meio ou no final da lista.
+### 2. Fotos tiradas nao aparecem no modal (foto_aparelho, foto_etiqueta, foto_estado)
+Quando o tecnico tira uma foto, a imagem e guardada no `formData` mas o Dialog fecha porque `showCamera` muda. Contudo, os dialogos de foto de reparacao (linhas 769, 825, 882) ainda nao verificam `!showPayment`, e a foto e corretamente mostrada apos captura -- o problema real e que o `deriveStepFromDb` ao reabrir o fluxo nao pre-carrega as fotos no formData porque faz queries desnecessariamente complexas que falham parcialmente.
 
-2. **Pesquisa incompleta**: A pesquisa atual cobre `codigo, aparelho, marca, avaria, nome/telefone/email do cliente`, mas **nao pesquisa por nome do tecnico** nem por outros campos como modelo, numero de serie ou descricao do trabalho.
+### 3. Botao "Iniciar" demora porque `deriveStepFromDb` faz 3+ queries sequenciais a BD
+O resumo faz: fetch photos metadata + fetch photo URLs + fetch parts, tudo sequencialmente, antes de mostrar o botao como ativo.
+
+### 4. Guardas `!showPayment` em falta nos dialogos de foto (reparacao)
+Os dialogos `foto_aparelho`, `foto_etiqueta` e `foto_estado` nao verificam `!showPayment`, herdado da correcao anterior incompleta.
 
 ## Solucao
 
-### 1. `src/hooks/useServices.ts` -- Alterar ordenacao e pesquisa
+### Parte 1: Adicionar colunas `flow_step` e `flow_data` a tabela `services`
 
-**Ordenacao (3 locais):**
-
-Substituir a ordem atual:
-```text
-.order('scheduled_date', { ascending: true })
-.order('scheduled_shift', { ascending: true })
-.order('created_at', { ascending: false })
+Migracao SQL:
+```sql
+ALTER TABLE services ADD COLUMN IF NOT EXISTS flow_step text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS flow_data jsonb;
 ```
 
-Por ordem por criacao descendente (mais recentes primeiro):
-```text
-.order('created_at', { ascending: false })
+### Parte 2: Atualizar RPC `technician_update_service` para aceitar os novos campos
+
+```sql
+CREATE OR REPLACE FUNCTION public.technician_update_service(
+  _service_id uuid,
+  _status text DEFAULT NULL,
+  _detected_fault text DEFAULT NULL,
+  _work_performed text DEFAULT NULL,
+  _pending_pricing boolean DEFAULT NULL,
+  _last_status_before_part_request text DEFAULT NULL,
+  _flow_step text DEFAULT NULL,
+  _flow_data jsonb DEFAULT NULL
+) RETURNS void ...
+  -- Adicionar ao UPDATE:
+  flow_step = COALESCE(_flow_step, flow_step),
+  flow_data = COALESCE(_flow_data, flow_data),
 ```
 
-Isto aplica-se a:
-- `useServices()` (linha 40-42) -- usado pela OficinaPage
-- `usePaginatedServices()` sem searchTerm (linhas 320-322) -- usado pela GeralPage
-- `usePaginatedServices()` com searchTerm, no sort manual (linhas 280-301)
+### Parte 3: Atualizar `src/types/database.ts` para incluir os novos campos
 
-**Pesquisa (1 local):**
+Adicionar `flow_step` e `flow_data` ao tipo `Service` (ja existem no ficheiro, mas confirmar que estao corretos).
 
-Expandir o filtro `.or()` na pesquisa de servicos (linha 253) para incluir mais campos:
+### Parte 4: Otimizar `deriveStepFromDb` em `useFlowPersistence.ts`
+
+- Usar `flow_step` da BD como fonte principal (ja esta no codigo, mas nunca tem valor porque a coluna nao existia)
+- Executar queries de fotos e pecas em **paralelo** com `Promise.all` em vez de sequencialmente
+- Resultado: o botao "Iniciar" carrega em menos de 300ms
+
+### Parte 5: Limpar `flow_step` ao concluir o servico
+
+Em todos os fluxos (Visita, Oficina, Instalacao, Entrega), ao chamar `clearState()` apos conclusao, tambem gravar `flow_step = null` na BD para evitar que o servico fique "preso" num passo antigo.
+
+### Parte 6: Adicionar `!showPayment` aos dialogos de foto (reparacao)
+
+Nos 3 dialogos de foto em `VisitFlowModals.tsx` (linhas 769, 825, 882):
 ```text
-code, appliance_type, brand, model, serial_number, fault_description, detected_fault, work_performed
+open={currentStep === "foto_X" && !showCamera && !showSignature && !showPayment}
 ```
 
-Adicionar pesquisa por tecnico: buscar `technicians` -> `profiles` com `full_name.ilike` e incluir os `technician_id` correspondentes na pesquisa combinada (mesmo padrao ja usado para clientes).
-
-### 2. `src/pages/OficinaPage.tsx` -- Adicionar barra de pesquisa
-
-A pagina Oficina nao tem pesquisa. Adicionar:
-- Campo de pesquisa com filtro local por `code`, `customer.name`, `appliance_type`, `brand`, `fault_description` e `technician.profile.full_name`
-
-### Resumo de Alteracoes
+## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/hooks/useServices.ts` | Ordenar por `created_at DESC`; expandir campos de pesquisa; adicionar pesquisa por tecnico |
-| `src/pages/OficinaPage.tsx` | Adicionar barra de pesquisa local com filtro por palavra-chave |
+| Migracao SQL (nova) | Adicionar colunas `flow_step` e `flow_data` |
+| Migracao SQL (nova) | Atualizar RPC `technician_update_service` |
+| `src/hooks/useFlowPersistence.ts` | Paralelizar queries; usar `flow_step` da BD como prioridade |
+| `src/components/technician/VisitFlowModals.tsx` | Guardar `flow_step=null` ao concluir; guardar `!showPayment` nos 3 dialogos de foto |
+| `src/components/technician/WorkshopFlowModals.tsx` | Guardar `flow_step=null` ao concluir |
+| `src/components/technician/InstallationFlowModals.tsx` | Guardar `flow_step=null` ao concluir |
+| `src/components/technician/DeliveryFlowModals.tsx` | Guardar `flow_step=null` ao concluir |
 
-### Resultado
+## Resultado
 
-- Servicos recem-criados aparecem **sempre no topo** de todas as listas
-- Pesquisa funciona por: codigo, cliente, aparelho, marca, modelo, numero de serie, avaria, diagnostico, trabalho realizado e **nome do tecnico**
-- A pagina Oficina ganha uma barra de pesquisa identica as outras paginas
-
+- O tecnico pode sair e voltar ao servico **exatamente** no passo onde parou (gravado na BD, nao so em localStorage)
+- O botao "Iniciar" carrega instantaneamente (queries paralelas)
+- As fotos aparecem corretamente apos serem tiradas
+- Nenhum dialogo sobrepoe outro (guardas completas)
+- A experiencia e fluida e sem travamentos
