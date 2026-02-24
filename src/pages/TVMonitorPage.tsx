@@ -21,6 +21,7 @@ import tecnofrioLogoIcon from "@/assets/tecnofrio-logo-icon.png";
 import { supabase } from "@/integrations/supabase/client";
 import { SERVICE_STATUS_CONFIG } from "@/types/database";
 import { usePublicActivityLogs } from "@/hooks/useActivityLogs";
+import { useRealtime } from "@/hooks/useRealtime";
 import { cn } from "@/lib/utils";
 
 // Tipo de Serviço para o Monitor
@@ -73,18 +74,15 @@ export default function TVMonitorPage() {
             if (error) throw error;
             return (data || []) as TVMonitorService[];
         },
-        refetchInterval: 30000
+        refetchInterval: false // Desativado em favor do Realtime
     });
+
+    // Ativar Realtime para atualizações instantâneas sem polling
+    useRealtime('services', [['tv-monitor-services']]);
+    useRealtime('activity_logs', [['public-activity-logs']]);
 
     const { data: activityLogs = [] } = usePublicActivityLogs(10);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            refetch();
-            setLastRefresh(new Date());
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [refetch]);
 
     // Carousel Logic: Split rows evenly
     const topRowServices = services.filter((_, i) => i % 2 === 0);

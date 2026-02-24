@@ -38,152 +38,110 @@ export async function deriveStepFromDb(
   flowType: FlowState['flowType'],
   service: Record<string, unknown>
 ): Promise<DbResumeResult> {
-  // Parallel fetch: photos metadata + parts
-  const [photoMetaResult, partsResult] = await Promise.all([
-    supabase
-      .from('service_photos')
-      .select('id, photo_type, uploaded_at')
-      .eq('service_id', serviceId)
-      .order('uploaded_at', { ascending: false }),
-    supabase
-      .from('service_parts')
-      .select('part_name, part_code, quantity, is_requested, arrived')
-      .eq('service_id', serviceId),
-  ]);
+  try {
+    // Parallel fetch: photos metadata + parts
+    const [photoMetaResult, partsResult] = await Promise.all([
+      supabase
+        .from('service_photos')
+        .select('id, photo_type, uploaded_at')
+        .eq('service_id', serviceId)
+        .order('uploaded_at', { ascending: false }),
+      supabase
+        .from('service_parts')
+        .select('part_name, part_code, quantity, is_requested, arrived')
+        .eq('service_id', serviceId),
+    ]);
 
-  const photoMetadata = photoMetaResult.data ?? [];
-  const parts = partsResult.data ?? [];
+    if (photoMetaResult.error) throw photoMetaResult.error;
+    if (partsResult.error) throw partsResult.error;
 
-  const photoMetadataByType: Record<string, { id: string; uploaded_at: string }[]> = {};
-  for (const photo of photoMetadata) {
-    if (!photoMetadataByType[photo.photo_type]) photoMetadataByType[photo.photo_type] = [];
-    photoMetadataByType[photo.photo_type].push({ id: photo.id, uploaded_at: photo.uploaded_at });
-  }
+    const photoMetadata = photoMetaResult.data ?? [];
+    const parts = partsResult.data ?? [];
 
-  const hasPhoto = (type: string) => (photoMetadataByType[type]?.length ?? 0) > 0;
-  const hasAnyPhoto = photoMetadata.length > 0;
+    const photoMetadataByType: Record<string, { id: string; uploaded_at: string }[]> = {};
+    for (const photo of photoMetadata) {
+      if (!photoMetadataByType[photo.photo_type]) photoMetadataByType[photo.photo_type] = [];
+      photoMetadataByType[photo.photo_type].push({ id: photo.id, uploaded_at: photo.uploaded_at });
+    }
 
-  const hasRequestedPart = parts.some((p) => p.is_requested);
-  const usedPartsList = parts
-    .filter((p) => !p.is_requested)
-    .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
+    const hasPhoto = (type: string) => (photoMetadataByType[type]?.length ?? 0) > 0;
+    const hasAnyPhoto = photoMetadata.length > 0;
 
-  // Identify photo IDs we actually need to fetch URLs for
-  const idsToFetch: string[] = [];
-  const addLatestId = (type: string) => {
-    if (photoMetadataByType[type]?.[0]) idsToFetch.push(photoMetadataByType[type][0].id);
-  };
+    const hasRequestedPart = parts.some((p) => p.is_requested);
+    const usedPartsList = parts
+      .filter((p) => !p.is_requested)
+      .map((p) => ({ name: p.part_name, reference: p.part_code ?? '', quantity: p.quantity ?? 1 }));
 
-  ['aparelho', 'etiqueta', 'antes', 'depois', 'instalacao_antes', 'instalacao_depois', 'assinatura', 'entrega', 'verificacao', 'aparelho_recuperado', 'visita'].forEach(addLatestId);
-  if (photoMetadataByType['estado']) {
-    photoMetadataByType['estado'].slice(0, 3).forEach(p => idsToFetch.push(p.id));
-  }
-
-  // Fetch actual URLs for identified photos
-  let photos: any[] = [];
-  if (idsToFetch.length > 0) {
-    const { data: fetchedPhotos } = await supabase
-      .from('service_photos')
-      .select('photo_type, file_url, uploaded_at')
-      .in('id', idsToFetch)
-      .order('uploaded_at', { ascending: false });
-    photos = fetchedPhotos ?? [];
-  }
-
-  const photosByType: Record<string, string[]> = {};
-  for (const photo of photos) {
-    if (!photosByType[photo.photo_type]) photosByType[photo.photo_type] = [];
-    photosByType[photo.photo_type].push(photo.file_url);
-  }
-
-  const latestPhoto = (type: string) => photosByType[type]?.[0] ?? null;
-  const allPhotos = (type: string) => photosByType[type] ?? [];
-
-  const detectedFault = (service.detected_fault as string) || '';
-  const workPerformed = (service.work_performed as string) || '';
-  const flowStep = (service.flow_step as string) || '';
-  const status = (service.status as string) || '';
-
-  // Status that imply the service has already passed the initial entry/photos phase
-  const isInProgress = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluido'].includes(status);
-
-  // --- WORKSHOP FLOW ---
-  if (flowType === 'oficina' || flowType === 'oficina_continuacao') {
-    const formDataOverrides: Record<string, unknown> = {
-      detectedFault,
-      workPerformed,
-      photoAparelho: latestPhoto('aparelho'),
-      photoEtiqueta: latestPhoto('etiqueta'),
-      photosEstado: allPhotos('estado'),
-      usedPartsList,
-      usedParts: usedPartsList.length > 0,
-      productBrand: service.brand || "",
-      productModel: service.model || "",
-      productSerial: service.serial_number || "",
-      productPNC: (service as any).pnc || "",
-      productType: service.appliance_type || "",
+    // Identify photo IDs we actually need to fetch URLs for (latest of each relevant type, and max 3 'estado')
+    const idsToFetch: string[] = [];
+    const addLatestId = (type: string) => {
+      if (photoMetadataByType[type]?.[0]) idsToFetch.push(photoMetadataByType[type][0].id);
     };
 
-    if (flowType === 'oficina_continuacao') {
-      return { step: 'confirmacao_peca', formDataOverrides };
+    ['aparelho', 'etiqueta', 'antes', 'depois', 'instalacao_antes', 'instalacao_depois', 'assinatura', 'entrega', 'verificacao', 'aparelho_recuperado', 'visita'].forEach(addLatestId);
+    if (photoMetadataByType['estado']) {
+      photoMetadataByType['estado'].slice(0, 3).forEach(p => idsToFetch.push(p.id));
     }
 
-    // Prioritize explicit flow_step from DB
-    if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
-      return { step: flowStep, formDataOverrides };
+    // Fetch actual URLs for identified photos
+    let photos: any[] = [];
+    if (idsToFetch.length > 0) {
+      const { data: fetchedPhotos, error: fetchPhotosError } = await supabase
+        .from('service_photos')
+        .select('photo_type, file_url, uploaded_at')
+        .in('id', idsToFetch)
+        .order('uploaded_at', { ascending: false });
+
+      if (fetchPhotosError) throw fetchPhotosError;
+      photos = fetchedPhotos ?? [];
     }
 
-    // Skip initial photos if service is already in progress and has any photos
-    const skipInitialPhotos = isInProgress && hasAnyPhoto;
-
-    if (!skipInitialPhotos) {
-      if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
-      if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
-      if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+    const photosByType: Record<string, string[]> = {};
+    for (const photo of photos) {
+      if (!photosByType[photo.photo_type]) photosByType[photo.photo_type] = [];
+      photosByType[photo.photo_type].push(photo.file_url);
     }
 
-    const hasProductInfo = !!(service.brand && service.model);
-    if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+    const latestPhoto = (type: string) => photosByType[type]?.[0] ?? null;
+    const allPhotos = (type: string) => photosByType[type] ?? [];
 
-    if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
-    if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
-    if (!workPerformed) return { step: 'pecas_usadas', formDataOverrides };
-    return { step: 'conclusao', formDataOverrides };
-  }
+    const detectedFault = (service.detected_fault as string) || '';
+    const workPerformed = (service.work_performed as string) || '';
+    const flowStep = (service.flow_step as string) || '';
+    const status = (service.status as string) || '';
 
-  // --- VISIT FLOW ---
-  if (flowType === 'visita' || flowType === 'visita_continuacao') {
-    const serviceType = (service.service_type as string) || '';
-    const isReparacao = serviceType === 'reparacao';
+    // Status that imply the service has already passed the initial entry/photos phase
+    const isInProgress = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'].includes(status);
 
-    const formDataOverrides: Record<string, unknown> = {
-      detectedFault,
-      photoAparelho: latestPhoto('aparelho'),
-      photoEtiqueta: latestPhoto('etiqueta'),
-      photosEstado: allPhotos('estado'),
-      photoFile: latestPhoto('visita'),
-      usedPartsList,
-      usedParts: usedPartsList.length > 0,
-      productBrand: service.brand || "",
-      productModel: service.model || "",
-      productSerial: service.serial_number || "",
-      productPNC: (service as any).pnc || "",
-      productType: service.appliance_type || "",
-    };
+    // --- WORKSHOP FLOW ---
+    if (flowType === 'oficina' || flowType === 'oficina_continuacao') {
+      const formDataOverrides: Record<string, unknown> = {
+        detectedFault,
+        workPerformed,
+        photoAparelho: latestPhoto('aparelho'),
+        photoEtiqueta: latestPhoto('etiqueta'),
+        photosEstado: allPhotos('estado'),
+        usedPartsList,
+        usedParts: usedPartsList.length > 0,
+        productBrand: service.brand || "",
+        productModel: service.model || "",
+        productSerial: service.serial_number || "",
+        productPNC: (service as any).pnc || "",
+        productType: service.appliance_type || "",
+      };
 
-    if (flowType === 'visita_continuacao') {
-      return { step: 'confirmacao_peca', formDataOverrides };
-    }
+      if (flowType === 'oficina_continuacao') {
+        return { step: 'confirmacao_peca', formDataOverrides };
+      }
 
-    // Prioritize explicit flow_step from DB
-    if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
-      return { step: flowStep, formDataOverrides };
-    }
+      // Prioritize explicit flow_step from DB
+      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+        return { step: flowStep, formDataOverrides };
+      }
 
-    // Skip initial photos if service is already in progress and has any photos
-    const skipInitialPhotos = isInProgress && hasAnyPhoto;
+      // Skip initial photos if service is already in progress and has any photos
+      const skipInitialPhotos = isInProgress && hasAnyPhoto;
 
-    if (isReparacao) {
       if (!skipInitialPhotos) {
         if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
         if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
@@ -194,47 +152,99 @@ export async function deriveStepFromDb(
       if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
-      if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
-      return { step: 'decisao', formDataOverrides };
-    } else {
-      if (!hasPhoto('visita')) return { step: 'foto', formDataOverrides };
-
-      const hasProductInfo = !!(service.brand && service.model);
-      if (!hasProductInfo) return { step: 'produto', formDataOverrides };
-
-      if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
-      if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
-      return { step: 'decisao', formDataOverrides };
+      if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
+      if (!workPerformed) return { step: 'pecas_usadas', formDataOverrides };
+      return { step: 'conclusao', formDataOverrides };
     }
+
+    // --- VISIT FLOW ---
+    if (flowType === 'visita' || flowType === 'visita_continuacao') {
+      const serviceType = (service.service_type as string) || '';
+      const isReparacao = serviceType === 'reparacao';
+
+      const formDataOverrides: Record<string, unknown> = {
+        detectedFault,
+        photoAparelho: latestPhoto('aparelho'),
+        photoEtiqueta: latestPhoto('etiqueta'),
+        photosEstado: allPhotos('estado'),
+        photoFile: latestPhoto('visita'),
+        usedPartsList,
+        usedParts: usedPartsList.length > 0,
+        productBrand: service.brand || "",
+        productModel: service.model || "",
+        productSerial: service.serial_number || "",
+        productPNC: (service as any).pnc || "",
+        productType: service.appliance_type || "",
+      };
+
+      if (flowType === 'visita_continuacao') {
+        return { step: 'confirmacao_peca', formDataOverrides };
+      }
+
+      // Prioritize explicit flow_step from DB
+      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+        return { step: flowStep, formDataOverrides };
+      }
+
+      // Skip initial photos if service is already in progress and has any photos
+      const skipInitialPhotos = isInProgress && hasAnyPhoto;
+
+      if (isReparacao) {
+        if (!skipInitialPhotos) {
+          if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
+          if (!hasPhoto('etiqueta')) return { step: 'foto_etiqueta', formDataOverrides };
+          if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
+        }
+
+        const hasProductInfo = !!(service.brand && service.model);
+        if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+
+        if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
+        if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
+        return { step: 'decisao', formDataOverrides };
+      } else {
+        if (!hasPhoto('visita')) return { step: 'foto', formDataOverrides };
+
+        const hasProductInfo = !!(service.brand && service.model);
+        if (!hasProductInfo) return { step: 'produto', formDataOverrides };
+
+        if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
+        if (hasRequestedPart) return { step: 'pedir_peca', formDataOverrides };
+        return { step: 'decisao', formDataOverrides };
+      }
+    }
+
+    // --- INSTALLATION FLOW ---
+    if (flowType === 'instalacao') {
+      const formDataOverrides: Record<string, unknown> = {
+        photoAntes: latestPhoto('instalacao_antes'),
+        photoDepois: latestPhoto('instalacao_depois'),
+        workPerformed,
+        usedMaterials: usedPartsList,
+      };
+
+      if (!hasPhoto('instalacao_antes')) return { step: 'foto_antes', formDataOverrides };
+      if (usedPartsList.length === 0) return { step: 'materiais', formDataOverrides };
+      if (!workPerformed) return { step: 'trabalho', formDataOverrides };
+      if (!hasPhoto('instalacao_depois')) return { step: 'foto_depois', formDataOverrides };
+      return { step: 'finalizacao', formDataOverrides };
+    }
+
+    // --- DELIVERY FLOW ---
+    if (flowType === 'entrega') {
+      const formDataOverrides: Record<string, unknown> = {
+        photoFile: latestPhoto('entrega'),
+      };
+
+      if (!hasPhoto('entrega')) return { step: 'foto', formDataOverrides };
+      return { step: 'finalizacao', formDataOverrides };
+    }
+
+    return { step: 'resumo', formDataOverrides: {} };
+  } catch (error) {
+    console.error('Error deriving step from DB:', error);
+    return { step: 'resumo', formDataOverrides: {} };
   }
-
-  // --- INSTALLATION FLOW ---
-  if (flowType === 'instalacao') {
-    const formDataOverrides: Record<string, unknown> = {
-      photoAntes: latestPhoto('instalacao_antes'),
-      photoDepois: latestPhoto('instalacao_depois'),
-      workPerformed,
-      usedMaterials: usedPartsList,
-    };
-
-    if (!hasPhoto('instalacao_antes')) return { step: 'foto_antes', formDataOverrides };
-    if (usedPartsList.length === 0) return { step: 'materiais', formDataOverrides };
-    if (!workPerformed) return { step: 'trabalho', formDataOverrides };
-    if (!hasPhoto('instalacao_depois')) return { step: 'foto_depois', formDataOverrides };
-    return { step: 'finalizacao', formDataOverrides };
-  }
-
-  // --- DELIVERY FLOW ---
-  if (flowType === 'entrega') {
-    const formDataOverrides: Record<string, unknown> = {
-      photoFile: latestPhoto('entrega'),
-    };
-
-    if (!hasPhoto('entrega')) return { step: 'foto', formDataOverrides };
-    return { step: 'finalizacao', formDataOverrides };
-  }
-
-  return { step: 'resumo', formDataOverrides: {} };
 }
 
 export function useFlowPersistence<T extends Record<string, unknown>>(

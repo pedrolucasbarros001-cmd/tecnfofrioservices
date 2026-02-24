@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureValidSession } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { WorkshopFlowModals } from '@/components/technician/WorkshopFlowModals';
 import { RequestTransferModal } from '@/components/modals/RequestTransferModal';
@@ -92,11 +92,13 @@ export default function TechnicianOfficePage() {
         return;
       }
 
-      await updateService.mutateAsync({
-        id: service.id,
-        technician_id: tech.id,
-        status: 'na_oficina',
+      await ensureValidSession();
+
+      const { error: rpcError } = await (supabase.rpc as any)('start_workshop_service', {
+        _service_id: service.id,
       });
+
+      if (rpcError) throw rpcError;
 
       toast.success('Serviço assumido com sucesso!');
       refetch();
@@ -164,8 +166,6 @@ export default function TechnicianOfficePage() {
             ? 'bg-slate-50 border-l-4 border-l-slate-400'
             : 'bg-orange-50 border-l-4 border-l-orange-500'
         )}
-        onMouseEnter={() => prefetchFullServiceData(queryClient, service.id)}
-        onTouchStart={() => prefetchFullServiceData(queryClient, service.id)}
       >
         <CardContent className="p-4 pt-6">
           {/* Transfer button - only for assigned services */}

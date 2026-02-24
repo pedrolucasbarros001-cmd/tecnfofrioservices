@@ -50,6 +50,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 
 import { Separator } from '@/components/ui/separator';
@@ -266,7 +267,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Nova Entrega Direta</DialogTitle>
             <p className="text-sm text-muted-foreground">Esta entrega será atribuída a um técnico para levar o equipamento ao cliente.</p>
@@ -274,8 +275,8 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 overflow-y-auto px-6">
-                <div className="space-y-6 py-4 pr-4">
+              <ScrollArea className="flex-1 px-6">
+                <div className="space-y-6 py-4 pr-3">
                   {/* Customer Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Informações do Cliente</h3>
@@ -648,7 +649,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
                     />
                   </div>
                 </div>
-              </div>
+              </ScrollArea>
 
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button type="button" variant="outline" onClick={handleClose}>

@@ -19,6 +19,7 @@ import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logServiceStart, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
 import { supabase, ensureValidSession } from "@/integrations/supabase/client";
+import { humanizeError } from "@/utils/errorMessages";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
@@ -173,13 +174,18 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         return;
       }
 
+      // Usa RPC SECURITY DEFINER: atribui o técnico se necessário e
+      // muda para em_execucao sem erro de RLS (funciona mesmo quando
+      // technician_id era null antes do início).
+      setIsSubmitting(true);
+      await ensureValidSession();
       const { error: rpcError } = await (supabase.rpc as any)('start_workshop_service', {
         _service_id: service.id,
       });
       if (rpcError) throw rpcError;
 
       // Log activity (background)
-      logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => {});
+      logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => { });
 
       queryClient.invalidateQueries({ queryKey: ["services"] });
       queryClient.invalidateQueries({ queryKey: ["technician-services"] });
@@ -195,28 +201,34 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }
     } catch (error) {
       console.error("Error starting repair:", error);
-      toast.error("Erro ao iniciar reparação. Verifique a sua sessão.");
+      toast.error(humanizeError(error));
     }
   };
 
   const handlePartsConfirm = async (parts: PartEntry[]) => {
-    // Save parts to database
-    for (const part of parts) {
-      await supabase.from("service_parts").insert({
-        service_id: service.id,
-        part_name: part.name,
-        part_code: part.reference || null,
-        quantity: part.quantity,
-        is_requested: false,
-        arrived: true,
-        cost: 0,
-      });
-    }
+    try {
+      await ensureValidSession();
+      // Save parts to database
+      for (const part of parts) {
+        await supabase.from("service_parts").insert({
+          service_id: service.id,
+          part_name: part.name,
+          part_code: part.reference || null,
+          quantity: part.quantity,
+          is_requested: false,
+          arrived: true,
+          cost: 0,
+        });
+      }
 
-    setFormData((prev) => ({ ...prev, usedPartsList: parts }));
-    setShowPartsModal(false);
-    queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
-    toast.success("Peças registadas!");
+      setFormData((prev) => ({ ...prev, usedPartsList: parts }));
+      setShowPartsModal(false);
+      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      toast.success("Peças registadas!");
+    } catch (error) {
+      console.error("Error confirming parts:", error);
+      toast.error(humanizeError(error));
+    }
   };
 
   const handleRequestPart = async () => {
@@ -228,6 +240,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     setIsSubmitting(true);
     try {
       await ensureValidSession();
+
       // Save the part request
       await supabase.from("service_parts").insert({
         service_id: service.id,
@@ -265,7 +278,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       onComplete();
     } catch (error) {
       console.error("Error requesting part:", error);
-      toast.error("Erro ao solicitar peça");
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -285,6 +298,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     setIsSubmitting(true);
     try {
       await ensureValidSession();
+
       // Update service to concluidos + pending_pricing via RPC (bypassa RLS)
       const { error: rpcError } = await (supabase.rpc as any)('technician_update_service', {
         _service_id: service.id,
@@ -309,7 +323,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       onComplete();
     } catch (error) {
       console.error("Error completing repair:", error);
-      toast.error("Erro ao concluir reparação");
+      toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -773,7 +787,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 3: Peças Usadas */}
-      < Dialog
+      <Dialog
         open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal
         }
         onOpenChange={(open) => !open && handleClose()}
@@ -995,6 +1009,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           if (currentStep === "foto_aparelho") photoType = "aparelho";
           else if (currentStep === "foto_etiqueta") photoType = "etiqueta";
           else if (currentStep === "foto_estado") photoType = "estado";
+
+          await ensureValidSession();
 
           await supabase.from("service_photos").insert({
             service_id: service.id,

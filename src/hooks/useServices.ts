@@ -58,6 +58,7 @@ export function useServices(options: UseServicesOptions = {}) {
       if (error) throw error;
       return (data as unknown as Service[]) || [];
     },
+    refetchInterval: 300000, // Reduced to 5 minutes to stabilize DB
   });
 }
 
@@ -333,6 +334,7 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         totalPages: Math.ceil(totalCount / pageSize),
       };
     },
+    refetchInterval: 300000,
     placeholderData: (prev) => prev,
   });
 }

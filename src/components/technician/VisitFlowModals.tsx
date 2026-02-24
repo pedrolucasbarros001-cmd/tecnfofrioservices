@@ -255,7 +255,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       toast.success("Foto guardada!");
     } catch (error) {
       console.error("Error saving photo:", error);
-      toast.error("Erro ao guardar foto");
+      toast.error(humanizeError(error));
     }
   };
 
@@ -281,12 +281,16 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const saveUsedParts = async () => {
     if (!formData.usedParts) return;
 
+    await ensureValidSession();
+
     // Fetch parts already saved for this service (used parts, not requested)
-    const { data: existingParts } = await supabase
+    const { data: existingParts, error: fetchError } = await supabase
       .from("service_parts")
       .select("part_name")
       .eq("service_id", service.id)
       .eq("is_requested", false);
+
+    if (fetchError) throw fetchError;
 
     const existingNames = new Set((existingParts || []).map((p: any) => p.part_name?.toLowerCase().trim()));
 
@@ -352,6 +356,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         // Update service status
+        await ensureValidSession();
         await updateService.mutateAsync({
           id: service.id,
           status: "para_pedir_peca",
@@ -434,6 +439,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         // Update service - repaired on site
+        await ensureValidSession();
         await updateService.mutateAsync({
           id: service.id,
           status: "concluidos",
@@ -671,6 +677,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   // Save product info to service
   const handleProductoConfirm = async () => {
     try {
+      await ensureValidSession();
       await updateService.mutateAsync({
         id: service.id,
         brand: formData.productBrand || undefined,
@@ -1023,79 +1030,79 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
       <Dialog open={currentStep === "produto" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="prod_type" className="text-sm">Tipo de Aparelho</Label>
+              <Input
+                id="prod_type"
+                placeholder="Ex: Máquina de Lavar, Frigorífico..."
+                value={formData.productType as string}
+                onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="prod_type" className="text-sm">Tipo de Aparelho</Label>
+                <Label htmlFor="prod_brand" className="text-sm">Marca</Label>
                 <Input
-                  id="prod_type"
-                  placeholder="Ex: Máquina de Lavar, Frigorífico..."
-                  value={formData.productType as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
+                  id="prod_brand"
+                  placeholder="Ex: Bosch, LG..."
+                  value={formData.productBrand as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
                   className="mt-1"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="prod_brand" className="text-sm">Marca</Label>
-                  <Input
-                    id="prod_brand"
-                    placeholder="Ex: Bosch, LG..."
-                    value={formData.productBrand as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="prod_model" className="text-sm">Modelo</Label>
-                  <Input
-                    id="prod_model"
-                    placeholder="Ex: WAT24469ES"
-                    value={formData.productModel as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="prod_model" className="text-sm">Modelo</Label>
+                <Input
+                  id="prod_model"
+                  placeholder="Ex: WAT24469ES"
+                  value={formData.productModel as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
+                  className="mt-1"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="prod_serial" className="text-sm">Nº de Série</Label>
-                  <Input
-                    id="prod_serial"
-                    placeholder="Número de série"
-                    value={formData.productSerial as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="prod_pnc" className="text-sm">PNC</Label>
-                  <Input
-                    id="prod_pnc"
-                    placeholder="Product Number Code"
-                    value={formData.productPNC as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Preencha o que estiver visível na placa do aparelho. Campos opcionais.
-              </p>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="prod_serial" className="text-sm">Nº de Série</Label>
+                <Input
+                  id="prod_serial"
+                  placeholder="Número de série"
+                  value={formData.productSerial as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="prod_pnc" className="text-sm">PNC</Label>
+                <Input
+                  id="prod_pnc"
+                  placeholder="Product Number Code"
+                  value={formData.productPNC as string}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Preencha o que estiver visível na placa do aparelho. Campos opcionais.
+            </p>
+          </div>
 
-            <DialogFooter className="flex gap-2 mt-6">
-              <Button variant="outline" onClick={goToPreviousPhotoStep} className="flex items-center gap-1">
-                <ArrowLeft className="h-4 w-4" /> Voltar
-              </Button>
-              <Button onClick={handleProductoConfirm} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white">
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          <DialogFooter className="flex gap-2 mt-6">
+            <Button variant="outline" onClick={goToPreviousPhotoStep} className="flex items-center gap-1">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+            <Button onClick={handleProductoConfirm} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white">
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal 4/6: Diagnóstico */}
       <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>

@@ -166,8 +166,6 @@ export default function ServicosPage() {
         className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder)}
         data-tour="service-cards"
         data-demo="service-cards"
-        onMouseEnter={() => prefetchFullServiceData(queryClient, service.id)}
-        onTouchStart={() => prefetchFullServiceData(queryClient, service.id)}
       >
         <CardContent className="p-4">
           <div className="space-y-3">

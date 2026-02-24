@@ -49,6 +49,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 
 import { cn } from '@/lib/utils';
@@ -343,7 +344,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">
               {step === 'location' ? 'Tipo de Serviço' : 'Criar Novo Serviço'}
@@ -392,8 +393,8 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-                <div className="flex-1 overflow-y-auto px-6">
-                  <div className="space-y-4 py-4 pr-4">
+                <ScrollArea className="flex-1 px-6">
+                  <div className="space-y-4 py-4 pr-3">
                     {/* Customer Selected Box */}
                     {selectedCustomer && (
                       <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -854,7 +855,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
                   </div>
-                </div>
+                </ScrollArea>
 
                 <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                   <Button type="button" variant="outline" onClick={() => setStep('location')}>
