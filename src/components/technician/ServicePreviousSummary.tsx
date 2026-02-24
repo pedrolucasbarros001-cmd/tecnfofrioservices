@@ -48,7 +48,7 @@ export function ServicePreviousSummary({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
-  // Fetch activity logs for this service
+  // Fetch activity logs for this service — lazy: only when expanded
   const { data: activityLogs } = useQuery({
     queryKey: ['service-activity-summary', service.id],
     queryFn: async () => {
@@ -63,10 +63,11 @@ export function ServicePreviousSummary({
       if (error) throw error;
       return data as ActivityLogWithActor[];
     },
-    enabled: !!service.id,
+    enabled: !!service.id && isExpanded,
+    staleTime: 30_000,
   });
 
-  // Fetch photos for this service
+  // Fetch photos for this service — lazy: only when expanded
   const { data: photos } = useQuery({
     queryKey: ['service-photos-summary', service.id],
     queryFn: async () => {
@@ -80,7 +81,8 @@ export function ServicePreviousSummary({
       if (error) throw error;
       return data;
     },
-    enabled: !!service.id,
+    enabled: !!service.id && isExpanded,
+    staleTime: 30_000,
   });
 
   // Get the most recent execution log
