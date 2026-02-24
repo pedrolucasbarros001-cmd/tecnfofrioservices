@@ -1,103 +1,136 @@
 
+Objetivo principal
+- Eliminar os fechamentos indevidos de modais, travamentos de fluxo e estados inconsistentes nos fluxos do técnico (Visita, Entrega, Instalação, Oficina), com validação de navegação real (não apenas leitura de ficheiros).
+- Padronizar uma estrutura de fluxo para parar de “corrigir sempre” os mesmos problemas.
 
-# Plano: Alinhar Mapa com Morada Real e Auditoria Geral de Fluxos/Modais
+Do I know what the issue is?
+- Sim.
+- A causa principal dos fechamentos inesperados é combinação de:
+  1) múltiplos `Dialog` independentes por passo dentro do mesmo fluxo;
+  2) `onOpenChange` mal guardado (em alguns pontos fecha sempre, mesmo quando não devia);
+  3) fechamento legítimo de um passo durante transição disparando `onOpenChange(false)` e sendo interpretado como “fechar fluxo todo”.
+- Há também pontos secundários:
+  - `FieldPaymentStep` e `SignatureCanvas` com `onOpenChange` agressivo;
+  - custo desnecessário de carregamento em resumo com histórico (querys montadas cedo demais);
+  - warning de ref no Sidebar que pode gerar comportamento UI inconsistente em mobile/sheet.
 
-## Problema 1: Mapa nao alinhado com a morada
+Evidências técnicas encontradas
+- `VisitFlowModals`: existe `onOpenChange={() => handleClose()}` em diálogo principal (fecha sempre, inclusive em transições).
+- `WorkshopFlowModals`: também há `onOpenChange={() => handleClose()}` em passos.
+- `DeliveryFlowModals` e `InstallationFlowModals`: usam `!open && handleClose()`, porém continuam vulneráveis quando um `Dialog` fecha por mudança de passo e outro abre no mesmo fluxo.
+- `FieldPaymentStep`: `onOpenChange={() => handleSkip()}` (executa skip de forma agressiva).
+- `SignatureCanvas`: `onOpenChange={handleClose}` (sem distinguir `open` true/false).
+- Console aponta warning de ref ligado ao `Sidebar`/`Dialog`, exigindo hardening para evitar efeitos colaterais.
 
-### Diagnostico
+Estratégia de correção (arquitetura padrão)
+- Em vez de continuar com correções pontuais por botão, vou aplicar uma padronização única de controle de fechamento para todos os fluxos:
+  - “Fechar fluxo” só quando houver intenção real de fechar (X/backdrop/escape), não durante troca de passo.
+  - Transição de passo nunca pode disparar fechamento global.
+- Isso cria uma base estável para Visita, Entrega, Instalação e Oficina com mesma lógica.
 
-Os tres fluxos do tecnico (Visita, Instalacao, Entrega) abrem o Google Maps usando apenas o campo `service_address` ou `customer.address`, **sem incluir cidade, codigo postal ou "Portugal"**. Exemplo:
+Plano de implementação
 
-- Morada guardada: `Rua Padre Americo nº58`
-- Google Maps recebe: `Rua Padre Americo nº58` (sem contexto geografico)
-- Resultado: Google Maps pode resolver para uma rua com nome semelhante em Cascais, Lisboa ou qualquer outro sitio
+1) Guardião único de fechamento por passo (core fix)
+- Ficheiros:
+  - `src/components/technician/VisitFlowModals.tsx`
+  - `src/components/technician/DeliveryFlowModals.tsx`
+  - `src/components/technician/InstallationFlowModals.tsx`
+  - `src/components/technician/WorkshopFlowModals.tsx`
+- Implementar handler padrão por passo:
+  - `handleStepDialogOpenChange(open, stepId)`:
+    - se `open === true`, não fecha nada;
+    - se `currentStep !== stepId`, ignorar (foi transição interna de passo);
+    - só chamar `handleClose()` quando `open === false` e o passo atual ainda é aquele diálogo.
+- Substituir todos os `onOpenChange` dos passos para esse padrão.
+- Corrigir imediatamente todos os `onOpenChange={() => handleClose()}` e equivalentes.
 
-### Solucao
+Resultado esperado:
+- Botões “Iniciar/Continuar/Concluir” deixam de fechar o fluxo acidentalmente.
+- Troca entre modais de passo não derruba para agenda/página de fundo.
 
-Criar uma funcao utilitaria `buildFullAddress` que concatena todos os campos disponiveis (morada + codigo postal + cidade + "Portugal") para garantir que o Google Maps resolve corretamente.
+2) Normalização de submodais (pagamento, assinatura, câmara)
+- Ficheiros:
+  - `src/components/technician/FieldPaymentStep.tsx`
+  - `src/components/shared/SignatureCanvas.tsx`
+  - (revisão de consistência em `CameraCapture.tsx`)
+- Ajustes:
+  - `FieldPaymentStep`: `onOpenChange={(open) => { if (!open) handleSkip(); }}`
+  - `SignatureCanvas`: `onOpenChange={(open) => { if (!open) handleClose(); }}`
+  - Garantir que nenhum submodal execute “close side effects” quando abrir.
+- Resultado:
+  - Evita salto de etapas e assinatura/pagamento sumindo por callback indevido.
 
-**Novo ficheiro: `src/utils/addressUtils.ts`**
+3) Performance de retoma em serviços com histórico (reparação/oficina)
+- Ficheiros:
+  - `src/components/technician/ServicePreviousSummary.tsx`
+  - `src/components/technician/DiagnosisPhotosGallery.tsx`
+  - `src/components/technician/WorkshopFlowModals.tsx`
+  - `src/components/technician/VisitFlowModals.tsx`
+- Ajustes:
+  - Lazy-load de dados pesados do resumo anterior apenas quando bloco expandido/necessário.
+  - Evitar cargas de miniaturas/fotos não visíveis no primeiro paint.
+  - Revisar “estado de retoma” para não bloquear botão por tempo excessivo se fallback já resolver.
+- Resultado:
+  - Fluxo de reparação com histórico deixa de “ficar carregando” por demasiado tempo antes de responder.
 
-```typescript
-export function buildFullAddress(parts: {
-  address?: string | null;
-  postalCode?: string | null;
-  city?: string | null;
-}): string | null {
-  const { address, postalCode, city } = parts;
-  if (!address) return null;
-  const segments = [address];
-  if (postalCode) segments.push(postalCode);
-  if (city) segments.push(city);
-  segments.push('Portugal');
-  return segments.join(', ');
-}
-```
+4) Hardening de sidebar/ref warning (estabilidade geral de navegação)
+- Ficheiros:
+  - `src/components/ui/sidebar.tsx`
+  - sidebars de layout se necessário (`OwnerSidebar`, `SecretarySidebar`, `TechnicianSidebar`)
+- Objetivo:
+  - Eliminar warning “Function components cannot be given refs” no caminho de render da Sidebar/Dialog.
+  - Remover fonte de comportamento não determinístico em mobile + sheet.
+- Resultado:
+  - Menos ruído no runtime e menos risco de regressões de interação.
 
-**Atualizar `handleNavigateToClient` nos 3 ficheiros:**
+5) Auditoria de botões críticos e guardas de submissão
+- Ficheiros foco:
+  - Fluxos técnicos (4 ficheiros acima)
+  - Hooks auxiliares de update (`useServices`, `useFlowPersistence`) apenas se necessário
+- Validar:
+  - todos os botões finais com `isSubmitting`;
+  - nenhuma ação crítica sem `ensureValidSession`;
+  - transições de estado sem loops (ex.: `em_execucao` → passos → conclusão).
+- Resultado:
+  - proteção contra clique duplo, race conditions e duplicação de eventos.
 
-- `src/components/technician/VisitFlowModals.tsx` (linha 223-231)
-- `src/components/technician/DeliveryFlowModals.tsx` (linha 130-138)
-- `src/components/technician/InstallationFlowModals.tsx` (linha 143-151)
+Validação prática (navegação real + regressão)
 
-Logica atualizada (igual nos 3):
-```typescript
-const handleNavigateToClient = () => {
-  const fullAddress = buildFullAddress({
-    address: service.service_address || service.customer?.address,
-    postalCode: service.service_postal_code || service.customer?.postal_code,
-    city: service.service_city || service.customer?.city,
-  });
-  if (fullAddress) {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`, '_blank');
-  } else {
-    toast.error('Morada nao disponivel');
-  }
-};
-```
+Matriz E2E obrigatória
+1) Entrega (rota `/servicos`)
+- Abrir card entrega → “Começar” → “Iniciar Entrega” → avançar todos os passos
+- Confirmar que não retorna à agenda ao trocar de passo
+- Fechar por X/cancelar e confirmar fechamento correto
 
-**Atualizar tambem a exibicao da morada no modal de deslocacao** para mostrar endereco completo (morada + codigo postal + cidade) em vez de so a rua:
+2) Visita
+- Iniciar visita nova e visita com histórico
+- Testar botões: iniciar, fotos, diagnóstico, decisão, pedir peça, assinatura
+- Confirmar que nenhum botão fecha fluxo indevidamente
 
-Nos 3 ficheiros, onde aparece:
-```
-<p className="font-medium">{service.service_address || service.customer?.address || 'N/A'}</p>
-```
-Substituir por:
-```
-<p className="font-medium">
-  {service.service_address || service.customer?.address || 'N/A'}
-</p>
-{(service.service_postal_code || service.customer?.postal_code || service.service_city || service.customer?.city) && (
-  <p className="text-muted-foreground text-xs mt-1">
-    {[service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city].filter(Boolean).join(', ')}
-  </p>
-)}
-```
+3) Instalação
+- Iniciar, deslocação, foto antes/depois, materiais, trabalho, pagamento, assinatura
+- Validar mudança de passo contínua sem desmontar fluxo
 
-## Problema 2: Auditoria geral de fluxos e modais
+4) Oficina
+- Reparação normal e continuação de peça
+- Confirmar “Iniciar/Continuar Reparação”, confirmação de peça, conclusão
+- Garantir ausência de fechamento abrupto
 
-Apos revisao completa dos ficheiros, confirmo que os restantes fluxos e modais estao nos conformes:
+5) Navegação/estabilidade global
+- Abrir/fechar notificações, trocar abas, voltar, repetir fluxos
+- Conferir console limpo de warning crítico de ref e sem erros de runtime
 
-- Todos os `DialogContent` possuem `max-w-[95vw]` e `max-h-[90vh]`
-- Scroll nativo (`overflow-y-auto`) ja aplicado em todos os modais de criacao e pedido de pecas (corrigido na mensagem anterior)
-- Guardas de submissao (`isSubmitting`) presentes em todos os botoes finais
-- Overlay protection (`pointer-events-none` no estado closed) ja aplicada
-- Propagacao de eventos interrompida nos menus de acao
+Critério de pronto
+- Nenhum fluxo técnico fecha sozinho ao trocar de passo.
+- Botões críticos não causam retorno inesperado para agenda.
+- Reparação com histórico responde sem demora anormal.
+- Submodais (pagamento/assinatura/câmara) não provocam side effects de fechamento.
+- Sem erros de console que indiquem problema estrutural de interação.
 
-**Nenhuma alteracao adicional necessaria alem da correcao do mapa.**
-
-## Ficheiros Alterados
-
-| Ficheiro | Alteracao |
-|---|---|
-| `src/utils/addressUtils.ts` | **Novo** - funcao `buildFullAddress` |
-| `src/components/technician/VisitFlowModals.tsx` | Usar `buildFullAddress` no `handleNavigateToClient` + mostrar cidade/CP no modal |
-| `src/components/technician/DeliveryFlowModals.tsx` | Idem |
-| `src/components/technician/InstallationFlowModals.tsx` | Idem |
-
-## Resultado
-
-- Google Maps abre centrado na morada correta em Braganca (ou arredores)
-- Morada completa visivel no passo de deslocacao (rua + codigo postal + cidade)
-- Todos os fluxos e modais mantidos estaveis sem alteracoes adicionais
-
+Observação importante sobre “garantir que nunca mais acontece”
+- Garantia absoluta (“jamais”) não existe em software, mas esta entrega vai incluir:
+  - correção estrutural da causa raiz;
+  - padronização de fechamento para todos os fluxos;
+  - validação E2E de navegação real;
+  - hardening contra regressões.
+- Isso reduz drasticamente a probabilidade de repetição e elimina os cenários reportados agora.
