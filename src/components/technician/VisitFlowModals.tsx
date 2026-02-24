@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Navigation,
   MapPin,
@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logWorkshopPickup, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, ensureValidSession } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { humanizeError } from "@/utils/errorMessages";
 import { useQueryClient } from "@tanstack/react-query";
@@ -142,14 +142,21 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   // Flow persistence with mode support - separate key for continuation
   const persistenceKey = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
-  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<VisitFormData>(service.id, persistenceKey);
+  const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<VisitFormData>(service.id, persistenceKey);
+
+  // Stable initialization ref
+  const hasInitialized = useRef(false);
 
   // Load saved state or reset when opened
   useEffect(() => {
     if (!isOpen) {
+      hasInitialized.current = false;
       setIsResuming(false);
       return;
     }
+
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
     const savedState = loadState();
     if (savedState) {
@@ -159,13 +166,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }
 
     setIsResuming(true);
-    // No localStorage → derive step from DB (handles phone restart)
     const persistenceFlowType = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
       setDerivedResumeStep(resumeStep as ModalStep);
 
-      // We still want to show Resumo first
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
 
       setFormData((prev) => ({
@@ -180,7 +185,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       }));
       setIsResuming(false);
     }).catch(() => setIsResuming(false));
-  }, [isOpen, service, loadState, mode]);
+  }, [isOpen, service.id]);
 
   // Auto-save state on step/data changes
   useEffect(() => {
@@ -189,6 +194,30 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       saveStateToDb(currentStep, formData);
     }
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
+
+  const handleStartVisit = async () => {
+    try {
+      await ensureValidSession();
+      // Mark service as em_execucao on server (visit flow was missing this)
+      const { error } = await (supabase.rpc as any)('technician_update_service', {
+        _service_id: service.id,
+        _status: 'em_execucao',
+      });
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+
+      if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
+        setCurrentStep(derivedResumeStep);
+      } else {
+        setCurrentStep("deslocacao");
+      }
+    } catch (error) {
+      console.error("Error starting visit:", error);
+      toast.error("Erro ao iniciar visita. Verifique a sua sessão.");
+    }
+  };
 
   const handleNavigateToClient = () => {
     const address = service.service_address || service.customer?.address;
@@ -202,6 +231,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   const handlePhotoCapture = async (imageData: string) => {
     try {
+      await ensureValidSession();
       await supabase.from("service_photos").insert({
         service_id: service.id,
         photo_type: currentPhotoType,
@@ -278,6 +308,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const handleSignatureComplete = async (signatureData: string, signerName: string) => {
     setIsSubmitting(true);
     try {
+      await ensureValidSession();
       // Save used parts if any (idempotent)
       await saveUsedParts();
 
@@ -485,6 +516,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   };
 
   const handleClose = () => {
+    // Flush current state to DB immediately before closing
+    if (currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
+      flushStateToDb(currentStep, formData);
+    }
     setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
     setFormData({
       detectedFault: "",
@@ -715,13 +750,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </Button>
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
-              onClick={() => {
-                if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
-                  setCurrentStep(derivedResumeStep);
-                } else {
-                  setCurrentStep("deslocacao");
-                }
-              }}
+              onClick={handleStartVisit}
               disabled={isResuming}
             >
               {isResuming ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}

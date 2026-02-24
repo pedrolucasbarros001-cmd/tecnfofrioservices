@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logServiceStart, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, ensureValidSession } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
@@ -104,17 +104,24 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   // Flow persistence with mode support
   const persistenceKey = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
-  const { loadState, saveState, saveStateToDb, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
+  const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
 
   // Check if service has previous execution history
   const hasPreviousHistory = !!service.detected_fault;
 
+  // Stable initialization ref — prevents re-running on service object reference changes
+  const hasInitialized = useRef(false);
+
   // Load saved state or pre-fill from service
   useEffect(() => {
     if (!isOpen) {
+      hasInitialized.current = false;
       setIsResuming(false);
       return;
     }
+
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
     const savedState = loadState();
     if (savedState) {
@@ -147,7 +154,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }));
       setIsResuming(false);
     }).catch(() => setIsResuming(false));
-  }, [isOpen, service, loadState, mode]);
+  }, [isOpen, service.id]);
 
   // Save state on changes
   useEffect(() => {
@@ -159,21 +166,20 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   const handleStartRepair = async () => {
     try {
+      await ensureValidSession();
+
       if (mode === "continuacao_peca") {
         setCurrentStep("confirmacao_peca");
         return;
       }
 
-      // Usa RPC SECURITY DEFINER: atribui o técnico se necessário e
-      // muda para em_execucao sem erro de RLS (funciona mesmo quando
-      // technician_id era null antes do início).
       const { error: rpcError } = await (supabase.rpc as any)('start_workshop_service', {
         _service_id: service.id,
       });
       if (rpcError) throw rpcError;
 
-      // Log activity
-      await logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
+      // Log activity (background)
+      logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => {});
 
       queryClient.invalidateQueries({ queryKey: ["services"] });
       queryClient.invalidateQueries({ queryKey: ["technician-services"] });
@@ -189,7 +195,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }
     } catch (error) {
       console.error("Error starting repair:", error);
-      toast.error("Erro ao iniciar reparação");
+      toast.error("Erro ao iniciar reparação. Verifique a sua sessão.");
     }
   };
 
@@ -221,6 +227,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
     setIsSubmitting(true);
     try {
+      await ensureValidSession();
       // Save the part request
       await supabase.from("service_parts").insert({
         service_id: service.id,
@@ -277,6 +284,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
     setIsSubmitting(true);
     try {
+      await ensureValidSession();
       // Update service to concluidos + pending_pricing via RPC (bypassa RLS)
       const { error: rpcError } = await (supabase.rpc as any)('technician_update_service', {
         _service_id: service.id,
@@ -308,6 +316,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   };
 
   const handleClose = () => {
+    // Flush current state to DB immediately before closing
+    if (currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
+      flushStateToDb(currentStep, formData);
+    }
     setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
     setFormData({
       detectedFault: "",
