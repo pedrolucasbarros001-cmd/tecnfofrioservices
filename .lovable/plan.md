@@ -1,94 +1,74 @@
 
-# Plano: Tornar o Sistema Resiliente a Lentidao do Supabase
+# Plano: Corrigir Login com Credenciais Correctas e Permitir Sessoes Simultaneas
 
-## Diagnostico Real (dos logs)
+## Problema Raiz
 
-A base de dados Supabase esta a sofrer timeouts intermitentes ao nivel da infraestrutura:
+Ha dois problemas distintos a causar o erro de "credenciais invalidas" com senhas correctas:
+
+### Problema 1: O logout mata TODAS as sessoes
+
+O `signOut()` actual chama `supabase.auth.signOut()` **sem parametros**. Por defeito, o Supabase usa `scope: 'global'`, que **invalida TODOS os refresh tokens** do utilizador em todos os dispositivos. Isto significa:
 
 ```text
-11:16:50 - Auth /token -> 500: "error finding user: timeout: context canceled"
-11:11:29 - Auth /token -> 504: "dial tcp [::1]:5432: i/o timeout"
-11:12:49 - Auth /token -> 200 mas demorou 9.7 SEGUNDOS
-11:11:37 - Auth /token -> 200 mas demorou 6.1 SEGUNDOS
-DB logs: multiplos "canceling statement due to statement timeout"
+Utilizador loga no PC -> OK
+Utilizador loga no telemovel -> OK
+Utilizador faz logout no telemovel -> MATA a sessao do PC tambem!
+  |
+  v
+PC tenta renovar token -> token invalido
+  |
+  v
+Proximo login no PC pode falhar com erro ambiguo
 ```
 
-O problema nao e do codigo -- e o servico Supabase que perde conexao com a propria base de dados. Mas o sistema pode ser **muito mais inteligente** a lidar com isto.
+### Problema 2: Erros de servidor sao classificados como "credenciais invalidas"
 
-## Problemas Actuais no Codigo
+Quando a base de dados esta lenta e retorna 500/504, o Supabase Auth por vezes retorna mensagens de erro que nao contem as palavras-chave de servidor ("database error", "timeout"), e caem no bloco generico que o utilizador interpreta como "senha errada".
 
-1. **signIn nao faz retry**: se o Supabase Auth retorna 500/504, o login falha imediatamente sem tentar novamente
-2. **Mensagem de erro generica**: o utilizador ve "Erro de autenticacao" quando na verdade e "servidor sobrecarregado, tente de novo"
-3. **Sem deteccao proactiva**: a pagina de login nao avisa o utilizador quando o servidor esta lento ANTES de tentar logar
+### Problema 3: TVMonitorPage faz signOut global separado
 
-## Solucao (2 ficheiros)
+A pagina `TVMonitorPage.tsx` chama `supabase.auth.signOut()` directamente (sem usar o contexto), tambem com scope global.
+
+## Solucao (3 ficheiros)
 
 ### Ficheiro 1: `src/contexts/AuthContext.tsx`
 
-Adicionar retry automatico ao `signIn`:
+Alterar a funcao `signOut` para usar `scope: 'local'`:
 
 ```text
-signIn (modificado):
-  tentativa 1: signInWithPassword (timeout 12s)
-  se erro 500/504/timeout:
-    espera 2 segundos
-    tentativa 2: signInWithPassword (timeout 12s)
-    se erro novamente:
-      retorna erro ao utilizador
-  se sucesso:
-    retorna normalmente
+Antes:  await supabase.auth.signOut()              // mata TODAS as sessoes
+Depois: await supabase.auth.signOut({ scope: 'local' })  // so mata ESTA sessao
 ```
 
-- Detectar erros de servidor (500, "Database error", "timeout", "context canceled") vs erros de credenciais (401, "Invalid login credentials")
-- So fazer retry em erros de servidor, NAO em credenciais invalidas
-- Maximo de 1 retry (total 2 tentativas)
+Isto permite que a mesma conta esteja logada em multiplos dispositivos simultaneamente sem conflito.
 
-### Ficheiro 2: `src/pages/LoginPage.tsx`
+### Ficheiro 2: `src/pages/TVMonitorPage.tsx`
 
-Melhorias na experiencia do utilizador:
-
-1. **Deteccao proactiva de saude do servidor**: ao carregar a pagina de login, fazer um "health check" silencioso (query simples ao Supabase) e mostrar um banner amarelo se o servidor estiver lento
-2. **Mensagens de erro especificas**: distinguir entre "servidor sobrecarregado" (com opcao de tentar novamente) e "credenciais invalidas"
-3. **Feedback de progresso**: durante o login, mostrar texto que muda conforme o tempo passa:
-   - 0-3s: "A entrar..."
-   - 3-8s: "A conectar ao servidor..."
-   - 8s+: "O servidor esta lento, por favor aguarde..."
-4. **Botao "Tentar novamente"**: se o login falhar por timeout, mostrar botao para repetir em vez de obrigar o utilizador a preencher tudo de novo
+Alterar o logout directo para tambem usar scope local:
 
 ```text
-LoginPage (modificado):
-
-  // Health check ao montar
-  useEffect -> fetch simples ao Supabase
-    se demorar > 3s ou falhar -> mostrar banner "Servidor lento"
-
-  // Feedback progressivo
-  useEffect (durante isLoading):
-    setTimeout 3s -> "A conectar ao servidor..."
-    setTimeout 8s -> "O servidor está lento..."
-
-  // Mensagens de erro melhoradas
-  onSubmit:
-    se erro.message inclui "Database error" ou "timeout":
-      toast: "Servidor temporariamente indisponível. A tentar novamente..."
-      // O retry ja acontece no AuthContext
-    se erro.message inclui "Invalid login":
-      toast: "Credenciais inválidas"
+Antes:  await supabase.auth.signOut()
+Depois: await supabase.auth.signOut({ scope: 'local' })
 ```
+
+### Ficheiro 3: `src/pages/LoginPage.tsx`
+
+Melhorar a deteccao de erros para evitar classificar erros de servidor como "credenciais invalidas":
+
+- Antes de verificar "invalid"/"credentials", primeiro limpar sessao local antiga (que pode estar a causar conflito)
+- Adicionar mais palavras-chave de servidor: "context deadline", "connection", "ECONNREFUSED"
+- Chamar `localStorage.clear()` automaticamente antes de cada tentativa de login para eliminar sessoes fantasma
 
 ## Resultado
 
-- Login com retry automatico: se o servidor falhar na 1a tentativa, tenta novamente automaticamente
-- O utilizador sabe ANTES de logar se o servidor esta lento (banner amarelo)
-- Mensagens de erro claras: "servidor sobrecarregado" vs "senha errada"
-- Feedback visual progressivo durante o login
-- O botao "Entrar" NUNCA fica preso (timeouts + safety resets ja existentes)
+- A mesma conta pode estar logada em quantos dispositivos quiser, ao mesmo tempo
+- Fazer logout num dispositivo NAO afecta os outros
+- Sessoes antigas nao interferem com novos logins
+- Erros de servidor nao sao confundidos com "senha errada"
 
-## Secao Tecnica
+## Seccao Tecnica
 
-- O retry so acontece para erros de servidor (500, 504, timeout, "Database error"), nunca para credenciais invalidas
-- O health check usa uma query leve (`supabase.from('profiles').select('count', { count: 'exact', head: true }).limit(0)`) que nao carrega dados
-- O timeout do health check e 5 segundos -- se demorar mais, mostra banner
-- As queries React Query ja tem `retry: 1` configurado globalmente no QueryClient
-- Os timeouts existentes (10s para queries, 15s safety) continuam activos
-- A base de dados tem 227MB e apenas 19 servicos -- os timeouts sao da infraestrutura Supabase, nao do volume de dados
+- `supabase.auth.signOut({ scope: 'local' })` apenas remove a sessao do localStorage do browser actual, sem tocar no servidor
+- O Supabase suporta nativamente sessoes multiplas -- cada `signInWithPassword` gera um novo par access/refresh token independente
+- Nenhuma alteracao de base de dados e necessaria
+- A limpeza de localStorage antes do login garante que tokens expirados/invalidos de sessoes anteriores nao interferem
