@@ -1,88 +1,153 @@
 
+# Plano: Corrigir Erros nos Fluxos do Tecnico e Garantir Estabilidade
 
-# Plano: Adicionar Scroll Padronizado a Todos os Modais
+## Problemas Identificados
 
-## Problema
+Apos analise detalhada do codigo, identifiquei 6 problemas concretos que causam erros, crashes e bloqueios no fluxo do tecnico.
 
-Varios modais do sistema nao possuem suporte a scroll quando o conteudo excede a altura da tela, especialmente em dispositivos moveis. Isto causa conteudo cortado e botoes inacessiveis (como visivel no screenshot do "Registar Pedido de Peca").
+### Problema 1: Entrega de Oficina -- Tecnico nao consegue iniciar (CRITICO)
 
-## Modais que Precisam de Correcao
+Quando a secretaria atribui uma entrega via `AssignDeliveryModal`, o modal:
+- Define `delivery_technician_id` (tecnico de entrega)
+- Define `delivery_method`, `delivery_date`, `scheduled_shift`
+- **NAO** define `technician_id` (campo usado pelo RPC)
+- **NAO** muda o `service_type` para `entrega`
+- **NAO** muda o `status` para `por_fazer`
 
-### Grupo 1 -- Modais sem qualquer scroll (6 ficheiros)
+Resultado: O tecnico de entrega nunca ve o servico na sua lista (ServicosPage filtra por `technician_id`), e mesmo que visse, o RPC `technician_update_service` recusa porque verifica `technician_id`, nao `delivery_technician_id`.
 
-| Modal | Problema |
-|---|---|
-| `SendTaskModal.tsx` | Sem max-h, sem scroll |
-| `ServiceTypeSelector.tsx` | Sem max-w-[95vw], sem max-h, sem scroll |
-| `DeliveryManagementModal.tsx` | Sem max-h, sem scroll |
-| `ContactClientModal.tsx` | Sem max-h, sem scroll |
-| `ServiceTagModal.tsx` | Sem max-h, sem scroll |
-| `RequestTransferModal.tsx` | Sem max-h, sem scroll |
+### Problema 2: DeliveryFlowModals -- Assinatura nao e idempotente (ERRO)
 
-### Grupo 2 -- Modal com scroll fora do padrao (1 ficheiro)
+No `handleSignatureComplete`, a assinatura e inserida sem verificar se ja existe (linha 163). Se o tecnico clicar duas vezes ou a rede falhar no meio, insere duplicadas ou da erro.
 
-| Modal | Problema |
-|---|---|
-| `EditServiceDetailsModal.tsx` | Usa `overflow-y-auto` direto no DialogContent em vez do padrao com header fixo + ScrollArea + footer fixo |
+Comparacao: `VisitFlowModals` JA faz a verificacao corretamente com `maybeSingle()` antes de inserir.
 
-### Modais ja corretos (nao serao alterados)
+### Problema 3: WorkshopFlowModals -- Camera sem try/catch (CRASH)
 
-ConfirmPartOrderModal, CreateServiceModal, CreateCustomerModal, CreateDeliveryModal, SetPriceModal, CreateBudgetModal, ForceStateModal, RescheduleServiceModal, AssignDeliveryModal, UsedPartsModal, CreateUserModal, EditUserModal, PartArrivedModal, RegisterPaymentModal, RequestPartModal, ConvertBudgetModal, AssignTechnicianModal, CreateInstallationModal, EditBudgetDetailsModal, ServicePrintModal (modal especial de impressao).
+O `onCapture` da camera (linhas 1009-1035) faz `await ensureValidSession()` e `await supabase.from("service_photos").insert(...)` diretamente sem try/catch. Se a sessao expirar ou falhar o upload, o erro nao e capturado e pode crashar a pagina.
+
+### Problema 4: WorkshopFlowModals -- "confirmacao_peca" sem scroll (UI)
+
+O dialog na linha 493 usa `className="max-w-md p-6"` sem `max-w-[95vw] max-h-[90vh] overflow-y-auto`, ao contrario de todos os outros dialogs do mesmo fluxo. Em telemoveis pequenos o conteudo fica cortado.
+
+### Problema 5: DeliveryFlowModals -- Falta ensureValidSession na assinatura (ERRO)
+
+No `handleSignatureComplete` (linha 161), chama `ensureValidSession()` mas NAO verifica a sessao antes do `updateService.mutateAsync` na linha 171. Se a sessao expirar entre a assinatura e a atualizacao, da erro de RLS.
+
+### Problema 6: Falta de try/catch em handleStartRepair no workshop (CRASH)
+
+A funcao `handleStartRepair` (linha 169) tem try/catch, mas no bloco `finally` faz `setIsSubmitting(false)` -- se o modo for `continuacao_peca`, o return na linha 176 ignora o finally e `isSubmitting` nunca volta a false. Na verdade, `finally` SEMPRE executa, entao este caso especifico esta ok. Mas o fluxo de continuacao salta diretamente para `confirmacao_peca` sem registar atividade, o que e correto.
 
 ## Solucao
 
-Aplicar o padrao ja existente no projeto em todos os modais: `DialogContent` com `max-h-[90vh] flex flex-col overflow-hidden p-0`, header com `px-6 pt-6 pb-4 flex-shrink-0`, conteudo central com scroll, e footer com `px-6 py-4 border-t flex-shrink-0`.
+### 1. Corrigir AssignDeliveryModal (ficheiro principal do bug de entrega)
 
-### Para modais mais simples (Grupo 1)
+Ao atribuir um tecnico para entrega de oficina, tambem definir:
+- `technician_id` = tecnico selecionado (para que o RPC e a query do tecnico funcionem)
+- `service_type` = `'entrega'` (para que o fluxo correto seja iniciado)
+- `status` = `'por_fazer'` (para que o servico apareca como pendente)
+- `scheduled_date` = data da entrega
 
-Adicionar `max-h-[90vh]` e `overflow-y-auto` ao DialogContent (sem necessidade de separar header/footer pois o conteudo e curto, mas garante que em telas pequenas funcione):
-
+```typescript
+await updateService.mutateAsync({
+  id: service.id,
+  delivery_method: 'technician_delivery',
+  delivery_technician_id: technicianId,
+  delivery_date: deliveryDate,
+  scheduled_shift: deliveryTime,
+  // NOVAS LINHAS:
+  technician_id: technicianId,
+  service_type: 'entrega',
+  status: 'por_fazer',
+  scheduled_date: deliveryDate,
+  skipToast: true,
+});
 ```
-DialogContent className="sm:max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto"
+
+### 2. Tornar DeliveryFlowModals idempotente
+
+Adicionar verificacao `maybeSingle()` antes de inserir assinatura e usar o mesmo padrao do VisitFlowModals:
+
+```typescript
+// Verificar se assinatura ja existe
+const { data: existingSig } = await supabase
+  .from('service_signatures')
+  .select('id')
+  .eq('service_id', service.id)
+  .eq('signature_type', 'entrega')
+  .maybeSingle();
+
+if (!existingSig) {
+  await supabase.from('service_signatures').insert({...});
+}
 ```
 
-### Para EditServiceDetailsModal (Grupo 2)
+### 3. Adicionar try/catch ao onCapture da camera no WorkshopFlowModals
 
-Converter para o padrao completo: header fixo, ScrollArea no meio, footer fixo. Isto garante que os botoes "Cancelar" e "Guardar" fiquem sempre visiveis.
+Envolver o handler em try/catch com `humanizeError`:
 
-## Detalhes por Ficheiro
+```typescript
+onCapture={async (imageData) => {
+  try {
+    await ensureValidSession();
+    // ... insert photo ...
+    toast.success("Foto guardada!");
+  } catch (error) {
+    console.error("Error saving photo:", error);
+    toast.error(humanizeError(error));
+  }
+}}
+```
 
-### `src/components/modals/SendTaskModal.tsx`
-- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
+### 4. Adicionar scroll ao dialog "confirmacao_peca" no WorkshopFlowModals
 
-### `src/components/modals/ServiceTypeSelector.tsx`
-- Adicionar `max-w-[95vw] max-h-[90vh] overflow-y-auto` ao DialogContent
+Mudar linha 493 de:
+```
+className="max-w-md p-6"
+```
+Para:
+```
+className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"
+```
 
-### `src/components/modals/DeliveryManagementModal.tsx`
-- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
+### 5. Reforcar sessao no DeliveryFlowModals antes de updateService
 
-### `src/components/modals/ContactClientModal.tsx`
-- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
+Adicionar `await ensureValidSession()` antes da chamada `updateService.mutateAsync` na assinatura:
 
-### `src/components/modals/ServiceTagModal.tsx`
-- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
+```typescript
+// Antes de atualizar status
+await ensureValidSession();
+await updateService.mutateAsync({
+  id: service.id,
+  status: 'finalizado',
+  ...
+});
+```
 
-### `src/components/modals/RequestTransferModal.tsx`
-- Adicionar `max-h-[90vh] overflow-y-auto` ao DialogContent
+### 6. Adicionar ensureValidSession no handleStartDelivery
 
-### `src/components/modals/EditServiceDetailsModal.tsx`
-- Converter de `overflow-y-auto` simples para o padrao completo com `p-0`, header fixo (`px-6 pt-6 pb-4 flex-shrink-0`), ScrollArea central, e DialogFooter fixo (`px-6 py-4 border-t flex-shrink-0`)
+O `handleStartDelivery` ja tem `ensureValidSession()`, mas o `technicianUpdateService` pode falhar sem mensagem clara. Melhorar a mensagem de erro:
+
+```typescript
+} catch (error) {
+  console.error('Error starting delivery:', error);
+  toast.error(humanizeError(error)); // Em vez de string fixa
+}
+```
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/components/modals/SendTaskModal.tsx` | Adicionar max-h + overflow |
-| `src/components/modals/ServiceTypeSelector.tsx` | Adicionar max-w-[95vw] + max-h + overflow |
-| `src/components/modals/DeliveryManagementModal.tsx` | Adicionar max-h + overflow |
-| `src/components/modals/ContactClientModal.tsx` | Adicionar max-h + overflow |
-| `src/components/modals/ServiceTagModal.tsx` | Adicionar max-h + overflow |
-| `src/components/modals/RequestTransferModal.tsx` | Adicionar max-h + overflow |
-| `src/components/modals/EditServiceDetailsModal.tsx` | Refactor para padrao completo com ScrollArea |
+| `src/components/modals/AssignDeliveryModal.tsx` | Definir `technician_id`, `service_type`, `status`, `scheduled_date` ao atribuir entrega |
+| `src/components/technician/DeliveryFlowModals.tsx` | Idempotencia na assinatura + ensureValidSession + humanizeError |
+| `src/components/technician/WorkshopFlowModals.tsx` | try/catch na camera + scroll no confirmacao_peca |
 
 ## Resultado
 
-- Todos os modais terao scroll funcional em qualquer tamanho de tela
-- Botoes de acao (Cancelar, Confirmar) ficam sempre acessiveis
-- Padrao visual consistente em todo o sistema
-- Funciona identicamente para todos os cargos (dono, secretaria, tecnico)
+- Entregas atribuidas aparecem na lista do tecnico e podem ser iniciadas sem erro
+- Cliques duplos em assinaturas nao geram registos duplicados
+- Sessoes expiradas durante fluxos mostram mensagens claras em vez de crashes
+- Camera que falha nao crashe a pagina inteira do tecnico
+- Todos os dialogs do fluxo funcionam corretamente em telemoveis pequenos
+- Zero impacto funcional nos outros fluxos (visita, instalacao, oficina)
