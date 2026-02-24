@@ -179,15 +179,17 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-indigo-600" />
-            Editar Serviço {service.code}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <div className="px-6 pt-6 pb-4 flex-shrink-0">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-indigo-600" />
+              Editar Serviço {service.code}
+            </DialogTitle>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 space-y-6">
           {/* Section: Equipamento */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 border-b pb-1 mb-2">
@@ -336,12 +338,14 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           </div>
         </div>
 
-        <DialogFooter className="border-t pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-            {isLoading ? 'A guardar...' : 'Guardar Alterações'}
-          </Button>
-        </DialogFooter>
+        <div className="px-6 py-4 border-t flex-shrink-0">
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {isLoading ? 'A guardar...' : 'Guardar Alterações'}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

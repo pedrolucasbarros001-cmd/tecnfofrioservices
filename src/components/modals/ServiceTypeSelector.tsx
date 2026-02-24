@@ -44,7 +44,7 @@ export function ServiceTypeSelector({ open, onOpenChange, onSelect }: ServiceTyp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Escolha o Tipo de Serviço</DialogTitle>
           <p className="text-sm text-muted-foreground">O tipo de serviço define o fluxo que será seguido pelo técnico.</p>
