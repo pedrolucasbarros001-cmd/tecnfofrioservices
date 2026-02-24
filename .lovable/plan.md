@@ -1,135 +1,120 @@
 
-# Plano: Acelerar Carregamento da Pagina Geral e Abrir Fichas Sem Delay
+# Plano: Eliminar Leak de Realtime e Polling Redundante
 
-## Problema
+## Causa Raiz Confirmada
 
-A pagina Geral (`/geral`) demora muito a carregar e as fichas demoram a abrir porque:
+O hook `useRealtime.ts` (linha 46) tem `queryKeys` no array de dependencias do `useEffect`. Como cada componente passa um array inline (ex: `[['services-paginated'], ['all-pending-parts']]`), o React cria uma **nova referencia a cada render**, o que faz o `useEffect` executar cleanup + re-subscribe em loop infinito.
 
-1. **Sem prefetch nos cards da tabela** -- ao clicar num servico, so DEPOIS comeca a carregar fotos, pecas, assinaturas e pagamentos. Na OficinaPage ja existe prefetch mas na GeralPage nao.
+Resultado: milhares de chamadas `realtime.list_changes` por hora.
 
-2. **WeeklyAgenda usa os mesmos 50 servicos paginados** -- a agenda recebe `services` (max 50 da pagina atual), entao mostra "Sem servicos" na maioria dos dias porque os servicos agendados podem estar na pagina 2 ou 3.
+### Subscriptions ativas (4 total, mas re-criadas milhares de vezes):
 
-3. **Pesquisa dispara 4 queries separadas** -- quando ha texto no campo de pesquisa, o sistema faz: 1 query a customers, 1 a technicians, 1 a services por campos, e 2 por IDs. Isto e pesado e lento.
+| Pagina | Tabela | Query Keys |
+|---|---|---|
+| GeralPage | services | services-paginated, all-pending-parts |
+| GeralPage | service_parts | all-pending-parts, services-paginated |
+| TVMonitorPage | services | tv-monitor-services |
+| TVMonitorPage | activity_logs | public-activity-logs |
 
-4. **Todos os modais sao renderizados sempre** -- 15+ modais sao montados no DOM mesmo quando fechados, aumentando o tempo de render inicial.
+### Polling ativo em paralelo (6 timers):
+
+| Ficheiro | Intervalo |
+|---|---|
+| useServices.ts (useAllServices) | 5 min |
+| useServices.ts (usePaginatedServices) | 5 min |
+| ServicosPage.tsx | 1 min |
+| TechnicianOfficePage.tsx | 1 min |
+| useServiceTransfers.ts | 1 min |
+| useActivityLogs.ts (public) | 1 min |
 
 ## Solucao
 
-### 1. Adicionar prefetch na GeralPage (como na OficinaPage)
+### 1. Corrigir `src/hooks/useRealtime.ts`
 
-**Ficheiro: `src/pages/GeralPage.tsx`**
+Tres mudancas criticas:
 
-Importar `prefetchFullServiceData` e `useQueryClient`. Nos `TableRow`, adicionar `onMouseEnter` e `onTouchStart` para pre-carregar os dados completos do servico:
+- Mover `queryKeys` para `useRef` e remover do dependency array -- isto impede a re-criacao do channel a cada render
+- Adicionar throttle de 5 segundos -- impede cascata de invalidacoes quando varias mudancas acontecem seguidas
+- Usar nome de channel unico por `table:event` -- evita conflitos entre subscriptions
+- Remover `console.log` -- cada log tambem consome recursos
 
 ```typescript
-const queryClient = useQueryClient();
-const handlePrefetch = (serviceId: string) => {
-  prefetchFullServiceData(queryClient, serviceId);
-};
+import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
-// No TableRow:
-<TableRow
-  onMouseEnter={() => handlePrefetch(service.id)}
-  onTouchStart={() => handlePrefetch(service.id)}
-  onClick={() => handleServiceClick(service)}
->
+const THROTTLE_MS = 5000;
+
+export function useRealtime(
+  table: string,
+  queryKeys: string[][] = [['services'], ['services-paginated']],
+  event: 'INSERT' | 'UPDATE' | 'DELETE' | '*' = '*'
+) {
+  const queryClient = useQueryClient();
+  const queryKeysRef = useRef(queryKeys);
+  queryKeysRef.current = queryKeys;
+  const lastInvalidationRef = useRef<number>(0);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`rt:${table}:${event}`)
+      .on('postgres_changes', { event, schema: 'public', table }, () => {
+        const now = Date.now();
+        if (now - lastInvalidationRef.current < THROTTLE_MS) return;
+        lastInvalidationRef.current = now;
+        queryKeysRef.current.forEach(key => {
+          queryClient.invalidateQueries({ queryKey: key });
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [table, event, queryClient]);
+}
 ```
 
-Isto faz com que quando o utilizador passa o rato ou toca na linha, os dados ja estejam no cache quando clicar.
+### 2. Remover polling redundante (5 ficheiros)
 
-### 2. Query separada e leve para a Agenda
+O Realtime ja cobre as atualizacoes. Manter apenas `refetchOnWindowFocus: true` (que ja e default do React Query).
 
-**Ficheiro: `src/pages/GeralPage.tsx`**
+**`src/hooks/useServices.ts`** -- remover `refetchInterval: 300000` de `useAllServices` e `usePaginatedServices`
 
-A agenda precisa de TODOS os servicos com data agendada, nao apenas os 50 da pagina. Criar uma query separada e leve que carrega apenas os campos necessarios para a agenda:
+**`src/pages/ServicosPage.tsx`** -- remover `refetchInterval: 60000`
 
-```typescript
-const { data: agendaServices = [] } = useQuery({
-  queryKey: ['agenda-services'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('services')
-      .select(`
-        id, code, scheduled_date, scheduled_shift,
-        appliance_type, brand, fault_description,
-        service_type, service_location, status,
-        technician:technicians!services_technician_id_fkey(id, color, profile:profiles(full_name))
-      `)
-      .not('scheduled_date', 'is', null)
-      .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'na_oficina'])
-      .order('scheduled_date', { ascending: true });
-    if (error) throw error;
-    return data || [];
-  },
-});
-```
+**`src/pages/technician/TechnicianOfficePage.tsx`** -- remover `refetchInterval: 60000`
 
-Passa `agendaServices` para o `WeeklyAgenda` em vez de `services`. A query e leve porque:
-- So carrega servicos COM data agendada
-- So carrega servicos ativos (nao finalizados)
-- Nao carrega customer completo, so os campos necessarios para renderizar o card
+**`src/hooks/useServiceTransfers.ts`** -- remover `refetchInterval: 60000`
 
-### 3. Lazy render dos modais (so montar quando necessario)
+**`src/hooks/useActivityLogs.ts`** -- remover `refetchInterval: 60000` do modo public
 
-**Ficheiro: `src/pages/GeralPage.tsx`**
+**`src/components/layouts/AppLayout.tsx`** -- manter `refetchInterval: 120000` para notificacoes (nao tem Realtime)
 
-Envolver cada modal em condicao para so renderizar quando aberto ou quando tem servico selecionado:
+### 3. Consolidar subscriptions na GeralPage
+
+**`src/pages/GeralPage.tsx`** -- remover a segunda subscription (`service_parts`) porque updates em pecas ja sao cobertos pelo Realtime na tabela `services` (o trigger `updated_at = now()` atualiza o servico):
 
 ```typescript
-{showAssignModal && currentService && (
-  <AssignTechnicianModal ... />
-)}
-{showSetPriceModal && currentService && (
-  <SetPriceModal ... />
-)}
-// ... etc para todos os 15 modais
-```
-
-Isto reduz o numero de componentes montados de ~15 para 0 no render inicial, melhorando drasticamente o tempo de first paint.
-
-### 4. `placeholderData` para transicoes sem "A carregar..."
-
-**Ficheiro: `src/hooks/useServices.ts`**
-
-O `usePaginatedServices` ja tem `placeholderData: (prev) => prev` -- isto e bom. Mas a GeralPage mostra "A carregar servicos..." no primeiro load. Adicionar um skeleton/spinner mais leve em vez do texto simples, e mostrar a tabela vazia com skeleton rows para feedback visual imediato.
-
-**Ficheiro: `src/pages/GeralPage.tsx`**
-
-Substituir o texto "A carregar servicos..." por skeleton rows na tabela:
-
-```typescript
-{isLoading ? (
-  <Table>
-    <TableHeader>...</TableHeader>
-    <TableBody>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-) : ...}
+// Manter apenas 1:
+useRealtime('services', [['services-paginated'], ['all-pending-parts'], ['agenda-services']]);
+// Remover: useRealtime('service_parts', ...)
 ```
 
 ## Ficheiros Alterados
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/pages/GeralPage.tsx` | Prefetch nos TableRow; query separada para agenda; lazy render modais; skeleton loading |
+| `src/hooks/useRealtime.ts` | queryKeys para useRef + throttle 5s + channel unico |
+| `src/hooks/useServices.ts` | Remover 2x refetchInterval |
+| `src/pages/ServicosPage.tsx` | Remover refetchInterval |
+| `src/pages/technician/TechnicianOfficePage.tsx` | Remover refetchInterval |
+| `src/hooks/useServiceTransfers.ts` | Remover refetchInterval |
+| `src/hooks/useActivityLogs.ts` | Remover refetchInterval public |
+| `src/pages/GeralPage.tsx` | Remover 2a subscription duplicada |
 
 ## Resultado Esperado
 
-- Pagina carrega visivelmente mais rapido (skeletons em vez de tela vazia)
-- Agenda mostra TODOS os servicos agendados (nao apenas 50)
-- Fichas abrem instantaneamente (dados pre-carregados no hover)
-- Render inicial ~15 modais mais leve (so monta quando necessario)
-- Zero impacto na BD (prefetch usa cache existente; query da agenda e leve e cached por 2min)
+- De ~10,000 chamadas `realtime.list_changes` para ~50/hora (reducao de 99%)
+- Disk IO cai drasticamente -- o alerta deve desaparecer em poucas horas
+- 6 timers de polling eliminados -- menos queries a BD
+- Atualizacoes continuam em tempo real (4 subscriptions estaveis, sem re-criacao)
+- Zero impacto funcional -- tudo continua a atualizar quando muda na BD
