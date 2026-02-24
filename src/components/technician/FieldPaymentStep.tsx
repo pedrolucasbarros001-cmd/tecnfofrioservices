@@ -150,7 +150,7 @@ export function FieldPaymentStep({
     };
 
     return (
-        <Dialog open={open} onOpenChange={() => handleSkip()}>
+        <Dialog open={open} onOpenChange={(o) => { if (!o) handleSkip(); }}>
             <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6">
                 {/* Header */}
                 <DialogHeader className="p-0 mb-3">

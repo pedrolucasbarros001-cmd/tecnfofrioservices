@@ -437,7 +437,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   return (
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showPartsModal} onOpenChange={() => handleClose()}>
+      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showPartsModal} onOpenChange={(open) => { if (!open) handleClose(); }}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
@@ -520,7 +520,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       {/* Modal 2a: Foto do Aparelho (if no history) */}
       <Dialog
         open={currentStep === "foto_aparelho" && !showCamera && !showPartsModal}
-        onOpenChange={() => handleClose()}
+        onOpenChange={(open) => { if (!open) handleClose(); }}
       >
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto do Aparelho" step="Fotos Obrigatórias" />
@@ -577,7 +577,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       {/* Modal 2b: Foto da Etiqueta (if no history) */}
       <Dialog
         open={currentStep === "foto_etiqueta" && !showCamera && !showPartsModal}
-        onOpenChange={() => handleClose()}
+        onOpenChange={(open) => { if (!open) handleClose(); }}
       >
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto da Etiqueta" step="Fotos Obrigatórias" />

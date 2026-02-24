@@ -720,7 +720,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   return (
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={() => handleClose()}>
+      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => { if (!open) handleClose(); }}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
