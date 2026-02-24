@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Wrench, Send, UserPlus, Clock, AlertCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Wrench, Send, UserPlus, Clock, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
@@ -19,8 +20,25 @@ export default function OficinaPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
+
+  const filteredServices = useMemo(() => {
+    if (!searchTerm.trim()) return services;
+    const term = searchTerm.toLowerCase();
+    return services.filter(s =>
+      s.code?.toLowerCase().includes(term) ||
+      s.customer?.name?.toLowerCase().includes(term) ||
+      s.appliance_type?.toLowerCase().includes(term) ||
+      s.brand?.toLowerCase().includes(term) ||
+      s.model?.toLowerCase().includes(term) ||
+      s.fault_description?.toLowerCase().includes(term) ||
+      s.detected_fault?.toLowerCase().includes(term) ||
+      s.serial_number?.toLowerCase().includes(term) ||
+      s.technician?.profile?.full_name?.toLowerCase().includes(term)
+    );
+  }, [services, searchTerm]);
 
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);
@@ -44,8 +62,19 @@ export default function OficinaPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Oficina</h1>
             <p className="text-muted-foreground">Serviços com equipamentos fisicamente na oficina.</p>
-          </div>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Pesquisar por código, cliente, aparelho, técnico..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowTaskModal(true)}>
@@ -61,14 +90,14 @@ export default function OficinaPage() {
           <div className="col-span-full text-center py-12 text-muted-foreground">
             A carregar serviços...
           </div>
-        ) : services.length === 0 ? (
+        ) : filteredServices.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="py-12 text-center text-muted-foreground">
               Nenhum serviço na oficina.
             </CardContent>
           </Card>
         ) : (
-          services.map((service) => {
+          filteredServices.map((service) => {
             const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG];
             const hasTechnician = !!service.technician;
 
