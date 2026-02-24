@@ -1,106 +1,60 @@
 
 
-# Plano: Corrigir Bugs nos Modais de Fluxo do Tecnico
+# Plano: Ordenacao por Criacao e Pesquisa Completa nos Servicos
 
-## Problema Raiz Identificado
+## Problema Atual
 
-O problema central e a **falta de guardas consistentes nas condicoes `open` dos dialogos**. Quando um sub-modal (camera, pagamento, assinatura, pecas) abre, o dialogo do passo atual deveria fechar-se temporariamente. Mas em muitos passos, as condicoes `open` nao verificam todos os estados de sub-modais, causando:
+1. **Ordenacao**: Os servicos sao ordenados por `scheduled_date ASC` (data agendada), o que coloca servicos antigos no topo. Servicos recem-criados ficam perdidos no meio ou no final da lista.
 
-- **Dois dialogos abertos simultaneamente** (sobreposicao visual)
-- **Clique fora fecha o dialogo errado** (fecha o passo em vez do sub-modal)
-- **Fluxo "salta" passos** ou parece fechar inesperadamente
-- **Experiencia fragmentada** em vez de sequencial e fluida
-
-## Analise Detalhada por Ficheiro
-
-### 1. `VisitFlowModals.tsx` (1426 linhas) -- MAIS CRITICO
-
-Tres estados de sub-modais: `showCamera`, `showSignature`, `showPayment`
-
-**Dialogos com guardas incompletas:**
-
-| Passo | Linha | Verifica Camera | Verifica Signature | Verifica Payment |
-|---|---|---|---|---|
-| resumo | 663 | Sim | Sim | **NAO** |
-| deslocacao | 733 | Sim | **NAO** | **NAO** |
-| foto (legacy) | 947 | Sim | **NAO** | **NAO** |
-| produto | 995 | Sim | **NAO** | **NAO** |
-| diagnostico | 1071 | Sim | **NAO** | **NAO** |
-| decisao | 1108 | Sim | **NAO** | **NAO** |
-| pecas_usadas | 1179 | Sim | **NAO** | **NAO** |
-
-**Resultado:** Quando o pagamento ou assinatura abre, o dialogo do passo atual fica visivel por baixo, criando sobreposicao e comportamento erratico.
-
-### 2. `DeliveryFlowModals.tsx` (404 linhas)
-
-Tres estados de sub-modais: `showCamera`, `showSignature`, `showPayment`
-
-**Dialogos com guardas incompletas:**
-
-| Passo | Linha | Verifica Camera | Verifica Signature | Verifica Payment |
-|---|---|---|---|---|
-| resumo | 218 | Sim | Sim | **NAO** |
-| deslocacao | 279 | Sim | Sim | **NAO** |
-| foto | 321 | Sim | Sim | **NAO** |
-
-**Resultado:** Quando o passo de pagamento abre a partir da foto (linha 364), o dialogo de foto permanece aberto por baixo.
-
-### 3. `InstallationFlowModals.tsx` (654 linhas)
-
-Quatro estados de sub-modais: `showCamera`, `showSignature`, `showMaterialsModal`, `showPayment`
-
-**Dialogos com guardas incompletas:**
-
-| Passo | Linha | Verifica Camera | Verifica Signature | Verifica Materials | Verifica Payment |
-|---|---|---|---|---|---|
-| resumo | 284 | Sim | Sim | Sim | **NAO** |
-| deslocacao | 349 | Sim | Sim | Sim | **NAO** |
-| foto_antes | 391 | Sim | Sim | Sim | **NAO** |
-| materiais | 444 | Sim | Sim | Sim | **NAO** |
-| foto_depois | ~530 | Sim | Sim | Sim | **NAO** |
-| finalizacao | ~580 | Sim | Sim | Sim | **NAO** |
-
-### 4. `WorkshopFlowModals.tsx` (1020 linhas)
-
-Dois estados de sub-modais: `showCamera`, `showPartsModal` (sem pagamento/assinatura neste fluxo)
-
-Este ficheiro esta correto -- todos os dialogos verificam ambos `!showCamera && !showPartsModal`.
+2. **Pesquisa incompleta**: A pesquisa atual cobre `codigo, aparelho, marca, avaria, nome/telefone/email do cliente`, mas **nao pesquisa por nome do tecnico** nem por outros campos como modelo, numero de serie ou descricao do trabalho.
 
 ## Solucao
 
-### Regra Universal
+### 1. `src/hooks/useServices.ts` -- Alterar ordenacao e pesquisa
 
-Cada `Dialog open={...}` deve incluir **TODOS** os estados de sub-modais do componente como guardas negativas:
+**Ordenacao (3 locais):**
 
+Substituir a ordem atual:
 ```text
-open={currentStep === "X" && !showCamera && !showSignature && !showPayment}
+.order('scheduled_date', { ascending: true })
+.order('scheduled_shift', { ascending: true })
+.order('created_at', { ascending: false })
 ```
 
-### Alteracoes Especificas
+Por ordem por criacao descendente (mais recentes primeiro):
+```text
+.order('created_at', { ascending: false })
+```
 
-**Ficheiro 1: `VisitFlowModals.tsx`**
-- 7 dialogos a corrigir (linhas 663, 733, 947, 995, 1071, 1108, 1179)
-- Adicionar `&& !showPayment` a todos
-- Adicionar `&& !showSignature` aos 6 que nao verificam
+Isto aplica-se a:
+- `useServices()` (linha 40-42) -- usado pela OficinaPage
+- `usePaginatedServices()` sem searchTerm (linhas 320-322) -- usado pela GeralPage
+- `usePaginatedServices()` com searchTerm, no sort manual (linhas 280-301)
 
-**Ficheiro 2: `DeliveryFlowModals.tsx`**
-- 3 dialogos a corrigir (linhas 218, 279, 321)
-- Adicionar `&& !showPayment` a todos
+**Pesquisa (1 local):**
 
-**Ficheiro 3: `InstallationFlowModals.tsx`**
-- 6 dialogos a corrigir (linhas 284, 349, 391, 444, e os de foto_depois e finalizacao)
-- Adicionar `&& !showPayment` a todos
+Expandir o filtro `.or()` na pesquisa de servicos (linha 253) para incluir mais campos:
+```text
+code, appliance_type, brand, model, serial_number, fault_description, detected_fault, work_performed
+```
 
-**Ficheiro 4: `WorkshopFlowModals.tsx`**
-- Sem alteracoes necessarias (ja esta correto)
+Adicionar pesquisa por tecnico: buscar `technicians` -> `profiles` com `full_name.ilike` e incluir os `technician_id` correspondentes na pesquisa combinada (mesmo padrao ja usado para clientes).
 
-### Total: ~16 linhas de codigo a modificar em 3 ficheiros
+### 2. `src/pages/OficinaPage.tsx` -- Adicionar barra de pesquisa
 
-## Impacto
+A pagina Oficina nao tem pesquisa. Adicionar:
+- Campo de pesquisa com filtro local por `code`, `customer.name`, `appliance_type`, `brand`, `fault_description` e `technician.profile.full_name`
 
-Apos estas correcoes:
-- Apenas **um unico dialogo** estara visivel em qualquer momento
-- Os sub-modais (camera, pagamento, assinatura) abrem sobre o passo atual sem sobreposicao
-- O fluxo sera verdadeiramente sequencial e sem saltos
-- Aplicavel a **todas as contas** com nivel tecnico, nao apenas ao Carlos Amotino
+### Resumo de Alteracoes
+
+| Ficheiro | Alteracao |
+|---|---|
+| `src/hooks/useServices.ts` | Ordenar por `created_at DESC`; expandir campos de pesquisa; adicionar pesquisa por tecnico |
+| `src/pages/OficinaPage.tsx` | Adicionar barra de pesquisa local com filtro por palavra-chave |
+
+### Resultado
+
+- Servicos recem-criados aparecem **sempre no topo** de todas as listas
+- Pesquisa funciona por: codigo, cliente, aparelho, marca, modelo, numero de serie, avaria, diagnostico, trabalho realizado e **nome do tecnico**
+- A pagina Oficina ganha uma barra de pesquisa identica as outras paginas
 
