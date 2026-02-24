@@ -1,87 +1,97 @@
 
-# Plano: Corrigir Scroll e Responsividade nos Modais de Criacao de Servico e Pedido de Peca
+Objetivo: resolver o congelamento de interação (“clica e nada acontece”) para o José Alves e qualquer utilizador após tempo parado na mesma tela.
 
-## Problemas Identificados
+Diagnóstico técnico (com evidências)
+- A conta está válida (perfil existe, role em `user_roles` = `dono`, onboarding completo).
+- As chamadas de rede continuam a funcionar em loop (services/budgets/notifications 200), ou seja, a app não está “morta”.
+- O sintoma descrito (“tudo visível, mas nenhum botão responde”) é típico de camada de overlay invisível capturando clique.
+- O projeto usa vários overlays de tela cheia (Radix Dialog/Sheet + GuidedTour/Demo) com `position: fixed; inset: 0`.
+- Em `DialogOverlay` e `SheetOverlay`, não há proteção explícita para desabilitar eventos quando estado está fechado (`data-state=closed`), o que pode deixar uma camada a bloquear interações após idle/retorno de aba.
 
-### 1. Modal de criar servico a partir do perfil do cliente (CustomerDetailSheet.tsx)
+Do I know what the issue is?
+- Sim, com alta confiança: bloqueio global de pointer events por overlay residual (Dialog/Sheet/Tour/Demo) após inatividade/retomada de aba.
+- A parte de sessão pode coexistir noutros fluxos, mas não explica “sidebar e botões não navegam” com app ainda renderizando e API respondendo.
 
-**Ficheiro:** `src/components/shared/CustomerDetailSheet.tsx`, linha 672
+Plano de implementação
 
-O `DialogContent` usa:
-```
-className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden"
-```
+1) Blindagem de overlays Radix (correção principal)
+- Ficheiro: `src/components/ui/dialog.tsx`
+  - Ajustar classes do `DialogOverlay` para:
+    - `data-[state=open]:pointer-events-auto`
+    - `data-[state=closed]:pointer-events-none`
+- Ficheiro: `src/components/ui/sheet.tsx`
+  - Mesmo ajuste no `SheetOverlay`.
 
-Falta `max-w-[95vw]` -- em telemoveis, o modal pode ultrapassar a largura do ecra e cortar conteudo/botoes. Todos os outros modais do sistema ja usam `max-w-[95vw]` como padrao.
+Resultado esperado:
+- Mesmo que o overlay feche e permaneça momentaneamente no DOM, não bloqueará cliques quando `closed`.
 
-### 2. RequestPartModal -- sem ScrollArea padrao
+2) Failsafe global por CSS (defesa em profundidade)
+- Ficheiro: `src/index.css`
+- Adicionar regra global de segurança:
+  - `[data-radix-dialog-overlay][data-state="closed"] { pointer-events: none !important; }`
+  - `[vaul-overlay][data-state="closed"] { pointer-events: none !important; }` (se aplicável)
+- Manter sem mexer nas regras de print já existentes.
 
-**Ficheiro:** `src/components/modals/RequestPartModal.tsx`, linha 126/135
+Resultado esperado:
+- Camadas residuais “fantasma” deixam de capturar input, mesmo fora dos componentes principais.
 
-O modal usa um `<div className="flex-1 overflow-y-auto">` em vez do componente `ScrollArea` padrao usado em todos os outros modais. O `overflow-y-auto` nativo pode nao mostrar a scrollbar visivel em alguns dispositivos moveis, dando a impressao de que nao ha scroll. O padrao do sistema e usar `ScrollArea` do Radix para garantir scrollbar visivel e consistente.
+3) Recuperação automática ao voltar de inatividade (robustez)
+- Ficheiro: `src/components/layouts/AppLayout.tsx`
+- Adicionar efeito leve em `visibilitychange` e `focus` para:
+  - Fechar painel de notificações (`setShowNotifications(false)`), evitando sheet aberto residual após tab idle.
+  - Remover classes de estado órfãs de tour/demo no `body` se não houver UI ativa correspondente.
+- Não alterar lógica funcional de negócio; apenas sanitização de UI global.
 
-### 3. ConfirmPartOrderModal -- falta max-w-[95vw]
+Resultado esperado:
+- Após ficar horas parado, ao voltar para a aba a interface volta clicável.
 
-**Ficheiro:** `src/components/modals/ConfirmPartOrderModal.tsx`, linha 141
+4) Hardening do overlay de tour/demo (sem quebrar onboarding)
+- Ficheiros:
+  - `src/components/onboarding/GuidedTour.tsx`
+  - `src/components/onboarding/DemoRunner.tsx`
+- Adicionar fallback de timeout defensivo para sair de estado “navigating” prolongado (ex.: >5s) e desmontar overlay se seletor alvo não existir.
+- Garantir cleanup completo de listeners/refs em mudança de aba.
 
-Ja tem `ScrollArea` e `max-h-[95vh]`, mas falta `max-w-[95vw]` para responsividade mobile.
+Resultado esperado:
+- Overlay de tutorial/demo não fica preso em tela cheia bloqueando tudo.
 
-## Alteracoes
+5) Observabilidade mínima para confirmar correção
+- Adicionar logs temporários de debug (curtos) quando houver:
+  - Overlay `open/closed`
+  - `visibilitychange` -> rotina de recuperação
+  - Detecção de overlay órfão
+- Objetivo: confirmar no próximo relato sem adivinhação.
 
-### Ficheiro 1: `src/components/shared/CustomerDetailSheet.tsx`
+Validação (E2E)
+- Cenário A (desktop, dono):
+  1. Login como José.
+  2. Navegar por sidebar (Dashboard → Geral → Clientes → Oficina).
+  3. Deixar aba inativa por 20-60 min.
+  4. Voltar e clicar em sidebar, cards e botões de ação.
+  5. Confirmar que URL muda e páginas abrem normalmente.
+- Cenário B (com modal):
+  1. Abrir/fechar Sheet de notificações.
+  2. Abrir/fechar modais de serviço.
+  3. Confirmar que após fechar tudo, a tela continua clicável.
+- Cenário C (tour/demo):
+  1. Iniciar e interromper tour/demo.
+  2. Trocar aba e voltar.
+  3. Confirmar ausência de bloqueio global.
 
-**Linha 672** -- Adicionar `max-w-[95vw]`:
+Ficheiros previstos para alteração
+- `src/components/ui/dialog.tsx`
+- `src/components/ui/sheet.tsx`
+- `src/index.css`
+- `src/components/layouts/AppLayout.tsx`
+- `src/components/onboarding/GuidedTour.tsx`
+- `src/components/onboarding/DemoRunner.tsx`
 
-```
-// DE:
-<DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+Risco e mitigação
+- Risco: interferir no comportamento legítimo de bloqueio quando modal está aberto.
+- Mitigação: só desabilitar pointer-events no estado `closed`; estado `open` permanece bloqueante como esperado.
+- Risco: cleanup de body classes remover estado válido.
+- Mitigação: validar antes por presença real de componentes ativos.
 
-// PARA:
-<DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
-```
-
-### Ficheiro 2: `src/components/modals/RequestPartModal.tsx`
-
-**Linha 126** -- Adicionar `max-w-[95vw]` (ja tem `max-w-[95vw]`, confirmar consistencia com max-h):
-
-**Linhas 135-217** -- Substituir `<div className="flex-1 overflow-y-auto min-h-0 px-6">` por `<ScrollArea>` padrao:
-
-```typescript
-// DE:
-<div className="flex-1 overflow-y-auto min-h-0 px-6">
-  <div className="space-y-4 py-4">
-    ...conteudo...
-  </div>
-</div>
-
-// PARA:
-<ScrollArea className="flex-1 px-6">
-  <div className="space-y-4 py-4 pr-3">
-    ...conteudo... (sem alteracoes ao conteudo)
-  </div>
-</ScrollArea>
-```
-
-Adicionar import do `ScrollArea`:
-```typescript
-import { ScrollArea } from '@/components/ui/scroll-area';
-```
-
-### Ficheiro 3: `src/components/modals/ConfirmPartOrderModal.tsx`
-
-Ja esta correto -- usa `ScrollArea` e tem `max-h-[95vh]`. Apenas falta `max-w-[95vw]` para mobile (embora `sm:max-w-lg` cubra desktop).
-
-Nao e necessaria alteracao, ja tem a estrutura correta.
-
-## Ficheiros Alterados
-
-| Ficheiro | Alteracao |
-|---|---|
-| `src/components/shared/CustomerDetailSheet.tsx` | Adicionar `max-w-[95vw]` ao DialogContent (linha 672) |
-| `src/components/modals/RequestPartModal.tsx` | Substituir div overflow-y-auto por ScrollArea padrao + import |
-
-## Resultado
-
-- Modal de criar servico a partir do perfil do cliente funciona corretamente em mobile (390px)
-- RequestPartModal mostra scrollbar visivel em todos os dispositivos
-- Consistencia visual com todos os outros modais do sistema
+Critério de pronto
+- Não existe mais estado em que a UI fica visível porém “morta” ao clique.
+- Sidebar e botões voltam a responder imediatamente após períodos longos de inatividade.
