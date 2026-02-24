@@ -12,6 +12,7 @@ interface GuidedTourOverlayProps {
 }
 
 export function GuidedTourOverlay({ targetRect }: GuidedTourOverlayProps) {
+  // data-tour-overlay is used by AppLayout cleanup logic
   const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function GuidedTourOverlay({ targetRect }: GuidedTourOverlayProps) {
   if (!targetRect) {
     return (
       <div
+        data-tour-overlay=""
         className="fixed inset-0 z-[9998] transition-opacity duration-300"
         style={{ backgroundColor: 'rgba(0,0,0,0.65)', pointerEvents: 'auto' }}
       />
@@ -61,6 +63,7 @@ export function GuidedTourOverlay({ targetRect }: GuidedTourOverlayProps) {
 
   return (
     <svg
+      data-tour-overlay=""
       className="fixed inset-0 z-[9998] transition-all duration-300"
       width={w}
       height={h}

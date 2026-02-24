@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,26 @@ export function AppLayout() {
   const { isOpen: isOnboardingOpen } = useOnboarding();
   const { isActive: isDemoActive } = useDemo();
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Sanitize UI when returning from idle/tab switch
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Close notification panel to avoid residual sheet overlay
+        setShowNotifications(false);
+        // Clean orphan body classes if no active tour/demo
+        if (!document.querySelector('[data-tour-overlay]')) {
+          document.body.classList.remove('tour-active');
+        }
+        if (!document.querySelector('[data-demo-banner]')) {
+          document.body.classList.remove('demo-active');
+          document.body.style.paddingTop = '';
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Query for unread notifications count
   const { data: unreadCount = 0 } = useQuery({

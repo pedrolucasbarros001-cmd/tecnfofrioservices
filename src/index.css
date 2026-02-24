@@ -617,6 +617,14 @@
 }
 
 /* ======================================
+   Overlay Safety — Prevent ghost overlays blocking clicks
+   ====================================== */
+[data-radix-dialog-overlay][data-state="closed"],
+[vaul-overlay][data-state="closed"] {
+  pointer-events: none !important;
+}
+
+/* ======================================
    Tour Guiado — Elevação de modais Radix
    ====================================== */
 body.tour-active [data-radix-dialog-overlay],

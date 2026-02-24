@@ -18,6 +18,7 @@ export function DemoBanner() {
 
     return (
         <div
+            data-demo-banner=""
             className="fixed top-0 left-0 right-0 z-[10000] flex flex-col"
             style={{ pointerEvents: 'auto' }}
         >

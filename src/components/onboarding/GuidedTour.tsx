@@ -122,8 +122,8 @@ export function GuidedTour() {
         setIsNavigating(false);
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
-      } else if (attempts > 20) {
-        // Timeout after 2s - show as central card
+      } else if (attempts > 50) {
+        // Timeout after 5s - show as central card (prevents stuck overlay)
         setTargetRect(null);
         setIsNavigating(false);
         if (pollRef.current) clearInterval(pollRef.current);
