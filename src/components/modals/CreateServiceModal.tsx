@@ -344,7 +344,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">
               {step === 'location' ? 'Tipo de Serviço' : 'Criar Novo Serviço'}
@@ -393,7 +393,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-                <ScrollArea className="flex-1 px-6">
+                <ScrollArea className="flex-1 min-h-0 px-6">
                   <div className="space-y-4 py-4 pr-3">
                     {/* Customer Selected Box */}
                     {selectedCustomer && (

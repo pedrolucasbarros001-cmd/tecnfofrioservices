@@ -669,7 +669,7 @@ function CreateServiceFromCustomerModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
             {step === 'type'
@@ -775,7 +775,7 @@ function CreateServiceFromCustomerModal({
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 px-6">
+              <ScrollArea className="flex-1 min-h-0 px-6">
                 <div className="space-y-4 py-4 pr-4">
                   {/* Customer info */}
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
