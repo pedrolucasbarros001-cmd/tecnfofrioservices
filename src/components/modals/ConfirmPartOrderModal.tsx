@@ -147,7 +147,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
           <p className="text-sm text-muted-foreground">Confirme os detalhes do pedido. A previsão de chegada serve como termómetro de urgência.</p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
+        <ScrollArea className="flex-1 min-h-0 px-6">
           <div className="space-y-4 py-4 pr-3">
             {/* Service Info */}
             {service && (
