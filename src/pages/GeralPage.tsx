@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, ChevronDown, MapPin, Calendar, AlertCircle } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { WeeklyAgenda } from '@/components/agenda/WeeklyAgenda';
 import { CreateServiceModal } from '@/components/modals/CreateServiceModal';
 import { CreateInstallationModal } from '@/components/modals/CreateInstallationModal';
@@ -33,12 +34,12 @@ import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
-import { usePaginatedServices, useUpdateService, useDeleteService } from '@/hooks/useServices';
+import { usePaginatedServices, useUpdateService, useDeleteService, prefetchFullServiceData } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,6 +49,12 @@ export default function GeralPage() {
   const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | 'all'>(searchParams.get('status') as ServiceStatus || 'all');
   const [selectedLocation, setSelectedLocation] = useState<'cliente' | 'oficina' | 'all'>(searchParams.get('location') as any || 'all');
   const PAGE_SIZE = 50;
+  const queryClient = useQueryClient();
+
+  // Prefetch service data on hover/touch
+  const handlePrefetch = useCallback((serviceId: string) => {
+    prefetchFullServiceData(queryClient, serviceId);
+  }, [queryClient]);
 
   // Debounce search
   useEffect(() => {
@@ -70,7 +77,6 @@ export default function GeralPage() {
       if (statusParam && validStatuses.includes(statusParam)) {
         if (statusParam !== selectedStatus) setSelectedStatus(statusParam);
       } else if (statusParam && !validStatuses.includes(statusParam)) {
-        // Reset invalid status to 'all'
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('status');
         setSearchParams(newParams);
@@ -129,6 +135,27 @@ export default function GeralPage() {
   const totalCount = result?.totalCount || 0;
   const totalPages = result?.totalPages || 0;
 
+  // Dedicated lightweight query for the agenda (all scheduled active services)
+  const { data: agendaServices = [] } = useQuery({
+    queryKey: ['agenda-services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select(`
+          id, code, scheduled_date, scheduled_shift,
+          appliance_type, brand, fault_description,
+          service_type, service_location, status,
+          technician:technicians!services_technician_id_fkey(id, color, profile:profiles(full_name))
+        `)
+        .not('scheduled_date', 'is', null)
+        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'na_oficina'])
+        .order('scheduled_date', { ascending: true });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    staleTime: 1000 * 120, // 2 minutes
+  });
+
   // Fetch pending parts for all services (for the thermometer indicator)
   const { data: pendingPartsMap = {} } = useQuery({
     queryKey: ['all-pending-parts'],
@@ -172,9 +199,6 @@ export default function GeralPage() {
     } else {
       newParams.set('status', status);
     }
-    // Clear location if setting a specific status that is not location agnostic? 
-    // Usually status filters are primary. But let's keep location if set, unless user explicitly clears it.
-    // For now, simple behavior.
     setSearchParams(newParams);
   };
   const handleServiceClick = (service: Service) => {
@@ -244,13 +268,10 @@ export default function GeralPage() {
       console.error('Error finalizing service:', error);
     }
   };
-  // Handler to open the confirm part order modal
   const handleConfirmPartOrder = (service: Service) => {
     setCurrentService(service);
     setShowConfirmPartOrderModal(true);
   };
-
-  // Handler to open the part arrived modal
   const handleMarkPartArrived = (service: Service) => {
     setCurrentService(service);
     setShowPartArrivedModal(true);
@@ -259,6 +280,45 @@ export default function GeralPage() {
     setCurrentService(service);
     setShowEditDetailsModal(true);
   };
+
+  // Skeleton rows for loading state
+  const renderSkeletonRows = () => (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[900px]">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[80px]">Tipo</TableHead>
+            <TableHead>Código</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Descrição</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Tags</TableHead>
+            <TableHead>Técnico</TableHead>
+            <TableHead>Data + Turno</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <TableRow key={i}>
+              <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-40 mb-1" />
+                <Skeleton className="h-3 w-28" />
+              </TableCell>
+              <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <ErrorBoundary
@@ -305,18 +365,15 @@ export default function GeralPage() {
 
         {/* Status Filter */}
 
-
-        {/* Weekly Agenda - only show when no status filter */}
+        {/* Weekly Agenda - only show when no status filter, uses dedicated lightweight query */}
         {selectedStatus === 'all' && selectedLocation === 'all' && !searchTerm && (
-          <WeeklyAgenda services={services} onServiceClick={handleServiceClick} />
+          <WeeklyAgenda services={agendaServices as any[]} onServiceClick={handleServiceClick} />
         )}
 
         {/* Services Table */}
         <Card data-tour="services-table" data-demo="services-table">
           <CardContent className="p-0">
-            {isLoading ? <div className="text-center py-12 text-muted-foreground">
-              A carregar serviços...
-            </div> : filteredServices.length === 0 ? <div className="py-12 text-center text-muted-foreground">
+            {isLoading ? renderSkeletonRows() : filteredServices.length === 0 ? <div className="py-12 text-center text-muted-foreground">
               {searchTerm || selectedStatus !== 'all' ? 'Nenhum serviço encontrado com os filtros aplicados.' : 'Ainda não existem serviços. Crie o primeiro!'}
             </div> : <div className="overflow-x-auto">
               <Table className="min-w-[900px]">
@@ -341,7 +398,6 @@ export default function GeralPage() {
                       color: 'bg-gray-500 text-white'
                     };
 
-                    // Type config based on service_type and service_location
                     const getTypeConfig = () => {
                       if (service.service_type === 'instalacao') {
                         return { label: 'INSTALAÇÃO', variant: 'type-instalacao' as const };
@@ -349,7 +405,6 @@ export default function GeralPage() {
                       if (service.service_type === 'entrega') {
                         return { label: 'ENTREGA', variant: 'type-entrega' as const };
                       }
-                      // Reparação - diferenciando por visita vs oficina
                       if (service.service_location === 'cliente') {
                         return { label: 'REPARAÇÃO', variant: 'type-visita' as const };
                       }
@@ -357,7 +412,13 @@ export default function GeralPage() {
                     };
                     const typeConfig = getTypeConfig();
 
-                    return <TableRow key={service.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleServiceClick(service)}>
+                    return <TableRow
+                      key={service.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onMouseEnter={() => handlePrefetch(service.id)}
+                      onTouchStart={() => handlePrefetch(service.id)}
+                      onClick={() => handleServiceClick(service)}
+                    >
                       {/* Tipo - discrete badge */}
                       <TableCell>
                         <Badge variant={typeConfig.variant as any}>{typeConfig.label}</Badge>
@@ -387,7 +448,6 @@ export default function GeralPage() {
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <ServiceStatusBadge service={service} />
-                          {/* Part arrival indicator for services waiting for parts */}
                           {service.status === 'em_espera_de_peca' && (
                             <PartArrivalIndicator
                               estimatedArrival={pendingPartsMap[service.id] || null}
@@ -396,22 +456,15 @@ export default function GeralPage() {
                         </div>
                       </TableCell>
 
-                      {/* Tags - Discrete, informative, not dominant */}
+                      {/* Tags */}
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
-                          {/* Urgente - subtle but noticeable */}
                           {service.is_urgent && (
                             <Badge variant={"subtle-urgent" as any} className="text-xs">Urgente</Badge>
                           )}
-
-                          {/* Garantia - subtle */}
                           {service.is_warranty && (
                             <Badge variant={"subtle-warranty" as any} className="text-xs">Garantia</Badge>
                           )}
-
-                          {/* A Precificar - gerido pelo ServiceStatusBadge na coluna Estado */}
-
-                          {/* Em Débito - indica débito quando estado principal é outro */}
                           {service.status !== 'em_debito' &&
                             (service.final_price || 0) > 0 &&
                             (service.amount_paid || 0) < (service.final_price || 0) && (
@@ -472,43 +525,69 @@ export default function GeralPage() {
           itemLabel="serviço"
         />
 
-        {/* Creation Modals */}
+        {/* Creation Modals - always rendered (lightweight, controlled by open prop) */}
         <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
         <CreateInstallationModal open={showInstallationModal} onOpenChange={setShowInstallationModal} />
         <CreateDeliveryModal open={showDeliveryModal} onOpenChange={setShowDeliveryModal} />
 
-        {/* Management Modals */}
-        <AssignTechnicianModal service={currentService} open={showAssignModal} onOpenChange={setShowAssignModal} />
-        <SetPriceModal service={currentService} open={showSetPriceModal} onOpenChange={setShowSetPriceModal} />
-        <RegisterPaymentModal service={currentService} open={showPaymentModal} onOpenChange={setShowPaymentModal} />
-        <RequestPartModal service={currentService} open={showRequestPartModal} onOpenChange={setShowRequestPartModal} requireSignature={currentService?.service_location === 'cliente'} />
-        <ConfirmPartOrderModal service={currentService} open={showConfirmPartOrderModal} onOpenChange={setShowConfirmPartOrderModal} />
-        <PartArrivedModal service={currentService} open={showPartArrivedModal} onOpenChange={setShowPartArrivedModal} />
-        <DeliveryManagementModal service={currentService} open={showDeliveryMgmtModal} onOpenChange={setShowDeliveryMgmtModal} onAssignDelivery={handleAssignDelivery} />
-        <AssignDeliveryModal service={currentService} open={showAssignDeliveryModal} onOpenChange={setShowAssignDeliveryModal} />
-        <ForceStateModal service={currentService} open={showForceStateModal} onOpenChange={setShowForceStateModal} />
-        <ContactClientModal service={currentService} open={showContactModal} onOpenChange={setShowContactModal} />
-        <RescheduleServiceModal service={currentService} open={showRescheduleModal} onOpenChange={setShowRescheduleModal} />
-        <EditServiceDetailsModal open={showEditDetailsModal} onOpenChange={setShowEditDetailsModal} service={currentService} onSuccess={() => { }} />
+        {/* Management Modals - lazy rendered (only mount when needed) */}
+        {showAssignModal && currentService && (
+          <AssignTechnicianModal service={currentService} open={showAssignModal} onOpenChange={setShowAssignModal} />
+        )}
+        {showSetPriceModal && currentService && (
+          <SetPriceModal service={currentService} open={showSetPriceModal} onOpenChange={setShowSetPriceModal} />
+        )}
+        {showPaymentModal && currentService && (
+          <RegisterPaymentModal service={currentService} open={showPaymentModal} onOpenChange={setShowPaymentModal} />
+        )}
+        {showRequestPartModal && currentService && (
+          <RequestPartModal service={currentService} open={showRequestPartModal} onOpenChange={setShowRequestPartModal} requireSignature={currentService?.service_location === 'cliente'} />
+        )}
+        {showConfirmPartOrderModal && currentService && (
+          <ConfirmPartOrderModal service={currentService} open={showConfirmPartOrderModal} onOpenChange={setShowConfirmPartOrderModal} />
+        )}
+        {showPartArrivedModal && currentService && (
+          <PartArrivedModal service={currentService} open={showPartArrivedModal} onOpenChange={setShowPartArrivedModal} />
+        )}
+        {showDeliveryMgmtModal && currentService && (
+          <DeliveryManagementModal service={currentService} open={showDeliveryMgmtModal} onOpenChange={setShowDeliveryMgmtModal} onAssignDelivery={handleAssignDelivery} />
+        )}
+        {showAssignDeliveryModal && currentService && (
+          <AssignDeliveryModal service={currentService} open={showAssignDeliveryModal} onOpenChange={setShowAssignDeliveryModal} />
+        )}
+        {showForceStateModal && currentService && (
+          <ForceStateModal service={currentService} open={showForceStateModal} onOpenChange={setShowForceStateModal} />
+        )}
+        {showContactModal && currentService && (
+          <ContactClientModal service={currentService} open={showContactModal} onOpenChange={setShowContactModal} />
+        )}
+        {showRescheduleModal && currentService && (
+          <RescheduleServiceModal service={currentService} open={showRescheduleModal} onOpenChange={setShowRescheduleModal} />
+        )}
+        {showEditDetailsModal && currentService && (
+          <EditServiceDetailsModal open={showEditDetailsModal} onOpenChange={setShowEditDetailsModal} service={currentService} onSuccess={() => { }} />
+        )}
 
         {/* Delete Confirmation */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Eliminação</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem a certeza que deseja eliminar o serviço {currentService?.code}?
-                Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Eliminar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {showDeleteDialog && currentService && (
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Eliminação</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem a certeza que deseja eliminar o serviço {currentService?.code}?
+                  Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         {/* Detail Sheet */}
         <ServiceDetailSheet service={selectedService} open={showDetailSheet} onOpenChange={setShowDetailSheet} />
