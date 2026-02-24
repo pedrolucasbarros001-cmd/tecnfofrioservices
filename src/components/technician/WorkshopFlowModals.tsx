@@ -21,6 +21,7 @@ import { logServiceStart, logPartRequest, logServiceCompletion } from "@/utils/a
 import { supabase, ensureValidSession } from "@/integrations/supabase/client";
 import { humanizeError } from "@/utils/errorMessages";
 import { toast } from "sonner";
+import { technicianUpdateService } from "@/utils/technicianRpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { UsedPartsModal, PartEntry } from "@/components/modals/UsedPartsModal";
@@ -253,12 +254,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
 
       // Update service status via RPC (bypassa RLS)
-      const { error: rpcError } = await (supabase.rpc as any)('technician_update_service', {
-        _service_id: service.id,
-        _status: 'para_pedir_peca',
-        _last_status_before_part_request: service.status,
-        _detected_fault: formData.detectedFault || null,
-        _work_performed: formData.workPerformed || null,
+      const { error: rpcError } = await technicianUpdateService({
+        serviceId: service.id,
+        status: 'para_pedir_peca',
+        lastStatusBeforePartRequest: service.status,
+        detectedFault: formData.detectedFault || null,
+        workPerformed: formData.workPerformed || null,
       });
       if (rpcError) throw rpcError;
 
@@ -300,12 +301,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       await ensureValidSession();
 
       // Update service to concluidos + pending_pricing via RPC (bypassa RLS)
-      const { error: rpcError } = await (supabase.rpc as any)('technician_update_service', {
-        _service_id: service.id,
-        _status: 'concluidos',
-        _pending_pricing: true,
-        _detected_fault: formData.detectedFault || null,
-        _work_performed: finalWorkPerformed,
+      const { error: rpcError } = await technicianUpdateService({
+        serviceId: service.id,
+        status: 'concluidos',
+        pendingPricing: true,
+        detectedFault: formData.detectedFault || null,
+        workPerformed: finalWorkPerformed,
       });
       if (rpcError) throw rpcError;
 

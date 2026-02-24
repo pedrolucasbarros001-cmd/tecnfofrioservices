@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { technicianUpdateService } from '@/utils/technicianRpc';
 
 export interface FlowState<T = Record<string, unknown>> {
   serviceId: string;
@@ -39,8 +40,13 @@ export async function deriveStepFromDb(
   service: Record<string, unknown>
 ): Promise<DbResumeResult> {
   try {
-    // Parallel fetch: photos metadata + parts
-    const [photoMetaResult, partsResult] = await Promise.all([
+    // Parallel fetch: service snapshot + photos metadata + parts
+    const [serviceResult, photoMetaResult, partsResult] = await Promise.all([
+      supabase
+        .from('services')
+        .select('id, status, flow_step, detected_fault, work_performed, brand, model, serial_number, appliance_type, pnc, service_type')
+        .eq('id', serviceId)
+        .maybeSingle(),
       supabase
         .from('service_photos')
         .select('id, photo_type, uploaded_at')
@@ -55,6 +61,7 @@ export async function deriveStepFromDb(
     if (photoMetaResult.error) throw photoMetaResult.error;
     if (partsResult.error) throw partsResult.error;
 
+    const serviceSnapshot = (serviceResult.data as Record<string, unknown> | null) ?? service;
     const photoMetadata = photoMetaResult.data ?? [];
     const parts = partsResult.data ?? [];
 
@@ -105,10 +112,10 @@ export async function deriveStepFromDb(
     const latestPhoto = (type: string) => photosByType[type]?.[0] ?? null;
     const allPhotos = (type: string) => photosByType[type] ?? [];
 
-    const detectedFault = (service.detected_fault as string) || '';
-    const workPerformed = (service.work_performed as string) || '';
-    const flowStep = (service.flow_step as string) || '';
-    const status = (service.status as string) || '';
+    const detectedFault = (serviceSnapshot.detected_fault as string) || '';
+    const workPerformed = (serviceSnapshot.work_performed as string) || '';
+    const flowStep = (serviceSnapshot.flow_step as string) || '';
+    const status = (serviceSnapshot.status as string) || '';
 
     // Status that imply the service has already passed the initial entry/photos phase
     const isInProgress = ['em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'].includes(status);
@@ -123,11 +130,11 @@ export async function deriveStepFromDb(
         photosEstado: allPhotos('estado'),
         usedPartsList,
         usedParts: usedPartsList.length > 0,
-        productBrand: service.brand || "",
-        productModel: service.model || "",
-        productSerial: service.serial_number || "",
-        productPNC: (service as any).pnc || "",
-        productType: service.appliance_type || "",
+        productBrand: serviceSnapshot.brand || "",
+        productModel: serviceSnapshot.model || "",
+        productSerial: serviceSnapshot.serial_number || "",
+        productPNC: (serviceSnapshot as any).pnc || "",
+        productType: serviceSnapshot.appliance_type || "",
       };
 
       if (flowType === 'oficina_continuacao') {
@@ -148,7 +155,7 @@ export async function deriveStepFromDb(
         if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
       }
 
-      const hasProductInfo = !!(service.brand && service.model);
+      const hasProductInfo = !!(serviceSnapshot.brand && serviceSnapshot.model);
       if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
@@ -159,7 +166,7 @@ export async function deriveStepFromDb(
 
     // --- VISIT FLOW ---
     if (flowType === 'visita' || flowType === 'visita_continuacao') {
-      const serviceType = (service.service_type as string) || '';
+      const serviceType = (serviceSnapshot.service_type as string) || '';
       const isReparacao = serviceType === 'reparacao';
 
       const formDataOverrides: Record<string, unknown> = {
@@ -170,11 +177,11 @@ export async function deriveStepFromDb(
         photoFile: latestPhoto('visita'),
         usedPartsList,
         usedParts: usedPartsList.length > 0,
-        productBrand: service.brand || "",
-        productModel: service.model || "",
-        productSerial: service.serial_number || "",
-        productPNC: (service as any).pnc || "",
-        productType: service.appliance_type || "",
+        productBrand: serviceSnapshot.brand || "",
+        productModel: serviceSnapshot.model || "",
+        productSerial: serviceSnapshot.serial_number || "",
+        productPNC: (serviceSnapshot as any).pnc || "",
+        productType: serviceSnapshot.appliance_type || "",
       };
 
       if (flowType === 'visita_continuacao') {
@@ -196,7 +203,7 @@ export async function deriveStepFromDb(
           if (!hasPhoto('estado')) return { step: 'foto_estado', formDataOverrides };
         }
 
-        const hasProductInfo = !!(service.brand && service.model);
+        const hasProductInfo = !!(serviceSnapshot.brand && serviceSnapshot.model);
         if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
         if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
@@ -205,7 +212,7 @@ export async function deriveStepFromDb(
       } else {
         if (!hasPhoto('visita')) return { step: 'foto', formDataOverrides };
 
-        const hasProductInfo = !!(service.brand && service.model);
+        const hasProductInfo = !!(serviceSnapshot.brand && serviceSnapshot.model);
         if (!hasProductInfo) return { step: 'produto', formDataOverrides };
 
         if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
@@ -288,6 +295,7 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
   }, [serviceId, flowType]);
 
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPersistedStepRef = useRef<string | null>(null);
 
   // Sanitize formData: replace base64 photo strings with placeholder to avoid huge DB payloads
   const sanitizeFormData = useCallback((formData?: T): Record<string, unknown> | null => {
@@ -307,43 +315,54 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
     return cleanData;
   }, []);
 
-  const saveStateToDb = useCallback((currentStep: string, formData?: T) => {
-    // Debounce: cancel previous pending save and schedule a new one in 2s
+  const persistStepToDb = useCallback(async (currentStep: string | null, formData?: T) => {
+    const cleanData = sanitizeFormData(formData);
+    const { error } = await technicianUpdateService({
+      serviceId,
+      flowStep: currentStep,
+      flowData: cleanData,
+    });
+
+    if (error) throw error;
+  }, [serviceId, sanitizeFormData]);
+
+  const saveStateToDb = useCallback((currentStep: string | null, formData?: T) => {
+    // Persist immediately when a new step is reached (prevents "passo fantasma")
+    if (currentStep !== lastPersistedStepRef.current) {
+      lastPersistedStepRef.current = currentStep;
+      persistStepToDb(currentStep, formData).catch((error) => {
+        console.error('Error persisting flow step to DB:', error);
+      });
+    }
+
+    // Debounce additional form-data updates for same step
     if (dbSaveTimerRef.current) {
       clearTimeout(dbSaveTimerRef.current);
     }
+
     dbSaveTimerRef.current = setTimeout(async () => {
       try {
-        const cleanData = sanitizeFormData(formData);
-        const { error } = await (supabase.rpc as any)('technician_update_service', {
-          _service_id: serviceId,
-          _flow_step: currentStep,
-          _flow_data: cleanData,
-        });
-        if (error) throw error;
+        await persistStepToDb(currentStep, formData);
       } catch (error) {
         console.error('Error persisting flow state to DB:', error);
       }
-    }, 2000);
-  }, [serviceId, sanitizeFormData]);
+    }, 600);
+  }, [persistStepToDb]);
 
   // Flush immediately (no debounce) — call when modal closes
-  const flushStateToDb = useCallback(async (currentStep: string, formData?: T) => {
+  const flushStateToDb = useCallback(async (currentStep: string | null, formData?: T) => {
     if (dbSaveTimerRef.current) {
       clearTimeout(dbSaveTimerRef.current);
       dbSaveTimerRef.current = null;
     }
+
     try {
-      const cleanData = sanitizeFormData(formData);
-      await (supabase.rpc as any)('technician_update_service', {
-        _service_id: serviceId,
-        _flow_step: currentStep,
-        _flow_data: cleanData,
-      });
+      lastPersistedStepRef.current = currentStep;
+      await persistStepToDb(currentStep, formData);
     } catch (error) {
       console.error('Error flushing flow state to DB:', error);
     }
-  }, [serviceId, sanitizeFormData]);
+  }, [persistStepToDb]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {

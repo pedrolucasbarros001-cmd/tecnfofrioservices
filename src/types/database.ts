@@ -159,9 +159,11 @@ export interface ServicePart {
   part_code: string | null;
   quantity: number;
   cost: number;
+  iva_rate: number;
   is_requested: boolean;
   estimated_arrival: string | null;
   arrived: boolean;
+  supplier: string | null;
   notes: string | null;
   created_at: string;
 }
