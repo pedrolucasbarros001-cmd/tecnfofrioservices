@@ -165,8 +165,8 @@ export function RequestPartModal({
           <p className="text-sm text-muted-foreground">Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.</p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6">
-          <div className="space-y-4 py-4 pr-3">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
+          <div className="space-y-4 py-4">
             {service && (
               <div className="p-3 bg-muted rounded-lg text-sm">
                 <p className="font-medium">{service.code}</p>
@@ -277,7 +277,7 @@ export function RequestPartModal({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>

@@ -775,8 +775,8 @@ function CreateServiceFromCustomerModal({
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 min-h-0 px-6">
-                <div className="space-y-4 py-4 pr-4">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <div className="space-y-4 py-4">
                   {/* Customer info */}
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm font-medium text-green-800">
@@ -1182,7 +1182,7 @@ function CreateServiceFromCustomerModal({
                     />
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
 
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button
