@@ -1,74 +1,29 @@
 
-# Plano: Corrigir Login com Credenciais Correctas e Permitir Sessoes Simultaneas
+# Plano: Expandir Acesso da Secretaria nas Accoes de Pecas
 
-## Problema Raiz
+## Problema
 
-Ha dois problemas distintos a causar o erro de "credenciais invalidas" com senhas correctas:
+Tres accoes nos servicos estao restritas apenas ao nivel "dono", impedindo qualquer conta com nivel "secretaria" de as usar:
 
-### Problema 1: O logout mata TODAS as sessoes
+1. **"Registar Pedido"** (quando servico esta em "para_pedir_peca") -- so dono
+2. **"Peca Chegou"** (quando servico esta em "em_espera_de_peca") -- so dono
+3. **"Solicitar Peca"** (durante execucao/oficina) -- so tecnico ou dono
 
-O `signOut()` actual chama `supabase.auth.signOut()` **sem parametros**. Por defeito, o Supabase usa `scope: 'global'`, que **invalida TODOS os refresh tokens** do utilizador em todos os dispositivos. Isto significa:
+## Solucao (1 ficheiro)
 
-```text
-Utilizador loga no PC -> OK
-Utilizador loga no telemovel -> OK
-Utilizador faz logout no telemovel -> MATA a sessao do PC tambem!
-  |
-  v
-PC tenta renovar token -> token invalido
-  |
-  v
-Proximo login no PC pode falhar com erro ambiguo
-```
+### `src/components/services/StateActionButtons.tsx`
 
-### Problema 2: Erros de servidor sao classificados como "credenciais invalidas"
+Tres alteracoes simples de permissao:
 
-Quando a base de dados esta lenta e retorna 500/504, o Supabase Auth por vezes retorna mensagens de erro que nao contem as palavras-chave de servidor ("database error", "timeout"), e caem no bloco generico que o utilizador interpreta como "senha errada".
+1. Linha 134: `isDono` passa a `(isDono || isSecretaria)` -- botao principal "Registar Pedido"
+2. Linha 145: `isDono` passa a `(isDono || isSecretaria)` -- botao principal "Peca Chegou"
+3. Linha 279: `(isTecnico || isDono)` passa a `(isTecnico || isDono || isSecretaria)` -- menu "Solicitar Peca"
 
-### Problema 3: TVMonitorPage faz signOut global separado
+### O que NAO muda (mantido exclusivo do dono)
 
-A pagina `TVMonitorPage.tsx` chama `supabase.auth.signOut()` directamente (sem usar o contexto), tambem com scope global.
-
-## Solucao (3 ficheiros)
-
-### Ficheiro 1: `src/contexts/AuthContext.tsx`
-
-Alterar a funcao `signOut` para usar `scope: 'local'`:
-
-```text
-Antes:  await supabase.auth.signOut()              // mata TODAS as sessoes
-Depois: await supabase.auth.signOut({ scope: 'local' })  // so mata ESTA sessao
-```
-
-Isto permite que a mesma conta esteja logada em multiplos dispositivos simultaneamente sem conflito.
-
-### Ficheiro 2: `src/pages/TVMonitorPage.tsx`
-
-Alterar o logout directo para tambem usar scope local:
-
-```text
-Antes:  await supabase.auth.signOut()
-Depois: await supabase.auth.signOut({ scope: 'local' })
-```
-
-### Ficheiro 3: `src/pages/LoginPage.tsx`
-
-Melhorar a deteccao de erros para evitar classificar erros de servidor como "credenciais invalidas":
-
-- Antes de verificar "invalid"/"credentials", primeiro limpar sessao local antiga (que pode estar a causar conflito)
-- Adicionar mais palavras-chave de servidor: "context deadline", "connection", "ECONNREFUSED"
-- Chamar `localStorage.clear()` automaticamente antes de cada tentativa de login para eliminar sessoes fantasma
+- "Mudar Status (Forcado)" -- accao critica de seguranca
+- "Eliminar Servico" -- accao destrutiva irreversivel
 
 ## Resultado
 
-- A mesma conta pode estar logada em quantos dispositivos quiser, ao mesmo tempo
-- Fazer logout num dispositivo NAO afecta os outros
-- Sessoes antigas nao interferem com novos logins
-- Erros de servidor nao sao confundidos com "senha errada"
-
-## Seccao Tecnica
-
-- `supabase.auth.signOut({ scope: 'local' })` apenas remove a sessao do localStorage do browser actual, sem tocar no servidor
-- O Supabase suporta nativamente sessoes multiplas -- cada `signInWithPassword` gera um novo par access/refresh token independente
-- Nenhuma alteracao de base de dados e necessaria
-- A limpeza de localStorage antes do login garante que tokens expirados/invalidos de sessoes anteriores nao interferem
+Qualquer conta com o nivel de acesso "secretaria" podera gerir todo o fluxo de pecas (solicitar, registar pedido, confirmar chegada), alinhando com as permissoes ja existentes de orcamentar e registar pagamentos.
