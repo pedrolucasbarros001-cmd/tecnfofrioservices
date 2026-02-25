@@ -30,6 +30,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -68,6 +69,17 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { humanizeError } from '@/utils/errorMessages';
 import { formatShiftLabel } from '@/utils/dateUtils';
 
 // Helper: descrição amigável para tipos de assinatura
@@ -103,16 +115,8 @@ const getPhotoTypeLabel = (type: string | null): string => {
     default: return 'Foto';
   }
 };
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+
+
 
 // LazyImage: shows skeleton until image loads, then fades in
 function LazyImage({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
@@ -205,6 +209,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<ServicePayment | null>(null);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
 
   // Consolidate status, parts, payments, photos, signatures into one request (logs loaded separately)
   const { data: fullData, isLoading: isLoadingFull } = useFullServiceData(service?.id, open);
@@ -703,11 +709,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                               </p>
                             </div>
                           </div>
-                          {payment.description && (
-                            <span className="text-xs text-muted-foreground max-w-[150px] truncate">
-                              {payment.description}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {payment.description && (
+                              <span className="text-xs text-muted-foreground max-w-[150px] truncate">
+                                {payment.description}
+                              </span>
+                            )}
+                            {role === 'dono' && (
+                              <button
+                                onClick={() => setPaymentToDelete(payment)}
+                                className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                                title="Apagar pagamento"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -965,6 +982,66 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Payment Confirmation */}
+      <AlertDialog open={!!paymentToDelete} onOpenChange={(open) => !open && setPaymentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar Pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem a certeza que deseja apagar o pagamento de{' '}
+              <strong>{paymentToDelete?.amount.toFixed(2)} €</strong>
+              {paymentToDelete?.payment_date && ` do dia ${format(new Date(paymentToDelete.payment_date), "dd/MM/yyyy", { locale: pt })}`}
+              ? O saldo do serviço será recalculado automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingPayment}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingPayment}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!paymentToDelete || !service) return;
+                setIsDeletingPayment(true);
+                try {
+                  const { error: delError } = await supabase
+                    .from('service_payments')
+                    .delete()
+                    .eq('id', paymentToDelete.id);
+                  if (delError) throw delError;
+
+                  // Recalculate amount_paid from remaining payments
+                  const { data: remaining, error: sumError } = await supabase
+                    .from('service_payments')
+                    .select('amount')
+                    .eq('service_id', service.id);
+                  if (sumError) throw sumError;
+
+                  const newTotal = (remaining || []).reduce((s, p) => s + p.amount, 0);
+                  await updateService.mutateAsync({
+                    id: service.id,
+                    amount_paid: newTotal,
+                    skipToast: true,
+                  });
+
+                  queryClient.invalidateQueries({ queryKey: ['service-payments'] });
+                  queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
+                  toast.success(`Pagamento de ${paymentToDelete.amount.toFixed(2)} € eliminado. Novo total pago: ${newTotal.toFixed(2)} €`);
+                  setPaymentToDelete(null);
+                } catch (error) {
+                  console.error('Error deleting payment:', error);
+                  toast.error(humanizeError(error));
+                } finally {
+                  setIsDeletingPayment(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingPayment ? 'A eliminar...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
