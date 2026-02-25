@@ -135,8 +135,11 @@ async function _deriveStepFromDbImpl(
         return { step: 'confirmacao_peca', formDataOverrides };
       }
 
-      // Prioritize explicit flow_step from DB
-      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+      // Prioritize explicit flow_step from DB, but skip stale photo steps
+      // when the service already has history (e.g. came from a visit)
+      const isStalePhotoStep = flowStep && ['foto_aparelho', 'foto_etiqueta', 'foto_estado'].includes(flowStep);
+      const hasHistory = !!(detectedFault || serviceSnapshot.work_performed || isInProgress);
+      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao' && !(isStalePhotoStep && hasHistory)) {
         return { step: flowStep, formDataOverrides };
       }
 
