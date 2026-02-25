@@ -109,7 +109,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const safeSetStep = (step: ModalStep) => {
     isTransitioning.current = true;
     setCurrentStep(step);
-    setTimeout(() => { isTransitioning.current = false; }, 0);
+    // Use 350ms to safely cover Dialog unmount/mount animation cycles
+    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
