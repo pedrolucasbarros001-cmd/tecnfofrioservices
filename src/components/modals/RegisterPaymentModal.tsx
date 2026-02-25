@@ -74,6 +74,23 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
     setIsSubmitting(true);
     try {
+      // Check for duplicate payment (same amount + method within last 2 minutes)
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const { data: duplicates } = await supabase
+        .from('service_payments')
+        .select('id')
+        .eq('service_id', service.id)
+        .eq('amount', paymentValue)
+        .eq('payment_method', paymentMethod)
+        .gte('created_at', twoMinutesAgo)
+        .limit(1);
+
+      if (duplicates && duplicates.length > 0) {
+        toast.warning(`Já existe um pagamento de €${paymentValue.toFixed(2)} (${paymentMethod}) registado nos últimos 2 minutos. Verifique antes de duplicar.`);
+        setIsSubmitting(false);
+        return;
+      }
+
       // Insert payment record
       const { error: paymentError } = await supabase
         .from('service_payments')
