@@ -143,8 +143,9 @@ async function _deriveStepFromDbImpl(
         return { step: flowStep, formDataOverrides };
       }
 
-      // Skip initial photos if service is already in progress and has any photos
-      const skipInitialPhotos = isInProgress && hasAnyPhoto;
+      // Skip initial photos if service has history (came from visit, forced state, etc.)
+      // or if it's already in progress with existing photos
+      const skipInitialPhotos = hasHistory || (isInProgress && hasAnyPhoto);
 
       if (!skipInitialPhotos) {
         if (!hasPhoto('aparelho')) return { step: 'foto_aparelho', formDataOverrides };
