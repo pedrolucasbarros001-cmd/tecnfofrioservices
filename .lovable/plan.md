@@ -1,111 +1,120 @@
 
+# Plano de correção: modal “pisca e fecha” ao iniciar execução (todas as tipologias)
 
-# Correcao: Registos anteriores nao aparecem na Oficina e na Ficha Lateral
+## Leitura do problema (confirmado)
+O comportamento descrito (“clica em iniciar, pisca e fecha, fica em execução mas sem modal aberto”) é compatível com **estado de etapa inválida** + **transição frágil entre diálogos**.
 
-## Problema confirmado
+Pontos críticos encontrados no código:
+1. `deriveStepFromDb` pode devolver `flow_step` salvo no DB que **não pertence ao fluxo atual** (ex.: passo antigo de visita em fluxo de oficina).
+2. Os modais aceitam esse passo via cast (`as ModalStep`) sem validação.
+3. Quando `currentStep` fica inválido, nenhum `<Dialog open=...>` bate com `true` → visualmente “fecha tudo”.
+4. Em `Visit/Installation/Delivery`, `safeSetStep` ainda usa timeout `0ms`, mais suscetível a race de `onOpenChange(false)` no ciclo de animação.
+5. Ainda existem transições com `setCurrentStep(...)` direto (sem guard), o que pode reintroduzir fechamento inesperado.
 
-Dois bugs interdependentes impedem que registos da visita anterior (fotos, diagnostico, assinaturas, linha do tempo) aparecam quando o servico chega a oficina:
+---
 
-### Bug 1: `hasPreviousHistory` demasiado restritivo (`WorkshopFlowModals.tsx`, linha 127)
+## Estratégia de correção (sem aumentar carga no Supabase)
 
-```
-const hasPreviousHistory = !!service.detected_fault;
-```
+### 1) Blindar `deriveStepFromDb` contra `flow_step` inválido por fluxo
+Arquivo: `src/hooks/useFlowPersistence.ts`
 
-Se o tecnico nao preencheu o campo de diagnostico durante a visita (campo opcional), `detected_fault = NULL`. O sistema assume que nao houve atendimento anterior e:
-- Esconde o componente `ServicePreviousSummary`
-- Mostra o `DiagnosisPhotosGallery` em vez do resumo
-- Obriga o tecnico a repetir 3 fotos obrigatorias (aparelho, etiqueta, estado)
-- Nao mostra o botao "Continuar Reparacao" mas sim "Iniciar Reparacao"
+Implementar validação central de etapas:
+- Criar mapa de etapas válidas por `flowType`:
+  - visita / visita_continuacao
+  - oficina / oficina_continuacao
+  - instalacao
+  - entrega
+- Antes de retornar `flowStep` salvo no DB, validar:
+  - se não for válido para o fluxo corrente, **ignorar** e derivar passo por dados reais (fotos, peças, status, etc.).
+- Manter regra já criada de ignorar passos de foto “stale” na oficina quando há histórico.
 
-### Bug 2: `ServicePreviousSummary` nunca aparece sem `detected_fault` (linha 112)
+Resultado: nunca mais retomará em etapa inexistente para aquele modal.
 
-```
-if (!service.detected_fault && (!activityLogs || activityLogs.length === 0)) {
-  return null;
-}
-```
+---
 
-Os `activityLogs` so carregam quando `isExpanded = true` (lazy loading). Na primeira renderizacao, `activityLogs` e `undefined`, logo a condicao e sempre verdadeira e o componente retorna `null`. Circulo vicioso: o componente nunca aparece, nunca e expandido, nunca carrega logs.
+### 2) Normalizar abertura de passo em todos os FlowModals
+Arquivos:
+- `src/components/technician/WorkshopFlowModals.tsx`
+- `src/components/technician/VisitFlowModals.tsx`
+- `src/components/technician/InstallationFlowModals.tsx`
+- `src/components/technician/DeliveryFlowModals.tsx`
 
-### Bug 3: `ServiceDetailSheet` nao mostra fotos da visita
+Ações:
+- Unificar proteção de transição (`safeSetStep`) para janela segura (mesma abordagem estável, não `0ms`).
+- Validar sempre o destino antes de trocar etapa:
+  - `safeSetStep(step)` só aceita passo válido do fluxo.
+  - Se inválido, fallback para passo seguro (`resumo` ou primeiro passo operacional).
+- Substituir `setCurrentStep(...)` de navegação interna por `safeSetStep(...)` onde houver troca entre diálogos.
+- Ao carregar `savedState.currentStep` e `derivedResumeStep`, validar antes de aplicar; se inválido, cair para `resumo`.
 
-A ficha lateral (`ServiceDetailSheet`) carrega fotos via `useFullServiceData` que funciona correctamente, mas depende do `service-full` query key. Este esta correcto apos a correcao anterior. No entanto, o componente `ServicePreviousSummary` usado dentro do `WorkshopFlowModals` faz queries separadas com keys diferentes que nao sao invalidadas quando fotos sao apagadas ou adicionadas.
+Resultado: botão “Iniciar” nunca deixa o fluxo “sem segundo modal”.
 
-## Dados do TF-00035 confirmados
+---
 
-- `detected_fault`: NULL
-- `work_performed`: NULL
-- `service_location`: oficina
-- `status`: na_oficina
-- `flow_step`: foto_aparelho (da tentativa na oficina, nao da visita)
-- 4 logs de `inicio_execucao` (tentativas repetidas)
-- 0 fotos, 0 assinaturas, 0 pecas
-- Nenhum log de `levantamento` (confirma que o servico foi movido para oficina pelo admin via ForceState, nao pelo fluxo de visita)
+### 3) Adicionar auto-recuperação defensiva (anti-estado fantasma)
+Nos quatro modais técnicos:
+- Calcular se existe algum diálogo principal aberto para o `currentStep`.
+- Se `isOpen === true` e nenhum diálogo principal/submodal estiver ativo por estado inconsistente:
+  - recuperar automaticamente para `resumo` (sem fechar fluxo inteiro),
+  - opcionalmente registrar warning no console para diagnóstico futuro.
 
-Nota: O TF-00035 especifico nao passou pelo fluxo de visita completo — foi forcado para oficina. Mas o bug e real e afecta todos os servicos que passam pelo fluxo de visita sem preencher diagnostico.
+Resultado: mesmo se surgir estado corrompido, a UI se autocorrige.
 
-## Plano de correcao
+---
 
-### 1. Expandir `hasPreviousHistory` (`WorkshopFlowModals.tsx`, linha 127)
+## Diagrama do problema e correção
 
-Substituir a verificacao por uma que considere multiplos indicadores de historico:
+```text
+ANTES
+Iniciar -> status atualizado (em_execucao)
+        -> currentStep recebe flow_step inválido (ex: "deslocacao" em oficina)
+        -> nenhum Dialog casa com o step
+        -> modal "pisca/fecha"
 
-```typescript
-// Antes:
-const hasPreviousHistory = !!service.detected_fault;
-
-// Depois:
-const hasPreviousHistory = !!(
-  service.detected_fault ||
-  service.work_performed ||
-  (service.service_location === 'oficina' && service.status !== 'por_fazer')
-);
-```
-
-Logica: se o servico esta na oficina e nao esta em `por_fazer`, passou por algum fluxo anterior (visita com levantamento, ou entrada directa com atribuicao). Isto e suficiente para:
-- Mostrar o `ServicePreviousSummary` em vez do `DiagnosisPhotosGallery`
-- Saltar as fotos obrigatorias (aparelho, etiqueta, estado) e ir directo ao diagnostico
-- Mostrar "Continuar Reparacao" em vez de "Iniciar Reparacao"
-
-### 2. Corrigir condicao de visibilidade (`ServicePreviousSummary.tsx`, linha 112)
-
-O componente deve ser visivel sempre que houver indicadores de historico, independentemente dos logs (que sao lazy):
-
-```typescript
-// Antes:
-if (!service.detected_fault && (!activityLogs || activityLogs.length === 0)) {
-  return null;
-}
-
-// Depois:
-const hasHistoryIndicators = !!(
-  service.detected_fault ||
-  service.work_performed ||
-  service.service_location === 'oficina'
-);
-if (!hasHistoryIndicators && (!activityLogs || activityLogs.length === 0)) {
-  return null;
-}
+DEPOIS
+Iniciar -> status atualizado
+        -> flow_step validado por fluxo
+           -> inválido? ignora e deriva passo correto
+        -> safeSetStep com guard + fallback
+        -> próximo modal abre e permanece estável
 ```
 
-### 3. Corrigir `deriveStepFromDb` para servicos na oficina com historico (`useFlowPersistence.ts`)
+---
 
-Na funcao `deriveStepFromDb`, quando o fluxo e `oficina` e o servico tem `flow_step: foto_aparelho` salvo no DB de uma tentativa anterior falhada, o sistema retoma no passo de foto mesmo quando ja tem historico. Precisa verificar se o `flow_step` guardado ainda faz sentido dado o estado actual:
+## Arquivos a alterar
+1. `src/hooks/useFlowPersistence.ts`
+   - whitelist de etapas por fluxo
+   - validação de `flowStep` salvo
+   - fallback seguro por fluxo
+2. `src/components/technician/WorkshopFlowModals.tsx`
+   - validação de passos aplicados
+   - remover transições com `setCurrentStep` direto (trocas de diálogo)
+3. `src/components/technician/VisitFlowModals.tsx`
+   - mesmo padrão de guard/validação/fallback
+4. `src/components/technician/InstallationFlowModals.tsx`
+   - mesmo padrão de guard/validação/fallback
+5. `src/components/technician/DeliveryFlowModals.tsx`
+   - mesmo padrão de guard/validação/fallback
 
-Na seccao de workshop flow (linhas 138-141), adicionar uma verificacao: se o `flow_step` guardado e um passo de foto (foto_aparelho, foto_etiqueta, foto_estado) mas o servico ja esta in-progress com fotos anteriores de visita, ignorar o flow_step e saltar para diagnostico.
+---
 
-### Ficheiros a alterar
+## Garantia de performance / Supabase
+- Não será adicionada nova query recorrente.
+- Correção é majoritariamente de lógica cliente (validação de etapa).
+- Mantém arquitetura atual de persistência e retoma.
+- Sem migração SQL obrigatória para esta correção.
 
-| Ficheiro | Alteracao |
-|---|---|
-| `src/components/technician/WorkshopFlowModals.tsx` | Expandir `hasPreviousHistory` (linha 127) para considerar `service_location` e `status` |
-| `src/components/technician/ServicePreviousSummary.tsx` | Expandir condicao de visibilidade (linha 112) para nao depender exclusivamente de `detected_fault` |
-| `src/hooks/useFlowPersistence.ts` | Corrigir `deriveStepFromDb` para ignorar `flow_step` de foto quando o servico ja tem historico anterior |
+---
 
-### Impacto no Supabase
+## Plano de validação (obrigatório)
+Executar teste ponta-a-ponta com técnico em:
+1. Oficina (reparação): clicar “Começar/Continuar” em serviços com e sem histórico.
+2. Visita: iniciar e avançar 2-3 passos, fechar/reabrir, retomar corretamente.
+3. Instalação: iniciar e confirmar que não fecha no passo 1→2.
+4. Entrega: iniciar e confirmar transição estável.
+5. Caso com `flow_step` antigo/inválido: garantir fallback para passo válido e modal permanece aberto.
 
-- Zero queries adicionais — usa apenas campos ja carregados do servico (`service_location`, `status`, `detected_fault`, `work_performed`)
-- Sem migracoes SQL
-- Sem alteracao de RLS policies
-
+Critério de aceite:
+- Nenhum fluxo fecha sozinho ao iniciar.
+- Nunca fica “em execução sem modal”.
+- Sempre abre um passo válido do fluxo correspondente.
