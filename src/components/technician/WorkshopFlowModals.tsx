@@ -103,6 +103,21 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const [showCamera, setShowCamera] = useState(false);
   const [showPartsModal, setShowPartsModal] = useState(false);
 
+  // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
+  const isTransitioning = useRef(false);
+
+  const safeSetStep = (step: ModalStep) => {
+    isTransitioning.current = true;
+    setCurrentStep(step);
+    setTimeout(() => { isTransitioning.current = false; }, 0);
+  };
+
+  const handleStepDialogOpenChange = (open: boolean) => {
+    if (open) return;
+    if (isTransitioning.current) return;
+    handleClose();
+  };
+
 
   // Flow persistence with mode support
   const persistenceKey = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
@@ -172,7 +187,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       await ensureValidSession();
 
       if (mode === "continuacao_peca") {
-        setCurrentStep("confirmacao_peca");
+        safeSetStep("confirmacao_peca");
         return;
       }
 
@@ -193,11 +208,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
-        setCurrentStep(derivedResumeStep);
+        safeSetStep(derivedResumeStep);
       } else if (!hasPreviousHistory) {
-        setCurrentStep("foto_aparelho");
+        safeSetStep("foto_aparelho");
       } else {
-        setCurrentStep("diagnostico");
+        safeSetStep("diagnostico");
       }
     } catch (error) {
       console.error("Error starting repair:", error);
@@ -374,7 +389,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     } catch {
       // Non-critical - don't block flow
     }
-    setCurrentStep("diagnostico");
+    safeSetStep("diagnostico");
   };
 
   // Progress calculation
@@ -429,7 +444,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   const handleConfirmPart = () => {
     setFormData(prev => ({ ...prev, partInstalled: true }));
-    setCurrentStep("conclusao");
+    safeSetStep("conclusao");
   };
 
   if (!isOpen) return null;
@@ -437,7 +452,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   return (
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showPartsModal} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
@@ -489,7 +504,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 1b: Confirmação Peça */}
-      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
@@ -520,7 +535,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       {/* Modal 2a: Foto do Aparelho (if no history) */}
       <Dialog
         open={currentStep === "foto_aparelho" && !showCamera && !showPartsModal}
-        onOpenChange={(open) => { if (!open) handleClose(); }}
+        onOpenChange={handleStepDialogOpenChange}
       >
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto do Aparelho" step="Fotos Obrigatórias" />
@@ -565,7 +580,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep("foto_etiqueta")}
+              onClick={() => safeSetStep("foto_etiqueta")}
               disabled={!formData.photoAparelho}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -577,7 +592,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       {/* Modal 2b: Foto da Etiqueta (if no history) */}
       <Dialog
         open={currentStep === "foto_etiqueta" && !showCamera && !showPartsModal}
-        onOpenChange={(open) => { if (!open) handleClose(); }}
+        onOpenChange={handleStepDialogOpenChange}
       >
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto da Etiqueta" step="Fotos Obrigatórias" />
@@ -617,12 +632,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             )}
           </div>
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("foto_aparelho")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("foto_aparelho")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
-              onClick={() => setCurrentStep("foto_estado")}
+              onClick={() => safeSetStep("foto_estado")}
               disabled={!formData.photoEtiqueta}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -632,7 +647,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 2c: Foto do Estado (if no history) */}
-      <Dialog open={currentStep === "foto_estado" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "foto_estado" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Estado do Aparelho" step="Fotos Obrigatórias" />
           <div className="space-y-4">
@@ -665,7 +680,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </div>
           </div>
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("foto_etiqueta")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("foto_etiqueta")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
@@ -680,7 +695,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "produto" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Informação do Produto" step="Passo 2" />
 
@@ -745,7 +760,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           </div>
 
           <DialogFooter className="flex gap-2 mt-6">
-            <Button variant="outline" onClick={() => setCurrentStep("foto_estado")} className="flex items-center gap-1">
+            <Button variant="outline" onClick={() => safeSetStep("foto_estado")} className="flex items-center gap-1">
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
             <Button onClick={handleProductoConfirm} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
@@ -756,7 +771,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog>
 
       {/* Modal 2: Diagnóstico Complementar */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Diagnóstico" step="Passo 2" />
 
@@ -789,7 +804,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               className="flex-1"
               onClick={() => {
                 if (!hasPreviousHistory) {
-                  setCurrentStep("foto_estado");
+                  safeSetStep("foto_estado");
                 } else {
                   // If it came from a visit, we can go back to resumo
                   setCurrentStep("resumo");
@@ -798,7 +813,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
-            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => setCurrentStep("pecas_usadas")}>
+            <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pecas_usadas")}>
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </DialogFooter>
@@ -809,7 +824,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       <Dialog
         open={currentStep === "pecas_usadas" && !showCamera && !showPartsModal
         }
-        onOpenChange={(open) => !open && handleClose()}
+        onOpenChange={handleStepDialogOpenChange}
       >
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Peças Usadas" step="Passo 3" />
@@ -870,7 +885,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("diagnostico")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
             <Button
               className="flex-1 bg-orange-500 hover:bg-orange-600"
               onClick={() => {
@@ -878,7 +893,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   toast.error("Por favor, registe pelo menos uma peça utilizada.");
                   return;
                 }
-                setCurrentStep("pedir_peca");
+                safeSetStep("pedir_peca");
               }}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -888,7 +903,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog >
 
       {/* Modal 4: Pedir Peça */}
-      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      < Dialog open={currentStep === "pedir_peca" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Pedir Peça?" step="Passo 4" />
 
@@ -960,7 +975,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("pecas_usadas")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pecas_usadas")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             {formData.needsPartOrder ? (
@@ -973,7 +988,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 Solicitar Peça
               </Button>
             ) : (
-              <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => setCurrentStep("conclusao")}>
+              <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => safeSetStep("conclusao")}>
                 Continuar <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             )}
@@ -982,7 +997,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       </Dialog >
 
       {/* Modal 5: Conclusão */}
-      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={(open) => !open && handleClose()}>
+      < Dialog open={currentStep === "conclusao" && !showCamera && !showPartsModal} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Conclusão" step="Passo 5" />
 
@@ -1004,7 +1019,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("pedir_peca")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button

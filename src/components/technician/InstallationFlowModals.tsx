@@ -76,6 +76,21 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const [showPayment, setShowPayment] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
 
+  // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
+  const isTransitioning = useRef(false);
+
+  const safeSetStep = (step: ModalStep) => {
+    isTransitioning.current = true;
+    setCurrentStep(step);
+    setTimeout(() => { isTransitioning.current = false; }, 0);
+  };
+
+  const handleStepDialogOpenChange = (open: boolean) => {
+    if (open) return;
+    if (isTransitioning.current) return;
+    handleClose();
+  };
+
   // Flow persistence
   const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence(service.id, 'instalacao');
 
@@ -131,9 +146,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       queryClient.invalidateQueries({ queryKey: ['technician-services'] });
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo') {
-        setCurrentStep(derivedResumeStep);
+        safeSetStep(derivedResumeStep);
       } else {
-        setCurrentStep('deslocacao');
+        safeSetStep('deslocacao');
       }
     } catch (error) {
       console.error('Error starting installation:', error);
@@ -213,7 +228,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       toast.success('Materiais registados!');
 
       // Advance to next step
-      setCurrentStep('trabalho');
+      setCurrentStep('trabalho'); // not a dialog transition, just internal state
     } catch (error) {
       console.error('Error confirming materials:', error);
       toast.error(humanizeError(error));
@@ -345,7 +360,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Resumo da Instalação" step="Passo 1" />
 
@@ -404,7 +419,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -437,12 +452,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('resumo')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('resumo')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('foto_antes')}
+              onClick={() => safeSetStep('foto_antes')}
             >
               Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -451,7 +466,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 3: Foto Antes */}
-      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto_antes' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto Antes da Instalação" step="Passo 3" />
 
@@ -495,12 +510,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('deslocacao')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('materiais')}
+              onClick={() => safeSetStep('materiais')}
               disabled={!canProceedFromFotoAntes}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -510,7 +525,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 4: Materiais */}
-      <Dialog open={currentStep === 'materiais' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'materiais' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Materiais Utilizados" step="Passo 4" />
 
@@ -551,12 +566,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('foto_antes')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('foto_antes')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('trabalho')}
+              onClick={() => safeSetStep('trabalho')}
             >
               {formData.usedMaterials.length > 0 ? 'Continuar' : 'Sem Materiais'}
               <ArrowRight className="h-4 w-4 ml-1" />
@@ -566,7 +581,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 5: Descrição do Trabalho */}
-      <Dialog open={currentStep === 'trabalho' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'trabalho' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Descrição do Trabalho" step="Passo 5" />
 
@@ -588,12 +603,12 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('materiais')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('materiais')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => setCurrentStep('foto_depois')}
+              onClick={() => safeSetStep('foto_depois')}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -602,7 +617,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       </Dialog>
 
       {/* Modal 6: Foto Depois */}
-      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto_depois' && !showCamera && !showSignature && !showMaterialsModal && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto Após a Instalação" step="Passo 6" />
 
@@ -675,7 +690,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('trabalho')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('trabalho')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button

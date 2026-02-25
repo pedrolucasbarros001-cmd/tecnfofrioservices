@@ -139,6 +139,21 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const [showPayment, setShowPayment] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
 
+  // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
+  const isTransitioning = useRef(false);
+
+  const safeSetStep = (step: ModalStep) => {
+    isTransitioning.current = true;
+    setCurrentStep(step);
+    setTimeout(() => { isTransitioning.current = false; }, 0);
+  };
+
+  const handleStepDialogOpenChange = (open: boolean) => {
+    if (open) return;
+    if (isTransitioning.current) return;
+    handleClose();
+  };
+
   // Check if this is a repair service
   const isReparacao = service.service_type === "reparacao";
 
@@ -211,9 +226,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       queryClient.invalidateQueries({ queryKey: ['technician-services'] });
 
       if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
-        setCurrentStep(derivedResumeStep);
+        safeSetStep(derivedResumeStep);
       } else {
-        setCurrentStep("deslocacao");
+        safeSetStep("deslocacao");
       }
     } catch (error) {
       console.error("Error starting visit:", error);
@@ -479,7 +494,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       setShowPayment(true);
     } else {
       // Go to pecas_usadas step
-      setCurrentStep("pecas_usadas");
+      safeSetStep("pecas_usadas");
     }
   };
 
@@ -503,7 +518,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         return;
       }
     }
-    setCurrentStep("pedir_peca");
+    safeSetStep("pedir_peca");
   };
 
   const handlePedirPecaConfirm = () => {
@@ -660,34 +675,34 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   // Navigate to next/previous step
   const goToPreviousPhotoStep = () => {
-    if (currentStep === "foto_etiqueta") setCurrentStep("foto_aparelho");
-    else if (currentStep === "foto_estado") setCurrentStep("foto_etiqueta");
-    else if (currentStep === "produto" && isReparacao) setCurrentStep("foto_estado");
-    else if (currentStep === "produto") setCurrentStep("foto");
-    else if (currentStep === "diagnostico" && needsProductStep) setCurrentStep("produto");
-    else if (currentStep === "diagnostico" && isReparacao) setCurrentStep("foto_estado");
-    else if (currentStep === "diagnostico") setCurrentStep("foto");
-    else setCurrentStep("deslocacao");
+    if (currentStep === "foto_etiqueta") safeSetStep("foto_aparelho");
+    else if (currentStep === "foto_estado") safeSetStep("foto_etiqueta");
+    else if (currentStep === "produto" && isReparacao) safeSetStep("foto_estado");
+    else if (currentStep === "produto") safeSetStep("foto");
+    else if (currentStep === "diagnostico" && needsProductStep) safeSetStep("produto");
+    else if (currentStep === "diagnostico" && isReparacao) safeSetStep("foto_estado");
+    else if (currentStep === "diagnostico") safeSetStep("foto");
+    else safeSetStep("deslocacao");
   };
 
   const goToNextPhotoStep = () => {
     if (currentStep === "foto_aparelho") {
-      setCurrentStep("foto_etiqueta");
+      safeSetStep("foto_etiqueta");
       return;
     }
 
     if (currentStep === "foto_etiqueta") {
-      setCurrentStep("foto_estado");
+      safeSetStep("foto_estado");
       return;
     }
 
     if (currentStep === "foto_estado" || currentStep === "foto") {
-      setCurrentStep(needsProductStep ? "produto" : "diagnostico");
+      safeSetStep(needsProductStep ? "produto" : "diagnostico");
       return;
     }
 
     if (currentStep === "produto") {
-      setCurrentStep("diagnostico");
+      safeSetStep("diagnostico");
     }
   };
 
@@ -705,7 +720,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     } catch {
       // Non-critical - don't block flow
     }
-    setCurrentStep("diagnostico");
+    safeSetStep("diagnostico");
   };
 
   const handleConfirmacaoPeca = () => {
@@ -720,7 +735,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   return (
     <>
       {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
             title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
@@ -784,7 +799,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === "deslocacao" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "deslocacao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -809,12 +824,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("resumo")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => setCurrentStep(isReparacao ? "foto_aparelho" : "foto")}
+              onClick={() => safeSetStep(isReparacao ? "foto_aparelho" : "foto")}
             >
               Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -826,7 +841,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_aparelho" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={(open) => !open && handleClose()}
+          onOpenChange={handleStepDialogOpenChange}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Foto do Aparelho" step="Passo 3" />
@@ -869,7 +884,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </div>
 
             <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("deslocacao")}>
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
               </Button>
               <Button
@@ -888,7 +903,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_etiqueta" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={(open) => !open && handleClose()}
+          onOpenChange={handleStepDialogOpenChange}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
@@ -951,7 +966,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       {isReparacao && (
         <Dialog
           open={currentStep === "foto_estado" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={(open) => !open && handleClose()}
+          onOpenChange={handleStepDialogOpenChange}
         >
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Estado do Aparelho" step="Passo 5" />
@@ -1020,7 +1035,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
       {!isReparacao && (
-        <Dialog open={currentStep === "foto" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+        <Dialog open={currentStep === "foto" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
           <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
             <ModalHeader title="Tirar Foto" step="Passo 3" />
 
@@ -1058,12 +1073,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </div>
 
             <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("deslocacao")}>
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
               </Button>
               <Button
                 className="flex-1 bg-blue-500 hover:bg-blue-600"
-                onClick={() => setCurrentStep("diagnostico")}
+                onClick={() => safeSetStep("diagnostico")}
                 disabled={!canProceedFromFoto}
               >
                 Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -1074,7 +1089,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       )}
 
       {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      <Dialog open={currentStep === "produto" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "produto" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
 
@@ -1150,7 +1165,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 4/6: Diagnóstico */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
 
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
@@ -1177,7 +1192,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </Button>
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => setCurrentStep("decisao")}
+              onClick={() => safeSetStep("decisao")}
               disabled={!canProceedFromDiagnostico}
             >
               Continuar <ArrowRight className="h-4 w-4 ml-1" />
@@ -1187,7 +1202,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 5/7: Decisão */}
-      <Dialog open={currentStep === "decisao" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "decisao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
 
@@ -1238,7 +1253,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           </RadioGroup>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("diagnostico")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
@@ -1258,7 +1273,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
-      <Dialog open={currentStep === "pecas_usadas" && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "pecas_usadas" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Peças Usadas" step={isReparacao ? "Passo 8" : "Passo 6"} />
 
@@ -1337,7 +1352,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("decisao")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handlePecasUsadasConfirm}>
@@ -1348,7 +1363,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 7/9: Pedir Peça? (only for reparar_local) */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? "Passo 9" : "Passo 7"} />
 
@@ -1441,7 +1456,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </Dialog>
 
       {/* Modal 3d: Confirmação Peça */}
-      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
 
