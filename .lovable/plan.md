@@ -1,47 +1,70 @@
 
 
-# Correcao Manual de Pagamentos Duplicados pelo Administrador
+# Diagnostico: Fotos e valores nao aparecem na ficha de consulta
 
-## Contexto
+## Problema identificado
 
-Pagamentos duplicados ocorrem quando a base de dados confirma o INSERT mas o frontend nao recebe a confirmacao (timeout). O tecnico ou secretaria tenta novamente, criando entradas duplicadas. O administrador precisa de poder apagar pagamentos individuais directamente no historico de pagamentos do servico.
+A pagina `ServiceConsultPage` (`/service/:serviceId`) — a "ficha de consulta" — faz apenas uma query basica:
 
-## O que ja existe
+```sql
+SELECT *, customer:customers(*) FROM services WHERE id = :serviceId
+```
 
-- A tabela `service_payments` ja tem RLS policy que permite DELETE apenas para o role `dono`
-- O `ServiceDetailSheet` ja mostra o historico de pagamentos com cada entrada individual
-- O `useFullServiceData` ja carrega os pagamentos do servico
+Esta query carrega **apenas** os dados da tabela `services` e do cliente. **Nao carrega**:
+- Fotos (`service_photos`)
+- Historico de pagamentos (`service_payments`)
+- Pecas utilizadas (`service_parts`)
+- Assinaturas (`service_signatures`)
+- Diagnostico/trabalho realizado (estes campos existem em `services` mas nao sao renderizados na pagina)
 
-## Plano de Implementacao
+As fotos estao a ser guardadas correctamente no Storage (confirmei 15 registos recentes com URLs publicas validas). O problema e exclusivamente de **renderizacao** — a pagina nao carrega nem mostra esses dados.
 
-### 1. Adicionar botao de apagar no historico de pagamentos (`ServiceDetailSheet.tsx`)
+## Causa raiz
 
-No bloco que renderiza cada pagamento (linhas 688-712), adicionar um botao de lixo (Trash2 icon) visivel apenas para o role `dono`. Ao clicar, abre um AlertDialog de confirmacao com o valor e a data do pagamento.
+O `ServiceConsultPage` foi desenhado como pagina minimalista de estado para clientes, mas os colaboradores estao a usa-lo como ficha de consulta completa. Faltam seccoes inteiras.
 
-### 2. Logica de eliminacao
+## Plano de correcao (sem carga adicional no Supabase)
 
-Ao confirmar:
-1. DELETE do registo em `service_payments` pelo `id`
-2. Recalcular o `amount_paid` do servico somando os pagamentos restantes
-3. UPDATE em `services.amount_paid` com o novo total
-4. Invalidar queries de pagamentos e servicos
-5. Toast de confirmacao
+### 1. Expandir a query existente com JOINs embutidos
 
-### 3. Proteccao contra duplicacao futura (`RegisterPaymentModal.tsx`)
+Em vez de criar queries separadas (que multiplicam pedidos), expandir o `select` existente para incluir apenas os campos necessarios:
 
-Antes de inserir, verificar se ja existe um pagamento com o mesmo `service_id`, `amount` e `payment_method` criado nos ultimos 2 minutos. Se existir, mostrar aviso e bloquear.
+```sql
+SELECT *,
+  customer:customers(*),
+  photos:service_photos(id, file_url, photo_type, description),
+  payments:service_payments(id, amount, payment_method, payment_date),
+  parts:service_parts(id, part_name, quantity, arrived, is_requested),
+  signatures:service_signatures(id, file_url, signature_type, signer_name, signed_at)
+FROM services WHERE id = :serviceId
+```
+
+Uma unica query com JOINs embutidos — **zero queries adicionais**.
+
+### 2. Adicionar seccoes que faltam no JSX
+
+| Seccao | Dados | Visibilidade |
+|---|---|---|
+| Diagnostico e trabalho | `detected_fault`, `work_performed` da tabela services | Se existirem |
+| Fotos do servico | Grid de thumbnails com zoom | Se houver fotos |
+| Pecas | Lista simples com estado (registada/pedida/chegou) | Se houver pecas |
+| Pagamentos | Lista com valor, metodo e data | Se houver pagamentos |
+| Assinaturas | Miniaturas das assinaturas | Se houver assinaturas |
+
+### 3. Corrigir invalidacao de cache no ServiceDetailSheet
+
+O `handleDeletePhoto` invalida `['service-photos', service.id]` mas os dados estao em `['service-full', service.id]`. Corrigir para invalidar a query correcta.
 
 ### Ficheiros a alterar
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/components/services/ServiceDetailSheet.tsx` | Botao de apagar pagamento (apenas dono) com confirmacao e recalculo de amount_paid |
-| `src/components/modals/RegisterPaymentModal.tsx` | Verificacao de duplicacao antes do INSERT |
+| `src/pages/ServiceConsultPage.tsx` | Expandir query com JOINs, adicionar seccoes de fotos/pagamentos/pecas/assinaturas/diagnostico |
+| `src/components/services/ServiceDetailSheet.tsx` | Corrigir query key de invalidacao no `handleDeletePhoto` (linha 249) |
 
-### Detalhes tecnicos
+### Impacto no Supabase
 
-- DELETE usa `supabase.from('service_payments').delete().eq('id', paymentId)` — ja permitido pela RLS para dono
-- Recalculo: `SELECT COALESCE(SUM(amount), 0) FROM service_payments WHERE service_id = X` apos o delete, depois UPDATE em services
-- Verificacao de duplicacao: query antes do insert com filtro `created_at > now() - interval '2 minutes'` e mesmo amount/method
-- Nenhuma migracao SQL necessaria — as permissoes ja existem
+- **Zero queries adicionais** — tudo resolvido com JOINs embutidos na query existente
+- Os indices criados anteriormente em `service_photos.service_id`, `service_parts.service_id`, etc. garantem performance dos JOINs
+- Sem migracoes SQL necessarias
 
