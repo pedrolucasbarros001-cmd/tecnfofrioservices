@@ -1,70 +1,111 @@
 
 
-# Diagnostico: Fotos e valores nao aparecem na ficha de consulta
+# Correcao: Registos anteriores nao aparecem na Oficina e na Ficha Lateral
 
-## Problema identificado
+## Problema confirmado
 
-A pagina `ServiceConsultPage` (`/service/:serviceId`) — a "ficha de consulta" — faz apenas uma query basica:
+Dois bugs interdependentes impedem que registos da visita anterior (fotos, diagnostico, assinaturas, linha do tempo) aparecam quando o servico chega a oficina:
 
-```sql
-SELECT *, customer:customers(*) FROM services WHERE id = :serviceId
+### Bug 1: `hasPreviousHistory` demasiado restritivo (`WorkshopFlowModals.tsx`, linha 127)
+
+```
+const hasPreviousHistory = !!service.detected_fault;
 ```
 
-Esta query carrega **apenas** os dados da tabela `services` e do cliente. **Nao carrega**:
-- Fotos (`service_photos`)
-- Historico de pagamentos (`service_payments`)
-- Pecas utilizadas (`service_parts`)
-- Assinaturas (`service_signatures`)
-- Diagnostico/trabalho realizado (estes campos existem em `services` mas nao sao renderizados na pagina)
+Se o tecnico nao preencheu o campo de diagnostico durante a visita (campo opcional), `detected_fault = NULL`. O sistema assume que nao houve atendimento anterior e:
+- Esconde o componente `ServicePreviousSummary`
+- Mostra o `DiagnosisPhotosGallery` em vez do resumo
+- Obriga o tecnico a repetir 3 fotos obrigatorias (aparelho, etiqueta, estado)
+- Nao mostra o botao "Continuar Reparacao" mas sim "Iniciar Reparacao"
 
-As fotos estao a ser guardadas correctamente no Storage (confirmei 15 registos recentes com URLs publicas validas). O problema e exclusivamente de **renderizacao** — a pagina nao carrega nem mostra esses dados.
+### Bug 2: `ServicePreviousSummary` nunca aparece sem `detected_fault` (linha 112)
 
-## Causa raiz
-
-O `ServiceConsultPage` foi desenhado como pagina minimalista de estado para clientes, mas os colaboradores estao a usa-lo como ficha de consulta completa. Faltam seccoes inteiras.
-
-## Plano de correcao (sem carga adicional no Supabase)
-
-### 1. Expandir a query existente com JOINs embutidos
-
-Em vez de criar queries separadas (que multiplicam pedidos), expandir o `select` existente para incluir apenas os campos necessarios:
-
-```sql
-SELECT *,
-  customer:customers(*),
-  photos:service_photos(id, file_url, photo_type, description),
-  payments:service_payments(id, amount, payment_method, payment_date),
-  parts:service_parts(id, part_name, quantity, arrived, is_requested),
-  signatures:service_signatures(id, file_url, signature_type, signer_name, signed_at)
-FROM services WHERE id = :serviceId
+```
+if (!service.detected_fault && (!activityLogs || activityLogs.length === 0)) {
+  return null;
+}
 ```
 
-Uma unica query com JOINs embutidos — **zero queries adicionais**.
+Os `activityLogs` so carregam quando `isExpanded = true` (lazy loading). Na primeira renderizacao, `activityLogs` e `undefined`, logo a condicao e sempre verdadeira e o componente retorna `null`. Circulo vicioso: o componente nunca aparece, nunca e expandido, nunca carrega logs.
 
-### 2. Adicionar seccoes que faltam no JSX
+### Bug 3: `ServiceDetailSheet` nao mostra fotos da visita
 
-| Seccao | Dados | Visibilidade |
-|---|---|---|
-| Diagnostico e trabalho | `detected_fault`, `work_performed` da tabela services | Se existirem |
-| Fotos do servico | Grid de thumbnails com zoom | Se houver fotos |
-| Pecas | Lista simples com estado (registada/pedida/chegou) | Se houver pecas |
-| Pagamentos | Lista com valor, metodo e data | Se houver pagamentos |
-| Assinaturas | Miniaturas das assinaturas | Se houver assinaturas |
+A ficha lateral (`ServiceDetailSheet`) carrega fotos via `useFullServiceData` que funciona correctamente, mas depende do `service-full` query key. Este esta correcto apos a correcao anterior. No entanto, o componente `ServicePreviousSummary` usado dentro do `WorkshopFlowModals` faz queries separadas com keys diferentes que nao sao invalidadas quando fotos sao apagadas ou adicionadas.
 
-### 3. Corrigir invalidacao de cache no ServiceDetailSheet
+## Dados do TF-00035 confirmados
 
-O `handleDeletePhoto` invalida `['service-photos', service.id]` mas os dados estao em `['service-full', service.id]`. Corrigir para invalidar a query correcta.
+- `detected_fault`: NULL
+- `work_performed`: NULL
+- `service_location`: oficina
+- `status`: na_oficina
+- `flow_step`: foto_aparelho (da tentativa na oficina, nao da visita)
+- 4 logs de `inicio_execucao` (tentativas repetidas)
+- 0 fotos, 0 assinaturas, 0 pecas
+- Nenhum log de `levantamento` (confirma que o servico foi movido para oficina pelo admin via ForceState, nao pelo fluxo de visita)
+
+Nota: O TF-00035 especifico nao passou pelo fluxo de visita completo — foi forcado para oficina. Mas o bug e real e afecta todos os servicos que passam pelo fluxo de visita sem preencher diagnostico.
+
+## Plano de correcao
+
+### 1. Expandir `hasPreviousHistory` (`WorkshopFlowModals.tsx`, linha 127)
+
+Substituir a verificacao por uma que considere multiplos indicadores de historico:
+
+```typescript
+// Antes:
+const hasPreviousHistory = !!service.detected_fault;
+
+// Depois:
+const hasPreviousHistory = !!(
+  service.detected_fault ||
+  service.work_performed ||
+  (service.service_location === 'oficina' && service.status !== 'por_fazer')
+);
+```
+
+Logica: se o servico esta na oficina e nao esta em `por_fazer`, passou por algum fluxo anterior (visita com levantamento, ou entrada directa com atribuicao). Isto e suficiente para:
+- Mostrar o `ServicePreviousSummary` em vez do `DiagnosisPhotosGallery`
+- Saltar as fotos obrigatorias (aparelho, etiqueta, estado) e ir directo ao diagnostico
+- Mostrar "Continuar Reparacao" em vez de "Iniciar Reparacao"
+
+### 2. Corrigir condicao de visibilidade (`ServicePreviousSummary.tsx`, linha 112)
+
+O componente deve ser visivel sempre que houver indicadores de historico, independentemente dos logs (que sao lazy):
+
+```typescript
+// Antes:
+if (!service.detected_fault && (!activityLogs || activityLogs.length === 0)) {
+  return null;
+}
+
+// Depois:
+const hasHistoryIndicators = !!(
+  service.detected_fault ||
+  service.work_performed ||
+  service.service_location === 'oficina'
+);
+if (!hasHistoryIndicators && (!activityLogs || activityLogs.length === 0)) {
+  return null;
+}
+```
+
+### 3. Corrigir `deriveStepFromDb` para servicos na oficina com historico (`useFlowPersistence.ts`)
+
+Na funcao `deriveStepFromDb`, quando o fluxo e `oficina` e o servico tem `flow_step: foto_aparelho` salvo no DB de uma tentativa anterior falhada, o sistema retoma no passo de foto mesmo quando ja tem historico. Precisa verificar se o `flow_step` guardado ainda faz sentido dado o estado actual:
+
+Na seccao de workshop flow (linhas 138-141), adicionar uma verificacao: se o `flow_step` guardado e um passo de foto (foto_aparelho, foto_etiqueta, foto_estado) mas o servico ja esta in-progress com fotos anteriores de visita, ignorar o flow_step e saltar para diagnostico.
 
 ### Ficheiros a alterar
 
 | Ficheiro | Alteracao |
 |---|---|
-| `src/pages/ServiceConsultPage.tsx` | Expandir query com JOINs, adicionar seccoes de fotos/pagamentos/pecas/assinaturas/diagnostico |
-| `src/components/services/ServiceDetailSheet.tsx` | Corrigir query key de invalidacao no `handleDeletePhoto` (linha 249) |
+| `src/components/technician/WorkshopFlowModals.tsx` | Expandir `hasPreviousHistory` (linha 127) para considerar `service_location` e `status` |
+| `src/components/technician/ServicePreviousSummary.tsx` | Expandir condicao de visibilidade (linha 112) para nao depender exclusivamente de `detected_fault` |
+| `src/hooks/useFlowPersistence.ts` | Corrigir `deriveStepFromDb` para ignorar `flow_step` de foto quando o servico ja tem historico anterior |
 
 ### Impacto no Supabase
 
-- **Zero queries adicionais** — tudo resolvido com JOINs embutidos na query existente
-- Os indices criados anteriormente em `service_photos.service_id`, `service_parts.service_id`, etc. garantem performance dos JOINs
-- Sem migracoes SQL necessarias
+- Zero queries adicionais — usa apenas campos ja carregados do servico (`service_location`, `status`, `detected_fault`, `work_performed`)
+- Sem migracoes SQL
+- Sem alteracao de RLS policies
 
