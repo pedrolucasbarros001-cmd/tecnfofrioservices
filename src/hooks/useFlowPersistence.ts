@@ -30,6 +30,27 @@ export interface DbResumeResult {
 }
 
 /**
+ * Whitelist of valid steps per flow type.
+ * Used to validate flow_step from DB before applying — prevents "ghost step" bug
+ * where an invalid step causes no Dialog to match and the modal appears to close.
+ */
+const VALID_STEPS_BY_FLOW: Record<string, string[]> = {
+  visita: ['resumo', 'deslocacao', 'foto', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'decisao', 'pecas_usadas', 'pedir_peca'],
+  visita_continuacao: ['resumo_continuacao', 'confirmacao_peca', 'decisao', 'pecas_usadas', 'pedir_peca'],
+  oficina: ['resumo', 'iniciar', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'pecas_usadas', 'pedir_peca', 'conclusao'],
+  oficina_continuacao: ['resumo_continuacao', 'confirmacao_peca', 'conclusao'],
+  instalacao: ['resumo', 'deslocacao', 'foto_antes', 'materiais', 'trabalho', 'foto_depois', 'finalizacao'],
+  entrega: ['resumo', 'deslocacao', 'foto', 'finalizacao'],
+};
+
+/** Returns true if the step is valid for the given flow type */
+export function isValidStepForFlow(step: string, flowType: FlowState['flowType']): boolean {
+  const validSteps = VALID_STEPS_BY_FLOW[flowType];
+  if (!validSteps) return false;
+  return validSteps.includes(step);
+}
+
+/**
  * Derives the correct resume step and pre-filled form data from the database.
  * This is used as a fallback when localStorage is empty (e.g. after phone browser restart).
  * Handles: photos, parts, service fields (detected_fault, work_performed, etc.)
@@ -135,11 +156,11 @@ async function _deriveStepFromDbImpl(
         return { step: 'confirmacao_peca', formDataOverrides };
       }
 
-      // Prioritize explicit flow_step from DB, but skip stale photo steps
-      // when the service already has history (e.g. came from a visit)
+      // Prioritize explicit flow_step from DB, but validate it belongs to this flow
       const isStalePhotoStep = flowStep && ['foto_aparelho', 'foto_etiqueta', 'foto_estado'].includes(flowStep);
       const hasHistory = !!(detectedFault || serviceSnapshot.work_performed || isInProgress);
-      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao' && !(isStalePhotoStep && hasHistory)) {
+      const isValidForThisFlow = flowStep ? isValidStepForFlow(flowStep, flowType) : false;
+      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao' && isValidForThisFlow && !(isStalePhotoStep && hasHistory)) {
         return { step: flowStep, formDataOverrides };
       }
 
@@ -186,8 +207,9 @@ async function _deriveStepFromDbImpl(
         return { step: 'confirmacao_peca', formDataOverrides };
       }
 
-      // Prioritize explicit flow_step from DB
-      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao') {
+      // Prioritize explicit flow_step from DB, but validate it belongs to this flow
+      const isValidForThisFlow = flowStep ? isValidStepForFlow(flowStep, flowType) : false;
+      if (flowStep && flowStep !== 'resumo' && flowStep !== 'resumo_continuacao' && isValidForThisFlow) {
         return { step: flowStep, formDataOverrides };
       }
 

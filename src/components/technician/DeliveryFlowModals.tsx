@@ -30,7 +30,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
-import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
+import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from '@/hooks/useFlowPersistence';
 import { technicianUpdateService } from '@/utils/technicianRpc';
 import type { Service } from '@/types/database';
 
@@ -67,10 +67,15 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const isTransitioning = useRef(false);
 
   const safeSetStep = (step: ModalStep) => {
+    // Validate step belongs to this flow
+    if (!isValidStepForFlow(step, 'entrega')) {
+      console.warn(`[DeliveryFlow] Invalid step "${step}" for entrega, falling back to resumo`);
+      step = 'resumo' as ModalStep;
+    }
     isTransitioning.current = true;
     setCurrentStep(step);
-    // Reset after React has processed the state update
-    setTimeout(() => { isTransitioning.current = false; }, 0);
+    // Use 350ms to safely cover Dialog unmount/mount animation cycles
+    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
@@ -98,14 +103,24 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
 
     const savedState = loadState();
     if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
+      const savedStep = savedState.currentStep as ModalStep;
+      if (isValidStepForFlow(savedStep, 'entrega')) {
+        setCurrentStep(savedStep);
+      } else {
+        console.warn(`[DeliveryFlow] Saved step "${savedStep}" invalid, using resumo`);
+        setCurrentStep('resumo');
+      }
       setFormData(savedState.formData);
       return;
     }
 
     setIsResuming(true);
     deriveStepFromDb(service.id, 'entrega', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
-      const resumeStep = step === 'resumo' ? 'resumo' : step;
+      let resumeStep = step === 'resumo' ? 'resumo' : step;
+      if (!isValidStepForFlow(resumeStep, 'entrega')) {
+        console.warn(`[DeliveryFlow] Derived step "${resumeStep}" invalid, using resumo`);
+        resumeStep = 'resumo';
+      }
       setDerivedResumeStep(resumeStep as ModalStep);
       setCurrentStep('resumo');
       setFormData((prev) => ({ ...prev, ...formDataOverrides }));

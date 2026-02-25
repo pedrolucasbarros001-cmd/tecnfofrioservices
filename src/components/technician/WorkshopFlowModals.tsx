@@ -28,7 +28,7 @@ import { UsedPartsModal, PartEntry } from "@/components/modals/UsedPartsModal";
 
 import { ServicePreviousSummary } from "@/components/technician/ServicePreviousSummary";
 import { DiagnosisPhotosGallery } from "@/components/technician/DiagnosisPhotosGallery";
-import { useFlowPersistence, deriveStepFromDb } from "@/hooks/useFlowPersistence";
+import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from "@/hooks/useFlowPersistence";
 import type { Service } from "@/types/database";
 
 type ModalStep =
@@ -107,6 +107,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const isTransitioning = useRef(false);
 
   const safeSetStep = (step: ModalStep) => {
+    // Validate step belongs to this flow — fallback to resumo if invalid
+    if (!isValidStepForFlow(step, persistenceKey as any)) {
+      console.warn(`[WorkshopFlow] Invalid step "${step}" for flow "${persistenceKey}", falling back to resumo`);
+      step = (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") as ModalStep;
+    }
     isTransitioning.current = true;
     setCurrentStep(step);
     // Use 350ms to safely cover Dialog unmount/mount animation cycles
@@ -147,7 +152,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
     const savedState = loadState();
     if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
+      const savedStep = savedState.currentStep as ModalStep;
+      // Validate saved step belongs to this flow
+      if (isValidStepForFlow(savedStep, persistenceKey as any)) {
+        setCurrentStep(savedStep);
+      } else {
+        console.warn(`[WorkshopFlow] Saved step "${savedStep}" invalid for flow "${persistenceKey}", using resumo`);
+        setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
+      }
       setFormData(savedState.formData);
       return;
     }
@@ -157,7 +169,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     const persistenceFlowType = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
       // If the service has no in-progress data yet, start from resumo
-      const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      let resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      // Validate derived step
+      if (!isValidStepForFlow(resumeStep, persistenceKey as any)) {
+        console.warn(`[WorkshopFlow] Derived step "${resumeStep}" invalid for flow "${persistenceKey}", using resumo`);
+        resumeStep = mode === "continuacao_peca" ? "resumo_continuacao" : "resumo";
+      }
       setDerivedResumeStep(resumeStep as ModalStep);
 
       // We still want to show Resumo first, but we remember where to jump
