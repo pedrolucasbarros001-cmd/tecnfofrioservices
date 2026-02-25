@@ -108,8 +108,13 @@ export function ServicePreviousSummary({
 
   const previousWork = getPreviousWorkType();
 
-  // Don't show if no previous work
-  if (!service.detected_fault && (!activityLogs || activityLogs.length === 0)) {
+  // Don't show if no previous work indicators
+  const hasHistoryIndicators = !!(
+    service.detected_fault ||
+    service.work_performed ||
+    service.service_location === 'oficina'
+  );
+  if (!hasHistoryIndicators && (!activityLogs || activityLogs.length === 0)) {
     return null;
   }
 

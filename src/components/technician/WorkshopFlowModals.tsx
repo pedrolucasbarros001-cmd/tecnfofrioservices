@@ -123,8 +123,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const persistenceKey = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
   const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
 
-  // Check if service has previous execution history
-  const hasPreviousHistory = !!service.detected_fault;
+  // Check if service has previous execution history (visit, forced state, etc.)
+  const hasPreviousHistory = !!(
+    service.detected_fault ||
+    service.work_performed ||
+    (service.service_location === 'oficina' && service.status !== 'por_fazer')
+  );
 
   // Stable initialization ref — prevents re-running on service object reference changes
   const hasInitialized = useRef(false);
