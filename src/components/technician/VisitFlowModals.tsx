@@ -42,7 +42,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
 import { FieldPaymentStep } from "@/components/technician/FieldPaymentStep";
-import { useFlowPersistence, deriveStepFromDb } from "@/hooks/useFlowPersistence";
+import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from "@/hooks/useFlowPersistence";
 import type { Service, PhotoType } from "@/types/database";
 
 // Steps for repair services (reparacao)
@@ -142,10 +142,18 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
   const isTransitioning = useRef(false);
 
+  const persistenceFlowTypeRef = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
+
   const safeSetStep = (step: ModalStep) => {
+    // Validate step belongs to this flow — fallback to resumo if invalid
+    if (!isValidStepForFlow(step, persistenceFlowTypeRef as any)) {
+      console.warn(`[VisitFlow] Invalid step "${step}" for flow "${persistenceFlowTypeRef}", falling back to resumo`);
+      step = (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") as ModalStep;
+    }
     isTransitioning.current = true;
     setCurrentStep(step);
-    setTimeout(() => { isTransitioning.current = false; }, 0);
+    // Use 350ms to safely cover Dialog unmount/mount animation cycles
+    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
@@ -177,7 +185,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
     const savedState = loadState();
     if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
+      const savedStep = savedState.currentStep as ModalStep;
+      // Validate saved step belongs to this flow
+      if (isValidStepForFlow(savedStep, persistenceFlowTypeRef as any)) {
+        setCurrentStep(savedStep);
+      } else {
+        console.warn(`[VisitFlow] Saved step "${savedStep}" invalid for flow, using resumo`);
+        setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
+      }
       setFormData(savedState.formData);
       return;
     }
@@ -185,7 +200,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setIsResuming(true);
     const persistenceFlowType = mode === "continuacao_peca" ? "visita_continuacao" : "visita";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
-      const resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      let resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
+      // Validate derived step
+      if (!isValidStepForFlow(resumeStep, persistenceFlowTypeRef as any)) {
+        console.warn(`[VisitFlow] Derived step "${resumeStep}" invalid, using resumo`);
+        resumeStep = mode === "continuacao_peca" ? "resumo_continuacao" : "resumo";
+      }
       setDerivedResumeStep(resumeStep as ModalStep);
 
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");

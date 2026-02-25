@@ -35,7 +35,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
-import { useFlowPersistence, deriveStepFromDb } from '@/hooks/useFlowPersistence';
+import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from '@/hooks/useFlowPersistence';
 import { technicianUpdateService } from '@/utils/technicianRpc';
 import type { Service } from '@/types/database';
 
@@ -80,9 +80,15 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   const isTransitioning = useRef(false);
 
   const safeSetStep = (step: ModalStep) => {
+    // Validate step belongs to this flow
+    if (!isValidStepForFlow(step, 'instalacao')) {
+      console.warn(`[InstallationFlow] Invalid step "${step}" for instalacao, falling back to resumo`);
+      step = 'resumo' as ModalStep;
+    }
     isTransitioning.current = true;
     setCurrentStep(step);
-    setTimeout(() => { isTransitioning.current = false; }, 0);
+    // Use 350ms to safely cover Dialog unmount/mount animation cycles
+    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
@@ -110,14 +116,24 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
     const savedState = loadState();
     if (savedState) {
-      setCurrentStep(savedState.currentStep as ModalStep);
+      const savedStep = savedState.currentStep as ModalStep;
+      if (isValidStepForFlow(savedStep, 'instalacao')) {
+        setCurrentStep(savedStep);
+      } else {
+        console.warn(`[InstallationFlow] Saved step "${savedStep}" invalid, using resumo`);
+        setCurrentStep('resumo');
+      }
       setFormData(savedState.formData as InstallationFormData);
       return;
     }
 
     setIsResuming(true);
     deriveStepFromDb(service.id, 'instalacao', service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
-      const resumeStep = step === 'resumo' ? 'resumo' : step;
+      let resumeStep = step === 'resumo' ? 'resumo' : step;
+      if (!isValidStepForFlow(resumeStep, 'instalacao')) {
+        console.warn(`[InstallationFlow] Derived step "${resumeStep}" invalid, using resumo`);
+        resumeStep = 'resumo';
+      }
       setDerivedResumeStep(resumeStep as ModalStep);
       setCurrentStep('resumo');
       setFormData((prev) => ({ ...prev, ...formDataOverrides }));
@@ -228,7 +244,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       toast.success('Materiais registados!');
 
       // Advance to next step
-      setCurrentStep('trabalho'); // not a dialog transition, just internal state
+      safeSetStep('trabalho');
     } catch (error) {
       console.error('Error confirming materials:', error);
       toast.error(humanizeError(error));
