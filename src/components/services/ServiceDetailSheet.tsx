@@ -247,6 +247,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      queryClient.invalidateQueries({ queryKey: ['service-full', service.id] });
+      queryClient.invalidateQueries({ queryKey: ['service-consult', service.id] });
       toast.success('Foto eliminada com sucesso');
     } catch (error) {
       console.error('Error deleting photo:', error);
