@@ -63,6 +63,22 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   const [showPayment, setShowPayment] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
 
+  // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
+  const isTransitioning = useRef(false);
+
+  const safeSetStep = (step: ModalStep) => {
+    isTransitioning.current = true;
+    setCurrentStep(step);
+    // Reset after React has processed the state update
+    setTimeout(() => { isTransitioning.current = false; }, 0);
+  };
+
+  const handleStepDialogOpenChange = (open: boolean) => {
+    if (open) return;
+    if (isTransitioning.current) return;
+    handleClose();
+  };
+
   // Flow persistence
   const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<DeliveryFormData>(service.id, 'entrega');
 
@@ -118,9 +134,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       queryClient.invalidateQueries({ queryKey: ['technician-services'] });
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo') {
-        setCurrentStep(derivedResumeStep);
+        safeSetStep(derivedResumeStep);
       } else {
-        setCurrentStep('deslocacao');
+        safeSetStep('deslocacao');
       }
     } catch (error) {
       console.error('Error starting delivery:', error);
@@ -261,7 +277,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   return (
     <>
       {/* Modal 1: Resumo */}
-      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'resumo' && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Resumo da Entrega" step="Passo 1" />
 
@@ -316,7 +332,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'deslocacao' && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Deslocação" step="Passo 2" />
 
@@ -349,12 +365,12 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('resumo')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('resumo')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
               className="flex-1 bg-green-500 hover:bg-green-600"
-              onClick={() => setCurrentStep('foto')}
+              onClick={() => safeSetStep('foto')}
             >
               Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -363,7 +379,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       </Dialog>
 
       {/* Modal 3: Foto (opcional) */}
-      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature && !showPayment} onOpenChange={(open) => !open && handleClose()}>
+      <Dialog open={currentStep === 'foto' && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Foto da Entrega" step="Passo 3" />
 
@@ -407,7 +423,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep('deslocacao')}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep('deslocacao')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
