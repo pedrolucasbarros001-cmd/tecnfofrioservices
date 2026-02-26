@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,37 +26,16 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-
-
 export default function LoginPage() {
   const navigate = useNavigate();
-  
   const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  
-  const [loadingText, setLoadingText] = useState('A entrar...');
-  const lastSubmittedData = useRef<LoginFormValues | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
-
-
-  // Progressive loading text
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadingText('A entrar...');
-      return;
-    }
-
-    setLoadingText('A entrar...');
-    const t1 = setTimeout(() => setLoadingText('A conectar ao servidor...'), 3000);
-    const t2 = setTimeout(() => setLoadingText('O servidor está lento, por favor aguarde...'), 8000);
-
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [isLoading]);
 
   // Redirect when authenticated
   useEffect(() => {
@@ -66,69 +44,23 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, role, loading, navigate]);
 
-  // No role loaded after auth — only warn after generous delay
-  const roleWarningShown = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated && !loading && !role && !roleWarningShown.current) {
-      const delay = setTimeout(() => {
-        if (!role) {
-          roleWarningShown.current = true;
-          toast({
-            variant: 'destructive',
-            title: 'Erro ao carregar perfil',
-            description: 'Não foi possível carregar as suas permissões. Recarregue a página ou tente novamente.',
-          });
-          setIsLoading(false);
-        }
-      }, 10000);
-      return () => clearTimeout(delay);
-    }
-    // Reset flag when role arrives
-    if (role) roleWarningShown.current = false;
-  }, [isAuthenticated, loading, role]);
-
-  function isServerError(msg: string): boolean {
-    const lower = msg.toLowerCase();
-    return lower.includes('database error') ||
-      lower.includes('timeout') ||
-      lower.includes('context canceled') ||
-      lower.includes('context deadline') ||
-      lower.includes('connection') ||
-      lower.includes('econnrefused') ||
-      lower.includes('500') ||
-      lower.includes('504') ||
-      lower.includes('load failed') ||
-      lower.includes('failed to fetch') ||
-      lower.includes('networkerror');
-  }
-
   async function onSubmit(data: LoginFormValues) {
-    lastSubmittedData.current = data;
     setIsLoading(true);
 
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT')), 30000)
-      );
-
-      const { error } = await Promise.race([signIn(data.email, data.password), timeoutPromise]);
+      const { error } = await signIn(data.email, data.password);
 
       if (error) {
         const msg = error.message || '';
+        const lower = msg.toLowerCase();
 
-        if (isServerError(msg)) {
-          toast({
-            variant: 'destructive',
-            title: 'Servidor temporariamente indisponível',
-            description: 'O servidor está sobrecarregado. A sua tentativa incluiu retry automático. Tente novamente em alguns segundos.',
-          });
-        } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
+        if (lower.includes('invalid') || lower.includes('credentials')) {
           toast({
             variant: 'destructive',
             title: 'Credenciais inválidas',
             description: 'Email ou palavra-passe incorretos.',
           });
-        } else if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
+        } else if (lower.includes('email') && lower.includes('confirm')) {
           toast({
             variant: 'destructive',
             title: 'Email não confirmado',
@@ -138,31 +70,21 @@ export default function LoginPage() {
           toast({
             variant: 'destructive',
             title: 'Erro de autenticação',
-            description: msg || 'Erro ao fazer login.',
+            description: msg,
           });
         }
         setIsLoading(false);
         return;
       }
 
-      // Safety timeout for role loading
-      setTimeout(() => setIsLoading(false), 20000);
-    } catch (error: any) {
-      const isTimeout = error?.message === 'TIMEOUT';
+      // Success — redirect handled by useEffect
+    } catch {
       toast({
         variant: 'destructive',
-        title: isTimeout ? 'Tempo esgotado' : 'Erro de ligação',
-        description: isTimeout
-          ? 'O servidor demorou a responder. Tente novamente.'
-          : 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
+        title: 'Erro de ligação',
+        description: 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
       });
       setIsLoading(false);
-    }
-  }
-
-  function handleRetry() {
-    if (lastSubmittedData.current) {
-      onSubmit(lastSubmittedData.current);
     }
   }
 
@@ -170,7 +92,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/10 backdrop-blur-xl">
         <CardHeader className="space-y-4 text-center pb-8">
-
           <div className="mx-auto p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
             <img src={tecnofrioLogoIcon} alt="TECNOFRIO" className="h-20 w-20 object-contain" />
           </div>
@@ -235,24 +156,12 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {loadingText}
+                    A entrar...
                   </>
                 ) : (
                   'Entrar'
                 )}
               </Button>
-
-              {/* Retry button after failure */}
-              {!isLoading && lastSubmittedData.current && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleRetry}
-                  className="w-full border-white/20 text-slate-300 hover:bg-white/10"
-                >
-                  Tentar novamente
-                </Button>
-              )}
             </form>
           </Form>
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
