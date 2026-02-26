@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, Phone } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, Phone, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { formatShiftLabel } from '@/utils/dateUtils';
 import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
 import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
+import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Service } from '@/types/database';
@@ -29,6 +30,7 @@ export default function ServicosPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [activeFlow, setActiveFlow] = useState<FlowType>(null);
   const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   // Use React Query for proper caching and refetch
   const queryClient = useQueryClient();
@@ -344,6 +346,16 @@ export default function ServicosPage() {
           onComplete={handleFlowComplete}
         />
       )}
+      {/* Quick Create FAB */}
+      <Button
+        size="icon"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40"
+        onClick={() => setQuickCreateOpen(true)}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      <TechQuickServiceModal open={quickCreateOpen} onOpenChange={setQuickCreateOpen} />
     </div>
   );
 }
