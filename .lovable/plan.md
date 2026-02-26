@@ -1,82 +1,120 @@
 
 
-# Correcao: "Resumo do atendimento anterior" aparece em todos os servicos e tem delay
+# Plano: Criacao Rapida de Servico pelo Tecnico em Campo
 
-## Problema
+## Resumo
 
-Dois issues relacionados:
+O tecnico em campo precisa criar servicos rapidos sem ligar para a secretaria. A solucao usa uma RPC `SECURITY DEFINER` (porque RLS bloqueia INSERT de tecnicos em `services` e `customers`) e um modal simplificado mas completo.
 
-### 1. Aparece em servicos sem historico
-A condicao actual (linha 112-116 do `ServicePreviousSummary.tsx`):
-```typescript
-const hasHistoryIndicators = !!(
-  service.detected_fault ||
-  service.work_performed ||
-  service.service_location === 'oficina'  // ← PROBLEMA
-);
-```
-`service_location === 'oficina'` e verdadeiro para TODOS os servicos de oficina, incluindo os que acabaram de entrar e nunca foram abertos. Dados confirmados:
-- TF-00039: oficina, `na_oficina`, 0 logs, 0 fotos, sem diagnostico → mostra "Resumo" indevidamente
-- TF-00035: oficina, `na_oficina`, 4 logs de tentativas falhadas, 0 fotos → mostra "Resumo" sem conteudo util
+## Campos do formulario
 
-Mesma logica repetida no `WorkshopFlowModals.tsx` linha 133:
-```typescript
-const hasPreviousHistory = !!(
-  service.detected_fault ||
-  service.work_performed ||
-  (service.service_location === 'oficina' && service.status !== 'por_fazer')
-);
-```
+Campos obrigatorios:
+- Nome do cliente *
+- Telefone do cliente *
+- Tipo de aparelho *
+- Descricao da avaria *
 
-### 2. Delay de segundos ao expandir
-Os dados (logs e fotos) so carregam quando o utilizador clica na seta (`enabled: isExpanded`). Isto causa um delay visivel de 1-3 segundos enquanto as queries correm. E ma experiencia.
+Campos opcionais (pedidos pelo utilizador):
+- Morada (rua, codigo postal, cidade) — guardados no cliente
+- Garantia (toggle) + Marca da garantia + Numero de processo
+- Urgente (toggle)
+- Notas
 
-## Plano de correcao
+Auto-deteccao de cliente existente por telefone (reutiliza logica do CreateServiceModal).
 
-### 1. Carregar dados logo ao montar (sem lazy loading)
+## Arquitectura
 
-Mudar as duas queries de `enabled: !!service.id && isExpanded` para `enabled: !!service.id`. Sao queries leves (5 logs com filtro, fotos com indice) e ja tem `staleTime: 30_000`. Isto:
-- Elimina o delay ao expandir (dados ja estao prontos)
-- Permite usar os dados carregados para decidir se o componente deve aparecer
-
-### 2. Condicao de visibilidade baseada em dados reais
-
-Substituir a heuristica de campos do servico por verificacao dos dados carregados:
-
-```typescript
-// Mostrar apenas se existem registos reais
-const hasRealHistory = !!(
-  service.detected_fault ||
-  service.work_performed ||
-  (activityLogs && activityLogs.length > 0) ||
-  (photos && photos.length > 0)
-);
-
-if (!hasRealHistory) return null;
+```text
+ServicosPage (Agenda)
+  └── FAB "+" (canto inferior direito)
+        └── TechQuickServiceModal
+              ├── Campos de cliente (nome, telefone, morada)
+              ├── Campos de equipamento (aparelho, avaria)
+              ├── Garantia toggle + campos condicionais
+              ├── Urgente toggle
+              └── Botao "Criar Servico"
+                    └── RPC: technician_create_service (SECURITY DEFINER)
+                          1. Valida is_tecnico(auth.uid())
+                          2. Busca technician_id do caller
+                          3. INSERT OR SELECT cliente por telefone
+                          4. INSERT servico com:
+                             - technician_id = tecnico do caller
+                             - service_location = 'cliente'
+                             - status = 'por_fazer'
+                             - scheduled_date = hoje
+                             - pending_pricing = true
+                             - service_type = 'reparacao'
+                          5. Retorna id + code
 ```
 
-Isto garante que:
-- Servicos novos na oficina sem nenhum registo → NAO mostra
-- Servicos com visita anterior que registou fotos/diagnostico → mostra
-- Servicos com logs de execucao real (levantamento, conclusao) → mostra
+## Detalhes tecnicos
 
-### 3. Actualizar `hasPreviousHistory` no WorkshopFlowModals
+### 1. Migracao SQL — RPC `technician_create_service`
 
-A mesma logica precisa ser espelhada no `WorkshopFlowModals.tsx`. Como o componente pai nao tem acesso aos counts sem query adicional, a abordagem sera:
+Funcao `SECURITY DEFINER` com `search_path = public`:
 
-- Remover `service.service_location === 'oficina'` da condicao
-- Manter apenas `detected_fault || work_performed || last_status_before_part_request`
-- O `ServicePreviousSummary` ja se auto-esconde quando nao ha dados, portanto mesmo que `hasPreviousHistory` seja `false` para um caso edge, o componente corrige-se sozinho
+Parametros de entrada:
 
-### Ficheiros a alterar
+| Parametro | Tipo | Obrigatorio |
+|---|---|---|
+| `_customer_name` | text | Sim |
+| `_customer_phone` | text | Sim |
+| `_appliance_type` | text | Sim |
+| `_fault_description` | text | Sim |
+| `_is_urgent` | boolean | Nao (default false) |
+| `_is_warranty` | boolean | Nao (default false) |
+| `_warranty_brand` | text | Nao |
+| `_warranty_process_number` | text | Nao |
+| `_customer_address` | text | Nao |
+| `_customer_postal_code` | text | Nao |
+| `_customer_city` | text | Nao |
+| `_notes` | text | Nao |
 
-| Ficheiro | Alteracao |
+Retorna `TABLE(service_id uuid, service_code text)`.
+
+Logica:
+- Verifica `is_tecnico(auth.uid())`; se nao, RAISE EXCEPTION
+- Busca `technician_id` via `technicians.profile_id = profiles.id WHERE profiles.user_id = auth.uid()`
+- Busca cliente existente por telefone (`SELECT id FROM customers WHERE phone = _customer_phone LIMIT 1`). Se nao existe, INSERT novo cliente com os dados fornecidos
+- INSERT em `services` — o trigger `generate_service_code()` gera o codigo TF-XXXXX automaticamente
+- INSERT em `activity_logs` com `action_type = 'criacao'` e descricao adequada
+- RETURN service id e code
+
+### 2. Componente `TechQuickServiceModal`
+
+Ficheiro: `src/components/technician/TechQuickServiceModal.tsx`
+
+- Modal com `Dialog` + `ScrollArea` optimizado para mobile
+- Formulario com `react-hook-form` + `zod` validation
+- Auto-deteccao de cliente por telefone (debounce 500ms, mesma logica do CreateServiceModal)
+- Toggle "Garantia?" que revela campos `warranty_brand` e `warranty_process_number`
+- Toggle "Urgente?"
+- Seccao de morada (rua + codigo postal + cidade)
+- Chama `supabase.rpc('technician_create_service', {...})`
+- Toast de sucesso com codigo: "Servico TF-00045 criado!"
+- Invalida queries: `technician-services`, `services`, `services-paginated`, `customers`
+
+### 3. Botao FAB na `ServicosPage`
+
+Ficheiro: `src/pages/ServicosPage.tsx`
+
+- Botao flutuante `+` no canto inferior direito (`fixed bottom-6 right-6`)
+- Cor primaria, circular, com sombra
+- Ao clicar abre `TechQuickServiceModal`
+
+## Ficheiros a criar/alterar
+
+| Ficheiro | Accao |
 |---|---|
-| `src/components/technician/ServicePreviousSummary.tsx` | Remover lazy loading; condicao baseada em dados reais |
-| `src/components/technician/WorkshopFlowModals.tsx` | Remover `service_location === 'oficina'` do `hasPreviousHistory` |
+| `supabase/migrations/[timestamp]_technician_create_service.sql` | Nova RPC |
+| `src/components/technician/TechQuickServiceModal.tsx` | Novo componente |
+| `src/pages/ServicosPage.tsx` | Adicionar FAB + importar modal |
 
-### Impacto no Supabase
-- Mesmas 2 queries que ja existiam, apenas carregam mais cedo (ao montar em vez de ao expandir)
-- Queries sao leves: 5 logs filtrados + fotos por service_id (indexado)
-- `staleTime: 30_000` mantido — nao recarrega a cada render
+## O que NAO muda
+
+- `CreateServiceModal` do dono/secretaria inalterado
+- RLS policies existentes inalteradas
+- Fluxos de execucao do tecnico inalterados
+- O servico criado aparece automaticamente nas listagens do dono e secretaria (RLS SELECT ja permite)
+- Codigo TF-XXXXX gerado pelo mesmo trigger existente
 
