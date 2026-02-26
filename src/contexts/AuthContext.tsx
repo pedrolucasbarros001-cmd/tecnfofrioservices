@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { queryClient } from '@/App';
 import type { AppRole, Profile } from '@/types/database';
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Query'): Promise<T> {
+function withTimeout<T>(thenable: PromiseLike<T>, ms: number, label = 'Query'): Promise<T> {
+  const promise = new Promise<T>((resolve, reject) => thenable.then(resolve, reject));
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
@@ -32,18 +34,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [initStarted, setInitStarted] = useState(false);
-  const fetchingRef = React.useRef<string | null>(null);
+  const fetchingRef = useRef<string | null>(null);
+  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Safety timeout: never hang forever
     const safetyTimeout = setTimeout(() => {
       if (loading) {
         console.warn('[AuthContext] Auth initialization safety timeout reached');
         setLoading(false);
       }
-    }, 15000); // 15 seconds
+    }, 15000);
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[AuthContext] Auth state changed:', event);
@@ -52,6 +53,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Detect user switch — clear stale cache from previous user
+          if (lastUserIdRef.current && lastUserIdRef.current !== session.user.id) {
+            console.log('[AuthContext] User switch detected, clearing cache');
+            queryClient.clear();
+          }
+          lastUserIdRef.current = session.user.id;
           fetchUserData(session.user.id);
         } else {
           setProfile(null);
@@ -61,7 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Only perform initial check once
     if (!initStarted) {
       setInitStarted(true);
       supabase.auth.getSession().then(({ data: { session } }) => {
@@ -69,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          lastUserIdRef.current = session.user.id;
           fetchUserData(session.user.id);
         } else {
           setLoading(false);
@@ -76,19 +83,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Session bridge listener: respond to print pages requesting session
+    // Session bridge listener for print pages
     const handleSessionRequest = async (event: MessageEvent) => {
-      // Security: only accept messages from same origin
       if (event.origin !== window.location.origin) return;
-
       if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
         console.log('[AuthContext] Received session request from new tab');
-
         try {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
-
           if (currentSession && event.source) {
-            console.log('[AuthContext] Sending session to new tab');
             (event.source as Window).postMessage(
               {
                 type: 'SUPABASE_SESSION',
@@ -119,32 +121,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let profileData: Profile | null = null;
     let userRole: AppRole | null = null;
 
-    // Fetch profile with timeout
+    // FIX: removed Promise.resolve() wrapper so timeout actually works on HTTP request
     try {
-      const { data, error: profileError } = await withTimeout(
-        Promise.resolve(supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle()),
-        10000,
+      const result = await withTimeout(
+        supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+        8000,
         'profiles'
       );
-      if (profileError) {
-        console.error('[AuthContext] Error fetching profile:', profileError);
+      if (result.error) {
+        console.error('[AuthContext] Error fetching profile:', result.error);
       }
-      profileData = data as Profile | null;
+      profileData = result.data as Profile | null;
     } catch (e) {
       console.warn('[AuthContext] Profile fetch failed:', e);
     }
 
-    // Fetch role with timeout
     try {
-      const { data: roleData, error: roleError } = await withTimeout(
-        Promise.resolve(supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()),
-        10000,
+      const result = await withTimeout(
+        supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(),
+        8000,
         'user_roles'
       );
-      if (roleError) {
-        console.error('[AuthContext] Error fetching role:', roleError);
+      if (result.error) {
+        console.error('[AuthContext] Error fetching role:', result.error);
       }
-      userRole = (roleData?.role as AppRole) ?? null;
+      userRole = (result.data?.role as AppRole) ?? null;
     } catch (e) {
       console.warn('[AuthContext] Role fetch failed:', e);
     }
@@ -163,7 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let result = await fetchUserDataOnce(userId);
 
-      // If role is null, retry once after 3 seconds (transient DB issue)
       if (!result.role) {
         console.warn('[AuthContext] Role not loaded, retrying in 3s...');
         await new Promise(r => setTimeout(r, 3000));
@@ -196,6 +196,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
+    // Clear any stale session/tokens before attempting login
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (_) {
+      // Ignore errors during cleanup
+    }
+
+    // Clear previous user's cache
+    queryClient.clear();
+
     // Attempt 1
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -204,7 +214,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[AuthContext] Server error on signIn attempt 1, retrying in 2s...', error.message);
         await new Promise(r => setTimeout(r, 2000));
 
-        // Attempt 2
         try {
           const { error: error2 } = await supabase.auth.signInWithPassword({ email, password });
           return { error: error2 };
@@ -231,11 +240,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    // 1. Sign out from Supabase
     await supabase.auth.signOut({ scope: 'local' });
+
+    // 2. Clear React state
     setUser(null);
     setSession(null);
     setProfile(null);
     setRole(null);
+    lastUserIdRef.current = null;
+
+    // 3. Clear React Query cache (prevents data leaking to next user)
+    queryClient.clear();
+
+    // 4. Clear all Supabase localStorage keys (stale tokens)
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // 5. Hard redirect to ensure completely fresh state
+    window.location.href = '/login';
   }
 
   const value: AuthContextType = {
