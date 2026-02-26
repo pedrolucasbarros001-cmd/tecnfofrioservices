@@ -41,13 +41,13 @@ import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
 import ImportPage from "@/pages/ImportPage";
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2, // 2 minutes - Reduce DB load significantly
-      gcTime: 1000 * 60 * 30, // 30 minutes - Free memory sooner
-      refetchOnWindowFocus: true, // Primary freshness mechanism
-      refetchOnReconnect: true, // Refetch when network reconnects (mobile)
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
       retry: 1,
     },
   },
