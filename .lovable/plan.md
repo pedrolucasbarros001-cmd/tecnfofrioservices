@@ -1,52 +1,33 @@
 
-Implementação proposta (focada no problema recorrente de login em **preview + publicado**, e em **antes/depois do redirect**):
 
-1) `src/lib/queryClient.ts` (novo)
-- Extrair `queryClient` de `App.tsx` para módulo isolado.
-- Exportar `queryClient` único.
+## Diagnóstico real (baseado no código e logs)
 
-2) `src/App.tsx`
-- Importar `queryClient` de `@/lib/queryClient`.
-- Remover definição local de `queryClient`.
-- Corrigir `GlobalErrorHandler`: trocar `process.env.NODE_ENV` por `import.meta.env.DEV`.
+O problema tem **duas causas concretas** no código atual:
 
-3) `src/contexts/AuthContext.tsx`
-- Importar `queryClient` de `@/lib/queryClient` (elimina ciclo `App -> AuthContext -> App`).
-- Tornar cleanup pré-login resiliente:
-  - `signOut(local)` com `Promise.race` (timeout curto, ex.: 1500–2000ms).
-  - Em timeout/falha, continuar fluxo (não bloquear login).
-- Garantir que `signIn` nunca fica pendente:
-  - Encapsular etapas críticas em `try/catch/finally`.
-  - Sempre limpar flags de fluxo no `finally`.
-- Se `signInWithPassword` retornar sucesso mas hidratação falhar/timeout:
-  - fazer fallback controlado com `getSession` + `hydrateSession`.
-  - retornar erro explícito só se realmente não houver sessão/role ao final.
-- Manter supressão seletiva apenas para `SIGNED_OUT` do cleanup.
+**Causa 1: `signIn` chama `signOut` antes de autenticar (linha 134 do AuthContext)**
+Isto dispara o evento `SIGNED_OUT` no `onAuthStateChange`, que limpa `role=null`, `profile=null`. Depois o `signInWithPassword` dispara `SIGNED_IN`, que inicia `fetchUserData` assincronamente. Mas o `signIn` retorna **antes** da hidratação terminar. Resultado: o LoginPage fica à espera que o `useEffect` detecte `role`, mas o `role` pode não ter chegado ainda — ou o evento de limpeza interferiu.
 
-4) `src/pages/LoginPage.tsx`
-- Adicionar watchdog local de UI (ex.: 30s) para nunca manter botão preso em “A entrar...”.
-- Se watchdog disparar: liberar `isLoading` + toast orientando nova tentativa (sem refresh manual).
-- Manter navegação imediata por `redirectPath` e fallback por `useEffect`.
+**Causa 2: `isLoading` nunca é resetado no caminho de sucesso (LoginPage)**
+Quando `signIn` retorna sem erro, o `onSubmit` **não faz nada** — não navega, não desliga o loading. Depende 100% do `useEffect` que vigia `isAuthenticated && role && !loading`. Se o `role` demora (rede lenta, retry de 3s no fetchUserData), o botão fica preso em "A entrar..." indefinidamente.
 
-5) `src/contexts/OnboardingContext.tsx`
-- Blindar bootstrap para não gerar crash em janelas transitórias:
-  - só consultar onboarding quando `authLoading === false` e `user && role`.
-  - evitar reentrância durante troca de sessão (flag local de execução).
+## Plano de correção (sem gambiarras, sem timeouts artificiais)
 
-6) Diagnóstico temporário (curto prazo)
-- Logs com `requestId` por tentativa de login:
-  - `login_start`, `cleanup_start/end`, `signInWithPassword_ok`, `hydrate_start/end`, `navigate`.
-- Remover logs após validar estabilidade.
+### 1) `AuthContext.tsx` — remover `signOut` do `signIn`
+- `signInWithPassword` já substitui a sessão. O `signOut` prévio é desnecessário e é a causa das colisões de eventos.
+- `signIn` deve: chamar `signInWithPassword` → aguardar `fetchUserData` → retornar `{ error, role }`.
+- Assim o LoginPage recebe o role de forma síncrona e navega imediatamente.
 
-7) Testes obrigatórios (antes de fechar)
-- Login 10x seguidas no mesmo utilizador (desktop + telemóvel).
-- Logout A -> login B -> logout B -> login A no mesmo dispositivo.
-- Rede lenta (throttling): confirmar que não trava em “A entrar...”.
-- Fluxo completo sem refresh manual no preview e no publicado.
-- Confirmar ausência do erro `useAuth must be used within an AuthProvider`.
+### 2) `AuthContext.tsx` — `signIn` espera pela hidratação
+- Após `signInWithPassword` com sucesso, chamar `await fetchUserData(user.id)` dentro do próprio `signIn`.
+- Retornar `{ error: null, role: this.role }` após hidratação.
+- O `onAuthStateChange` continua a funcionar em paralelo (para refresh de página, etc.), mas o `signIn` não depende dele.
 
-Seção técnica (resumo objetivo)
-- Raiz provável 1: ciclo de módulos (`AuthContext` importando `queryClient` de `App`) causando estado inconsistente de contexto em runtime/HMR.
-- Raiz provável 2: `await signOut(local)` no início do login podendo bloquear a promessa de `signIn`.
-- Raiz provável 3: handler global com `process.env.NODE_ENV` em app Vite pode gerar erro em runtime.
-- Estratégia: remover ciclo, tornar `signIn` “non-blocking + fail-safe”, e garantir watchdog de UI para nunca congelar botão de entrada.
+### 3) `LoginPage.tsx` — navegação direta + reset garantido
+- `onSubmit`: usar `try/finally` para **sempre** resetar `isLoading`.
+- No sucesso: usar `role` retornado por `signIn` para navegar imediatamente via `navigate(getDefaultRouteForRole(role))`.
+- O `useEffect` existente permanece apenas como fallback (ex: refresh de página com sessão ativa).
+
+### 4) `AuthContext.tsx` — limpar `signOut`
+- Remover `setTimeout(() => setLoading(false), 500)` no `signOut` — é um delay artificial sem propósito.
+- Limpar estado e definir `loading=false` diretamente.
+
