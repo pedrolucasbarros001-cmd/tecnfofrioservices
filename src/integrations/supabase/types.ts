@@ -1126,6 +1126,26 @@ export type Database = {
         Args: { _service_id: string }
         Returns: undefined
       }
+      technician_create_service: {
+        Args: {
+          _appliance_type: string
+          _customer_address?: string
+          _customer_city?: string
+          _customer_name: string
+          _customer_phone: string
+          _customer_postal_code?: string
+          _fault_description: string
+          _is_urgent?: boolean
+          _is_warranty?: boolean
+          _notes?: string
+          _warranty_brand?: string
+          _warranty_process_number?: string
+        }
+        Returns: {
+          service_code: string
+          service_id: string
+        }[]
+      }
       technician_update_service:
         | {
             Args: {
