@@ -4,18 +4,57 @@ import { supabase } from '@/integrations/supabase/client';
 import { queryClient } from '@/App';
 import type { AppRole, Profile } from '@/types/database';
 
+/* ────────────── Types ────────────── */
+
+interface SignInResult {
+  error: Error | null;
+  role?: AppRole | null;
+  redirectPath?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   role: AppRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/* ────────────── Helpers ────────────── */
+
+function clearSupabaseLocalStorage() {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('sb-')) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+}
+
+function ts() {
+  return new Date().toISOString().slice(11, 23);
+}
+
+function isServerError(error: { message?: string } | null): boolean {
+  if (!error) return false;
+  const msg = (error.message || '').toLowerCase();
+  return msg.includes('database error') ||
+    msg.includes('timeout') ||
+    msg.includes('context canceled') ||
+    msg.includes('context deadline') ||
+    msg.includes('500') ||
+    msg.includes('504') ||
+    msg.includes('load failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror');
+}
+
+/* ────────────── Provider ────────────── */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,88 +63,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
-  const bootstrappedRef = useRef(false);
-  // Flag to suppress onAuthStateChange during explicit signIn
-  const signInActiveRef = useRef(false);
 
-  function clearSupabaseLocalStorage() {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('sb-')) {
-        keysToRemove.push(key);
-      }
+  // --- Single-flight hydration per userId ---
+  const hydrationPromiseRef = useRef<{ userId: string; promise: Promise<{ profile: Profile | null; role: AppRole | null; networkError: boolean }> } | null>(null);
+
+  // --- Selective suppression: only suppress SIGNED_OUT during signIn cleanup ---
+  const suppressSignedOutRef = useRef(false);
+
+  /**
+   * Fetch profile + role in parallel. Returns a cached promise if one is
+   * already in-flight for the same userId (single-flight dedup).
+   */
+  function fetchUserData(userId: string) {
+    // Reuse existing in-flight promise for same user
+    if (hydrationPromiseRef.current?.userId === userId) {
+      console.log(`[Auth ${ts()}] Reusing in-flight hydration for ${userId.slice(0, 8)}`);
+      return hydrationPromiseRef.current.promise;
     }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+    console.log(`[Auth ${ts()}] Starting hydration fetch for ${userId.slice(0, 8)}`);
+
+    const promise = (async () => {
+      const [profileResult, roleResult] = await Promise.allSettled([
+        supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(),
+      ]);
+
+      let profileData: Profile | null = null;
+      let userRole: AppRole | null = null;
+      let networkError = false;
+
+      if (profileResult.status === 'fulfilled') {
+        if (profileResult.value.error) {
+          console.error('[Auth] Profile query error:', profileResult.value.error);
+          networkError = true;
+        } else {
+          profileData = profileResult.value.data as Profile | null;
+        }
+      } else {
+        console.error('[Auth] Profile fetch rejected:', profileResult.reason);
+        networkError = true;
+      }
+
+      if (roleResult.status === 'fulfilled') {
+        if (roleResult.value.error) {
+          console.error('[Auth] Role query error:', roleResult.value.error);
+          networkError = true;
+        } else {
+          userRole = (roleResult.value.data?.role as AppRole) ?? null;
+        }
+      } else {
+        console.error('[Auth] Role fetch rejected:', roleResult.reason);
+        networkError = true;
+      }
+
+      // Retry role once if null without network error (trigger may be slow)
+      if (!userRole && !networkError) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const retryResult = await supabase
+            .from('user_roles').select('role').eq('user_id', userId)
+            .order('created_at', { ascending: true }).limit(1).maybeSingle();
+          if (!retryResult.error) {
+            userRole = (retryResult.data?.role as AppRole) ?? null;
+          }
+        } catch (e) {
+          console.warn('[Auth] Role retry failed:', e);
+        }
+      }
+
+      return { profile: profileData, role: userRole, networkError };
+    })();
+
+    hydrationPromiseRef.current = { userId, promise };
+
+    // Clear cache when done so next call fetches fresh
+    promise.finally(() => {
+      if (hydrationPromiseRef.current?.userId === userId) {
+        hydrationPromiseRef.current = null;
+      }
+    });
+
+    return promise;
   }
 
   /**
-   * Fetch profile and role in PARALLEL — no artificial timeouts.
-   * Let the browser's natural network timeout (~30s) handle slow connections.
-   * Returns { profile, role, networkError } to distinguish network failures from missing data.
+   * Apply session + user data to React state.
    */
-  async function fetchUserData(userId: string): Promise<{
-    profile: Profile | null;
-    role: AppRole | null;
-    networkError: boolean;
-  }> {
-    console.log('[AuthContext] Fetching profile+role in parallel for:', userId);
-
-    const [profileResult, roleResult] = await Promise.allSettled([
-      supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
-      supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(),
-    ]);
-
-    let profileData: Profile | null = null;
-    let userRole: AppRole | null = null;
-    let networkError = false;
-
-    if (profileResult.status === 'fulfilled') {
-      if (profileResult.value.error) {
-        console.error('[AuthContext] Profile query error:', profileResult.value.error);
-        networkError = true;
-      } else {
-        profileData = profileResult.value.data as Profile | null;
-      }
-    } else {
-      console.error('[AuthContext] Profile fetch rejected:', profileResult.reason);
-      networkError = true;
-    }
-
-    if (roleResult.status === 'fulfilled') {
-      if (roleResult.value.error) {
-        console.error('[AuthContext] Role query error:', roleResult.value.error);
-        networkError = true;
-      } else {
-        userRole = (roleResult.value.data?.role as AppRole) ?? null;
-      }
-    } else {
-      console.error('[AuthContext] Role fetch rejected:', roleResult.reason);
-      networkError = true;
-    }
-
-    // If role is null but no network error, retry once (trigger may be slow to create the row)
-    if (!userRole && !networkError) {
-      await new Promise((r) => setTimeout(r, 500));
-      try {
-        const retryResult = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (!retryResult.error) {
-          userRole = (retryResult.data?.role as AppRole) ?? null;
-        }
-      } catch (e) {
-        console.warn('[AuthContext] Role retry failed:', e);
-      }
-    }
-
-    return { profile: profileData, role: userRole, networkError };
-  }
-
   async function hydrateSession(nextSession: Session | null) {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
@@ -115,12 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole(null);
       lastUserIdRef.current = null;
       setLoading(false);
-      return;
+      return { profile: null, role: null };
     }
 
     // Detect user switch — clear stale cache
     if (lastUserIdRef.current && lastUserIdRef.current !== nextSession.user.id) {
-      console.log('[AuthContext] User switch detected, clearing cache');
+      console.log('[Auth] User switch detected, clearing cache');
       queryClient.clear();
     }
 
@@ -131,28 +175,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(result.profile);
     setRole(result.role);
     setLoading(false);
+    return result;
   }
+
+  /* ────────── Auth state listener ────────── */
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, nextSession) => {
-        console.log('[AuthContext] Auth state changed:', event);
-        // Skip if signIn is handling hydration explicitly
-        if (signInActiveRef.current) {
-          console.log('[AuthContext] Skipping hydration — signIn is active');
+        console.log(`[Auth ${ts()}] onAuthStateChange: ${event}`);
+
+        // Only suppress SIGNED_OUT from the cleanup inside signIn
+        if (event === 'SIGNED_OUT' && suppressSignedOutRef.current) {
+          console.log('[Auth] Suppressing SIGNED_OUT (signIn cleanup)');
           return;
         }
+
+        // Let INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED flow through always
         try {
           await hydrateSession(nextSession);
         } catch (err) {
-          console.error('[AuthContext] hydrateSession failed:', err);
+          console.error('[Auth] hydrateSession failed:', err);
           setLoading(false);
         }
       }
     );
 
-    // No separate getSession() bootstrap — onAuthStateChange fires INITIAL_SESSION automatically
-
+    // postMessage bridge for print pages
     const handleSessionRequest = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
@@ -169,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             );
           }
         } catch (err) {
-          console.error('[AuthContext] Error responding to session request:', err);
+          console.error('[Auth] Error responding to session request:', err);
         }
       }
     };
@@ -182,61 +231,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  function isServerError(error: { message?: string } | null): boolean {
-    if (!error) return false;
-    const msg = (error.message || '').toLowerCase();
-    return msg.includes('database error') ||
-      msg.includes('timeout') ||
-      msg.includes('context canceled') ||
-      msg.includes('context deadline') ||
-      msg.includes('500') ||
-      msg.includes('504') ||
-      msg.includes('load failed') ||
-      msg.includes('failed to fetch') ||
-      msg.includes('networkerror');
-  }
+  /* ────────── signIn ────────── */
 
-  async function signIn(email: string, password: string) {
-    // 1. Suppress onAuthStateChange BEFORE cleanup to prevent SIGNED_OUT triggering hydrateSession
-    signInActiveRef.current = true;
+  async function signIn(email: string, password: string): Promise<SignInResult> {
+    console.log(`[Auth ${ts()}] signIn START`);
 
-    // 2. Purge previous session completely
+    // 1. Suppress only the SIGNED_OUT event from cleanup
+    suppressSignedOutRef.current = true;
+
     try {
       await supabase.auth.signOut({ scope: 'local' });
-    } catch (_) {
-      // ignore cleanup errors
-    }
+    } catch (_) { /* ignore cleanup errors */ }
     clearSupabaseLocalStorage();
     queryClient.clear();
+
+    // Re-enable SIGNED_OUT listening
+    suppressSignedOutRef.current = false;
+
+    console.log(`[Auth ${ts()}] Cleanup done, calling signInWithPassword`);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        signInActiveRef.current = false;
+        console.log(`[Auth ${ts()}] signInWithPassword error:`, error.message);
         return { error };
       }
+      console.log(`[Auth ${ts()}] signInWithPassword OK`);
 
       const { data: { session: activeSession }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !activeSession?.user) {
-        signInActiveRef.current = false;
         return { error: new Error('Sessão não foi estabelecida após login.') };
       }
+      console.log(`[Auth ${ts()}] getSession OK, user=${activeSession.user.id.slice(0, 8)}`);
 
-      // 3. Hydrate state with parallel fetch
-      const userData = await fetchUserData(activeSession.user.id);
+      // 2. Hydrate with timeout fail-safe (25s)
+      const HYDRATION_TIMEOUT = 25_000;
+      let userData: { profile: Profile | null; role: AppRole | null; networkError: boolean };
 
-      // 4. Distinguish network error from genuinely missing role
+      try {
+        userData = await Promise.race([
+          fetchUserData(activeSession.user.id),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('HYDRATION_TIMEOUT')), HYDRATION_TIMEOUT)
+          ),
+        ]);
+      } catch (timeoutErr) {
+        console.error(`[Auth ${ts()}] Hydration timed out after ${HYDRATION_TIMEOUT}ms`);
+        return { error: new Error('O servidor demorou demasiado a responder. Tente novamente.') };
+      }
+
+      console.log(`[Auth ${ts()}] Hydration done: role=${userData.role}, networkError=${userData.networkError}`);
+
+      // 3. Distinguish network error from missing role
       if (userData.networkError && !userData.role) {
-        signInActiveRef.current = false;
         return { error: new Error('Falha de rede ao carregar perfil. Verifique a sua ligação e tente novamente.') };
       }
 
       if (!userData.role) {
-        signInActiveRef.current = false;
         return { error: new Error('Perfil sem permissões atribuídas. Contacte o administrador.') };
       }
 
-      // 5. Set all state atomically
+      // 4. Commit state
       setSession(activeSession);
       setUser(activeSession.user);
       setProfile(userData.profile);
@@ -244,10 +299,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastUserIdRef.current = activeSession.user.id;
       setLoading(false);
 
-      signInActiveRef.current = false;
-      return { error: null };
+      const redirectPath = getDefaultRouteForRole(userData.role);
+      console.log(`[Auth ${ts()}] signIn SUCCESS → redirect=${redirectPath}`);
+
+      return { error: null, role: userData.role, redirectPath };
     } catch (error) {
-      signInActiveRef.current = false;
       const err = error as Error;
       if (isServerError(err)) {
         return { error: new Error('Falha de ligação ao serviço de autenticação.') };
@@ -255,6 +311,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: err };
     }
   }
+
+  /* ────────── signOut ────────── */
 
   async function signOut() {
     await supabase.auth.signOut({ scope: 'local' });
@@ -269,13 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value: AuthContextType = {
-    user,
-    session,
-    profile,
-    role,
-    loading,
-    signIn,
-    signOut,
+    user, session, profile, role, loading, signIn, signOut,
     isAuthenticated: !!session,
   };
 
@@ -292,15 +344,10 @@ export function useAuth() {
 
 export function getDefaultRouteForRole(role: AppRole | null): string {
   switch (role) {
-    case 'dono':
-      return '/dashboard';
-    case 'secretaria':
-      return '/geral';
-    case 'tecnico':
-      return '/servicos';
-    case 'monitor':
-      return '/tv-monitor';
-    default:
-      return '/login';
+    case 'dono': return '/dashboard';
+    case 'secretaria': return '/geral';
+    case 'tecnico': return '/servicos';
+    case 'monitor': return '/tv-monitor';
+    default: return '/login';
   }
 }

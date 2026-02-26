@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,7 +37,7 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  // Redirect when authenticated
+  // Fallback redirect — if already authenticated (e.g. page refresh)
   useEffect(() => {
     if (isAuthenticated && role && !loading) {
       navigate(getDefaultRouteForRole(role), { replace: true });
@@ -48,10 +48,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(data.email, data.password);
+      const result = await signIn(data.email, data.password);
 
-      if (error) {
-        const msg = error.message || '';
+      if (result.error) {
+        const msg = result.error.message || '';
         const lower = msg.toLowerCase();
 
         if (lower.includes('invalid') || lower.includes('credentials')) {
@@ -77,7 +77,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Success — redirect handled by useEffect
+      // SUCCESS — navigate immediately using returned data
+      if (result.redirectPath) {
+        navigate(result.redirectPath, { replace: true });
+      }
+      // isLoading stays true during navigation (unmount cleans up)
     } catch {
       toast({
         variant: 'destructive',
