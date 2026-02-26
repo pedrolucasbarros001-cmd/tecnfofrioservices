@@ -3,7 +3,8 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OnboardingProvider } from "@/contexts/OnboardingContext";
@@ -41,18 +42,6 @@ import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
 import ImportPage from "@/pages/ImportPage";
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 30,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-      retry: 1,
-    },
-  },
-});
-
 // Global error handler component
 function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -72,7 +61,7 @@ function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
       console.error("Unhandled error:", event.error);
 
       // Prevent the default browser error logging (only in development to help debug)
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         // Allow React error boundary to catch it
         return;
       }

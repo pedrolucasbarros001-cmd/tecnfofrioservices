@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { getOnboardingSteps, type OnboardingStepContent } from '@/components/onboarding/onboardingContent';
@@ -31,6 +31,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [isCompleted, setIsCompleted] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [hasCheckedOnboarding, setHasCheckedOnboarding] = useState(false);
+  const checkingRef = useRef(false);
 
   const content = getOnboardingSteps(role);
   const totalSteps = content.length;
@@ -38,12 +39,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   // Check onboarding status when user logs in
   useEffect(() => {
-    if (authLoading || !user || !role || hasCheckedOnboarding) {
+    if (authLoading || !user || !role || hasCheckedOnboarding || checkingRef.current) {
       if (!authLoading && !user) {
         setIsLoading(false);
       }
       return;
     }
+    checkingRef.current = true;
 
     const checkOnboardingStatus = async () => {
       setIsLoading(true);
