@@ -1,69 +1,57 @@
 
 
-# Diagnóstico: Login falha no telemóvel
+# Diagnóstico: Dois cenários de erro distintos
 
-## Causa raiz encontrada
+## O que mostram as screenshots
 
-Analisei os logs de autenticação do Supabase: **zero erros no servidor**. Todos os logins retornam status 200. O problema é 100% no código do cliente.
+**IMG_8782** — Tela "A carregar..." presa + toast "Ocorreu um erro inesperado"
+**IMG_8783** — ErrorBoundary ("Ocorreu um erro") com botões Tentar/Voltar
 
-A falha tem duas causas concretas:
+Estes são dois caminhos de falha diferentes, ambos causados por problemas na função `hydrateSession` do `AuthContext.tsx`.
 
-### Causa 1 — Queries sequenciais com timeout agressivo
+## Causa raiz identificada (3 bugs)
 
-```text
-signIn → signInWithPassword (1-3s rede)
-       → getSession (instant)
-       → fetchUserData
-           → SELECT profiles (timeout 8s)  ← espera acabar
-           → SELECT user_roles (timeout 8s) ← só começa depois
-           Total possível: 16s sequencial
-```
-
-No telemóvel com rede lenta (3G/4G fraco), cada query pode levar 3-5s (TLS + DNS + HTTP). **São feitas em SEQUÊNCIA**, não em paralelo. Se uma delas excede 8s, o `withTimeout` dispara, retorna `role = null`, e o código trata isso como "utilizador sem permissões":
+### Bug 1 — `hydrateSession` não tem try/catch
 
 ```typescript
-// AuthContext.tsx linha 225
-if (!userData.role) {
-  return { error: new Error('Perfil sem permissões atribuídas.') };
+// AuthContext.tsx — callback do onAuthStateChange
+async (event, nextSession) => {
+  // Se hydrateSession lançar exceção, torna-se unhandled rejection
+  await hydrateSession(nextSession);  // ← SEM try/catch
 }
 ```
 
-**Timeout de rede é interpretado como falta de permissão.** O login "falha" quando na realidade o servidor respondeu bem — o cliente é que não esperou.
+Se `fetchUserData` falhar por qualquer motivo inesperado (erro de rede transitório, exceção interna do Supabase client), a exceção propaga como **unhandled promise rejection**. O `GlobalErrorHandler` apanha-a e mostra o toast "Ocorreu um erro inesperado". E como `setLoading(false)` nunca executa, a tela fica presa em "A carregar..." para sempre.
 
-### Causa 2 — Trabalho duplicado
+### Bug 2 — Bootstrap duplicado cria race condition
 
-`signInWithPassword` dispara `onAuthStateChange(SIGNED_IN)` → `hydrateSession` → `fetchUserData`. Depois, `signIn` também chama `fetchUserData`. O dedup via `fetchingRef` funciona SE os dois chamam ao mesmo tempo, mas se o primeiro já acabou quando o segundo começa, faz tudo de novo — 4 queries HTTP em vez de 2.
+Na inicialização da app, AMBOS disparam `hydrateSession` com a mesma sessão:
+- `onAuthStateChange(INITIAL_SESSION)` → `hydrateSession(session)` 
+- `getSession().then()` → `hydrateSession(session)`
+
+São duas chamadas paralelas não coordenadas. Ambas fazem `setLoading(true)`, ambas chamam `fetchUserData`, ambas fazem `setLoading(false)`. Se a primeira termina e seta `loading=false`, e a segunda ainda está a correr e seta `loading=true` de novo, o utilizador vê "A carregar..." novamente sem razão.
+
+### Bug 3 — ProtectedRoute permite render com `role = null`
+
+```typescript
+// ProtectedRoute.tsx linha 30
+if (allowedRoles && role && !allowedRoles.includes(role)) {
+  return redirect;
+}
+return <>{children}</>;  // ← Renderiza mesmo com role = null
+```
+
+Se `loading = false` mas `role = null` (porque fetchUserData falhou silenciosamente), o ProtectedRoute renderiza os children. Os componentes internos (AppLayout, sidebars, páginas) recebem `role = null` e podem crashar → **ErrorBoundary** (IMG_8783).
 
 ## Plano de correção (2 ficheiros)
 
 ### `src/contexts/AuthContext.tsx`
 
-1. **Queries em PARALELO**: Mudar `fetchUserDataOnce` para usar `Promise.allSettled([profileQuery, roleQuery])` em vez de sequencial. Corta o tempo de 16s para 8s no pior caso.
+1. **Envolver TODO o callback de `onAuthStateChange` em try/catch** — impede unhandled rejections
+2. **Eliminar bootstrap duplicado** — usar apenas `onAuthStateChange` para hidratar a sessão inicial; remover o `getSession().then()` separado (o Supabase v2 já dispara `INITIAL_SESSION` automaticamente)
+3. **Mover `signInActiveRef = true` para ANTES do `signOut`** no `signIn` — suprime também o evento SIGNED_OUT do cleanup
 
-2. **Remover timeout artificial**: Eliminar `withTimeout` das queries de profile/role. Deixar o browser gerir o timeout natural da rede (~30s). Um SELECT simples com índice unique NUNCA demora 8s no servidor — o tempo é rede, e cortá-lo artificialmente causa falhas falsas.
+### `src/components/auth/ProtectedRoute.tsx`
 
-3. **Não tratar timeout como "sem permissões"**: Se `fetchUserData` falha por rede, o `signIn` deve devolver erro de rede, não erro de permissões. Separar os dois cenários.
-
-4. **Evitar fetch duplicado no login**: No `signIn`, como já faz `fetchUserData` explicitamente, marcar um flag para que o `onAuthStateChange(SIGNED_IN)` NÃO dispare `hydrateSession` → `fetchUserData` de novo. Menos queries = login mais rápido.
-
-### `src/pages/LoginPage.tsx`
-
-5. **Remover textos de "servidor lento"**: O servidor não está lento (0 erros nos logs). Remover mensagens enganadoras. Manter apenas "A entrar..." durante o loading. Se falhar, mostrar o erro real, não uma suposição sobre o servidor.
-
-## Resultado esperado
-
-```text
-ANTES (sequencial, mobile lento):
-  signIn: 3s + profile: 5s + role: 5s = 13s + duplicado = timeout
-
-DEPOIS (paralelo, sem timeout artificial):
-  signIn: 3s + max(profile, role): 5s = 8s total, sem falsos erros
-```
-
-## Ficheiros alterados
-
-| Ficheiro | Alteração |
-|---|---|
-| `src/contexts/AuthContext.tsx` | Queries paralelas, remover withTimeout, separar erro rede vs permissões, evitar fetch duplicado |
-| `src/pages/LoginPage.tsx` | Remover mensagens enganadoras de servidor lento |
+4. **Redirecionar para `/login` quando `loading = false` E `isAuthenticated = true` MAS `role = null`** — indica que a hidratação falhou; em vez de renderizar componentes com dados incompletos, mandar o utilizador para login onde pode tentar de novo
 
