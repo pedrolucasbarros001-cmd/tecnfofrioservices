@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import type { AppRole } from '@/types/database';
 import { Loader2 } from 'lucide-react';
 
@@ -27,15 +27,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If authenticated but role is null, hydration failed — redirect to login to retry
-  if (!role) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    // Redirect to appropriate dashboard based on role
-    const redirectPath = role === 'dono' ? '/dashboard' : role === 'secretaria' ? '/geral' : role === 'monitor' ? '/tv-monitor' : '/servicos';
-    return <Navigate to={redirectPath} replace />;
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    return <Navigate to={getDefaultRouteForRole(role)} replace />;
   }
 
   return <>{children}</>;

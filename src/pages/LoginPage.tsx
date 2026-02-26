@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,100 +28,88 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const submitGuardRef = useRef(false);
+
+  const loadingText = 'A entrar...';
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  // Clear watchdog on unmount
-  useEffect(() => {
-    return () => {
-      if (watchdogRef.current) clearTimeout(watchdogRef.current);
-    };
-  }, []);
-
-  // Fallback redirect — if already authenticated (e.g. page refresh)
+  // Redirecionar quando autenticado
   useEffect(() => {
     if (isAuthenticated && role && !loading) {
-      navigate(getDefaultRouteForRole(role), { replace: true });
+      const from = location.state?.from?.pathname;
+      if (from && from !== '/login') {
+        navigate(from, { replace: true });
+      } else {
+        navigate(getDefaultRouteForRole(role), { replace: true });
+      }
     }
-  }, [isAuthenticated, role, loading, navigate]);
+  }, [isAuthenticated, role, loading, navigate, location.state]);
+
+  // Aviso se o cargo demorar muito a carregar
+  const roleWarningShown = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && !loading && !role && !roleWarningShown.current) {
+      const delay = setTimeout(() => {
+        if (!role) {
+          roleWarningShown.current = true;
+          toast({
+            variant: 'destructive',
+            title: 'Erro de permissões',
+            description: 'Não foi possível detectar o seu nível de acesso. Por favor, recarregue a página.',
+          });
+          setIsLoading(false);
+        }
+      }, 8000);
+      return () => clearTimeout(delay);
+    }
+    if (role) roleWarningShown.current = false;
+  }, [isAuthenticated, loading, role, toast]);
 
   async function onSubmit(data: LoginFormValues) {
-    if (submitGuardRef.current) return;
-    submitGuardRef.current = true;
     setIsLoading(true);
 
-    // 30s watchdog — never let button stay stuck
-    watchdogRef.current = setTimeout(() => {
-      submitGuardRef.current = false;
-      setIsLoading(false);
-      toast({
-        variant: 'destructive',
-        title: 'Tempo esgotado',
-        description: 'O login demorou demasiado. Por favor, tente novamente.',
-      });
-    }, 30_000);
-
     try {
-      const result = await signIn(data.email, data.password);
+      const { error } = await signIn(data.email, data.password);
 
-      // Clear watchdog on response
-      if (watchdogRef.current) {
-        clearTimeout(watchdogRef.current);
-        watchdogRef.current = null;
-      }
+      if (error) {
+        const msg = error.message || '';
+        console.error('[LoginPage] Erro no sign in:', msg);
 
-      if (result.error) {
-        const msg = result.error.message || '';
-        const lower = msg.toLowerCase();
-
-        if (lower.includes('invalid') || lower.includes('credentials')) {
+        if (msg.toLowerCase().includes('database error') || msg.toLowerCase().includes('failed to fetch')) {
+          toast({
+            variant: 'destructive',
+            title: 'Servidor indisponível',
+            description: 'Não foi possível conectar ao servidor. Verifique sua ligação e tente novamente.',
+          });
+        } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
           toast({
             variant: 'destructive',
             title: 'Credenciais inválidas',
             description: 'Email ou palavra-passe incorretos.',
           });
-        } else if (lower.includes('email') && lower.includes('confirm')) {
-          toast({
-            variant: 'destructive',
-            title: 'Email não confirmado',
-            description: 'Confirme o seu email antes de entrar.',
-          });
         } else {
           toast({
             variant: 'destructive',
-            title: 'Erro de autenticação',
-            description: msg,
+            title: 'Erro ao entrar',
+            description: 'Ocorreu um problema inesperado. Tente novamente em alguns segundos.',
           });
         }
-        submitGuardRef.current = false;
         setIsLoading(false);
         return;
       }
-
-      // SUCCESS — navigate immediately using returned data
-      if (result.redirectPath) {
-        navigate(result.redirectPath, { replace: true });
-      }
-      // isLoading stays true during navigation (unmount cleans up)
-    } catch {
-      if (watchdogRef.current) {
-        clearTimeout(watchdogRef.current);
-        watchdogRef.current = null;
-      }
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro de ligação',
         description: 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
       });
-      submitGuardRef.current = false;
       setIsLoading(false);
     }
   }
@@ -194,7 +182,7 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    A entrar...
+                    {loadingText}
                   </>
                 ) : (
                   'Entrar'
