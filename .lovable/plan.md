@@ -1,57 +1,43 @@
 
+Objetivo: eliminar a causa do travamento no login (botão preso em “A entrar...”) sem camuflagem, tornando o fluxo determinístico mesmo em rede instável.
 
-# Diagnóstico: Dois cenários de erro distintos
+Implementação (curta e direta):
 
-## O que mostram as screenshots
+1) `src/contexts/AuthContext.tsx` — separar fluxo de eventos por tipo
+- Parar de bloquear todos os eventos quando `signInActiveRef` estiver `true`.
+- Bloquear apenas `SIGNED_OUT` do cleanup.
+- Permitir `SIGNED_IN`/`INITIAL_SESSION` seguirem para hidratação (com deduplicação), para não depender de um único caminho.
 
-**IMG_8782** — Tela "A carregar..." presa + toast "Ocorreu um erro inesperado"
-**IMG_8783** — ErrorBoundary ("Ocorreu um erro") com botões Tentar/Voltar
+2) `src/contexts/AuthContext.tsx` — deduplicação real de hidratação por utilizador
+- Criar um `hydrationPromiseRef` por `userId` para garantir “single-flight” (um único fetch de profile/role por sessão ativa).
+- `signIn` e `onAuthStateChange` passam a reutilizar a mesma promise quando ocorrerem em paralelo.
 
-Estes são dois caminhos de falha diferentes, ambos causados por problemas na função `hydrateSession` do `AuthContext.tsx`.
+3) `src/contexts/AuthContext.tsx` — fail-safe contra promise pendente
+- Em `signIn`, substituir await direto por `Promise.race` com timeout alto (ex.: 20–30s) apenas no passo de hidratação.
+- Se timeout disparar, não concluir login “cego”: acionar `supabase.auth.getSession()` + `hydrateSession(session)` e aguardar conclusão controlada.
+- Garantir `finally` para sempre liberar `signInActiveRef` e nunca deixar estado “preso”.
 
-## Causa raiz identificada (3 bugs)
+4) `src/pages/LoginPage.tsx` — navegação determinística após sucesso
+- Após `signIn` sem erro, navegar imediatamente para `getDefaultRouteForRole(...)` com role retornada do `signIn` (sem depender só do `useEffect`).
+- Manter `useEffect` apenas como fallback secundário.
+- Garantir reset de `isLoading` em todos os caminhos não navegados.
 
-### Bug 1 — `hydrateSession` não tem try/catch
+5) `src/contexts/AuthContext.tsx` — contrato do `signIn` mais explícito
+- Alterar retorno para incluir `role` e `redirectPath` no sucesso.
+- Login page deixa de inferir estado assíncrono indiretamente e usa retorno transacional do auth.
 
-```typescript
-// AuthContext.tsx — callback do onAuthStateChange
-async (event, nextSession) => {
-  // Se hydrateSession lançar exceção, torna-se unhandled rejection
-  await hydrateSession(nextSession);  // ← SEM try/catch
-}
-```
+6) `src/contexts/AuthContext.tsx` — instrumentação de diagnóstico temporária
+- Adicionar logs com timestamps por etapa: `signOut cleanup`, `signInWithPassword`, `getSession`, `fetch profile`, `fetch role`, `state commit`, `navigate`.
+- Remover logs após validação final.
 
-Se `fetchUserData` falhar por qualquer motivo inesperado (erro de rede transitório, exceção interna do Supabase client), a exceção propaga como **unhandled promise rejection**. O `GlobalErrorHandler` apanha-a e mostra o toast "Ocorreu um erro inesperado". E como `setLoading(false)` nunca executa, a tela fica presa em "A carregar..." para sempre.
+Testes obrigatórios (E2E):
+1) Login normal (dono/secretária/técnico) em desktop e telemóvel.
+2) Mesmo dispositivo: logout utilizador A → login utilizador B.
+3) Rede lenta (throttling): confirmar que não fica preso em “A entrar...”.
+4) Confirmar que, sem refresh manual, sempre redireciona para a rota correta.
 
-### Bug 2 — Bootstrap duplicado cria race condition
-
-Na inicialização da app, AMBOS disparam `hydrateSession` com a mesma sessão:
-- `onAuthStateChange(INITIAL_SESSION)` → `hydrateSession(session)` 
-- `getSession().then()` → `hydrateSession(session)`
-
-São duas chamadas paralelas não coordenadas. Ambas fazem `setLoading(true)`, ambas chamam `fetchUserData`, ambas fazem `setLoading(false)`. Se a primeira termina e seta `loading=false`, e a segunda ainda está a correr e seta `loading=true` de novo, o utilizador vê "A carregar..." novamente sem razão.
-
-### Bug 3 — ProtectedRoute permite render com `role = null`
-
-```typescript
-// ProtectedRoute.tsx linha 30
-if (allowedRoles && role && !allowedRoles.includes(role)) {
-  return redirect;
-}
-return <>{children}</>;  // ← Renderiza mesmo com role = null
-```
-
-Se `loading = false` mas `role = null` (porque fetchUserData falhou silenciosamente), o ProtectedRoute renderiza os children. Os componentes internos (AppLayout, sidebars, páginas) recebem `role = null` e podem crashar → **ErrorBoundary** (IMG_8783).
-
-## Plano de correção (2 ficheiros)
-
-### `src/contexts/AuthContext.tsx`
-
-1. **Envolver TODO o callback de `onAuthStateChange` em try/catch** — impede unhandled rejections
-2. **Eliminar bootstrap duplicado** — usar apenas `onAuthStateChange` para hidratar a sessão inicial; remover o `getSession().then()` separado (o Supabase v2 já dispara `INITIAL_SESSION` automaticamente)
-3. **Mover `signInActiveRef = true` para ANTES do `signOut`** no `signIn` — suprime também o evento SIGNED_OUT do cleanup
-
-### `src/components/auth/ProtectedRoute.tsx`
-
-4. **Redirecionar para `/login` quando `loading = false` E `isAuthenticated = true` MAS `role = null`** — indica que a hidratação falhou; em vez de renderizar componentes com dados incompletos, mandar o utilizador para login onde pode tentar de novo
-
+Detalhes técnicos (para implementação):
+- Manter roles exclusivamente em `user_roles` (sem mover para `profiles`).
+- Não usar localStorage para decisão de privilégio/autorização.
+- Continuar validação de role via consulta autenticada ao Supabase + RLS existente.
+- Evitar regressão de segurança: `ProtectedRoute` continua negando `role=null`.
