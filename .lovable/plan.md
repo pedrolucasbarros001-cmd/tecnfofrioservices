@@ -1,120 +1,103 @@
 
 
-# Plano: Criacao Rapida de Servico pelo Tecnico em Campo
+# Diagnostico Completo e Plano de Correcao
 
-## Resumo
+## Respostas directas as suas perguntas
 
-O tecnico em campo precisa criar servicos rapidos sem ligar para a secretaria. A solucao usa uma RPC `SECURITY DEFINER` (porque RLS bloqueia INSERT de tecnicos em `services` e `customers`) e um modal simplificado mas completo.
+### 1. Que key esta no frontend?
+**Anon key (SUPABASE_PUBLISHABLE_KEY).** O `service_role` so e usado em Edge Functions (server-side), como deve ser. Nao ha problema aqui.
 
-## Campos do formulario
+### 2. `persistSession: true`?
+Sim, esta activo no client. Isto e correcto e necessario.
 
-Campos obrigatorios:
-- Nome do cliente *
-- Telefone do cliente *
-- Tipo de aparelho *
-- Descricao da avaria *
+### 3. `setSession` manual?
+Apenas no `usePrintSessionBridge.ts` para paginas de impressao abertas em nova aba. Nao afecta o login normal.
 
-Campos opcionais (pedidos pelo utilizador):
-- Morada (rua, codigo postal, cidade) — guardados no cliente
-- Garantia (toggle) + Marca da garantia + Numero de processo
-- Urgente (toggle)
-- Notas
+### 4. localStorage customizado?
+Nao. Usa o storage padrao do Supabase (`localStorage`).
 
-Auto-deteccao de cliente existente por telefone (reutiliza logica do CreateServiceModal).
+### 5. Realtime subscriptions globais?
+O `useRealtime` hook cria canais por tabela, com throttle de 5s. Nao partilha estado entre utilizadores.
 
-## Arquitectura
+### 6. Supabase client singleton?
+Sim, `export const supabase = createClient(...)` — isto e o padrao correcto do Supabase. Um singleton por browser tab, cada um com o seu proprio JWT. Nao causa conflitos entre utilizadores em dispositivos diferentes.
 
-```text
-ServicosPage (Agenda)
-  └── FAB "+" (canto inferior direito)
-        └── TechQuickServiceModal
-              ├── Campos de cliente (nome, telefone, morada)
-              ├── Campos de equipamento (aparelho, avaria)
-              ├── Garantia toggle + campos condicionais
-              ├── Urgente toggle
-              └── Botao "Criar Servico"
-                    └── RPC: technician_create_service (SECURITY DEFINER)
-                          1. Valida is_tecnico(auth.uid())
-                          2. Busca technician_id do caller
-                          3. INSERT OR SELECT cliente por telefone
-                          4. INSERT servico com:
-                             - technician_id = tecnico do caller
-                             - service_location = 'cliente'
-                             - status = 'por_fazer'
-                             - scheduled_date = hoje
-                             - pending_pricing = true
-                             - service_type = 'reparacao'
-                          5. Retorna id + code
+---
+
+## Causas reais identificadas
+
+### PROBLEMA 1 — Login falha no telemovel
+**Causa: bug no `withTimeout`** no AuthContext.
+
+```typescript
+// Codigo actual (NAO funciona):
+await withTimeout(
+  Promise.resolve(supabase.from('profiles').select('*')...),
+  10000
+)
 ```
 
-## Detalhes tecnicos
+`Promise.resolve()` resolve **imediatamente** com o query builder. O timeout nunca actua. Em redes moveis lentas, o HTTP request pode demorar 10-20s sem feedback, ate atingir o safety timeout de 15s que corta o loading sem role carregado → toast de erro → utilizador pensa que o servidor esta em baixo.
 
-### 1. Migracao SQL — RPC `technician_create_service`
+Alem disso, `onAuthStateChange` e `getSession()` disparam **ambos** `fetchUserData`, causando 2x queries de profile+role no arranque.
 
-Funcao `SECURITY DEFINER` com `search_path = public`:
+### PROBLEMA 2 — Outro utilizador ve a pagina do anterior (mesmo dispositivo)
+**Causa: o `signOut` nao limpa o estado.**
 
-Parametros de entrada:
+Codigo actual:
+```typescript
+async function signOut() {
+  await supabase.auth.signOut({ scope: 'local' });
+  setUser(null); setSession(null); setProfile(null); setRole(null);
+  // Falta: queryClient.clear()
+  // Falta: limpar localStorage do Supabase
+  // Falta: redirecionar para /login
+}
+```
 
-| Parametro | Tipo | Obrigatorio |
-|---|---|---|
-| `_customer_name` | text | Sim |
-| `_customer_phone` | text | Sim |
-| `_appliance_type` | text | Sim |
-| `_fault_description` | text | Sim |
-| `_is_urgent` | boolean | Nao (default false) |
-| `_is_warranty` | boolean | Nao (default false) |
-| `_warranty_brand` | text | Nao |
-| `_warranty_process_number` | text | Nao |
-| `_customer_address` | text | Nao |
-| `_customer_postal_code` | text | Nao |
-| `_customer_city` | text | Nao |
-| `_notes` | text | Nao |
+Quando o User A faz logout e o User B faz login **no mesmo browser/dispositivo**:
+- O React Query cache ainda tem dados do User A
+- O React Router ainda tem a ultima rota visitada pelo User A
+- As chaves `sb-flialeqlwrtfnonxtsnx-auth-token` podem conter refresh tokens antigos
 
-Retorna `TABLE(service_id uuid, service_code text)`.
+### PROBLEMA 3 — NAO e problema de concorrencia no servidor
+15-16 utilizadores com Supabase Pro **nunca** devem ter conflitos de login simultaneo. Cada login e um POST independente ao GoTrue. O problema e 100% client-side.
 
-Logica:
-- Verifica `is_tecnico(auth.uid())`; se nao, RAISE EXCEPTION
-- Busca `technician_id` via `technicians.profile_id = profiles.id WHERE profiles.user_id = auth.uid()`
-- Busca cliente existente por telefone (`SELECT id FROM customers WHERE phone = _customer_phone LIMIT 1`). Se nao existe, INSERT novo cliente com os dados fornecidos
-- INSERT em `services` — o trigger `generate_service_code()` gera o codigo TF-XXXXX automaticamente
-- INSERT em `activity_logs` com `action_type = 'criacao'` e descricao adequada
-- RETURN service id e code
+---
 
-### 2. Componente `TechQuickServiceModal`
+## Plano de correcao
 
-Ficheiro: `src/components/technician/TechQuickServiceModal.tsx`
+### Ficheiro: `src/contexts/AuthContext.tsx`
 
-- Modal com `Dialog` + `ScrollArea` optimizado para mobile
-- Formulario com `react-hook-form` + `zod` validation
-- Auto-deteccao de cliente por telefone (debounce 500ms, mesma logica do CreateServiceModal)
-- Toggle "Garantia?" que revela campos `warranty_brand` e `warranty_process_number`
-- Toggle "Urgente?"
-- Seccao de morada (rua + codigo postal + cidade)
-- Chama `supabase.rpc('technician_create_service', {...})`
-- Toast de sucesso com codigo: "Servico TF-00045 criado!"
-- Invalida queries: `technician-services`, `services`, `services-paginated`, `customers`
+**Correcao 1 — `withTimeout` real:**
+Remover `Promise.resolve()` wrapper. Passar a promise HTTP directamente para que o timeout funcione.
 
-### 3. Botao FAB na `ServicosPage`
+**Correcao 2 — `signOut` completo:**
+- Importar `queryClient` do App (exportar do App.tsx ou usar `useQueryClient`)
+- No signOut: `queryClient.clear()`, limpar `localStorage` keys `sb-*`, redirecionar `window.location.href = '/login'`
 
-Ficheiro: `src/pages/ServicosPage.tsx`
+**Correcao 3 — Limpar sessao stale antes de signIn:**
+Adicionar `await supabase.auth.signOut({ scope: 'local' })` antes de `signInWithPassword` para eliminar refresh tokens antigos.
 
-- Botao flutuante `+` no canto inferior direito (`fixed bottom-6 right-6`)
-- Cor primaria, circular, com sombra
-- Ao clicar abre `TechQuickServiceModal`
+**Correcao 4 — Detectar troca de utilizador:**
+No `onAuthStateChange`, comparar o `user.id` com o anterior. Se mudou, chamar `queryClient.clear()` antes de carregar dados do novo utilizador.
 
-## Ficheiros a criar/alterar
+**Correcao 5 — Evitar fetch duplicado:**
+Usar um ref para o ultimo `user.id` processado e ignorar chamadas duplicadas de `fetchUserData` vindas de `onAuthStateChange` + `getSession`.
 
-| Ficheiro | Accao |
+### Ficheiro: `src/App.tsx`
+
+Exportar `queryClient` para poder importar no AuthContext.
+
+### Ficheiros a alterar
+
+| Ficheiro | Alteracao |
 |---|---|
-| `supabase/migrations/[timestamp]_technician_create_service.sql` | Nova RPC |
-| `src/components/technician/TechQuickServiceModal.tsx` | Novo componente |
-| `src/pages/ServicosPage.tsx` | Adicionar FAB + importar modal |
+| `src/App.tsx` | Exportar `queryClient` |
+| `src/contexts/AuthContext.tsx` | 5 correcoes acima |
 
-## O que NAO muda
-
-- `CreateServiceModal` do dono/secretaria inalterado
-- RLS policies existentes inalteradas
-- Fluxos de execucao do tecnico inalterados
-- O servico criado aparece automaticamente nas listagens do dono e secretaria (RLS SELECT ja permite)
-- Codigo TF-XXXXX gerado pelo mesmo trigger existente
+### Impacto
+- Zero alteracoes em SQL/RLS/Edge Functions
+- Zero alteracoes em componentes de UI
+- Resolve os 3 problemas reportados
 
