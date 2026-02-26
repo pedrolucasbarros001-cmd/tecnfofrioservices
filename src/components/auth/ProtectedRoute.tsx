@@ -27,7 +27,12 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
+  // If authenticated but role is null, hydration failed — redirect to login to retry
+  if (!role) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
     // Redirect to appropriate dashboard based on role
     const redirectPath = role === 'dono' ? '/dashboard' : role === 'secretaria' ? '/geral' : role === 'monitor' ? '/tv-monitor' : '/servicos';
     return <Navigate to={redirectPath} replace />;
