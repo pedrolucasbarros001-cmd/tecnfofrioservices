@@ -32,6 +32,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submitGuardRef = useRef(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -53,10 +54,13 @@ export default function LoginPage() {
   }, [isAuthenticated, role, loading, navigate]);
 
   async function onSubmit(data: LoginFormValues) {
+    if (submitGuardRef.current) return;
+    submitGuardRef.current = true;
     setIsLoading(true);
 
     // 30s watchdog — never let button stay stuck
     watchdogRef.current = setTimeout(() => {
+      submitGuardRef.current = false;
       setIsLoading(false);
       toast({
         variant: 'destructive',
@@ -97,6 +101,7 @@ export default function LoginPage() {
             description: msg,
           });
         }
+        submitGuardRef.current = false;
         setIsLoading(false);
         return;
       }
@@ -116,6 +121,7 @@ export default function LoginPage() {
         title: 'Erro de ligação',
         description: 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
       });
+      submitGuardRef.current = false;
       setIsLoading(false);
     }
   }
