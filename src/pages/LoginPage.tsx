@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,7 +31,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  
   const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -62,14 +62,9 @@ export default function LoginPage() {
   // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated && role && !loading) {
-      const from = location.state?.from?.pathname;
-      if (from && from !== '/login') {
-        navigate(from, { replace: true });
-      } else {
-        navigate(getDefaultRouteForRole(role), { replace: true });
-      }
+      navigate(getDefaultRouteForRole(role), { replace: true });
     }
-  }, [isAuthenticated, role, loading, navigate, location.state]);
+  }, [isAuthenticated, role, loading, navigate]);
 
   // No role loaded after auth — only warn after generous delay
   const roleWarningShown = useRef(false);
