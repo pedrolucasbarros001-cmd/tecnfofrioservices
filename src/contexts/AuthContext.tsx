@@ -33,61 +33,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initStarted, setInitStarted] = useState(false);
   const fetchingRef = useRef<string | null>(null);
+  const fetchPromiseRef = useRef<Promise<{ profile: Profile | null; role: AppRole | null }> | null>(null);
   const lastUserIdRef = useRef<string | null>(null);
+  const bootstrappedRef = useRef(false);
+
+  function clearSupabaseLocalStorage() {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  }
+
+  async function hydrateSession(nextSession: Session | null) {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+
+    if (!nextSession?.user) {
+      setProfile(null);
+      setRole(null);
+      fetchingRef.current = null;
+      fetchPromiseRef.current = null;
+      lastUserIdRef.current = null;
+      setLoading(false);
+      return;
+    }
+
+    if (lastUserIdRef.current && lastUserIdRef.current !== nextSession.user.id) {
+      console.log('[AuthContext] User switch detected, clearing cache');
+      queryClient.clear();
+    }
+
+    lastUserIdRef.current = nextSession.user.id;
+    setLoading(true);
+    await fetchUserData(nextSession.user.id);
+  }
 
   useEffect(() => {
-    const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn('[AuthContext] Auth initialization safety timeout reached');
-        setLoading(false);
-      }
-    }, 15000);
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event, nextSession) => {
         console.log('[AuthContext] Auth state changed:', event);
-
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Detect user switch — clear stale cache from previous user
-          if (lastUserIdRef.current && lastUserIdRef.current !== session.user.id) {
-            console.log('[AuthContext] User switch detected, clearing cache');
-            queryClient.clear();
-          }
-          lastUserIdRef.current = session.user.id;
-          fetchUserData(session.user.id);
-        } else {
-          setProfile(null);
-          setRole(null);
-          setLoading(false);
-        }
+        await hydrateSession(nextSession);
       }
     );
 
-    if (!initStarted) {
-      setInitStarted(true);
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          lastUserIdRef.current = session.user.id;
-          fetchUserData(session.user.id);
-        } else {
-          setLoading(false);
-        }
+    if (!bootstrappedRef.current) {
+      bootstrappedRef.current = true;
+      supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+        await hydrateSession(initialSession);
       });
     }
 
-    // Session bridge listener for print pages
     const handleSessionRequest = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
-        console.log('[AuthContext] Received session request from new tab');
         try {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
           if (currentSession && event.source) {
@@ -111,9 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('message', handleSessionRequest);
-      clearTimeout(safetyTimeout);
     };
-  }, [initStarted]);
+  }, []);
 
   async function fetchUserDataOnce(userId: string): Promise<{ profile: Profile | null; role: AppRole | null }> {
     console.log('[AuthContext] Fetching profile for:', userId);
@@ -153,32 +155,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { profile: profileData, role: userRole };
   }
 
-  async function fetchUserData(userId: string) {
-    // Avoid redundant fetching for the same user
-    if (fetchingRef.current === userId) {
-      console.log('[AuthContext] Already fetching data for user:', userId);
-      return;
+  async function fetchUserData(userId: string): Promise<{ profile: Profile | null; role: AppRole | null }> {
+    if (fetchingRef.current === userId && fetchPromiseRef.current) {
+      return fetchPromiseRef.current;
     }
+
     fetchingRef.current = userId;
 
-    try {
-      let result = await fetchUserDataOnce(userId);
+    const fetchPromise = (async () => {
+      try {
+        let result = await fetchUserDataOnce(userId);
 
-      if (!result.role) {
-        console.warn('[AuthContext] Role not loaded, retrying in 3s...');
-        await new Promise(r => setTimeout(r, 3000));
-        result = await fetchUserDataOnce(userId);
+        if (!result.role) {
+          await new Promise((r) => setTimeout(r, 300));
+          result = await fetchUserDataOnce(userId);
+        }
+
+        setProfile(result.profile);
+        setRole(result.role);
+        return result;
+      } catch (error) {
+        console.error('[AuthContext] Error in fetchUserData:', error);
+        return { profile: null, role: null };
+      } finally {
+        fetchingRef.current = null;
+        fetchPromiseRef.current = null;
+        setLoading(false);
       }
+    })();
 
-      setProfile(result.profile);
-      setRole(result.role);
-      console.log('[AuthContext] Loaded role:', result.role);
-    } catch (error) {
-      console.error('[AuthContext] Error in fetchUserData:', error);
-    } finally {
-      fetchingRef.current = null;
-      setLoading(false);
-    }
+    fetchPromiseRef.current = fetchPromise;
+    return fetchPromise;
   }
 
   function isServerError(error: { message?: string } | null): boolean {
@@ -196,44 +203,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
-    // Clear any stale session/tokens before attempting login
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch (_) {
-      // Ignore errors during cleanup
+      // ignore cleanup errors
     }
 
-    // Clear previous user's cache
+    clearSupabaseLocalStorage();
     queryClient.clear();
 
-    // Attempt 1
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error };
 
-      if (error && isServerError(error)) {
-        console.warn('[AuthContext] Server error on signIn attempt 1, retrying in 2s...', error.message);
-        await new Promise(r => setTimeout(r, 2000));
-
-        try {
-          const { error: error2 } = await supabase.auth.signInWithPassword({ email, password });
-          return { error: error2 };
-        } catch (retryErr) {
-          return { error: retryErr as Error };
-        }
+      const { data: { session: activeSession }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !activeSession?.user) {
+        return { error: new Error('Sessão não foi estabelecida após login.') };
       }
 
-      return { error };
+      const userData = await fetchUserData(activeSession.user.id);
+      if (!userData.role) {
+        return { error: new Error('Perfil sem permissões atribuídas. Contacte o administrador.') };
+      }
+
+      return { error: null };
     } catch (error) {
       const err = error as Error;
       if (isServerError(err)) {
-        console.warn('[AuthContext] Network error on signIn attempt 1, retrying in 2s...');
-        await new Promise(r => setTimeout(r, 2000));
-        try {
-          const { error: error2 } = await supabase.auth.signInWithPassword({ email, password });
-          return { error: error2 };
-        } catch (retryErr) {
-          return { error: retryErr as Error };
-        }
+        return { error: new Error('Falha de ligação ao serviço de autenticação.') };
       }
       return { error: err };
     }
@@ -253,15 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 3. Clear React Query cache (prevents data leaking to next user)
     queryClient.clear();
 
-    // 4. Clear all Supabase localStorage keys (stale tokens)
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('sb-')) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+    clearSupabaseLocalStorage();
 
     // 5. Hard redirect to ensure completely fresh state
     window.location.href = '/login';
