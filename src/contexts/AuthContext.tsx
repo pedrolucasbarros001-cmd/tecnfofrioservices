@@ -142,16 +142,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[AuthContext] Skipping hydration — signIn is active');
           return;
         }
-        await hydrateSession(nextSession);
+        try {
+          await hydrateSession(nextSession);
+        } catch (err) {
+          console.error('[AuthContext] hydrateSession failed:', err);
+          setLoading(false);
+        }
       }
     );
 
-    if (!bootstrappedRef.current) {
-      bootstrappedRef.current = true;
-      supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-        await hydrateSession(initialSession);
-      });
-    }
+    // No separate getSession() bootstrap — onAuthStateChange fires INITIAL_SESSION automatically
 
     const handleSessionRequest = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -197,7 +197,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
-    // 1. Purge previous session completely
+    // 1. Suppress onAuthStateChange BEFORE cleanup to prevent SIGNED_OUT triggering hydrateSession
+    signInActiveRef.current = true;
+
+    // 2. Purge previous session completely
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch (_) {
@@ -205,9 +208,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     clearSupabaseLocalStorage();
     queryClient.clear();
-
-    // 2. Suppress onAuthStateChange from doing duplicate work
-    signInActiveRef.current = true;
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
