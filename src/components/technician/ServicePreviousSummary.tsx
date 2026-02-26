@@ -63,11 +63,11 @@ export function ServicePreviousSummary({
       if (error) throw error;
       return data as ActivityLogWithActor[];
     },
-    enabled: !!service.id && isExpanded,
+    enabled: !!service.id,
     staleTime: 30_000,
   });
 
-  // Fetch photos for this service — lazy: only when expanded
+  // Fetch photos for this service — eager load for instant expand
   const { data: photos } = useQuery({
     queryKey: ['service-photos-summary', service.id],
     queryFn: async () => {
@@ -81,7 +81,7 @@ export function ServicePreviousSummary({
       if (error) throw error;
       return data;
     },
-    enabled: !!service.id && isExpanded,
+    enabled: !!service.id,
     staleTime: 30_000,
   });
 
@@ -108,15 +108,14 @@ export function ServicePreviousSummary({
 
   const previousWork = getPreviousWorkType();
 
-  // Don't show if no previous work indicators
-  const hasHistoryIndicators = !!(
+  // Only show if there are real history records
+  const hasRealHistory = !!(
     service.detected_fault ||
     service.work_performed ||
-    service.service_location === 'oficina'
+    (activityLogs && activityLogs.length > 0) ||
+    (photos && photos.length > 0)
   );
-  if (!hasHistoryIndicators && (!activityLogs || activityLogs.length === 0)) {
-    return null;
-  }
+  if (!hasRealHistory) return null;
 
   return (
     <>
