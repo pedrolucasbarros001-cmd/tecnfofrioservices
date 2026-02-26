@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,11 +31,19 @@ export default function LoginPage() {
   const { signIn, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  // Clear watchdog on unmount
+  useEffect(() => {
+    return () => {
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    };
+  }, []);
 
   // Fallback redirect — if already authenticated (e.g. page refresh)
   useEffect(() => {
@@ -47,8 +55,24 @@ export default function LoginPage() {
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
 
+    // 30s watchdog — never let button stay stuck
+    watchdogRef.current = setTimeout(() => {
+      setIsLoading(false);
+      toast({
+        variant: 'destructive',
+        title: 'Tempo esgotado',
+        description: 'O login demorou demasiado. Por favor, tente novamente.',
+      });
+    }, 30_000);
+
     try {
       const result = await signIn(data.email, data.password);
+
+      // Clear watchdog on response
+      if (watchdogRef.current) {
+        clearTimeout(watchdogRef.current);
+        watchdogRef.current = null;
+      }
 
       if (result.error) {
         const msg = result.error.message || '';
@@ -83,6 +107,10 @@ export default function LoginPage() {
       }
       // isLoading stays true during navigation (unmount cleans up)
     } catch {
+      if (watchdogRef.current) {
+        clearTimeout(watchdogRef.current);
+        watchdogRef.current = null;
+      }
       toast({
         variant: 'destructive',
         title: 'Erro de ligação',

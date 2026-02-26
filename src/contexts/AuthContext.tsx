@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { queryClient } from '@/App';
+import { queryClient } from '@/lib/queryClient';
 import type { AppRole, Profile } from '@/types/database';
 
 /* ────────────── Types ────────────── */
@@ -36,6 +36,9 @@ function clearSupabaseLocalStorage() {
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
+let reqCounter = 0;
+function rid() { return `R${++reqCounter}`; }
+
 function ts() {
   return new Date().toISOString().slice(11, 23);
 }
@@ -54,6 +57,16 @@ function isServerError(error: { message?: string } | null): boolean {
     msg.includes('networkerror');
 }
 
+/** Race a promise against a timeout. Returns the promise result or throws on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), ms)
+    ),
+  ]);
+}
+
 /* ────────────── Provider ────────────── */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -64,18 +77,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const lastUserIdRef = useRef<string | null>(null);
 
-  // --- Single-flight hydration per userId ---
+  // Single-flight hydration per userId
   const hydrationPromiseRef = useRef<{ userId: string; promise: Promise<{ profile: Profile | null; role: AppRole | null; networkError: boolean }> } | null>(null);
 
-  // --- Selective suppression: only suppress SIGNED_OUT during signIn cleanup ---
+  // Selective suppression: only suppress SIGNED_OUT during signIn cleanup
   const suppressSignedOutRef = useRef(false);
 
+  // Guard to prevent signIn re-entrance
+  const signInActiveRef = useRef(false);
+
   /**
-   * Fetch profile + role in parallel. Returns a cached promise if one is
-   * already in-flight for the same userId (single-flight dedup).
+   * Fetch profile + role in parallel with single-flight dedup.
    */
   function fetchUserData(userId: string) {
-    // Reuse existing in-flight promise for same user
     if (hydrationPromiseRef.current?.userId === userId) {
       console.log(`[Auth ${ts()}] Reusing in-flight hydration for ${userId.slice(0, 8)}`);
       return hydrationPromiseRef.current.promise;
@@ -136,8 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
 
     hydrationPromiseRef.current = { userId, promise };
-
-    // Clear cache when done so next call fetches fresh
     promise.finally(() => {
       if (hydrationPromiseRef.current?.userId === userId) {
         hydrationPromiseRef.current = null;
@@ -185,13 +197,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, nextSession) => {
         console.log(`[Auth ${ts()}] onAuthStateChange: ${event}`);
 
-        // Only suppress SIGNED_OUT from the cleanup inside signIn
+        // Suppress SIGNED_OUT from the cleanup inside signIn
         if (event === 'SIGNED_OUT' && suppressSignedOutRef.current) {
           console.log('[Auth] Suppressing SIGNED_OUT (signIn cleanup)');
           return;
         }
 
-        // Let INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED flow through always
+        // If signIn is active and we get SIGNED_IN/INITIAL_SESSION, skip —
+        // signIn will handle state commits itself to avoid double-hydration races
+        if (signInActiveRef.current && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          console.log(`[Auth] signIn active, skipping listener hydration for ${event}`);
+          return;
+        }
+
         try {
           await hydrateSession(nextSession);
         } catch (err) {
@@ -234,55 +252,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ────────── signIn ────────── */
 
   async function signIn(email: string, password: string): Promise<SignInResult> {
-    console.log(`[Auth ${ts()}] signIn START`);
+    const id = rid();
+    console.log(`[Auth ${ts()}] [${id}] signIn START`);
 
-    // 1. Suppress only the SIGNED_OUT event from cleanup
+    // Prevent re-entrance
+    if (signInActiveRef.current) {
+      console.warn(`[Auth ${ts()}] [${id}] signIn already active, aborting`);
+      return { error: new Error('Login já em curso. Aguarde.') };
+    }
+
+    signInActiveRef.current = true;
     suppressSignedOutRef.current = true;
 
     try {
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (_) { /* ignore cleanup errors */ }
-    clearSupabaseLocalStorage();
-    queryClient.clear();
+      // 1. Resilient cleanup — never blocks login for more than 2s
+      console.log(`[Auth ${ts()}] [${id}] cleanup_start`);
+      try {
+        await withTimeout(
+          supabase.auth.signOut({ scope: 'local' }),
+          2000,
+          'CLEANUP'
+        );
+      } catch (_) {
+        console.warn(`[Auth ${ts()}] [${id}] cleanup timed out or failed, continuing`);
+      }
+      clearSupabaseLocalStorage();
+      queryClient.clear();
+      suppressSignedOutRef.current = false;
+      console.log(`[Auth ${ts()}] [${id}] cleanup_end`);
 
-    // Re-enable SIGNED_OUT listening
-    suppressSignedOutRef.current = false;
-
-    console.log(`[Auth ${ts()}] Cleanup done, calling signInWithPassword`);
-
-    try {
+      // 2. Authenticate
+      console.log(`[Auth ${ts()}] [${id}] signInWithPassword_start`);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        console.log(`[Auth ${ts()}] signInWithPassword error:`, error.message);
+        console.log(`[Auth ${ts()}] [${id}] signInWithPassword error: ${error.message}`);
         return { error };
       }
-      console.log(`[Auth ${ts()}] signInWithPassword OK`);
+      console.log(`[Auth ${ts()}] [${id}] signInWithPassword_ok`);
 
+      // 3. Get confirmed session
       const { data: { session: activeSession }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !activeSession?.user) {
+        console.error(`[Auth ${ts()}] [${id}] getSession failed`);
         return { error: new Error('Sessão não foi estabelecida após login.') };
       }
-      console.log(`[Auth ${ts()}] getSession OK, user=${activeSession.user.id.slice(0, 8)}`);
+      console.log(`[Auth ${ts()}] [${id}] getSession OK user=${activeSession.user.id.slice(0, 8)}`);
 
-      // 2. Hydrate with timeout fail-safe (25s)
-      const HYDRATION_TIMEOUT = 25_000;
+      // 4. Hydrate with 20s timeout
+      console.log(`[Auth ${ts()}] [${id}] hydrate_start`);
       let userData: { profile: Profile | null; role: AppRole | null; networkError: boolean };
 
       try {
-        userData = await Promise.race([
-          fetchUserData(activeSession.user.id),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('HYDRATION_TIMEOUT')), HYDRATION_TIMEOUT)
-          ),
-        ]);
+        userData = await withTimeout(fetchUserData(activeSession.user.id), 20_000, 'HYDRATION');
       } catch (timeoutErr) {
-        console.error(`[Auth ${ts()}] Hydration timed out after ${HYDRATION_TIMEOUT}ms`);
-        return { error: new Error('O servidor demorou demasiado a responder. Tente novamente.') };
+        console.error(`[Auth ${ts()}] [${id}] hydration timed out, attempting fallback getSession`);
+        // Fallback: try one more getSession + fresh fetch
+        try {
+          const { data: { session: fallbackSession } } = await supabase.auth.getSession();
+          if (fallbackSession?.user) {
+            // Clear stale hydration cache
+            hydrationPromiseRef.current = null;
+            userData = await withTimeout(fetchUserData(fallbackSession.user.id), 10_000, 'HYDRATION_FALLBACK');
+          } else {
+            return { error: new Error('O servidor demorou demasiado a responder. Tente novamente.') };
+          }
+        } catch {
+          return { error: new Error('O servidor demorou demasiado a responder. Tente novamente.') };
+        }
       }
 
-      console.log(`[Auth ${ts()}] Hydration done: role=${userData.role}, networkError=${userData.networkError}`);
+      console.log(`[Auth ${ts()}] [${id}] hydrate_end role=${userData.role} networkError=${userData.networkError}`);
 
-      // 3. Distinguish network error from missing role
+      // 5. Distinguish network error from missing role
       if (userData.networkError && !userData.role) {
         return { error: new Error('Falha de rede ao carregar perfil. Verifique a sua ligação e tente novamente.') };
       }
@@ -291,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: new Error('Perfil sem permissões atribuídas. Contacte o administrador.') };
       }
 
-      // 4. Commit state
+      // 6. Commit state atomically
       setSession(activeSession);
       setUser(activeSession.user);
       setProfile(userData.profile);
@@ -300,21 +341,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       const redirectPath = getDefaultRouteForRole(userData.role);
-      console.log(`[Auth ${ts()}] signIn SUCCESS → redirect=${redirectPath}`);
+      console.log(`[Auth ${ts()}] [${id}] signIn SUCCESS → redirect=${redirectPath}`);
 
       return { error: null, role: userData.role, redirectPath };
     } catch (error) {
       const err = error as Error;
+      console.error(`[Auth ${ts()}] [${id}] signIn CATCH:`, err.message);
       if (isServerError(err)) {
         return { error: new Error('Falha de ligação ao serviço de autenticação.') };
       }
       return { error: err };
+    } finally {
+      // ALWAYS release guards — no stuck state possible
+      signInActiveRef.current = false;
+      suppressSignedOutRef.current = false;
+      console.log(`[Auth ${ts()}] [${id}] signIn FINALLY (guards released)`);
     }
   }
 
   /* ────────── signOut ────────── */
 
-  async function signOut() {
+  async function handleSignOut() {
     await supabase.auth.signOut({ scope: 'local' });
     setUser(null);
     setSession(null);
@@ -327,7 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value: AuthContextType = {
-    user, session, profile, role, loading, signIn, signOut,
+    user, session, profile, role, loading, signIn, signOut: handleSignOut,
     isAuthenticated: !!session,
   };
 
