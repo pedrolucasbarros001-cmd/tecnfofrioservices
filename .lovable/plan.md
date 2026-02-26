@@ -1,43 +1,52 @@
 
-Objetivo: eliminar a causa do travamento no login (botão preso em “A entrar...”) sem camuflagem, tornando o fluxo determinístico mesmo em rede instável.
+Implementação proposta (focada no problema recorrente de login em **preview + publicado**, e em **antes/depois do redirect**):
 
-Implementação (curta e direta):
+1) `src/lib/queryClient.ts` (novo)
+- Extrair `queryClient` de `App.tsx` para módulo isolado.
+- Exportar `queryClient` único.
 
-1) `src/contexts/AuthContext.tsx` — separar fluxo de eventos por tipo
-- Parar de bloquear todos os eventos quando `signInActiveRef` estiver `true`.
-- Bloquear apenas `SIGNED_OUT` do cleanup.
-- Permitir `SIGNED_IN`/`INITIAL_SESSION` seguirem para hidratação (com deduplicação), para não depender de um único caminho.
+2) `src/App.tsx`
+- Importar `queryClient` de `@/lib/queryClient`.
+- Remover definição local de `queryClient`.
+- Corrigir `GlobalErrorHandler`: trocar `process.env.NODE_ENV` por `import.meta.env.DEV`.
 
-2) `src/contexts/AuthContext.tsx` — deduplicação real de hidratação por utilizador
-- Criar um `hydrationPromiseRef` por `userId` para garantir “single-flight” (um único fetch de profile/role por sessão ativa).
-- `signIn` e `onAuthStateChange` passam a reutilizar a mesma promise quando ocorrerem em paralelo.
+3) `src/contexts/AuthContext.tsx`
+- Importar `queryClient` de `@/lib/queryClient` (elimina ciclo `App -> AuthContext -> App`).
+- Tornar cleanup pré-login resiliente:
+  - `signOut(local)` com `Promise.race` (timeout curto, ex.: 1500–2000ms).
+  - Em timeout/falha, continuar fluxo (não bloquear login).
+- Garantir que `signIn` nunca fica pendente:
+  - Encapsular etapas críticas em `try/catch/finally`.
+  - Sempre limpar flags de fluxo no `finally`.
+- Se `signInWithPassword` retornar sucesso mas hidratação falhar/timeout:
+  - fazer fallback controlado com `getSession` + `hydrateSession`.
+  - retornar erro explícito só se realmente não houver sessão/role ao final.
+- Manter supressão seletiva apenas para `SIGNED_OUT` do cleanup.
 
-3) `src/contexts/AuthContext.tsx` — fail-safe contra promise pendente
-- Em `signIn`, substituir await direto por `Promise.race` com timeout alto (ex.: 20–30s) apenas no passo de hidratação.
-- Se timeout disparar, não concluir login “cego”: acionar `supabase.auth.getSession()` + `hydrateSession(session)` e aguardar conclusão controlada.
-- Garantir `finally` para sempre liberar `signInActiveRef` e nunca deixar estado “preso”.
+4) `src/pages/LoginPage.tsx`
+- Adicionar watchdog local de UI (ex.: 30s) para nunca manter botão preso em “A entrar...”.
+- Se watchdog disparar: liberar `isLoading` + toast orientando nova tentativa (sem refresh manual).
+- Manter navegação imediata por `redirectPath` e fallback por `useEffect`.
 
-4) `src/pages/LoginPage.tsx` — navegação determinística após sucesso
-- Após `signIn` sem erro, navegar imediatamente para `getDefaultRouteForRole(...)` com role retornada do `signIn` (sem depender só do `useEffect`).
-- Manter `useEffect` apenas como fallback secundário.
-- Garantir reset de `isLoading` em todos os caminhos não navegados.
+5) `src/contexts/OnboardingContext.tsx`
+- Blindar bootstrap para não gerar crash em janelas transitórias:
+  - só consultar onboarding quando `authLoading === false` e `user && role`.
+  - evitar reentrância durante troca de sessão (flag local de execução).
 
-5) `src/contexts/AuthContext.tsx` — contrato do `signIn` mais explícito
-- Alterar retorno para incluir `role` e `redirectPath` no sucesso.
-- Login page deixa de inferir estado assíncrono indiretamente e usa retorno transacional do auth.
+6) Diagnóstico temporário (curto prazo)
+- Logs com `requestId` por tentativa de login:
+  - `login_start`, `cleanup_start/end`, `signInWithPassword_ok`, `hydrate_start/end`, `navigate`.
+- Remover logs após validar estabilidade.
 
-6) `src/contexts/AuthContext.tsx` — instrumentação de diagnóstico temporária
-- Adicionar logs com timestamps por etapa: `signOut cleanup`, `signInWithPassword`, `getSession`, `fetch profile`, `fetch role`, `state commit`, `navigate`.
-- Remover logs após validação final.
+7) Testes obrigatórios (antes de fechar)
+- Login 10x seguidas no mesmo utilizador (desktop + telemóvel).
+- Logout A -> login B -> logout B -> login A no mesmo dispositivo.
+- Rede lenta (throttling): confirmar que não trava em “A entrar...”.
+- Fluxo completo sem refresh manual no preview e no publicado.
+- Confirmar ausência do erro `useAuth must be used within an AuthProvider`.
 
-Testes obrigatórios (E2E):
-1) Login normal (dono/secretária/técnico) em desktop e telemóvel.
-2) Mesmo dispositivo: logout utilizador A → login utilizador B.
-3) Rede lenta (throttling): confirmar que não fica preso em “A entrar...”.
-4) Confirmar que, sem refresh manual, sempre redireciona para a rota correta.
-
-Detalhes técnicos (para implementação):
-- Manter roles exclusivamente em `user_roles` (sem mover para `profiles`).
-- Não usar localStorage para decisão de privilégio/autorização.
-- Continuar validação de role via consulta autenticada ao Supabase + RLS existente.
-- Evitar regressão de segurança: `ProtectedRoute` continua negando `role=null`.
+Seção técnica (resumo objetivo)
+- Raiz provável 1: ciclo de módulos (`AuthContext` importando `queryClient` de `App`) causando estado inconsistente de contexto em runtime/HMR.
+- Raiz provável 2: `await signOut(local)` no início do login podendo bloquear a promessa de `signIn`.
+- Raiz provável 3: handler global com `process.env.NODE_ENV` em app Vite pode gerar erro em runtime.
+- Estratégia: remover ciclo, tornar `signIn` “non-blocking + fail-safe”, e garantir watchdog de UI para nunca congelar botão de entrada.
