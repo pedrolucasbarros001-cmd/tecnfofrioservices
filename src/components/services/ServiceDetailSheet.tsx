@@ -258,6 +258,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   if (!service) return null;
 
+  // Use fullData (which has fresh customer join) when available, fallback to prop
+  const displayService = fullData || service;
+
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
 
   const handleStartExecution = () => {
@@ -428,29 +431,29 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               >
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {service.contact_name || service.customer?.name || 'Sem cliente'}
+                  {displayService.contact_name || displayService.customer?.name || 'Sem cliente'}
                 </h3>
                 <div className="space-y-1 mt-2 text-sm">
-                  {service.customer?.nif && (
-                    <p className="text-muted-foreground">NIF: {service.customer.nif}</p>
+                  {displayService.customer?.nif && (
+                    <p className="text-muted-foreground">NIF: {displayService.customer.nif}</p>
                   )}
-                  {(service.contact_phone || service.customer?.phone) && (
+                  {(displayService.contact_phone || displayService.customer?.phone) && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Phone className="h-4 w-4" />
-                      <span>{service.contact_phone || service.customer?.phone}</span>
+                      <span>{displayService.contact_phone || displayService.customer?.phone}</span>
                     </div>
                   )}
-                  {(service.contact_email || service.customer?.email) && (
+                  {(displayService.contact_email || displayService.customer?.email) && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Mail className="h-4 w-4" />
-                      <span>{service.contact_email || service.customer?.email}</span>
+                      <span>{displayService.contact_email || displayService.customer?.email}</span>
                     </div>
                   )}
-                  {(service.service_address || service.customer?.address) && (
+                  {(displayService.service_address || displayService.customer?.address) && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4" />
                       <span>
-                        {[service.service_address || service.customer?.address, service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city]
+                        {[displayService.service_address || displayService.customer?.address, displayService.service_postal_code || displayService.customer?.postal_code, displayService.service_city || displayService.customer?.city]
                           .filter(Boolean)
                           .join(', ')}
                       </span>
