@@ -1,120 +1,82 @@
 
-# Plano de correção: modal “pisca e fecha” ao iniciar execução (todas as tipologias)
 
-## Leitura do problema (confirmado)
-O comportamento descrito (“clica em iniciar, pisca e fecha, fica em execução mas sem modal aberto”) é compatível com **estado de etapa inválida** + **transição frágil entre diálogos**.
+# Correcao: "Resumo do atendimento anterior" aparece em todos os servicos e tem delay
 
-Pontos críticos encontrados no código:
-1. `deriveStepFromDb` pode devolver `flow_step` salvo no DB que **não pertence ao fluxo atual** (ex.: passo antigo de visita em fluxo de oficina).
-2. Os modais aceitam esse passo via cast (`as ModalStep`) sem validação.
-3. Quando `currentStep` fica inválido, nenhum `<Dialog open=...>` bate com `true` → visualmente “fecha tudo”.
-4. Em `Visit/Installation/Delivery`, `safeSetStep` ainda usa timeout `0ms`, mais suscetível a race de `onOpenChange(false)` no ciclo de animação.
-5. Ainda existem transições com `setCurrentStep(...)` direto (sem guard), o que pode reintroduzir fechamento inesperado.
+## Problema
 
----
+Dois issues relacionados:
 
-## Estratégia de correção (sem aumentar carga no Supabase)
+### 1. Aparece em servicos sem historico
+A condicao actual (linha 112-116 do `ServicePreviousSummary.tsx`):
+```typescript
+const hasHistoryIndicators = !!(
+  service.detected_fault ||
+  service.work_performed ||
+  service.service_location === 'oficina'  // ← PROBLEMA
+);
+```
+`service_location === 'oficina'` e verdadeiro para TODOS os servicos de oficina, incluindo os que acabaram de entrar e nunca foram abertos. Dados confirmados:
+- TF-00039: oficina, `na_oficina`, 0 logs, 0 fotos, sem diagnostico → mostra "Resumo" indevidamente
+- TF-00035: oficina, `na_oficina`, 4 logs de tentativas falhadas, 0 fotos → mostra "Resumo" sem conteudo util
 
-### 1) Blindar `deriveStepFromDb` contra `flow_step` inválido por fluxo
-Arquivo: `src/hooks/useFlowPersistence.ts`
-
-Implementar validação central de etapas:
-- Criar mapa de etapas válidas por `flowType`:
-  - visita / visita_continuacao
-  - oficina / oficina_continuacao
-  - instalacao
-  - entrega
-- Antes de retornar `flowStep` salvo no DB, validar:
-  - se não for válido para o fluxo corrente, **ignorar** e derivar passo por dados reais (fotos, peças, status, etc.).
-- Manter regra já criada de ignorar passos de foto “stale” na oficina quando há histórico.
-
-Resultado: nunca mais retomará em etapa inexistente para aquele modal.
-
----
-
-### 2) Normalizar abertura de passo em todos os FlowModals
-Arquivos:
-- `src/components/technician/WorkshopFlowModals.tsx`
-- `src/components/technician/VisitFlowModals.tsx`
-- `src/components/technician/InstallationFlowModals.tsx`
-- `src/components/technician/DeliveryFlowModals.tsx`
-
-Ações:
-- Unificar proteção de transição (`safeSetStep`) para janela segura (mesma abordagem estável, não `0ms`).
-- Validar sempre o destino antes de trocar etapa:
-  - `safeSetStep(step)` só aceita passo válido do fluxo.
-  - Se inválido, fallback para passo seguro (`resumo` ou primeiro passo operacional).
-- Substituir `setCurrentStep(...)` de navegação interna por `safeSetStep(...)` onde houver troca entre diálogos.
-- Ao carregar `savedState.currentStep` e `derivedResumeStep`, validar antes de aplicar; se inválido, cair para `resumo`.
-
-Resultado: botão “Iniciar” nunca deixa o fluxo “sem segundo modal”.
-
----
-
-### 3) Adicionar auto-recuperação defensiva (anti-estado fantasma)
-Nos quatro modais técnicos:
-- Calcular se existe algum diálogo principal aberto para o `currentStep`.
-- Se `isOpen === true` e nenhum diálogo principal/submodal estiver ativo por estado inconsistente:
-  - recuperar automaticamente para `resumo` (sem fechar fluxo inteiro),
-  - opcionalmente registrar warning no console para diagnóstico futuro.
-
-Resultado: mesmo se surgir estado corrompido, a UI se autocorrige.
-
----
-
-## Diagrama do problema e correção
-
-```text
-ANTES
-Iniciar -> status atualizado (em_execucao)
-        -> currentStep recebe flow_step inválido (ex: "deslocacao" em oficina)
-        -> nenhum Dialog casa com o step
-        -> modal "pisca/fecha"
-
-DEPOIS
-Iniciar -> status atualizado
-        -> flow_step validado por fluxo
-           -> inválido? ignora e deriva passo correto
-        -> safeSetStep com guard + fallback
-        -> próximo modal abre e permanece estável
+Mesma logica repetida no `WorkshopFlowModals.tsx` linha 133:
+```typescript
+const hasPreviousHistory = !!(
+  service.detected_fault ||
+  service.work_performed ||
+  (service.service_location === 'oficina' && service.status !== 'por_fazer')
+);
 ```
 
----
+### 2. Delay de segundos ao expandir
+Os dados (logs e fotos) so carregam quando o utilizador clica na seta (`enabled: isExpanded`). Isto causa um delay visivel de 1-3 segundos enquanto as queries correm. E ma experiencia.
 
-## Arquivos a alterar
-1. `src/hooks/useFlowPersistence.ts`
-   - whitelist de etapas por fluxo
-   - validação de `flowStep` salvo
-   - fallback seguro por fluxo
-2. `src/components/technician/WorkshopFlowModals.tsx`
-   - validação de passos aplicados
-   - remover transições com `setCurrentStep` direto (trocas de diálogo)
-3. `src/components/technician/VisitFlowModals.tsx`
-   - mesmo padrão de guard/validação/fallback
-4. `src/components/technician/InstallationFlowModals.tsx`
-   - mesmo padrão de guard/validação/fallback
-5. `src/components/technician/DeliveryFlowModals.tsx`
-   - mesmo padrão de guard/validação/fallback
+## Plano de correcao
 
----
+### 1. Carregar dados logo ao montar (sem lazy loading)
 
-## Garantia de performance / Supabase
-- Não será adicionada nova query recorrente.
-- Correção é majoritariamente de lógica cliente (validação de etapa).
-- Mantém arquitetura atual de persistência e retoma.
-- Sem migração SQL obrigatória para esta correção.
+Mudar as duas queries de `enabled: !!service.id && isExpanded` para `enabled: !!service.id`. Sao queries leves (5 logs com filtro, fotos com indice) e ja tem `staleTime: 30_000`. Isto:
+- Elimina o delay ao expandir (dados ja estao prontos)
+- Permite usar os dados carregados para decidir se o componente deve aparecer
 
----
+### 2. Condicao de visibilidade baseada em dados reais
 
-## Plano de validação (obrigatório)
-Executar teste ponta-a-ponta com técnico em:
-1. Oficina (reparação): clicar “Começar/Continuar” em serviços com e sem histórico.
-2. Visita: iniciar e avançar 2-3 passos, fechar/reabrir, retomar corretamente.
-3. Instalação: iniciar e confirmar que não fecha no passo 1→2.
-4. Entrega: iniciar e confirmar transição estável.
-5. Caso com `flow_step` antigo/inválido: garantir fallback para passo válido e modal permanece aberto.
+Substituir a heuristica de campos do servico por verificacao dos dados carregados:
 
-Critério de aceite:
-- Nenhum fluxo fecha sozinho ao iniciar.
-- Nunca fica “em execução sem modal”.
-- Sempre abre um passo válido do fluxo correspondente.
+```typescript
+// Mostrar apenas se existem registos reais
+const hasRealHistory = !!(
+  service.detected_fault ||
+  service.work_performed ||
+  (activityLogs && activityLogs.length > 0) ||
+  (photos && photos.length > 0)
+);
+
+if (!hasRealHistory) return null;
+```
+
+Isto garante que:
+- Servicos novos na oficina sem nenhum registo → NAO mostra
+- Servicos com visita anterior que registou fotos/diagnostico → mostra
+- Servicos com logs de execucao real (levantamento, conclusao) → mostra
+
+### 3. Actualizar `hasPreviousHistory` no WorkshopFlowModals
+
+A mesma logica precisa ser espelhada no `WorkshopFlowModals.tsx`. Como o componente pai nao tem acesso aos counts sem query adicional, a abordagem sera:
+
+- Remover `service.service_location === 'oficina'` da condicao
+- Manter apenas `detected_fault || work_performed || last_status_before_part_request`
+- O `ServicePreviousSummary` ja se auto-esconde quando nao ha dados, portanto mesmo que `hasPreviousHistory` seja `false` para um caso edge, o componente corrige-se sozinho
+
+### Ficheiros a alterar
+
+| Ficheiro | Alteracao |
+|---|---|
+| `src/components/technician/ServicePreviousSummary.tsx` | Remover lazy loading; condicao baseada em dados reais |
+| `src/components/technician/WorkshopFlowModals.tsx` | Remover `service_location === 'oficina'` do `hasPreviousHistory` |
+
+### Impacto no Supabase
+- Mesmas 2 queries que ja existiam, apenas carregam mais cedo (ao montar em vez de ao expandir)
+- Queries sao leves: 5 logs filtrados + fotos por service_id (indexado)
+- `staleTime: 30_000` mantido — nao recarrega a cada render
+
