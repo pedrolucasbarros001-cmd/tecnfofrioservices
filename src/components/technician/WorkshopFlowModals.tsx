@@ -133,7 +133,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const hasPreviousHistory = !!(
     service.detected_fault ||
     service.work_performed ||
-    (service.service_location === 'oficina' && service.status !== 'por_fazer')
+    service.last_status_before_part_request
   );
 
   // Stable initialization ref — prevents re-running on service object reference changes
