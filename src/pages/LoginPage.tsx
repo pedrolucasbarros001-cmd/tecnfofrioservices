@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,12 +9,7 @@ import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -33,83 +28,46 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadingText = 'A entrar...';
-
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  // Redirecionar quando autenticado
+  // Fallback: if user is already authenticated (e.g. page refresh), redirect
   useEffect(() => {
     if (isAuthenticated && role && !loading) {
       const from = location.state?.from?.pathname;
-      if (from && from !== '/login') {
-        navigate(from, { replace: true });
-      } else {
-        navigate(getDefaultRouteForRole(role), { replace: true });
-      }
+      navigate(from && from !== '/login' ? from : getDefaultRouteForRole(role), { replace: true });
     }
   }, [isAuthenticated, role, loading, navigate, location.state]);
 
-  // Aviso se o cargo demorar muito a carregar
-  const roleWarningShown = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated && !loading && !role && !roleWarningShown.current) {
-      const delay = setTimeout(() => {
-        if (!role) {
-          roleWarningShown.current = true;
-          toast({
-            variant: 'destructive',
-            title: 'Erro de permissões',
-            description: 'Não foi possível detectar o seu nível de acesso. Por favor, recarregue a página.',
-          });
-          setIsLoading(false);
-        }
-      }, 8000);
-      return () => clearTimeout(delay);
-    }
-    if (role) roleWarningShown.current = false;
-  }, [isAuthenticated, loading, role, toast]);
-
   async function onSubmit(data: LoginFormValues) {
+    if (isLoading) return;
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(data.email, data.password);
+      const { error, role: userRole } = await signIn(data.email, data.password);
 
       if (error) {
         const msg = error.message || '';
-        console.error('[LoginPage] Erro no sign in:', msg);
-
         if (msg.toLowerCase().includes('database error') || msg.toLowerCase().includes('failed to fetch')) {
-          toast({
-            variant: 'destructive',
-            title: 'Servidor indisponível',
-            description: 'Não foi possível conectar ao servidor. Verifique sua ligação e tente novamente.',
-          });
+          toast({ variant: 'destructive', title: 'Servidor indisponível', description: 'Verifique sua ligação e tente novamente.' });
         } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
-          toast({
-            variant: 'destructive',
-            title: 'Credenciais inválidas',
-            description: 'Email ou palavra-passe incorretos.',
-          });
+          toast({ variant: 'destructive', title: 'Credenciais inválidas', description: 'Email ou palavra-passe incorretos.' });
         } else {
-          toast({
-            variant: 'destructive',
-            title: 'Erro ao entrar',
-            description: 'Ocorreu um problema inesperado. Tente novamente em alguns segundos.',
-          });
+          toast({ variant: 'destructive', title: 'Erro ao entrar', description: 'Ocorreu um problema inesperado. Tente novamente.' });
         }
-        setIsLoading(false);
         return;
       }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro de ligação',
-        description: 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
-      });
+
+      // Navigate immediately using the role returned by signIn
+      if (userRole) {
+        const from = location.state?.from?.pathname;
+        navigate(from && from !== '/login' ? from : getDefaultRouteForRole(userRole), { replace: true });
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Erro de ligação', description: 'Verifique a sua ligação à internet.' });
+    } finally {
       setIsLoading(false);
     }
   }
@@ -141,14 +99,8 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel className="text-slate-300">Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="seu@email.com"
-                        autoComplete="email"
-                        disabled={isLoading}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
-                        {...field}
-                      />
+                      <Input type="email" placeholder="seu@email.com" autoComplete="email" disabled={isLoading}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -161,40 +113,21 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel className="text-slate-300">Palavra-passe</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        autoComplete="current-password"
-                        disabled={isLoading}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
-                        {...field}
-                      />
+                      <Input type="password" placeholder="••••••••" autoComplete="current-password" disabled={isLoading}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button
-                type="submit"
-                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {loadingText}
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+              <Button type="submit" className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200" disabled={isLoading}>
+                {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />A entrar...</>) : 'Entrar'}
               </Button>
             </form>
           </Form>
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
-            <button
-              onClick={() => { localStorage.clear(); window.location.reload(); }}
-              className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"
-            >
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }}
+              className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4">
               Problemas ao entrar? Limpar sessão local
             </button>
           </div>
