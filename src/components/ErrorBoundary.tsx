@@ -63,7 +63,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 Voltar ao Login
               </Button>
             </div>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="text-left text-xs bg-muted p-3 rounded-lg">
                 <summary className="cursor-pointer text-muted-foreground">
                   Detalhes do erro (desenvolvimento)

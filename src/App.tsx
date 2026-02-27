@@ -82,7 +82,8 @@ function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const App = () => (
+function App() {
+  return (
   <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange={false}>
       <QueryClientProvider client={queryClient}>
@@ -228,6 +229,7 @@ const App = () => (
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>
-);
+  );
+}
 
 export default App;
