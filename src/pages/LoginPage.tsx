@@ -9,7 +9,12 @@ import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +38,6 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  // Fallback: if user is already authenticated (e.g. page refresh), redirect
   useEffect(() => {
     if (isAuthenticated && role && !loading) {
       const from = location.state?.from?.pathname;
@@ -49,24 +53,46 @@ export default function LoginPage() {
       const { error, role: userRole } = await signIn(data.email, data.password);
 
       if (error) {
-        const msg = error.message || '';
-        if (msg.toLowerCase().includes('database error') || msg.toLowerCase().includes('failed to fetch')) {
-          toast({ variant: 'destructive', title: 'Servidor indisponível', description: 'Verifique sua ligação e tente novamente.' });
-        } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
-          toast({ variant: 'destructive', title: 'Credenciais inválidas', description: 'Email ou palavra-passe incorretos.' });
+        const msg = error.message.toLowerCase();
+        if (msg.includes('database error') || msg.includes('failed to fetch')) {
+          toast({
+            variant: 'destructive',
+            title: 'Servidor indisponível',
+            description: 'Não foi possível conectar ao servidor. Verifique a sua ligação e tente novamente.',
+          });
+        } else if (msg.includes('invalid') || msg.includes('credentials')) {
+          toast({
+            variant: 'destructive',
+            title: 'Credenciais inválidas',
+            description: 'Email ou palavra-passe incorretos.',
+          });
         } else {
-          toast({ variant: 'destructive', title: 'Erro ao entrar', description: 'Ocorreu um problema inesperado. Tente novamente.' });
+          toast({
+            variant: 'destructive',
+            title: 'Erro ao entrar',
+            description: 'Ocorreu um erro inesperado. Tente novamente.',
+          });
         }
         return;
       }
 
-      // Navigate immediately using the role returned by signIn
-      if (userRole) {
-        const from = location.state?.from?.pathname;
-        navigate(from && from !== '/login' ? from : getDefaultRouteForRole(userRole), { replace: true });
+      if (!userRole) {
+        toast({
+          variant: 'destructive',
+          title: 'Sem permissões',
+          description: 'Conta autenticada, mas sem nível de acesso associado. Contacte o administrador.',
+        });
+        return;
       }
+
+      const from = location.state?.from?.pathname;
+      navigate(from && from !== '/login' ? from : getDefaultRouteForRole(userRole), { replace: true });
     } catch {
-      toast({ variant: 'destructive', title: 'Erro de ligação', description: 'Verifique a sua ligação à internet.' });
+      toast({
+        variant: 'destructive',
+        title: 'Erro de ligação',
+        description: 'Ocorreu um erro de rede. Verifique a sua ligação à internet.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -89,45 +115,83 @@ export default function LoginPage() {
             </CardDescription>
           </div>
         </CardHeader>
+
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="seu@email.com" autoComplete="email" disabled={isLoading}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const { ref: _emailRef, ...emailField } = field;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-slate-300">Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="seu@email.com"
+                          autoComplete="email"
+                          disabled={isLoading}
+                          className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
+                          {...emailField}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
+
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Palavra-passe</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" autoComplete="current-password" disabled={isLoading}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const { ref: _passwordRef, ...passwordField } = field;
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-slate-300">Palavra-passe</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          disabled={isLoading}
+                          className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:border-blue-400"
+                          {...passwordField}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
-              <Button type="submit" className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200" disabled={isLoading}>
-                {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />A entrar...</>) : 'Entrar'}
+
+              <Button
+                type="submit"
+                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    A entrar...
+                  </>
+                ) : (
+                  'Entrar'
+                )}
               </Button>
             </form>
           </Form>
+
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }}
-              className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4">
+            <button
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"
+            >
               Problemas ao entrar? Limpar sessão local
             </button>
           </div>
