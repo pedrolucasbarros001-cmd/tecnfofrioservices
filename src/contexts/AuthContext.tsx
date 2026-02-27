@@ -29,19 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const signInActiveRef = useRef(false);
-  const suppressSignedOutRef = useRef(false);
+  const hydrationPromiseRef = useRef<{ userId: string; promise: Promise<AppRole | null> } | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-      if (event === 'SIGNED_OUT' && suppressSignedOutRef.current) return;
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
       if (nextSession?.user) {
-        if (signInActiveRef.current) return;
-        await hydrateUser(nextSession.user.id);
+        void hydrateUser(nextSession.user.id);
       } else {
         setProfile(null);
         setRole(null);
@@ -77,55 +73,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const clearSupabaseLocalKeys = () => {
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-')) keysToRemove.push(key);
-      }
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
-    } catch (error) {
-      console.error('[AuthContext] Error clearing local Supabase keys:', error);
-    }
-  };
-
   async function hydrateUser(userId: string): Promise<AppRole | null> {
-    try {
-      const [profileRes, roleRpcRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
-        supabase.rpc('get_user_role', { _user_id: userId }),
-      ]);
-
-      if (profileRes.error) console.error('[AuthContext] Profile error:', profileRes.error);
-      if (roleRpcRes.error) console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
-
-      const profileData = profileRes.data as Profile | null;
-      const userRole = (roleRpcRes.data as AppRole | null) ?? null;
-
-      setProfile(profileData);
-      setRole(userRole);
-      return userRole;
-    } catch (error) {
-      console.error('[AuthContext] hydrateUser error:', error);
-      setRole(null);
-      return null;
-    } finally {
-      setLoading(false);
+    if (hydrationPromiseRef.current?.userId === userId) {
+      return hydrationPromiseRef.current.promise;
     }
+
+    const promise = (async () => {
+      try {
+        const [profileRes, roleRpcRes] = await Promise.all([
+          supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+          supabase.rpc('get_user_role', { _user_id: userId }),
+        ]);
+
+        if (profileRes.error) console.error('[AuthContext] Profile error:', profileRes.error);
+        if (roleRpcRes.error) console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
+
+        const profileData = profileRes.data as Profile | null;
+        const userRole = (roleRpcRes.data as AppRole | null) ?? null;
+
+        setProfile(profileData);
+        setRole(userRole);
+        return userRole;
+      } catch (error) {
+        console.error('[AuthContext] hydrateUser error:', error);
+        setProfile(null);
+        setRole(null);
+        return null;
+      } finally {
+        hydrationPromiseRef.current = null;
+        setLoading(false);
+      }
+    })();
+
+    hydrationPromiseRef.current = { userId, promise };
+    return promise;
   }
 
   async function signIn(email: string, password: string): Promise<SignInResult> {
     setLoading(true);
-    signInActiveRef.current = true;
-    suppressSignedOutRef.current = true;
 
     try {
       queryClient.clear();
-
-      // Local cleanup only (no artificial delays/timeouts)
-      await supabase.auth.signOut({ scope: 'local' });
-      clearSupabaseLocalKeys();
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
@@ -146,15 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       setLoading(false);
       return { error: error as Error };
-    } finally {
-      signInActiveRef.current = false;
-      suppressSignedOutRef.current = false;
     }
   }
 
   async function signOut() {
     await supabase.auth.signOut({ scope: 'local' });
-    clearSupabaseLocalKeys();
     setUser(null);
     setSession(null);
     setProfile(null);
