@@ -29,42 +29,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Tracks whether signIn is driving the hydration — so onAuthStateChange skips duplicate work
   const signInActiveRef = useRef(false);
+  const suppressSignedOutRef = useRef(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (event === 'SIGNED_OUT' && suppressSignedOutRef.current) return;
 
-        if (session?.user) {
-          // If signIn() is active, it handles hydration itself — skip here
-          if (signInActiveRef.current) return;
-          await hydrateUser(session.user.id);
-        } else {
-          setProfile(null);
-          setRole(null);
-          setLoading(false);
-        }
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (nextSession?.user) {
+        if (signInActiveRef.current) return;
+        await hydrateUser(nextSession.user.id);
+      } else {
+        setProfile(null);
+        setRole(null);
+        setLoading(false);
       }
-    );
+    });
 
-    // Session bridge for print pages
     const handleSessionRequest = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'REQUEST_SUPABASE_SESSION') {
-        try {
-          const { data: { session: s } } = await supabase.auth.getSession();
-          if (s && event.source) {
-            (event.source as Window).postMessage(
-              { type: 'SUPABASE_SESSION', access_token: s.access_token, refresh_token: s.refresh_token },
-              window.location.origin
-            );
-          }
-        } catch (err) {
-          console.error('[AuthContext] Session bridge error:', err);
-        }
+      if (event.data?.type !== 'REQUEST_SUPABASE_SESSION') return;
+
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession || !event.source) return;
+
+        (event.source as Window).postMessage(
+          {
+            type: 'SUPABASE_SESSION',
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token,
+          },
+          window.location.origin
+        );
+      } catch (err) {
+        console.error('[AuthContext] Session bridge error:', err);
       }
     };
 
@@ -75,71 +77,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  /** Fetches profile + role and sets state. Returns the role. */
+  const clearSupabaseLocalKeys = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-')) keysToRemove.push(key);
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+    } catch (error) {
+      console.error('[AuthContext] Error clearing local Supabase keys:', error);
+    }
+  };
+
   async function hydrateUser(userId: string): Promise<AppRole | null> {
     try {
-      const [profileRes, roleRes] = await Promise.all([
+      const [profileRes, roleRpcRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
-        supabase.from('user_roles').select('role').eq('user_id', userId).order('created_at', { ascending: true }).maybeSingle()
+        supabase.rpc('get_user_role', { _user_id: userId }),
       ]);
 
       if (profileRes.error) console.error('[AuthContext] Profile error:', profileRes.error);
-      if (roleRes.error) console.error('[AuthContext] Role error:', roleRes.error);
+      if (roleRpcRes.error) console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
 
       const profileData = profileRes.data as Profile | null;
-      const userRole = (roleRes.data?.role as AppRole) ?? null;
+      const userRole = (roleRpcRes.data as AppRole | null) ?? null;
 
       setProfile(profileData);
       setRole(userRole);
       return userRole;
     } catch (error) {
       console.error('[AuthContext] hydrateUser error:', error);
+      setRole(null);
       return null;
     } finally {
       setLoading(false);
     }
   }
 
-  /**
-   * Signs in and returns { error, role }.
-   * Does NOT call signOut first — signInWithPassword replaces the session natively.
-   * Awaits hydration so the caller gets the role immediately.
-   */
   async function signIn(email: string, password: string): Promise<SignInResult> {
+    setLoading(true);
+    signInActiveRef.current = true;
+    suppressSignedOutRef.current = true;
+
     try {
-      signInActiveRef.current = true;
       queryClient.clear();
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      // Local cleanup only (no artificial delays/timeouts)
+      await supabase.auth.signOut({ scope: 'local' });
+      clearSupabaseLocalKeys();
 
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        signInActiveRef.current = false;
+        setLoading(false);
         return { error };
       }
 
-      const userId = data.user?.id;
-      if (!userId) {
-        signInActiveRef.current = false;
-        return { error: new Error('No user returned from auth') };
+      if (!data.user || !data.session) {
+        setLoading(false);
+        return { error: new Error('Sessão inválida após login') };
       }
 
-      // Set session/user immediately
       setSession(data.session);
       setUser(data.user);
 
-      // Hydrate and get role
-      const userRole = await hydrateUser(userId);
-
-      signInActiveRef.current = false;
-      return { error: null, role: userRole };
+      const hydratedRole = await hydrateUser(data.user.id);
+      return { error: null, role: hydratedRole };
     } catch (error) {
-      signInActiveRef.current = false;
+      setLoading(false);
       return { error: error as Error };
+    } finally {
+      signInActiveRef.current = false;
+      suppressSignedOutRef.current = false;
     }
   }
 
   async function signOut() {
     await supabase.auth.signOut({ scope: 'local' });
+    clearSupabaseLocalKeys();
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -149,7 +164,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value: AuthContextType = {
-    user, session, profile, role, loading, signIn, signOut,
+    user,
+    session,
+    profile,
+    role,
+    loading,
+    signIn,
+    signOut,
     isAuthenticated: !!session,
   };
 
