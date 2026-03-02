@@ -1,117 +1,109 @@
 
 
-## Plano: Rastreabilidade Multi-Técnico nos Artigos + Painel Financeiro Consolidado
+## Plano: Alinhar SetPriceModal e RegisterPaymentModal com Histórico de Artigos
 
-### Problema Actual
+### Resumo
 
-1. A tabela `service_parts` não regista **quem** adicionou o artigo nem **onde** (visita/oficina)
-2. Quando o serviço vai de visita → oficina, o `handleConfirmArticles` da oficina **apaga todos os `is_requested=false`** e reinsere — perdem-se os artigos da visita
-3. O painel de detalhes (`ServiceDetailSheet`) mostra artigos sem separação por técnico/local
-4. Não há consolidação financeira multi-intervenção
+Sem botão "Validar como está" separado — o "Confirmar" existente faz tudo. O modal mostra o histórico de `service_parts` como read-only acima da tabela editável, e o form permite submissão com items vazios (artigos adicionais são opcionais se já existe histórico).
 
-### Alterações na Base de Dados
+### Ficheiros afectados
 
-**Migração: adicionar colunas à tabela `service_parts`**
+#### 1. `src/components/modals/SetPriceModal.tsx`
 
-```sql
-ALTER TABLE public.service_parts
-  ADD COLUMN registered_by uuid REFERENCES auth.users(id),
-  ADD COLUMN registered_location text DEFAULT 'oficina';
--- registered_location: 'visita' | 'oficina'
-```
+**Queries adicionais ao abrir (quando `open && service`):**
+- `service_parts` onde `is_requested = false` e `service_id = service.id` — artigos dos técnicos
+- `service_payments` onde `service_id = service.id` — pagamentos anteriores
+- `profiles` para resolver `registered_by` → nome do técnico
 
-Isto permite rastrear quem registou cada artigo e em que contexto.
-
-### Alterações nos Ficheiros
-
-#### 1. `VisitFlowModals.tsx` — `handleConfirmArticles`
-
-- Ao inserir artigos, preencher `registered_by: user.id` e `registered_location: 'visita'`
-- Alterar o DELETE para só apagar partes com `registered_location = 'visita'` (não apagar artigos de oficina se por acaso existirem)
-
-#### 2. `WorkshopFlowModals.tsx` — Artigos da Visita como Read-Only + Novos Artigos
-
-**Carregar artigos existentes** ao montar o modal:
-- Query `service_parts` onde `is_requested = false` para o serviço
-- Separar em `previousArticles` (registados por outro técnico/em visita) e artigos actuais
-
-**No modal `registo_artigos`**: Layout com duas secções:
+**Alterações de layout (inserir ACIMA da tabela PriceLineItems):**
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  Registo de Artigos                      Passo 3    │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ┌─ ARTIGOS DA VISITA ──── Técnico: João ─────────┐ │
-│  │  (opacity-50, não editável)                     │ │
-│  │  Ref  │ Descrição    │ Qtd │ Valor              │ │
-│  │  ABC  │ Filtro HEPA  │  1  │ 25.00              │ │
-│  └────────────────────────────────────────────────┘ │
-│                                                     │
-│  ┌─ ARTIGOS DA OFICINA (editáveis) ──────────────┐  │
-│  │  Artigo │ Descrição    │ Qtd │ Valor  │ 🗑     │  │
-│  │  [    ] │ [          ] │ [ ] │ [    ] │        │  │
+┌──────────────────────────────────────────────────────┐
+│  Definir Preço - TF-00042           [Garantia badge] │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ── HISTÓRICO DE INTERVENÇÕES ──── (read-only)       │
+│  (só aparece se existirem service_parts)             │
+│  Visita • João Silva • 28/02/2026                    │
+│    Filtro HEPA (ABC)   1x  25.00€  = 25.00€         │
+│                           Subtotal: 25.00 €          │
+│  Oficina • Pedro Costa • 01/03/2026                  │
+│    Compressor (XY)     1x 120.00€  = 120.00€        │
+│                           Subtotal: 120.00 €         │
+│                                                      │
+│  ── ARTIGOS ADICIONAIS (editáveis) ──────────────── │
+│  [PriceLineItems existente — SEM ALTERAÇÃO]          │
+│                                                      │
+│  ── RESUMO ─────────────────────────────────────── │
+│  [PricingSummary existente — subtotal inclui          │
+│   historySubtotal + additionalSubtotal]              │
+│                                                      │
+│  ── INFORMAÇÃO ──────────────────────────────────── │
+│  Já Pago ✅ ...................... 50.00 €           │
+│  Total a Cobrar ................. XXX.XX €           │
+│                                                      │
+├──────────────────────────────────────────────────────┤
+│  [Cancelar]                          [Confirmar]     │
+└──────────────────────────────────────────────────────┘
+```
+
+**Alterações de lógica:**
+- Calcular `historySubtotal` = soma de `cost * quantity` de todos os `service_parts` (is_requested=false)
+- O subtotal passado ao `PricingSummary` passa a ser `historySubtotal + additionalSubtotal` (dos PriceLineItems)
+- Relaxar validação do form: `items` passa de `.min(1)` para `.min(0)` — se não há artigos adicionais e existe histórico, o "Confirmar" funciona na mesma
+- Se os items do form estão todos vazios (description vazia), o submit filtra-os e usa só o histórico
+- Secção "Já Pago" mostra soma dos `service_payments` — informacional
+- O `pricing_description` JSON salvo inclui referência ao histórico para auditoria
+
+**Agrupamento dos artigos do histórico:**
+- Agrupar por `registered_location + registered_by`
+- Resolver nome do técnico via query a `profiles` onde `user_id IN (...)`
+- Mostrar data do primeiro artigo do grupo (`created_at`)
+- Opacity-60 para toda a secção, não editável
+
+#### 2. `src/components/modals/RegisterPaymentModal.tsx`
+
+**Queries adicionais ao abrir:**
+- `service_parts` (is_requested=false) + profiles para nomes dos técnicos
+- `service_payments` para histórico de pagamentos anteriores
+
+**Alterações de layout (inserir ACIMA do resumo financeiro existente):**
+
+```text
+┌──────────────────────────────────────────────────────┐
+│  Registar Pagamento - TF-00042                       │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ▼ Detalhes do Serviço (Collapsible, fechado)        │
+│  ┌────────────────────────────────────────────────┐  │
+│  │ Visita • João Silva                            │  │
+│  │   Filtro HEPA  1x  25.00€                      │  │
+│  │ Oficina • Pedro Costa                          │  │
+│  │   Compressor   1x 120.00€                      │  │
+│  │ Subtotal: 215.00€  Desc: -10€  IVA: +47€      │  │
+│  │ TOTAL: 252.15€                                 │  │
 │  └────────────────────────────────────────────────┘  │
-│                                                     │
-│  [+ Adicionar Artigo]                               │
-│                                                     │
-│  [← Anterior]              [Continuar →]            │
-└─────────────────────────────────────────────────────┘
+│                                                      │
+│  ── PAGAMENTOS ANTERIORES ────────────────────────── │
+│  (só aparece se existirem pagamentos)                │
+│  28/02 • Dinheiro • 50.00€ • Recebido: João         │
+│  Total Pago: 50.00€                                  │
+│                                                      │
+│  ── RESUMO FINANCEIRO (existente, sem alteração) ──  │
+│  [Campos de pagamento existentes]                    │
+│  [Novo saldo preview]                                │
+├──────────────────────────────────────────────────────┤
+│  [Cancelar]              [Confirmar Pagamento]       │
+└──────────────────────────────────────────────────────┘
 ```
 
-**No modal `resumo_reparacao`**: Mostra ambos os grupos com subtotais separados, depois soma total.
+**Detalhes:**
+- `Collapsible` (Radix) fechado por defeito para "Detalhes do Serviço"
+- Pagamentos anteriores: lista com data, método, valor e quem recebeu (join profiles via `received_by`)
+- O resumo financeiro existente (Valor Total / Já Pago / Em Falta) calcula `Em Falta` usando a soma real dos `service_payments`, não `amount_paid` do serviço — mais fiável
+- Max-width do modal alarga para `sm:max-w-[700px]` para acomodar os detalhes
 
-**No `handleConfirmArticles` da oficina**: DELETE apenas `registered_location = 'oficina'`, inserir com `registered_by: user.id` e `registered_location: 'oficina'`.
+### Nenhuma alteração de DB necessária
 
-#### 3. `ServiceDetailSheet.tsx` — Painel Financeiro Consolidado
-
-Redesign da secção "Artigos / Peças" e "Informação Financeira":
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  📦 Artigos / Intervenções                          │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ── Visita • João Silva • 28/02/2026 ──────────── │
-│  Filtro HEPA (ABC)   1x  25.00€  = 25.00€          │
-│  Mão de obra         1x  40.00€  = 40.00€          │
-│                          Subtotal: 65.00 €          │
-│                                                     │
-│  ── Oficina • Pedro Costa • 01/03/2026 ─────────  │
-│  Compressor (XY-123) 1x 120.00€  = 120.00€         │
-│  Soldadura            1x  30.00€  = 30.00€          │
-│                          Subtotal: 150.00 €         │
-│                                                     │
-├─────────────────────────────────────────────────────┤
-│  Subtotal Geral ..................... 215.00 €      │
-│  Desconto .......................... - 10.00 €      │
-│  IVA (23%) .......................... 47.15 €      │
-│  TOTAL FINAL ....................... 252.15 €      │
-│  ─────────────────────────────────────────────────  │
-│  Já Pago ✅ .......................... 50.00 €      │
-│  EM DÉBITO 🔴 ....................... 202.15 €      │
-└─────────────────────────────────────────────────────┘
-```
-
-- Agrupar `service_parts` por `registered_by` + `registered_location`
-- Resolver o nome do técnico via join com profiles
-- Mostrar data de criação do artigo
-- Calcular subtotais por grupo
-- Somar tudo, aplicar desconto/IVA do `pricing_description`
-- Abater `amount_paid` automaticamente
-- Mostrar saldo em débito
-
-#### 4. Dados necessários no `useFullServiceData`
-
-Adicionar join para buscar `registered_by` → `profiles.full_name` nos `service_parts`. Como o Supabase não suporta join directo de `service_parts.registered_by` → `profiles.user_id`, será necessário:
-- Buscar os `service_parts` com `registered_by`
-- Resolver nomes via query separada aos profiles onde `user_id IN (...)` dos registered_by únicos
-
-### Ficheiros Afectados
-
-1. **Migração SQL** — `ALTER TABLE service_parts ADD COLUMN registered_by, registered_location`
-2. **`src/components/technician/VisitFlowModals.tsx`** — inserir com `registered_by` + `registered_location: 'visita'`, DELETE filtrado por location
-3. **`src/components/technician/WorkshopFlowModals.tsx`** — carregar artigos anteriores, mostrar read-only com opacidade, inserir com `registered_location: 'oficina'`, DELETE filtrado
-4. **`src/components/services/ServiceDetailSheet.tsx`** — redesign da secção de artigos com agrupamento por técnico/local e painel financeiro consolidado
-5. **`src/hooks/useServices.ts`** — enriquecer query de `service_parts` para incluir `registered_by` e `registered_location`
+As colunas `registered_by` e `registered_location` já existem em `service_parts`. As queries são feitas client-side.
 
