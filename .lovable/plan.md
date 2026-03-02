@@ -1,33 +1,95 @@
 
 
-## Diagnóstico real (baseado no código e logs)
+## Plano: Registo de Artigos na Oficina + Alinhamento DB + Impressão + Painel Lateral
 
-O problema tem **duas causas concretas** no código atual:
+### Contexto
 
-**Causa 1: `signIn` chama `signOut` antes de autenticar (linha 134 do AuthContext)**
-Isto dispara o evento `SIGNED_OUT` no `onAuthStateChange`, que limpa `role=null`, `profile=null`. Depois o `signInWithPassword` dispara `SIGNED_IN`, que inicia `fetchUserData` assincronamente. Mas o `signIn` retorna **antes** da hidratação terminar. Resultado: o LoginPage fica à espera que o `useEffect` detecte `role`, mas o `role` pode não ter chegado ainda — ou o evento de limpeza interferiu.
+O fluxo de visita vai ter (ou já tem) a nova etapa "Registo de Artigos" em vez de "Usou peças?". O mesmo padrão precisa ser aplicado ao fluxo de oficina (`WorkshopFlowModals`). Além disso, a tabela `service_parts.quantity` é `integer` e precisa aceitar decimais. A ficha de impressão e o painel lateral precisam exibir os artigos com referência, descrição, quantidade, valor unitário e total por linha.
 
-**Causa 2: `isLoading` nunca é resetado no caminho de sucesso (LoginPage)**
-Quando `signIn` retorna sem erro, o `onSubmit` **não faz nada** — não navega, não desliga o loading. Depende 100% do `useEffect` que vigia `isAuthenticated && role && !loading`. Se o `role` demora (rede lenta, retry de 3s no fetchUserData), o botão fica preso em "A entrar..." indefinidamente.
+---
 
-## Plano de correção (sem gambiarras, sem timeouts artificiais)
+### 1. Migração DB: `service_parts.quantity` → `numeric`
 
-### 1) `AuthContext.tsx` — remover `signOut` do `signIn`
-- `signInWithPassword` já substitui a sessão. O `signOut` prévio é desnecessário e é a causa das colisões de eventos.
-- `signIn` deve: chamar `signInWithPassword` → aguardar `fetchUserData` → retornar `{ error, role }`.
-- Assim o LoginPage recebe o role de forma síncrona e navega imediatamente.
+```sql
+ALTER TABLE public.service_parts 
+  ALTER COLUMN quantity TYPE numeric USING quantity::numeric;
+```
 
-### 2) `AuthContext.tsx` — `signIn` espera pela hidratação
-- Após `signInWithPassword` com sucesso, chamar `await fetchUserData(user.id)` dentro do próprio `signIn`.
-- Retornar `{ error: null, role: this.role }` após hidratação.
-- O `onAuthStateChange` continua a funcionar em paralelo (para refresh de página, etc.), mas o `signIn` não depende dele.
+Isto alinha com o campo `cost` (já `numeric`) e permite quantidades decimais (1.5, 0.75, etc.) tanto no fluxo do técnico como no modal de orçamentar.
 
-### 3) `LoginPage.tsx` — navegação direta + reset garantido
-- `onSubmit`: usar `try/finally` para **sempre** resetar `isLoading`.
-- No sucesso: usar `role` retornado por `signIn` para navegar imediatamente via `navigate(getDefaultRouteForRole(role))`.
-- O `useEffect` existente permanece apenas como fallback (ex: refresh de página com sessão ativa).
+---
 
-### 4) `AuthContext.tsx` — limpar `signOut`
-- Remover `setTimeout(() => setLoading(false), 500)` no `signOut` — é um delay artificial sem propósito.
-- Limpar estado e definir `loading=false` diretamente.
+### 2. `WorkshopFlowModals.tsx` — Substituir `pecas_usadas` por `registo_artigos` + `resumo_reparacao`
+
+**Tipo `ModalStep`**: Remover `pecas_usadas`, adicionar `registo_artigos` e `resumo_reparacao`.
+
+**Interface `ArticleEntry`**: `{ reference: string; description: string; quantity: number; unit_price: number }` com total calculado = `qty × unit_price`.
+
+**`WorkshopFormData`**: Substituir `usedParts`/`usedPartsList` por `articles: ArticleEntry[]`, `discountValue`, `discountType`, `taxRate`, `articlesLocked`.
+
+**Etapa `registo_artigos`** (inline, sem modal separado):
+- Tabela com colunas: Ref | Descrição | Qtd | Valor (€) | Total
+- Qtd e Valor aceitam decimais (`step="any"`)
+- Botões: Adicionar linha, Remover linha
+- Auto-save via persistência existente
+
+**Etapa `resumo_reparacao`**:
+- Lista read-only dos artigos com totais por linha
+- Subtotal automático
+- Campo Desconto (€ ou %)
+- Campo IVA (select 0/6/13/23%)
+- Total final automático
+- Botão "Confirmar e Guardar Registos" → `articlesLocked = true`
+- Após confirmação: campos disabled
+
+**Remover**: Import e uso de `UsedPartsModal`, `showPartsModal`, `handlePartsConfirm`. Toda a lógica da RadioGroup "Usou peças?" desaparece.
+
+**Gravação**: Ao confirmar, gravar artigos em `service_parts` com `part_code` = referência, `part_name` = descrição, `quantity` (decimal), `cost` = valor unitário, `is_requested = false`, `arrived = true`.
+
+---
+
+### 3. `useFlowPersistence.ts` — Whitelist
+
+```
+oficina: [..., 'registo_artigos', 'resumo_reparacao'] // remover 'pecas_usadas'
+oficina_continuacao: [...] // sem alteração
+```
+
+Atualizar `deriveStepFromDb` para oficina: onde referencia `pecas_usadas`, passa a referenciar `registo_artigos`.
+
+---
+
+### 4. `ServicePrintPage.tsx` — Secção "Artigos do Serviço"
+
+Atualizar a secção "Peças Utilizadas" para mostrar a tabela completa:
+- Colunas: Ref. | Descrição | Qtd | Valor Unit. | Total
+- Total por linha = `cost × quantity`
+- Subtotal automático
+- Manter retrocompatibilidade com peças antigas (sem `cost` = mostrar "-")
+
+---
+
+### 5. `ServiceDetailSheet.tsx` — Secção "Peças Utilizadas/Solicitadas"
+
+Atualizar para mostrar:
+- Referência (`part_code`) ao lado do nome
+- Quantidade (com decimais)
+- Valor unitário (`cost`) e total por linha
+- Manter badges de estado (Pedida, Chegou, Registada)
+
+---
+
+### 6. `EditServiceDetailsModal.tsx` — Alinhamento
+
+Adicionar campo de `cost` (valor unitário) por peça na edição, para que o dono/secretaria possa editar o valor das peças registadas pelo técnico.
+
+---
+
+### Ficheiros afetados
+- **Migração SQL**: `service_parts.quantity` integer → numeric
+- `src/components/technician/WorkshopFlowModals.tsx` — alteração principal
+- `src/hooks/useFlowPersistence.ts` — whitelist + deriveStepFromDb
+- `src/pages/ServicePrintPage.tsx` — tabela de artigos
+- `src/components/services/ServiceDetailSheet.tsx` — painel lateral
+- `src/components/modals/EditServiceDetailsModal.tsx` — campo de custo
 
