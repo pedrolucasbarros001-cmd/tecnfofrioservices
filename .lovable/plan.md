@@ -1,43 +1,43 @@
 
 
-## Plano: Substituir "Peças Usadas" por "Registo de Artigos" + "Resumo da Reparação" no Fluxo de Visita
+## Problema
 
-### Estado Atual
+O crash `TypeError: undefined is not an object (evaluating 'formData.articles.length')` acontece porque ao retomar um serviço, `setFormData(savedState.formData)` restaura dados antigos que não contêm a propriedade `articles`. O fix anterior só cobriu `articlesSubtotal` mas há ~10 acessos directos a `formData.articles` no JSX.
 
-O **Workshop** (`WorkshopFlowModals.tsx`) já tem `registo_artigos` e `resumo_reparacao` implementados corretamente. O **Visit** (`VisitFlowModals.tsx`) ainda usa a etapa antiga `pecas_usadas` com pergunta Sim/Não (linhas 1295-1383).
+O mesmo risco existe no `WorkshopFlowModals.tsx` (linha 172).
 
-### Fluxo Proposto (Visita — "Reparar no Local")
+## Solução
 
-```text
-decisao → registo_artigos → pedir_peca
-  ├─ Sim (precisa peça) → resumo_reparacao → assinatura (pedido_peca) → fim
-  └─ Não (sem peça)     → resumo_reparacao → pagamento → assinatura (conclusao) → fim
+Garantir que ao restaurar `formData` de estado guardado, os campos novos (`articles`, `discountValue`, `discountType`, `taxRate`, `articlesLocked`) têm sempre valores default.
+
+### 1. `VisitFlowModals.tsx`
+
+**Linha 209** — Merge com defaults:
+```ts
+setFormData({ ...INITIAL_FORM_DATA, ...savedState.formData });
 ```
 
-### Alterações em `src/components/technician/VisitFlowModals.tsx`
+**Linha ~228** (deriveStepFromDb callback) — Mesmo padrão se houver `formDataOverrides`:
+```ts
+setFormData(prev => ({ ...INITIAL_FORM_DATA, ...prev, ...formDataOverrides }));
+```
 
-1. **Tipos**: Substituir `pecas_usadas` por `registo_artigos` e `resumo_reparacao` em `RepairModalStep` e `OtherModalStep`. Importar `ArticleEntry` do `WorkshopFlowModals`.
+**Remover `safeArticles`** (linha 351-352) — Já não é necessário pois `formData.articles` estará sempre inicializado. Voltar a usar `formData.articles` directamente.
 
-2. **`VisitFormData`**: Substituir `usedParts: boolean` e `usedPartsList: PartEntry[]` por `articles: ArticleEntry[]`, `discountValue: string`, `discountType: 'euro' | 'percent'`, `taxRate: number`, `articlesLocked: boolean`. Remover interface `PartEntry`.
+### 2. `WorkshopFlowModals.tsx`
 
-3. **Helpers**: Adicionar `addArticle`, `updateArticle`, `removeArticle`, `articlesSubtotal`, `discountAmount`, `taxAmount`, `totalFinal` (copiar padrão do Workshop). Remover `addPart`, `removePart`, `updatePart`, `saveUsedParts`.
+**Linha 172** — Mesmo fix:
+```ts
+setFormData({ ...INITIAL_FORM_DATA, ...savedState.formData });
+```
 
-4. **Navegação**:
-   - `handleDecisionConfirm` (reparar_local): vai para `registo_artigos` em vez de `pecas_usadas`.
-   - `handlePedirPecaConfirm`: antes de ir para assinatura/pagamento, vai para `resumo_reparacao`.
-   - Novo `handleResumoReparacaoConfirm`: confirma artigos (grava em `service_parts`), depois avança para pagamento+assinatura (sem peça) ou assinatura (com peça).
-   - Botão "Anterior" do `pedir_peca` volta para `registo_artigos`.
-   - Botão "Anterior" do `resumo_reparacao` volta para `pedir_peca`.
+(Onde `INITIAL_FORM_DATA` é o objecto default já definido no componente.)
 
-5. **UI — Etapa `registo_artigos`** (novo Dialog): Tabela com Ref | Descrição | Qtd (decimal) | Valor (€) | Total (auto). Botões adicionar/remover. Mesmo layout compacto do Workshop.
+### 3. Verificação extra
 
-6. **UI — Etapa `resumo_reparacao`** (novo Dialog): Lista read-only dos artigos, subtotal, desconto (€/%), IVA (0/6/13/23%), total final. Botão "Confirmar e Guardar" → `articlesLocked = true` → grava artigos em `service_parts` (delete+insert). Após confirmação: botão "Continuar" avança para pagamento/assinatura.
+Confirmar que `InstallationFlowModals` e `DeliveryFlowModals` não acedem a `articles` (já confirmado — não usam).
 
-7. **`getSteps()`**: Substituir `pecas_usadas` por `registo_artigos`, `resumo_reparacao`.
-
-8. **`handleSignatureComplete`**: Remover chamada a `saveUsedParts()` (a gravação ocorre em `handleResumoReparacaoConfirm`).
-
-### Sem alterações noutros ficheiros
-
-O Workshop já está correto. A whitelist em `useFlowPersistence.ts` já inclui `registo_artigos` e `resumo_reparacao` para `visita` e `visita_continuacao`. A `service_parts.quantity` já é `numeric`. Print e painel lateral já mostram artigos com valor unitário.
+### Ficheiros afectados
+- `src/components/technician/VisitFlowModals.tsx` — merge defaults na restauração
+- `src/components/technician/WorkshopFlowModals.tsx` — merge defaults na restauração
 
