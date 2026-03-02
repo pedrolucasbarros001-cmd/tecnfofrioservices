@@ -1302,42 +1302,67 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             <div className="space-y-4 py-4">
               <p className="text-sm text-muted-foreground">Registe os artigos/materiais utilizados nesta reparação.</p>
 
-              {(formData.articles as ArticleEntry[]).length > 0 && (
-                <div className="space-y-2">
-                  {(formData.articles as ArticleEntry[]).map((article, idx) => (
-                    <div key={idx} className="p-3 rounded-lg border bg-muted/30 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">Artigo {idx + 1}</span>
-                        {!formData.articlesLocked && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Referência" value={article.reference} onChange={(e) => updateArticle(idx, "reference", e.target.value)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
-                        <Input placeholder="Descrição *" value={article.description} onChange={(e) => updateArticle(idx, "description", e.target.value)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input type="number" step="any" min="0" value={article.quantity} onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Valor (€)</Label>
-                          <Input type="number" step="any" min="0" value={article.unit_price} onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Total</Label>
-                          <div className="h-8 flex items-center text-xs font-medium px-2 bg-muted rounded-md">
-                            {(article.quantity * article.unit_price).toFixed(2)} €
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              {/* Table header */}
+              <div className="rounded-lg border overflow-hidden">
+                <div className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 bg-muted/50 px-3 py-2">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigo</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Descrição</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Qtd</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Valor €</span>
+                  <span></span>
                 </div>
-              )}
+
+                {(formData.articles as ArticleEntry[]).map((article, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 px-3 py-2 border-t items-start">
+                    <Textarea
+                      placeholder="Referência"
+                      value={article.reference}
+                      onChange={(e) => updateArticle(idx, "reference", e.target.value)}
+                      className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
+                      rows={2}
+                      disabled={formData.articlesLocked as boolean}
+                    />
+                    <Textarea
+                      placeholder="Descrição *"
+                      value={article.description}
+                      onChange={(e) => updateArticle(idx, "description", e.target.value)}
+                      className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
+                      rows={2}
+                      disabled={formData.articlesLocked as boolean}
+                    />
+                    <div>
+                      <Input
+                        type="number" step="any" min="0"
+                        value={article.quantity}
+                        onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)}
+                        className="h-8 text-xs"
+                        disabled={formData.articlesLocked as boolean}
+                      />
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block">Unid.</span>
+                    </div>
+                    <Input
+                      type="number" step="any" min="0"
+                      value={article.unit_price}
+                      onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                      className="h-8 text-xs"
+                      disabled={formData.articlesLocked as boolean}
+                    />
+                    <div className="flex items-start pt-1">
+                      {!formData.articlesLocked && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {(formData.articles as ArticleEntry[]).length === 0 && (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-t">
+                    Nenhum artigo adicionado.
+                  </div>
+                )}
+              </div>
 
               {!formData.articlesLocked && (
                 <Button variant="outline" className="w-full" onClick={addArticle}>
