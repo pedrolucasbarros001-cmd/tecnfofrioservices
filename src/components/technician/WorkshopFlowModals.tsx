@@ -169,7 +169,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       } else {
         setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
       }
-      setFormData(savedState.formData);
+      setFormData(prev => ({ ...prev, articles: [], discountValue: "", discountType: "euro" as const, taxRate: 23, articlesLocked: false, ...savedState.formData }));
       return;
     }
 
