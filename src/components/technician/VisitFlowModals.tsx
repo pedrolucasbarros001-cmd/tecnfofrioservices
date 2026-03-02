@@ -360,18 +360,19 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const taxAmount = (articlesSubtotal - discountAmount) * ((formData.taxRate as number) / 100);
   const totalFinal = articlesSubtotal - discountAmount + taxAmount;
 
-  // Save articles to service_parts (idempotent delete+insert)
+   // Save articles to service_parts (idempotent delete+insert)
   const handleConfirmArticles = async () => {
     setIsSubmitting(true);
     try {
       await ensureValidSession();
 
-      // Delete existing non-requested parts for this service, then re-insert
+      // Delete only visit-registered non-requested parts, preserve workshop articles
       await supabase
         .from("service_parts")
         .delete()
         .eq("service_id", service.id)
-        .eq("is_requested", false);
+        .eq("is_requested", false)
+        .eq("registered_location", "visita");
 
       for (const article of (formData.articles as ArticleEntry[])) {
         if (!article.description.trim()) continue;
@@ -384,6 +385,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           is_requested: false,
           arrived: true,
           iva_rate: formData.taxRate as number,
+          registered_by: user?.id || null,
+          registered_location: "visita",
         });
       }
 
