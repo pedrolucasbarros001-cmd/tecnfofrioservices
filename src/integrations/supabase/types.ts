@@ -376,6 +376,8 @@ export type Database = {
           part_code: string | null
           part_name: string
           quantity: number | null
+          registered_by: string | null
+          registered_location: string | null
           service_id: string
           supplier: string | null
         }
@@ -391,6 +393,8 @@ export type Database = {
           part_code?: string | null
           part_name: string
           quantity?: number | null
+          registered_by?: string | null
+          registered_location?: string | null
           service_id: string
           supplier?: string | null
         }
@@ -406,6 +410,8 @@ export type Database = {
           part_code?: string | null
           part_name?: string
           quantity?: number | null
+          registered_by?: string | null
+          registered_location?: string | null
           service_id?: string
           supplier?: string | null
         }

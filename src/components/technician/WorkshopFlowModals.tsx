@@ -120,6 +120,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [previousArticles, setPreviousArticles] = useState<{ reference: string; description: string; quantity: number; unit_price: number; registeredByName: string; registeredLocation: string; created_at: string }[]>([]);
 
   // Transition guard
   const isTransitioning = useRef(false);
@@ -198,6 +199,52 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }).catch(() => setIsResuming(false));
   }, [isOpen, service.id]);
 
+  // Load previous visit articles as read-only
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadPreviousArticles = async () => {
+      try {
+        const { data: parts } = await supabase
+          .from("service_parts")
+          .select("*")
+          .eq("service_id", service.id)
+          .eq("is_requested", false)
+          .eq("registered_location", "visita");
+
+        if (!parts || parts.length === 0) {
+          setPreviousArticles([]);
+          return;
+        }
+
+        // Resolve technician names
+        const uniqueUserIds = [...new Set(parts.map(p => (p as any).registered_by).filter(Boolean))];
+        let nameMap: Record<string, string> = {};
+        if (uniqueUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name")
+            .in("user_id", uniqueUserIds);
+          if (profiles) {
+            profiles.forEach(p => { nameMap[p.user_id] = p.full_name || "Técnico"; });
+          }
+        }
+
+        setPreviousArticles(parts.map(p => ({
+          reference: p.part_code || "",
+          description: p.part_name,
+          quantity: p.quantity || 1,
+          unit_price: p.cost || 0,
+          registeredByName: nameMap[(p as any).registered_by] || "Técnico",
+          registeredLocation: (p as any).registered_location || "visita",
+          created_at: p.created_at,
+        })));
+      } catch (err) {
+        console.warn("Error loading previous articles:", err);
+      }
+    };
+    loadPreviousArticles();
+  }, [isOpen, service.id]);
+
   useEffect(() => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       saveState(currentStep, formData);
@@ -265,27 +312,30 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   };
 
   const articlesSubtotal = formData.articles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const previousArticlesSubtotal = previousArticles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const combinedSubtotal = articlesSubtotal + previousArticlesSubtotal;
 
   const discountAmount = (() => {
     const val = parseFloat(formData.discountValue) || 0;
-    if (formData.discountType === "percent") return articlesSubtotal * (val / 100);
+    if (formData.discountType === "percent") return combinedSubtotal * (val / 100);
     return val;
   })();
 
-  const taxAmount = (articlesSubtotal - discountAmount) * (formData.taxRate / 100);
-  const totalFinal = articlesSubtotal - discountAmount + taxAmount;
+  const taxAmount = (combinedSubtotal - discountAmount) * (formData.taxRate / 100);
+  const totalFinal = combinedSubtotal - discountAmount + taxAmount;
 
   const handleConfirmArticles = async () => {
     setIsSubmitting(true);
     try {
       await ensureValidSession();
 
-      // Delete existing non-requested parts for this service, then re-insert
+      // Delete only workshop-registered non-requested parts, preserve visit articles
       await supabase
         .from("service_parts")
         .delete()
         .eq("service_id", service.id)
-        .eq("is_requested", false);
+        .eq("is_requested", false)
+        .eq("registered_location", "oficina");
 
       for (const article of formData.articles) {
         if (!article.description.trim()) continue;
@@ -298,6 +348,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           is_requested: false,
           arrived: true,
           iva_rate: formData.taxRate,
+          registered_by: user?.id || null,
+          registered_location: "oficina",
         });
       }
 
@@ -791,6 +843,33 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">Registe os artigos utilizados nesta reparação.</p>
 
+                {/* Previous visit articles - read-only */}
+                {previousArticles.length > 0 && (
+                  <div className="rounded-lg border border-dashed border-muted-foreground/30 overflow-hidden opacity-60">
+                    <div className="flex items-center justify-between bg-muted/30 px-3 py-1.5">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigos da Visita</span>
+                      <span className="text-[10px] text-muted-foreground">{previousArticles[0]?.registeredByName}</span>
+                    </div>
+                    <div className="grid grid-cols-[1fr_1.5fr_70px_90px] gap-1 bg-muted/20 px-3 py-1">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Ref.</span>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Descrição</span>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Qtd</span>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Valor €</span>
+                    </div>
+                    {previousArticles.map((article, idx) => (
+                      <div key={`prev-${idx}`} className="grid grid-cols-[1fr_1.5fr_70px_90px] gap-1 px-3 py-1.5 border-t text-xs text-muted-foreground">
+                        <span className="truncate">{article.reference || "-"}</span>
+                        <span className="truncate">{article.description}</span>
+                        <span>{article.quantity}</span>
+                        <span>{article.unit_price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-end px-3 py-1.5 border-t text-xs font-medium text-muted-foreground">
+                      Subtotal: {previousArticlesSubtotal.toFixed(2)} €
+                    </div>
+                  </div>
+                )}
+
                 {/* Table header */}
                 <div className="rounded-lg border overflow-hidden">
                   <div className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 bg-muted/50 px-3 py-2">
@@ -867,9 +946,47 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             <>
               <ModalHeader title="Resumo da Reparação" step="Passo 4" />
               <div className="space-y-4">
-                {formData.articles.length === 0 ? (
+                {/* Previous visit articles - read-only */}
+                {previousArticles.length > 0 && (
+                  <div className="opacity-60">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigos da Visita</span>
+                      <span className="text-[10px] text-muted-foreground">{previousArticles[0]?.registeredByName}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-12 gap-1 text-[10px] font-medium text-muted-foreground uppercase px-2">
+                        <span className="col-span-2">Ref.</span>
+                        <span className="col-span-4">Descrição</span>
+                        <span className="col-span-2 text-center">Qtd</span>
+                        <span className="col-span-2 text-right">Unit.</span>
+                        <span className="col-span-2 text-right">Total</span>
+                      </div>
+                      {previousArticles.map((article, idx) => (
+                        <div key={`prev-${idx}`} className="grid grid-cols-12 gap-1 text-xs px-2 py-1.5 bg-muted/20 rounded">
+                          <span className="col-span-2 truncate">{article.reference || "-"}</span>
+                          <span className="col-span-4 truncate">{article.description}</span>
+                          <span className="col-span-2 text-center">{article.quantity}</span>
+                          <span className="col-span-2 text-right">{article.unit_price.toFixed(2)}</span>
+                          <span className="col-span-2 text-right font-medium">{(article.quantity * article.unit_price).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-end text-xs text-muted-foreground mt-1">
+                      Subtotal visita: {previousArticlesSubtotal.toFixed(2)} €
+                    </div>
+                  </div>
+                )}
+
+                {/* Current workshop articles */}
+                {previousArticles.length > 0 && formData.articles.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigos da Oficina</span>
+                  </div>
+                )}
+
+                {formData.articles.length === 0 && previousArticles.length === 0 ? (
                   <p className="text-sm text-center text-muted-foreground py-4 italic">Nenhum artigo registado.</p>
-                ) : (
+                ) : formData.articles.length > 0 ? (
                   <div className="space-y-1">
                     <div className="grid grid-cols-12 gap-1 text-[10px] font-medium text-muted-foreground uppercase px-2">
                       <span className="col-span-2">Ref.</span>
@@ -888,12 +1005,24 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                       </div>
                     ))}
                   </div>
-                )}
+                ) : null}
 
                 <div className="border-t pt-3 space-y-3">
+                  {previousArticles.length > 0 && (
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Subtotal Visita</span>
+                      <span>{previousArticlesSubtotal.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {formData.articles.length > 0 && (
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Subtotal Oficina</span>
+                      <span>{articlesSubtotal.toFixed(2)} €</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">{articlesSubtotal.toFixed(2)} €</span>
+                    <span className="text-muted-foreground font-medium">Subtotal Geral</span>
+                    <span className="font-medium">{combinedSubtotal.toFixed(2)} €</span>
                   </div>
 
                   {!formData.articlesLocked && (

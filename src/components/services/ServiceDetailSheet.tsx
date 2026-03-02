@@ -237,6 +237,41 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const serviceSignatures = fullData?.signatures || [];
   const activityLogs = activityLogsData || [];
 
+  // Resolve registered_by names for service parts
+  const partRegisteredByIds = [...new Set(serviceParts.map((p: any) => p.registered_by).filter(Boolean))];
+  const { data: partAuthorProfiles } = useQuery({
+    queryKey: ['part-authors', service?.id, partRegisteredByIds.join(',')],
+    queryFn: async () => {
+      if (partRegisteredByIds.length === 0) return [];
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', partRegisteredByIds);
+      return data || [];
+    },
+    enabled: partRegisteredByIds.length > 0 && open,
+  });
+
+  const partAuthorMap: Record<string, string> = {};
+  (partAuthorProfiles || []).forEach((p: any) => { partAuthorMap[p.user_id] = p.full_name || 'Técnico'; });
+
+  // Group parts by registered_location + registered_by
+  const groupedParts = serviceParts.reduce((groups: Record<string, typeof serviceParts>, part: any) => {
+    const loc = part.registered_location || 'oficina';
+    const by = part.registered_by || 'unknown';
+    const key = `${loc}__${by}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(part);
+    return groups;
+  }, {} as Record<string, typeof serviceParts>);
+
+  // Calculate consolidated financials from parts
+  const totalArticlesAmount = serviceParts
+    .filter((p: any) => !p.is_requested)
+    .reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
+
+  const totalPaidAmount = servicePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
   const handleDeletePhoto = async (photoId: string) => {
     try {
       const { error } = await supabase
@@ -563,24 +598,105 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
-              {/* Pricing - Enhanced financial section */}
-              {(service.labor_cost > 0 || service.parts_cost > 0 || service.final_price > 0) && (
+              {/* Artigos / Intervenções - Grouped by technician/location */}
+              {serviceParts.filter((p: any) => !p.is_requested).length > 0 && (
                 <Section
-                  title="Informação Financeira"
+                  title="Artigos / Intervenções"
+                  bgColor="bg-yellow-50"
+                  borderColor="border-l-yellow-500"
+                >
+                  <div className="space-y-3">
+                    {Object.entries(groupedParts).map(([key, parts]: [string, any[]]) => {
+                      const nonRequestedParts = parts.filter((p: any) => !p.is_requested);
+                      if (nonRequestedParts.length === 0) return null;
+                      const [loc, byId] = key.split('__');
+                      const authorName = partAuthorMap[byId] || 'Técnico';
+                      const locationLabel = loc === 'visita' ? 'Visita' : 'Oficina';
+                      const groupSubtotal = nonRequestedParts.reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
+                      const firstDate = nonRequestedParts[0]?.created_at;
+
+                      return (
+                        <div key={key} className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium border-b pb-1">
+                            <MapPin className="h-3 w-3" />
+                            <span>{locationLabel}</span>
+                            <span>•</span>
+                            <User className="h-3 w-3" />
+                            <span>{authorName}</span>
+                            {firstDate && !isNaN(new Date(firstDate).getTime()) && (
+                              <>
+                                <span>•</span>
+                                <span>{format(new Date(firstDate), 'dd/MM/yyyy', { locale: pt })}</span>
+                              </>
+                            )}
+                          </div>
+                          {nonRequestedParts.map((part: any) => {
+                            const lineTotal = (part.cost || 0) * (part.quantity || 1);
+                            return (
+                              <div key={part.id} className="flex items-center justify-between py-1 text-sm">
+                                <div className="flex-1">
+                                  <span className="font-medium">{part.part_name}</span>
+                                  {part.part_code && (
+                                    <span className="text-xs text-muted-foreground ml-1">({part.part_code})</span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground flex gap-2">
+                                  <span>{part.quantity}x</span>
+                                  <span>{(part.cost || 0).toFixed(2)}€</span>
+                                  <span className="font-medium text-foreground">= {lineTotal.toFixed(2)}€</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="flex justify-end text-xs text-muted-foreground pt-1">
+                            Subtotal: {groupSubtotal.toFixed(2)} €
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Peças Pedidas */}
+              {serviceParts.filter((p: any) => p.is_requested).length > 0 && (
+                <Section
+                  title="Peças Pedidas"
+                  bgColor="bg-orange-50"
+                  borderColor="border-l-orange-500"
+                >
+                  <div className="space-y-2">
+                    {serviceParts.filter((p: any) => p.is_requested).map((part: any) => (
+                      <div key={part.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-orange-600" />
+                          <span className="font-medium">{part.part_name}</span>
+                        </div>
+                        <Badge className={part.arrived ? "bg-green-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>
+                          {part.arrived ? 'Chegou' : 'Pedida'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Consolidated Financial Summary */}
+              {(totalArticlesAmount > 0 || service.final_price > 0 || service.labor_cost > 0) && (
+                <Section
+                  title="Resumo Financeiro"
                   bgColor="bg-emerald-50"
                   borderColor="border-l-emerald-500"
                 >
                   <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal Artigos</span>
+                      <span className="font-medium">{totalArticlesAmount.toFixed(2)} €</span>
+                    </div>
                     {service.labor_cost > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Mão de Obra</span>
                         <span className="font-medium">{service.labor_cost.toFixed(2)} €</span>
-                      </div>
-                    )}
-                    {service.parts_cost > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Peças</span>
-                        <span className="font-medium">{service.parts_cost.toFixed(2)} €</span>
                       </div>
                     )}
                     {service.discount > 0 && (
@@ -598,98 +714,18 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                         </div>
                       </>
                     )}
-                    {/* Valor já pago */}
-                    {(service.amount_paid || 0) > 0 && (
+                    {totalPaidAmount > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
-                        <span>Já Pago</span>
-                        <span>{(service.amount_paid || 0).toFixed(2)} €</span>
+                        <span>✅ Já Pago</span>
+                        <span>{totalPaidAmount.toFixed(2)} €</span>
                       </div>
                     )}
-                    {/* Em débito e falta para pagamento */}
-                    {service.final_price > 0 && (service.amount_paid || 0) < service.final_price && (
-                      <>
-                        <div className="flex justify-between text-sm text-red-600 font-medium">
-                          <span>Em Débito</span>
-                          <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-amber-600 font-medium bg-amber-50 p-2 rounded">
-                          <span>Falta para Pagamento Completo</span>
-                          <span>{(service.final_price - (service.amount_paid || 0)).toFixed(2)} €</span>
-                        </div>
-                      </>
+                    {service.final_price > 0 && totalPaidAmount < service.final_price && (
+                      <div className="flex justify-between text-sm font-medium p-2 rounded bg-destructive/10 text-destructive">
+                        <span>🔴 Em Débito</span>
+                        <span>{(service.final_price - totalPaidAmount).toFixed(2)} €</span>
+                      </div>
                     )}
-                  </div>
-                </Section>
-              )}
-
-              {/* History */}
-              <Section
-                title="Histórico"
-                bgColor="bg-gray-50"
-                borderColor="border-l-gray-400"
-              >
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Criado em:</span>
-                    <span>{service.created_at && !isNaN(new Date(service.created_at).getTime()) ? format(new Date(service.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Última atualização:</span>
-                    <span>{service.updated_at && !isNaN(new Date(service.updated_at).getTime()) ? format(new Date(service.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}</span>
-                  </div>
-                </div>
-              </Section>
-
-              {/* Artigos / Peças */}
-              {serviceParts.length > 0 && (
-                <Section
-                  title="Artigos / Peças"
-                  bgColor="bg-yellow-50"
-                  borderColor="border-l-yellow-500"
-                >
-                  <div className="space-y-2">
-                    {serviceParts.map((part) => {
-                      const lineTotal = (part.cost || 0) * (part.quantity || 1);
-                      return (
-                        <div key={part.id} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Package className="h-4 w-4 text-yellow-600" />
-                              <span className="font-medium">{part.part_name}</span>
-                              {part.part_code && (
-                                <span className="text-xs text-muted-foreground">({part.part_code})</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <span>Qtd: {part.quantity}</span>
-                              {part.cost != null && part.cost > 0 && (
-                                <span>• Unit: {part.cost.toFixed(2)} €</span>
-                              )}
-                              {lineTotal > 0 && (
-                                <span>• Total: {lineTotal.toFixed(2)} €</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {part.arrived ? (
-                              <Badge className="bg-green-500 text-white text-xs">Chegou</Badge>
-                            ) : part.is_requested ? (
-                              <Badge className="bg-orange-500 text-white text-xs">Pedida</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">Registada</Badge>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="flex justify-between pt-2 border-t font-medium text-sm">
-                      <span>Total Artigos:</span>
-                      <span className="text-primary">
-                        {serviceParts.reduce((sum, p) => sum + ((p.cost || 0) * (p.quantity || 1)), 0).toFixed(2)} €
-                      </span>
-                    </div>
                   </div>
                 </Section>
               )}
