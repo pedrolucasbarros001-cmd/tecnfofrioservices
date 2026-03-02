@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,11 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPayment } from '@/utils/activityLogUtils';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
+import { useServiceFinancialData } from '@/hooks/useServiceFinancialData';
+import { ServicePartsHistory } from '@/components/shared/ServicePartsHistory';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
@@ -40,33 +50,42 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'mbway', label: 'MB Way' },
 ];
 
+const METHOD_LABELS: Record<string, string> = {
+  dinheiro: 'Dinheiro',
+  multibanco: 'Multibanco',
+  transferencia: 'Transferência',
+  mbway: 'MB Way',
+};
+
 export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPaymentModalProps) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dinheiro');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
-  const amountPaid = service?.amount_paid || 0;
-  const finalPrice = service?.final_price || 0; // 0 means not defined or free
-  const remainingBalance = finalPrice - amountPaid;
+  // Fetch service history data
+  const { groupedParts, historySubtotal, payments, totalPaid, nameMap } = useServiceFinancialData(service?.id, open);
+
+  const finalPrice = service?.final_price || 0;
+  const remainingBalance = finalPrice > 0 ? finalPrice - totalPaid : 0;
 
   useEffect(() => {
     if (service && open) {
-      // Pre-fill with remaining balance when there's a price defined
       setAmount(finalPrice > 0 && remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
       setPaymentMethod('dinheiro');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setDescription('');
+      setDetailsOpen(false);
     }
   }, [service, open, finalPrice, remainingBalance]);
 
   const paymentValue = parseCurrencyInput(amount);
-  // If there's no final price we can't compute a real balance, just show 0
   const newBalance = finalPrice > 0 ? Math.max(0, remainingBalance - paymentValue) : 0;
 
   const handleSubmit = async () => {
@@ -74,7 +93,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
     setIsSubmitting(true);
     try {
-      // Check for duplicate payment (same amount + method within last 2 minutes)
+      // Check for duplicate payment
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const { data: duplicates } = await supabase
         .from('service_payments')
@@ -86,7 +105,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         .limit(1);
 
       if (duplicates && duplicates.length > 0) {
-        toast.warning(`Já existe um pagamento de €${paymentValue.toFixed(2)} (${paymentMethod}) registado nos últimos 2 minutos. Verifique antes de duplicar.`);
+        toast.warning(`Já existe um pagamento de €${paymentValue.toFixed(2)} (${paymentMethod}) registado nos últimos 2 minutos.`);
         setIsSubmitting(false);
         return;
       }
@@ -105,21 +124,17 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       if (paymentError) throw paymentError;
 
       // Update service amount_paid
-      const newAmountPaid = amountPaid + paymentValue;
-
-      // Determine if status should change (only if fully paid)
-      // Use a small epsilon for float comparison safety, though currency should be robust
+      const newAmountPaid = totalPaid + paymentValue;
       const isPaidInFull = newAmountPaid >= (finalPrice - 0.01);
 
       let newStatus: ServiceStatus | undefined;
 
       if (isPaidInFull) {
-        // If paid in full, move to next stage depending on location
         const isWorkshop = service.service_location === 'oficina';
         if (isWorkshop) {
-          newStatus = 'concluidos'; // Ready for delivery/pickup
+          newStatus = 'concluidos';
         } else {
-          newStatus = 'finalizado'; // Done on site
+          newStatus = 'finalizado';
         }
       }
 
@@ -127,10 +142,9 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         id: service.id,
         amount_paid: newAmountPaid,
         ...(newStatus && { status: newStatus }),
-        skipToast: true, // Contextual message below
+        skipToast: true,
       });
 
-      // Log activity
       await logPayment(
         service.code || 'N/A',
         service.id,
@@ -140,8 +154,8 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['service-payments-history'] });
 
-      // Contextual feedback message
       if (newBalance > 0) {
         toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);
       } else {
@@ -162,6 +176,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     setPaymentMethod('dinheiro');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setDescription('');
+    setDetailsOpen(false);
   };
 
   const handleClose = () => {
@@ -171,7 +186,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">
             Registar Pagamento - {service?.code}
@@ -181,7 +196,70 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
           <div className="space-y-4 py-4">
-            {/* Financial Summary Box - only meaningful when price known */}
+            {/* Collapsible Service Details */}
+            {groupedParts.length > 0 && (
+              <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors py-1">
+                  {detailsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  Detalhes do Serviço
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <ServicePartsHistory
+                    groupedParts={groupedParts}
+                    historySubtotal={historySubtotal}
+                  />
+                  {/* Pricing info from service */}
+                  {finalPrice > 0 && (
+                    <div className="mt-2 p-2 bg-muted/30 rounded text-xs space-y-1">
+                      {(service?.discount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Desconto</span>
+                          <span className="text-red-600">-€{(service?.discount || 0).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-semibold text-sm">
+                        <span>TOTAL</span>
+                        <span>€{finalPrice.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Previous Payments */}
+            {payments.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Pagamentos Anteriores
+                </h4>
+                <div className="space-y-1">
+                  {payments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-muted/20 rounded">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span>{p.payment_date ? format(new Date(p.payment_date), 'dd/MM', { locale: pt }) : '—'}</span>
+                        <span>•</span>
+                        <span>{METHOD_LABELS[p.payment_method || ''] || p.payment_method}</span>
+                        {p.received_by && nameMap[p.received_by] && (
+                          <>
+                            <span>•</span>
+                            <span className="text-xs">Recebido: {nameMap[p.received_by]}</span>
+                          </>
+                        )}
+                      </div>
+                      <span className="font-semibold text-green-600">€{p.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-end text-sm pt-1">
+                    <span className="text-muted-foreground mr-2">Total Pago:</span>
+                    <span className="font-semibold text-green-600">€{totalPaid.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Financial Summary Box */}
             <div className="p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
               {finalPrice > 0 ? (
                 <>
@@ -192,7 +270,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Já Pago:</span>
                     <span className="text-green-600 font-semibold">
-                      €{amountPaid.toFixed(2)}
+                      €{totalPaid.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
