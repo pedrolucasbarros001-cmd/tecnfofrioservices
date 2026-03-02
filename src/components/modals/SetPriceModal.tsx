@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Shield, AlertTriangle } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPricingSet } from '@/utils/activityLogUtils';
+import { useServiceFinancialData } from '@/hooks/useServiceFinancialData';
+import { ServicePartsHistory } from '@/components/shared/ServicePartsHistory';
 import { toast } from 'sonner';
 import type { Service, ServiceStatus } from '@/types/database';
 import {
@@ -29,7 +31,7 @@ import {
 } from '@/components/pricing/PriceLineItems';
 import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
 
-// Schema for line items
+// Schema — items can be empty if history exists
 const lineItemSchema = z.object({
   reference: z.string().optional(),
   description: z.string().min(1, 'Descrição é obrigatória'),
@@ -39,7 +41,7 @@ const lineItemSchema = z.object({
 });
 
 const formSchema = z.object({
-  items: z.array(lineItemSchema).min(1, 'Adicione pelo menos um artigo'),
+  items: z.array(lineItemSchema),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -54,6 +56,7 @@ interface PricingData {
   }>;
   discount?: { type: 'euro' | 'percent'; value: number };
   adjustment?: number;
+  historySubtotal?: number;
 }
 
 interface SetPriceModalProps {
@@ -73,6 +76,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
   const isWarrantyService = service?.is_warranty || false;
 
+  // Fetch service history data
+  const { groupedParts, historySubtotal, totalPaid, isLoading: historyLoading } = useServiceFinancialData(service?.id, open);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -83,7 +89,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   // Load existing pricing data when modal opens
   useEffect(() => {
     if (service && open) {
-      // Try to parse existing pricing_description as JSON
       let existingItems: LineItem[] = [];
       let existingDiscount: { type: 'euro' | 'percent'; value: number } | null = null;
       let existingAdjustment = 0;
@@ -107,7 +112,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             existingAdjustment = parsed.adjustment;
           }
         } catch {
-          // If not JSON, create a single line from existing data
           const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
           if (existingPrice > 0 || service.pricing_description) {
             existingItems = [{
@@ -120,7 +124,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           }
         }
       } else {
-        // No pricing_description, check if there's existing price data
         const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
         if (existingPrice > 0) {
           existingItems = [{
@@ -133,14 +136,12 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
         }
       }
 
-      // Set form values
       if (existingItems.length > 0) {
         form.reset({ items: existingItems });
       } else {
         form.reset({ items: [{ ...DEFAULT_LINE_ITEM }] });
       }
 
-      // Set discount
       if (existingDiscount) {
         setDiscountType(existingDiscount.type);
         setDiscountValue(existingDiscount.value.toString());
@@ -152,26 +153,43 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
         setDiscountType('euro');
       }
 
-      // Set adjustment
       setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
-
-      // If warranty service, default to covered
       setWarrantyCoversAll(isWarrantyService);
     }
   }, [service, open, isWarrantyService, form]);
 
   const watchItems = form.watch('items') || [];
-  const { subtotal, totalTax, total } = calculateTotals(watchItems as LineItem[]);
-  const discountAmount = calculateDiscount(subtotal, discountValue, discountType);
+  // Filter out empty additional items for calculation
+  const validAdditionalItems = (watchItems as LineItem[]).filter(
+    item => item.description && item.description.trim() !== ''
+  );
+  const { subtotal: additionalSubtotal, totalTax: additionalTax, total: additionalTotal } = calculateTotals(validAdditionalItems);
+  
+  // Combined subtotal: history + additional
+  const combinedSubtotal = historySubtotal + additionalSubtotal;
+  const combinedTax = additionalTax; // History IVA is already in the parts cost
+  const combinedTotal = historySubtotal + additionalTotal;
+  
+  const discountAmount = calculateDiscount(combinedSubtotal, discountValue, discountType);
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
-  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, total - discountAmount + adjustmentAmount);
+  const finalPrice = warrantyCoversAll ? 0 : Math.max(0, combinedTotal - discountAmount + adjustmentAmount);
+
+  const hasHistory = groupedParts.length > 0;
+  const hasValidAdditionalItems = validAdditionalItems.length > 0;
+  const canSubmit = hasHistory || hasValidAdditionalItems;
 
   const handleSubmit = async (values: FormValues) => {
     if (!service) return;
+    if (!canSubmit) {
+      toast.error('Adicione artigos ou valide o histórico existente.');
+      return;
+    }
 
-    // Prepare pricing description as JSON
+    // Filter out empty items
+    const filteredItems = values.items.filter(item => item.description && item.description.trim() !== '');
+
     const pricingData: PricingData = {
-      items: values.items.map(item => ({
+      items: filteredItems.map(item => ({
         ref: item.reference || '',
         desc: item.description,
         qty: item.quantity,
@@ -180,9 +198,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       })),
       discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
       adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+      historySubtotal: historySubtotal > 0 ? historySubtotal : undefined,
     };
 
-    // Determine new status
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
     const currentStatus = service.status as ServiceStatus;
 
@@ -190,18 +208,16 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
     if (currentStatus === 'a_precificar') {
       if (warrantyCoversAll) {
-        // Warranty: Skip payment flow, go to concluded/finished
         newStatus = isClientLocation ? 'finalizado' : 'concluidos';
       } else {
-        // Not Warranty: Go to Debit for payment collection
         newStatus = 'em_debito';
       }
     }
 
     await updateService.mutateAsync({
       id: service.id,
-      labor_cost: subtotal,
-      parts_cost: totalTax, // Store tax separately for reference
+      labor_cost: combinedSubtotal,
+      parts_cost: combinedTax,
       discount: discountAmount,
       final_price: finalPrice,
       pricing_description: JSON.stringify(pricingData),
@@ -210,7 +226,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       skipToast: true,
     });
 
-    // Log activity
     await logPricingSet(
       service.code || 'N/A',
       service.id,
@@ -219,7 +234,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       profile?.full_name || undefined
     );
 
-    // Contextual feedback message
     if (warrantyCoversAll) {
       toast.success('Garantia aplicada! Serviço sem custo para o cliente.');
     } else {
@@ -282,7 +296,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                   </div>
                 )}
 
-                {/* Warning for warranty not covering */}
                 {isWarrantyService && !warrantyCoversAll && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
@@ -292,18 +305,36 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                   </div>
                 )}
 
-                {/* Line Items Table */}
-                <PriceLineItems
-                  form={form}
-                  fieldName="items"
-                  disabled={warrantyCoversAll}
-                />
+                {/* History Section — read-only */}
+                {!historyLoading && hasHistory && (
+                  <ServicePartsHistory
+                    groupedParts={groupedParts}
+                    historySubtotal={historySubtotal}
+                  />
+                )}
+
+                {/* Additional Line Items Table */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Artigos Adicionais
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    {hasHistory
+                      ? 'Adicione artigos ou ajustes extras. Se não houver nada a adicionar, confirme como está.'
+                      : 'Adicione os artigos para definir o preço do serviço.'}
+                  </p>
+                  <PriceLineItems
+                    form={form}
+                    fieldName="items"
+                    disabled={warrantyCoversAll}
+                  />
+                </div>
 
                 {/* Pricing Summary */}
                 <div className="flex justify-end">
                   <PricingSummary
-                    subtotal={subtotal}
-                    totalTax={totalTax}
+                    subtotal={combinedSubtotal}
+                    totalTax={combinedTax}
                     discountValue={discountValue}
                     discountType={discountType}
                     adjustment={adjustment}
@@ -314,6 +345,27 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                     warrantyCoversAll={warrantyCoversAll}
                   />
                 </div>
+
+                {/* Payment Info */}
+                {totalPaid > 0 && (
+                  <div className="p-3 bg-green-50 border border-green-100 rounded-lg space-y-1">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-1.5 text-green-700">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Já Pago
+                      </span>
+                      <span className="font-semibold text-green-700">€{totalPaid.toFixed(2)}</span>
+                    </div>
+                    {!warrantyCoversAll && finalPrice > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Total a Cobrar</span>
+                        <span className="font-bold text-red-600">
+                          €{Math.max(0, finalPrice - totalPaid).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </ScrollArea>
 
@@ -323,7 +375,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               </Button>
               <Button
                 type="submit"
-                disabled={updateService.isPending}
+                disabled={updateService.isPending || !canSubmit}
                 className={warrantyCoversAll ? 'bg-green-600 hover:bg-green-700' : ''}
               >
                 {updateService.isPending
