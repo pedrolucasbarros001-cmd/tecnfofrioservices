@@ -21,6 +21,7 @@ interface Part {
   part_name: string;
   part_code: string;
   quantity: number;
+  cost: number;
   is_requested: boolean;
   arrived?: boolean;
 }
@@ -84,6 +85,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
       part_name: '',
       part_code: '',
       quantity: 1,
+      cost: 0,
       is_requested: isRequested,
       arrived: false
     }]);
@@ -143,6 +145,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
               part_name: part.part_name,
               part_code: part.part_code,
               quantity: part.quantity,
+              cost: part.cost,
               is_requested: part.is_requested
             })
             .eq('id', part.id);
@@ -158,7 +161,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
               quantity: part.quantity,
               is_requested: part.is_requested,
               arrived: false,
-              cost: 0
+              cost: part.cost
             });
           if (inError) throw inError;
         }
@@ -266,12 +269,24 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
                     <div className="col-span-2 md:col-span-1">
                       <Input
                         type="number"
+                        step="any"
                         value={part.quantity}
-                        onChange={e => updatePart(idx, 'quantity', parseInt(e.target.value) || 1)}
+                        onChange={e => updatePart(idx, 'quantity', parseFloat(e.target.value) || 1)}
                         className="h-8 text-xs px-1 text-center"
+                        placeholder="Qtd"
                       />
                     </div>
-                    <div className="col-span-2 md:col-span-2 flex justify-center">
+                    <div className="col-span-3 md:col-span-2">
+                      <Input
+                        type="number"
+                        step="any"
+                        value={part.cost}
+                        onChange={e => updatePart(idx, 'cost', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-xs"
+                        placeholder="Valor unit. €"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-1 flex justify-center">
                       <Badge variant={part.is_requested ? "subtle-urgent" : "outline"} className="text-[9px] h-5 px-1 uppercase tracking-tighter">
                         {part.is_requested ? "Pedida" : "Usada"}
                       </Badge>

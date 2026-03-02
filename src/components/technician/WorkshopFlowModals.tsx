@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X } from "lucide-react";
+import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +31,6 @@ import { toast } from "sonner";
 import { technicianUpdateService } from "@/utils/technicianRpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
-import { UsedPartsModal, PartEntry } from "@/components/modals/UsedPartsModal";
 
 import { ServicePreviousSummary } from "@/components/technician/ServicePreviousSummary";
 import { DiagnosisPhotosGallery } from "@/components/technician/DiagnosisPhotosGallery";
@@ -40,10 +46,18 @@ type ModalStep =
   | "foto_estado"
   | "produto"
   | "diagnostico"
-  | "pecas_usadas"
+  | "registo_artigos"
+  | "resumo_reparacao"
   | "confirmacao_peca"
   | "pedir_peca"
   | "conclusao";
+
+export interface ArticleEntry {
+  reference: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+}
 
 interface WorkshopFlowModalsProps {
   service: Service;
@@ -56,15 +70,17 @@ interface WorkshopFlowModalsProps {
 interface WorkshopFormData {
   detectedFault: string;
   workPerformed: string;
-  usedParts: boolean;
-  usedPartsList: PartEntry[];
+  articles: ArticleEntry[];
+  discountValue: string;
+  discountType: "euro" | "percent";
+  taxRate: number;
+  articlesLocked: boolean;
   needsPartOrder: boolean;
   partToOrder: string;
   partNotes: string;
   photoAparelho: string | null;
   photoEtiqueta: string | null;
   photosEstado: string[];
-  // Product info
   productBrand: string;
   productModel: string;
   productSerial: string;
@@ -82,8 +98,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const [formData, setFormData] = useState<WorkshopFormData>({
     detectedFault: "",
     workPerformed: "",
-    usedParts: false,
-    usedPartsList: [],
+    articles: [],
+    discountValue: "",
+    discountType: "euro",
+    taxRate: 23,
+    articlesLocked: false,
     needsPartOrder: false,
     partToOrder: "",
     partNotes: "",
@@ -101,20 +120,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [showPartsModal, setShowPartsModal] = useState(false);
 
-  // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
+  // Transition guard
   const isTransitioning = useRef(false);
 
   const safeSetStep = (step: ModalStep) => {
-    // Validate step belongs to this flow — fallback to resumo if invalid
     if (!isValidStepForFlow(step, persistenceKey as any)) {
       console.warn(`[WorkshopFlow] Invalid step "${step}" for flow "${persistenceKey}", falling back to resumo`);
       step = (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") as ModalStep;
     }
     isTransitioning.current = true;
     setCurrentStep(step);
-    // Use 350ms to safely cover Dialog unmount/mount animation cycles
     setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
@@ -124,21 +140,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     handleClose();
   };
 
-  // Flow persistence with mode support
   const persistenceKey = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
   const { loadState, saveState, saveStateToDb, flushStateToDb, clearState } = useFlowPersistence<WorkshopFormData>(service.id, persistenceKey);
 
-  // Check if service has previous execution history (visit, forced state, etc.)
   const hasPreviousHistory = !!(
     service.detected_fault ||
     service.work_performed ||
     service.last_status_before_part_request
   );
 
-  // Stable initialization ref — prevents re-running on service object reference changes
   const hasInitialized = useRef(false);
 
-  // Load saved state or pre-fill from service
   useEffect(() => {
     if (!isOpen) {
       hasInitialized.current = false;
@@ -152,11 +164,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     const savedState = loadState();
     if (savedState) {
       const savedStep = savedState.currentStep as ModalStep;
-      // Validate saved step belongs to this flow
       if (isValidStepForFlow(savedStep, persistenceKey as any)) {
         setCurrentStep(savedStep);
       } else {
-        console.warn(`[WorkshopFlow] Saved step "${savedStep}" invalid for flow "${persistenceKey}", using resumo`);
         setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
       }
       setFormData(savedState.formData);
@@ -164,19 +174,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }
 
     setIsResuming(true);
-    // No localStorage → derive step from DB (handles phone restart)
     const persistenceFlowType = mode === "continuacao_peca" ? "oficina_continuacao" : "oficina";
     deriveStepFromDb(service.id, persistenceFlowType, service as unknown as Record<string, unknown>).then(({ step, formDataOverrides }) => {
-      // If the service has no in-progress data yet, start from resumo
       let resumeStep = step === 'resumo' ? (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") : step;
-      // Validate derived step
       if (!isValidStepForFlow(resumeStep, persistenceKey as any)) {
-        console.warn(`[WorkshopFlow] Derived step "${resumeStep}" invalid for flow "${persistenceKey}", using resumo`);
         resumeStep = mode === "continuacao_peca" ? "resumo_continuacao" : "resumo";
       }
       setDerivedResumeStep(resumeStep as ModalStep);
-
-      // We still want to show Resumo first, but we remember where to jump
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
 
       setFormData((prev) => ({
@@ -194,7 +198,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }).catch(() => setIsResuming(false));
   }, [isOpen, service.id]);
 
-  // Save state on changes
   useEffect(() => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       saveState(currentStep, formData);
@@ -212,14 +215,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         return;
       }
 
-      // Usa RPC SECURITY DEFINER: atribui o técnico se necessário e
-      // muda para em_execucao sem erro de RLS
       const { error: rpcError } = await (supabase.rpc as any)('start_workshop_service', {
         _service_id: service.id,
       });
       if (rpcError) throw rpcError;
 
-      // Log activity (background)
       logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => { });
 
       queryClient.invalidateQueries({ queryKey: ["services"] });
@@ -242,29 +242,73 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }
   };
 
-  const handlePartsConfirm = async (parts: PartEntry[]) => {
+  // --- Articles helpers ---
+  const addArticle = () => {
+    setFormData(prev => ({
+      ...prev,
+      articles: [...prev.articles, { reference: "", description: "", quantity: 1, unit_price: 0 }],
+    }));
+  };
+
+  const updateArticle = (index: number, field: keyof ArticleEntry, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: prev.articles.map((a, i) => i === index ? { ...a, [field]: value } : a),
+    }));
+  };
+
+  const removeArticle = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: prev.articles.filter((_, i) => i !== index),
+    }));
+  };
+
+  const articlesSubtotal = formData.articles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+
+  const discountAmount = (() => {
+    const val = parseFloat(formData.discountValue) || 0;
+    if (formData.discountType === "percent") return articlesSubtotal * (val / 100);
+    return val;
+  })();
+
+  const taxAmount = (articlesSubtotal - discountAmount) * (formData.taxRate / 100);
+  const totalFinal = articlesSubtotal - discountAmount + taxAmount;
+
+  const handleConfirmArticles = async () => {
+    setIsSubmitting(true);
     try {
       await ensureValidSession();
-      // Save parts to database
-      for (const part of parts) {
+
+      // Delete existing non-requested parts for this service, then re-insert
+      await supabase
+        .from("service_parts")
+        .delete()
+        .eq("service_id", service.id)
+        .eq("is_requested", false);
+
+      for (const article of formData.articles) {
+        if (!article.description.trim()) continue;
         await supabase.from("service_parts").insert({
           service_id: service.id,
-          part_name: part.name,
-          part_code: part.reference || null,
-          quantity: part.quantity,
+          part_name: article.description,
+          part_code: article.reference || null,
+          quantity: article.quantity,
+          cost: article.unit_price,
           is_requested: false,
           arrived: true,
-          cost: 0,
+          iva_rate: formData.taxRate,
         });
       }
 
-      setFormData((prev) => ({ ...prev, usedPartsList: parts }));
-      setShowPartsModal(false);
+      setFormData(prev => ({ ...prev, articlesLocked: true }));
       queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
-      toast.success("Peças registadas!");
+      toast.success("Artigos registados e confirmados!");
     } catch (error) {
-      console.error("Error confirming parts:", error);
+      console.error("Error saving articles:", error);
       toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -278,7 +322,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
-      // Save the part request
       await supabase.from("service_parts").insert({
         service_id: service.id,
         part_name: formData.partToOrder.trim(),
@@ -289,7 +332,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         cost: 0,
       });
 
-      // Update service status via RPC (bypassa RLS)
       const { error: rpcError } = await technicianUpdateService({
         serviceId: service.id,
         status: 'para_pedir_peca',
@@ -299,7 +341,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
-      // Log activity
       await logPartRequest(
         service.code || "N/A",
         service.id,
@@ -335,7 +376,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
-      // Update service to concluidos + pending_pricing via RPC (bypassa RLS)
       const { error: rpcError } = await technicianUpdateService({
         serviceId: service.id,
         status: 'concluidos',
@@ -345,12 +385,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
-      // Clear continuation flag separately
       if (mode === "continuacao_peca") {
         await supabase.from("services").update({ last_status_before_part_request: null }).eq("id", service.id);
       }
 
-      // Log activity
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
       clearState();
@@ -366,7 +404,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   };
 
   const handleClose = () => {
-    // Flush current state to DB immediately before closing
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       flushStateToDb(currentStep, formData);
     }
@@ -374,8 +411,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     setFormData({
       detectedFault: "",
       workPerformed: "",
-      usedParts: false,
-      usedPartsList: [],
+      articles: [],
+      discountValue: "",
+      discountType: "euro",
+      taxRate: 23,
+      articlesLocked: false,
       needsPartOrder: false,
       partToOrder: "",
       partNotes: "",
@@ -415,7 +455,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     steps = ["resumo_continuacao", "confirmacao_peca", "conclusao"];
   } else {
     steps = hasPreviousHistory
-      ? ["resumo", needsProductStep ? "produto" : null, "diagnostico", "pecas_usadas", "pedir_peca", "conclusao"].filter(Boolean) as ModalStep[]
+      ? ["resumo", needsProductStep ? "produto" : null, "diagnostico", "registo_artigos", "resumo_reparacao", "pedir_peca", "conclusao"].filter(Boolean) as ModalStep[]
       : [
         "resumo",
         "foto_aparelho",
@@ -423,7 +463,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         "foto_estado",
         needsProductStep ? "produto" : null,
         "diagnostico",
-        "pecas_usadas",
+        "registo_artigos",
+        "resumo_reparacao",
         "pedir_peca",
         "conclusao",
       ].filter(Boolean) as ModalStep[];
@@ -469,7 +510,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   return (
     <>
       <Dialog
-        open={isOpen && !showCamera && !showPartsModal}
+        open={isOpen && !showCamera}
         onOpenChange={(open) => !open && handleClose()}
       >
         <DialogContent
@@ -565,19 +606,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 </div>
                 {formData.photoAparelho && formData.photoAparelho !== '__photo_exists__' ? (
                   <div className="relative">
-                    <img
-                      src={formData.photoAparelho}
-                      alt="Foto do aparelho"
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="absolute bottom-2 right-2"
-                      onClick={() => setShowCamera(true)}
-                    >
-                      Nova Foto
-                    </Button>
+                    <img src={formData.photoAparelho} alt="Foto do aparelho" className="w-full h-48 object-cover rounded-lg" />
+                    <Button variant="secondary" size="sm" className="absolute bottom-2 right-2" onClick={() => setShowCamera(true)}>Nova Foto</Button>
                   </div>
                 ) : formData.photoAparelho === '__photo_exists__' ? (
                   <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
@@ -596,11 +626,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("resumo")}>
                   <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
-                <Button
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  onClick={() => safeSetStep("foto_etiqueta")}
-                  disabled={!formData.photoAparelho}
-                >
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("foto_etiqueta")} disabled={!formData.photoAparelho}>
                   Continuar <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </DialogFooter>
@@ -619,19 +645,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 </div>
                 {formData.photoEtiqueta && formData.photoEtiqueta !== '__photo_exists__' ? (
                   <div className="relative">
-                    <img
-                      src={formData.photoEtiqueta}
-                      alt="Foto da etiqueta"
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="absolute bottom-2 right-2"
-                      onClick={() => setShowCamera(true)}
-                    >
-                      Nova Foto
-                    </Button>
+                    <img src={formData.photoEtiqueta} alt="Foto da etiqueta" className="w-full h-48 object-cover rounded-lg" />
+                    <Button variant="secondary" size="sm" className="absolute bottom-2 right-2" onClick={() => setShowCamera(true)}>Nova Foto</Button>
                   </div>
                 ) : formData.photoEtiqueta === '__photo_exists__' ? (
                   <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
@@ -650,11 +665,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 <Button variant="outline" className="flex-1" onClick={() => safeSetStep("foto_aparelho")}>
                   <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
-                <Button
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  onClick={() => safeSetStep("foto_estado")}
-                  disabled={!formData.photoEtiqueta}
-                >
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("foto_estado")} disabled={!formData.photoEtiqueta}>
                   Continuar <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </DialogFooter>
@@ -683,11 +694,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                     </div>
                   )}
                   {formData.photosEstado.filter(p => p !== '__photo_exists__').length < 3 && (
-                    <Button
-                      variant="outline"
-                      className="aspect-square flex-col gap-2 p-0"
-                      onClick={() => setShowCamera(true)}
-                    >
+                    <Button variant="outline" className="aspect-square flex-col gap-2 p-0" onClick={() => setShowCamera(true)}>
                       <Plus className="h-6 w-6 text-muted-foreground" />
                       <span className="text-[10px]">Adicionar</span>
                     </Button>
@@ -698,11 +705,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 <Button variant="outline" className="flex-1" onClick={() => safeSetStep("foto_etiqueta")}>
                   <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
-                <Button
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  onClick={() => safeSetStep(needsProductStep ? "produto" : "diagnostico")}
-                  disabled={formData.photosEstado.length === 0}
-                >
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep(needsProductStep ? "produto" : "diagnostico")} disabled={formData.photosEstado.length === 0}>
                   Continuar <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </DialogFooter>
@@ -716,56 +719,26 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="ws_prod_type" className="text-sm">Tipo de Aparelho</Label>
-                  <Input
-                    id="ws_prod_type"
-                    placeholder="Ex: Máquina de Lavar, Frigorífico..."
-                    value={formData.productType as string}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
-                    className="mt-1"
-                  />
+                  <Input id="ws_prod_type" placeholder="Ex: Máquina de Lavar, Frigorífico..." value={formData.productType as string} onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))} className="mt-1" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="ws_prod_brand" className="text-sm">Marca</Label>
-                    <Input
-                      id="ws_prod_brand"
-                      placeholder="Ex: Bosch, LG..."
-                      value={formData.productBrand as string}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
-                      className="mt-1"
-                    />
+                    <Input id="ws_prod_brand" placeholder="Ex: Bosch, LG..." value={formData.productBrand as string} onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))} className="mt-1" />
                   </div>
                   <div>
                     <Label htmlFor="ws_prod_model" className="text-sm">Modelo</Label>
-                    <Input
-                      id="ws_prod_model"
-                      placeholder="Ex: WAT24469ES"
-                      value={formData.productModel as string}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
-                      className="mt-1"
-                    />
+                    <Input id="ws_prod_model" placeholder="Ex: WAT24469ES" value={formData.productModel as string} onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))} className="mt-1" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="ws_prod_serial" className="text-sm">Nº de Série</Label>
-                    <Input
-                      id="ws_prod_serial"
-                      placeholder="Número de série"
-                      value={formData.productSerial as string}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
-                      className="mt-1"
-                    />
+                    <Input id="ws_prod_serial" placeholder="Número de série" value={formData.productSerial as string} onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))} className="mt-1" />
                   </div>
                   <div>
                     <Label htmlFor="ws_prod_pnc" className="text-sm">PNC</Label>
-                    <Input
-                      id="ws_prod_pnc"
-                      placeholder="Product Number Code"
-                      value={formData.productPNC as string}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
-                      className="mt-1"
-                    />
+                    <Input id="ws_prod_pnc" placeholder="Product Number Code" value={formData.productPNC as string} onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))} className="mt-1" />
                   </div>
                 </div>
               </div>
@@ -790,14 +763,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                     <FileText className="h-4 w-4" />
                     Diagnóstico complementar <span className="text-muted-foreground text-xs">(opcional)</span>
                   </Label>
-                  <Textarea
-                    id="detected_fault"
-                    placeholder="Adicione detalhes ao diagnóstico..."
-                    value={formData.detectedFault}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, detectedFault: e.target.value }))}
-                    rows={3}
-                    className="mt-1.5 text-sm"
-                  />
+                  <Textarea id="detected_fault" placeholder="Adicione detalhes ao diagnóstico..." value={formData.detectedFault} onChange={(e) => setFormData((prev) => ({ ...prev, detectedFault: e.target.value }))} rows={3} className="mt-1.5 text-sm" />
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setShowCamera(true)}>
                   <Camera className="h-4 w-4 mr-1" />
@@ -805,77 +771,182 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 </Button>
               </div>
               <DialogFooter className="flex gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    if (!hasPreviousHistory) safeSetStep("foto_estado");
-                    else safeSetStep("resumo");
-                  }}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => {
+                  if (!hasPreviousHistory) safeSetStep("foto_estado");
+                  else safeSetStep("resumo");
+                }}>
                   <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
-                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pecas_usadas")}>
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("registo_artigos")}>
                   Continuar <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </DialogFooter>
             </>
           )}
 
-          {/* Step: Peças Usadas */}
-          {currentStep === "pecas_usadas" && (
+          {/* Step: Registo de Artigos */}
+          {currentStep === "registo_artigos" && (
             <>
-              <ModalHeader title="Peças Usadas" step="Passo 3" />
+              <ModalHeader title="Registo de Artigos do Serviço" step="Passo 3" />
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">Foi necessário usar peças nesta reparação?</p>
-                <RadioGroup
-                  value={formData.usedParts ? "sim" : "nao"}
-                  onValueChange={(val) => setFormData((prev) => ({ ...prev, usedParts: val === "sim" }))}
-                  className="flex gap-4"
-                >
-                  <label htmlFor="usedParts_nao" className={cn("flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer", !formData.usedParts ? "border-orange-500 bg-orange-50" : "border-muted")}>
-                    <RadioGroupItem value="nao" id="usedParts_nao" />
-                    <span className="font-medium text-sm">Não</span>
-                  </label>
-                  <label htmlFor="usedParts_sim" className={cn("flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer", formData.usedParts ? "border-orange-500 bg-orange-50" : "border-muted")}>
-                    <RadioGroupItem value="sim" id="usedParts_sim" />
-                    <span className="font-medium text-sm">Sim</span>
-                  </label>
-                </RadioGroup>
+                <p className="text-sm text-muted-foreground">Registe os artigos utilizados nesta reparação.</p>
 
-                {formData.usedParts && (
+                {formData.articles.length > 0 && (
                   <div className="space-y-2">
-                    {formData.usedPartsList.length > 0 && (
-                      <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                        {formData.usedPartsList.map((p, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span>{p.name}</span>
-                            <span className="text-muted-foreground">x{p.quantity}</span>
+                    {formData.articles.map((article, idx) => (
+                      <div key={idx} className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">Artigo {idx + 1}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="Referência" value={article.reference} onChange={(e) => updateArticle(idx, "reference", e.target.value)} className="h-8 text-xs" />
+                          <Input placeholder="Descrição *" value={article.description} onChange={(e) => updateArticle(idx, "description", e.target.value)} className="h-8 text-xs" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                            <Input type="number" step="any" min="0" value={article.quantity} onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
                           </div>
-                        ))}
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Valor (€)</Label>
+                            <Input type="number" step="any" min="0" value={article.unit_price} onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Total</Label>
+                            <div className="h-8 flex items-center text-xs font-medium px-2 bg-muted rounded-md">
+                              {(article.quantity * article.unit_price).toFixed(2)} €
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <Button variant="outline" className="w-full" onClick={() => setShowPartsModal(true)}>
-                      <Package className="h-4 w-4 mr-1" />
-                      {formData.usedPartsList.length > 0 ? "Editar Peças" : "Registar Peças"}
-                    </Button>
+                    ))}
+                  </div>
+                )}
+
+                <Button variant="outline" className="w-full" onClick={addArticle}>
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar Artigo
+                </Button>
+              </div>
+              <DialogFooter className="flex gap-2 mt-4">
+                <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+                </Button>
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("resumo_reparacao")}>
+                  Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* Step: Resumo da Reparação */}
+          {currentStep === "resumo_reparacao" && (
+            <>
+              <ModalHeader title="Resumo da Reparação" step="Passo 4" />
+              <div className="space-y-4">
+                {formData.articles.length === 0 ? (
+                  <p className="text-sm text-center text-muted-foreground py-4 italic">Nenhum artigo registado.</p>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="grid grid-cols-12 gap-1 text-[10px] font-medium text-muted-foreground uppercase px-2">
+                      <span className="col-span-2">Ref.</span>
+                      <span className="col-span-4">Descrição</span>
+                      <span className="col-span-2 text-center">Qtd</span>
+                      <span className="col-span-2 text-right">Unit.</span>
+                      <span className="col-span-2 text-right">Total</span>
+                    </div>
+                    {formData.articles.map((article, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-1 text-xs px-2 py-1.5 bg-muted/30 rounded">
+                        <span className="col-span-2 truncate">{article.reference || "-"}</span>
+                        <span className="col-span-4 truncate">{article.description}</span>
+                        <span className="col-span-2 text-center">{article.quantity}</span>
+                        <span className="col-span-2 text-right">{article.unit_price.toFixed(2)}</span>
+                        <span className="col-span-2 text-right font-medium">{(article.quantity * article.unit_price).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t pt-3 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-medium">{articlesSubtotal.toFixed(2)} €</span>
+                  </div>
+
+                  {!formData.articlesLocked && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs whitespace-nowrap">Desconto</Label>
+                        <Input type="number" step="any" min="0" value={formData.discountValue} onChange={(e) => setFormData(prev => ({ ...prev, discountValue: e.target.value }))} className="h-8 text-xs flex-1" placeholder="0" />
+                        <Select value={formData.discountType} onValueChange={(v) => setFormData(prev => ({ ...prev, discountType: v as "euro" | "percent" }))}>
+                          <SelectTrigger className="h-8 w-16 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="euro">€</SelectItem>
+                            <SelectItem value="percent">%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs whitespace-nowrap">IVA</Label>
+                        <Select value={String(formData.taxRate)} onValueChange={(v) => setFormData(prev => ({ ...prev, taxRate: parseInt(v) }))}>
+                          <SelectTrigger className="h-8 text-xs flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0%</SelectItem>
+                            <SelectItem value="6">6%</SelectItem>
+                            <SelectItem value="13">13%</SelectItem>
+                            <SelectItem value="23">23%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Desconto</span>
+                      <span>-{discountAmount.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">IVA ({formData.taxRate}%)</span>
+                      <span>{taxAmount.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-base font-bold border-t pt-2">
+                    <span>Total Final</span>
+                    <span>{totalFinal.toFixed(2)} €</span>
+                  </div>
+                </div>
+
+                {formData.articlesLocked && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="text-sm text-green-700 font-medium">Artigos confirmados e guardados</span>
                   </div>
                 )}
               </div>
+
               <DialogFooter className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
-                <Button
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  onClick={() => {
-                    if (formData.usedParts && formData.usedPartsList.length === 0) {
-                      toast.error("Registe pelo menos uma peça.");
-                      return;
-                    }
-                    safeSetStep("pedir_peca");
-                  }}
-                >
-                  Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")} disabled={formData.articlesLocked}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
+                {!formData.articlesLocked ? (
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar e Guardar
+                  </Button>
+                ) : (
+                  <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pedir_peca")}>
+                    Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}
@@ -883,7 +954,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           {/* Step: Pedir Peça */}
           {currentStep === "pedir_peca" && (
             <>
-              <ModalHeader title="Pedir Peça?" step="Passo 4" />
+              <ModalHeader title="Pedir Peça?" step="Passo 5" />
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">É necessário pedir alguma peça?</p>
                 <RadioGroup value={formData.needsPartOrder ? "sim" : "nao"} onValueChange={(val) => setFormData((prev) => ({ ...prev, needsPartOrder: val === "sim" }))} className="flex gap-4">
@@ -905,7 +976,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 )}
               </div>
               <DialogFooter className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pecas_usadas")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
+                <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo_reparacao")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
                 {formData.needsPartOrder ? (
                   <Button className="flex-1 bg-yellow-500 text-black" onClick={handleRequestPart} disabled={isSubmitting || !formData.partToOrder.trim()}>Solicitar Peça</Button>
                 ) : (
@@ -918,7 +989,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           {/* Step: Conclusão */}
           {currentStep === "conclusao" && (
             <>
-              <ModalHeader title="Conclusão" step="Passo 5" />
+              <ModalHeader title="Conclusão" step="Passo 6" />
               <div className="space-y-4">
                 <Label htmlFor="work_performed" className="text-sm flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Resumo da reparação *
@@ -961,7 +1032,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
             await ensureValidSession();
 
-            // Usa a função centralizada de upload (da versão HEAD do repositório)
             const { uploadServicePhoto } = await import('@/utils/photoUpload');
             const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, `Foto de ${photoType} na oficina`);
 
@@ -978,14 +1048,6 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           }
         }}
         title="Capturar Foto"
-      />
-
-      <UsedPartsModal
-        open={showPartsModal}
-        onOpenChange={setShowPartsModal}
-        onConfirm={handlePartsConfirm}
-        title="Registar Peças"
-        initialParts={formData.usedPartsList.length > 0 ? formData.usedPartsList : undefined}
       />
     </>
   );

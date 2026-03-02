@@ -35,9 +35,9 @@ export interface DbResumeResult {
  * where an invalid step causes no Dialog to match and the modal appears to close.
  */
 const VALID_STEPS_BY_FLOW: Record<string, string[]> = {
-  visita: ['resumo', 'deslocacao', 'foto', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'decisao', 'pecas_usadas', 'pedir_peca'],
-  visita_continuacao: ['resumo_continuacao', 'confirmacao_peca', 'decisao', 'pecas_usadas', 'pedir_peca'],
-  oficina: ['resumo', 'iniciar', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'pecas_usadas', 'pedir_peca', 'conclusao'],
+  visita: ['resumo', 'deslocacao', 'foto', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'decisao', 'registo_artigos', 'resumo_reparacao', 'pecas_usadas', 'pedir_peca'],
+  visita_continuacao: ['resumo_continuacao', 'confirmacao_peca', 'decisao', 'registo_artigos', 'resumo_reparacao', 'pecas_usadas', 'pedir_peca'],
+  oficina: ['resumo', 'iniciar', 'foto_aparelho', 'foto_etiqueta', 'foto_estado', 'produto', 'diagnostico', 'registo_artigos', 'resumo_reparacao', 'pedir_peca', 'conclusao'],
   oficina_continuacao: ['resumo_continuacao', 'confirmacao_peca', 'conclusao'],
   instalacao: ['resumo', 'deslocacao', 'foto_antes', 'materiais', 'trabalho', 'foto_depois', 'finalizacao'],
   entrega: ['resumo', 'deslocacao', 'foto', 'finalizacao'],
@@ -179,7 +179,7 @@ async function _deriveStepFromDbImpl(
 
       if (!detectedFault) return { step: 'diagnostico', formDataOverrides };
       if (hasRequestedPart) return { step: 'conclusao', formDataOverrides };
-      if (!workPerformed) return { step: 'pecas_usadas', formDataOverrides };
+      if (!workPerformed) return { step: 'registo_artigos', formDataOverrides };
       return { step: 'conclusao', formDataOverrides };
     }
 
