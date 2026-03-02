@@ -12,6 +12,7 @@ import {
   Truck,
   X,
   Plus,
+  Trash2,
   Tag,
   ClipboardList,
 } from "lucide-react";
@@ -28,6 +29,13 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useUpdateService } from "@/hooks/useServices";
@@ -44,6 +52,7 @@ import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
 import { FieldPaymentStep } from "@/components/technician/FieldPaymentStep";
 import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from "@/hooks/useFlowPersistence";
 import type { Service, PhotoType } from "@/types/database";
+import type { ArticleEntry } from "@/components/technician/WorkshopFlowModals";
 
 // Steps for repair services (reparacao)
 type RepairModalStep =
@@ -56,22 +65,17 @@ type RepairModalStep =
   | "produto"
   | "diagnostico"
   | "decisao"
-  | "pecas_usadas"
+  | "registo_artigos"
   | "pedir_peca"
+  | "resumo_reparacao"
   | "confirmacao_peca";
 
 // Steps for other services (original flow)
-type OtherModalStep = "resumo" | "resumo_continuacao" | "deslocacao" | "foto" | "produto" | "diagnostico" | "decisao" | "pecas_usadas" | "pedir_peca" | "confirmacao_peca";
+type OtherModalStep = "resumo" | "resumo_continuacao" | "deslocacao" | "foto" | "produto" | "diagnostico" | "decisao" | "registo_artigos" | "pedir_peca" | "resumo_reparacao" | "confirmacao_peca";
 
 type ModalStep = RepairModalStep | OtherModalStep;
 type DecisionType = "reparar_local" | "levantar_oficina";
 type SignatureType = "conclusao" | "recolha" | "pedido_peca";
-
-interface PartEntry {
-  name: string;
-  reference: string;
-  quantity: number;
-}
 
 interface VisitFlowModalsProps {
   service: Service;
@@ -90,8 +94,12 @@ interface VisitFormData {
   photoEtiqueta: string | null;
   photosEstado: string[];
   decision: DecisionType;
-  usedParts: boolean;
-  usedPartsList: PartEntry[];
+  // Articles (replaces usedParts)
+  articles: ArticleEntry[];
+  discountValue: string;
+  discountType: 'euro' | 'percent';
+  taxRate: number;
+  articlesLocked: boolean;
   needsPartOrder: boolean;
   partToOrder: {
     name: string;
@@ -107,29 +115,34 @@ interface VisitFormData {
   [key: string]: unknown;
 }
 
+const INITIAL_FORM_DATA: VisitFormData = {
+  detectedFault: "",
+  photoFile: null,
+  photoAparelho: null,
+  photoEtiqueta: null,
+  photosEstado: [],
+  decision: "reparar_local",
+  articles: [],
+  discountValue: "",
+  discountType: "euro",
+  taxRate: 23,
+  articlesLocked: false,
+  needsPartOrder: false,
+  partToOrder: { name: "", reference: "" },
+  productBrand: "",
+  productModel: "",
+  productSerial: "",
+  productPNC: "",
+  productType: "",
+  partInstalled: false,
+};
+
 export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "normal" }: VisitFlowModalsProps) {
   const updateService = useUpdateService();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<ModalStep>("resumo");
-  const [formData, setFormData] = useState<VisitFormData>({
-    detectedFault: "",
-    photoFile: null,
-    photoAparelho: null,
-    photoEtiqueta: null,
-    photosEstado: [],
-    decision: "reparar_local",
-    usedParts: false,
-    usedPartsList: [{ name: "", reference: "", quantity: 1 }],
-    needsPartOrder: false,
-    partToOrder: { name: "", reference: "" },
-    productBrand: "",
-    productModel: "",
-    productSerial: "",
-    productPNC: "",
-    productType: "",
-    partInstalled: false,
-  });
+  const [formData, setFormData] = useState<VisitFormData>({ ...INITIAL_FORM_DATA });
   const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -313,35 +326,74 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setShowCamera(true);
   };
 
-  // Save used parts to database (idempotent — skips insert if part already exists)
-  const saveUsedParts = async () => {
-    if (!formData.usedParts) return;
+  // --- Articles helpers (same pattern as Workshop) ---
+  const addArticle = () => {
+    setFormData(prev => ({
+      ...prev,
+      articles: [...(prev.articles as ArticleEntry[]), { reference: "", description: "", quantity: 1, unit_price: 0 }],
+    }));
+  };
 
-    await ensureValidSession();
+  const updateArticle = (index: number, field: keyof ArticleEntry, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: (prev.articles as ArticleEntry[]).map((a, i) => i === index ? { ...a, [field]: value } : a),
+    }));
+  };
 
-    // Fetch parts already saved for this service (used parts, not requested)
-    const { data: existingParts, error: fetchError } = await supabase
-      .from("service_parts")
-      .select("part_name")
-      .eq("service_id", service.id)
-      .eq("is_requested", false);
+  const removeArticle = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      articles: (prev.articles as ArticleEntry[]).filter((_, i) => i !== index),
+    }));
+  };
 
-    if (fetchError) throw fetchError;
+  const articlesSubtotal = (formData.articles as ArticleEntry[]).reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
 
-    const existingNames = new Set((existingParts || []).map((p: any) => p.part_name?.toLowerCase().trim()));
+  const discountAmount = (() => {
+    const val = parseFloat(formData.discountValue as string) || 0;
+    if (formData.discountType === "percent") return articlesSubtotal * (val / 100);
+    return val;
+  })();
 
-    for (const part of formData.usedPartsList) {
-      if (part.name.trim() && !existingNames.has(part.name.toLowerCase().trim())) {
+  const taxAmount = (articlesSubtotal - discountAmount) * ((formData.taxRate as number) / 100);
+  const totalFinal = articlesSubtotal - discountAmount + taxAmount;
+
+  // Save articles to service_parts (idempotent delete+insert)
+  const handleConfirmArticles = async () => {
+    setIsSubmitting(true);
+    try {
+      await ensureValidSession();
+
+      // Delete existing non-requested parts for this service, then re-insert
+      await supabase
+        .from("service_parts")
+        .delete()
+        .eq("service_id", service.id)
+        .eq("is_requested", false);
+
+      for (const article of (formData.articles as ArticleEntry[])) {
+        if (!article.description.trim()) continue;
         await supabase.from("service_parts").insert({
           service_id: service.id,
-          part_name: part.name.trim(),
-          part_code: part.reference.trim() || null,
-          quantity: part.quantity,
+          part_name: article.description,
+          part_code: article.reference || null,
+          quantity: article.quantity,
+          cost: article.unit_price,
           is_requested: false,
           arrived: true,
-          cost: 0,
+          iva_rate: formData.taxRate as number,
         });
       }
+
+      setFormData(prev => ({ ...prev, articlesLocked: true }));
+      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      toast.success("Artigos registados e confirmados!");
+    } catch (error) {
+      console.error("Error saving articles:", error);
+      toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -349,8 +401,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setIsSubmitting(true);
     try {
       await ensureValidSession();
-      // Save used parts if any (idempotent)
-      await saveUsedParts();
 
       if (signatureType === "pedido_peca") {
         // Idempotent: only insert signature if it doesn't exist yet
@@ -433,10 +483,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        // Update to workshop via SECURITY DEFINER RPC:
-        // A função verifica que o utilizador é o técnico atribuído e
-        // executa o UPDATE como dono da BD (bypassa o RLS WITH CHECK que
-        // impede definir technician_id=null a partir do cliente).
         const { error: rpcError } = await (supabase.rpc as any)('lift_service_to_workshop', {
           _service_id: service.id,
           _detected_fault: formData.detectedFault || null,
@@ -444,12 +490,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
         if (rpcError) throw rpcError;
 
-        // Log activity - levantamento para oficina (only if signature was new)
         if (!existingSig) {
           await logWorkshopPickup(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
 
-        // Invalidate all service queries so lists update immediately
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
         queryClient.invalidateQueries({ queryKey: ["services"] });
         queryClient.invalidateQueries({ queryKey: ["technician-services"] });
@@ -474,7 +518,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        // Update service - repaired on site
         await ensureValidSession();
         await updateService.mutateAsync({
           id: service.id,
@@ -482,11 +525,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           pending_pricing: true,
           detected_fault: formData.detectedFault,
           work_performed: mode === "continuacao_peca" ? "Peça instalada e serviço concluído" : "Reparado no local do cliente",
-          last_status_before_part_request: null, // Clear continuation flag
+          last_status_before_part_request: null,
           skipToast: true,
         });
 
-        // Log activity - conclusão (only if signature was new)
         if (!existingSig) {
           await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
@@ -495,7 +537,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         toast.success("Visita concluída com sucesso!");
       }
 
-      // Clear persisted state on completion (localStorage + DB)
       clearState();
       saveStateToDb(null as any);
       setShowSignature(false);
@@ -513,8 +554,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       setSignatureType("recolha");
       setShowPayment(true);
     } else {
-      // Go to pecas_usadas step
-      safeSetStep("pecas_usadas");
+      // Go to registo_artigos step (replaces old pecas_usadas)
+      safeSetStep("registo_artigos");
     }
   };
 
@@ -529,81 +570,37 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setShowSignature(true);
   };
 
-  const handlePecasUsadasConfirm = () => {
-    // Validate if usedParts is true, at least one part with name must exist
-    if (formData.usedParts) {
-      const hasValidPart = formData.usedPartsList.some((p) => p.name.trim().length > 0);
-      if (!hasValidPart) {
-        toast.error("Adicione pelo menos uma peça com nome.");
-        return;
-      }
-    }
-    safeSetStep("pedir_peca");
-  };
-
   const handlePedirPecaConfirm = () => {
     if (formData.needsPartOrder) {
-      // Validate part to order
       if (!formData.partToOrder.name.trim()) {
         toast.error("Informe o nome da peça a pedir.");
         return;
       }
+      // Go to resumo_reparacao before signature
+      safeSetStep("resumo_reparacao");
+    } else {
+      // Go to resumo_reparacao before payment
+      safeSetStep("resumo_reparacao");
+    }
+  };
+
+  const handleResumoReparacaoConfirm = () => {
+    if (formData.needsPartOrder) {
       setSignatureType("pedido_peca");
       setShowSignature(true);
     } else {
-      // Go to payment step before conclusion signature
       setSignatureType("conclusao");
       setShowPayment(true);
     }
   };
 
   const handleClose = () => {
-    // Flush current state to DB immediately before closing
     if (currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       flushStateToDb(currentStep, formData);
     }
     setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
-    setFormData({
-      detectedFault: "",
-      photoFile: null,
-      photoAparelho: null,
-      photoEtiqueta: null,
-      photosEstado: [],
-      decision: "reparar_local",
-      usedParts: false,
-      usedPartsList: [{ name: "", reference: "", quantity: 1 }],
-      needsPartOrder: false,
-      partToOrder: { name: "", reference: "" },
-      productBrand: "",
-      productModel: "",
-      productSerial: "",
-      productPNC: "",
-      productType: "",
-      partInstalled: false,
-    } as VisitFormData);
+    setFormData({ ...INITIAL_FORM_DATA });
     onClose();
-  };
-
-  // Part list management
-  const addPart = () => {
-    setFormData((prev) => ({
-      ...prev,
-      usedPartsList: [...prev.usedPartsList, { name: "", reference: "", quantity: 1 }],
-    }));
-  };
-
-  const removePart = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      usedPartsList: prev.usedPartsList.filter((_, i) => i !== index),
-    }));
-  };
-
-  const updatePart = (index: number, field: keyof PartEntry, value: string | number) => {
-    setFormData((prev) => ({
-      ...prev,
-      usedPartsList: prev.usedPartsList.map((part, i) => (i === index ? { ...part, [field]: value } : part)),
-    }));
   };
 
   const removeEstadoPhoto = (index: number) => {
@@ -643,14 +640,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         "foto_aparelho",
         "foto_etiqueta",
         "foto_estado",
-        ...productStep, // Mandatory for repair
+        ...productStep,
         "diagnostico",
         "decisao",
-        "pecas_usadas",
+        "registo_artigos",
         "pedir_peca",
+        "resumo_reparacao",
       ];
     }
-    return ["resumo", "deslocacao", "foto", ...productStep, "diagnostico", "decisao", "pecas_usadas", "pedir_peca"];
+    return ["resumo", "deslocacao", "foto", ...productStep, "diagnostico", "decisao", "registo_artigos", "pedir_peca", "resumo_reparacao"];
   };
 
   // Progress calculation
@@ -1292,98 +1290,77 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         </DialogContent>
       </Dialog>
 
-      {/* Modal 6/8: Peças Usadas (only for reparar_local) */}
-      <Dialog open={currentStep === "pecas_usadas" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Peças Usadas" step={isReparacao ? "Passo 8" : "Passo 6"} />
-
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Usou peças na reparação?</p>
-
-            <RadioGroup
-              value={formData.usedParts ? "sim" : "nao"}
-              onValueChange={(val) => setFormData((prev) => ({ ...prev, usedParts: val === "sim" }))}
-              className="flex gap-4"
-            >
-              <label
-                htmlFor="usedParts_nao"
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                  !formData.usedParts ? "border-blue-500 bg-blue-50" : "border-muted hover:border-muted-foreground/30",
-                )}
-              >
-                <RadioGroupItem value="nao" id="usedParts_nao" />
-                <span className="font-medium text-sm">Não</span>
-              </label>
-
-              <label
-                htmlFor="usedParts_sim"
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                  formData.usedParts ? "border-blue-500 bg-blue-50" : "border-muted hover:border-muted-foreground/30",
-                )}
-              >
-                <RadioGroupItem value="sim" id="usedParts_sim" />
-                <span className="font-medium text-sm">Sim</span>
-              </label>
-            </RadioGroup>
-
-            {formData.usedParts && (
-              <div className="space-y-3 pt-2">
-                <Label className="text-sm">Peças utilizadas:</Label>
-                {formData.usedPartsList.map((part, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <Input
-                      className="col-span-5"
-                      placeholder="Nome da peça"
-                      value={part.name}
-                      onChange={(e) => updatePart(idx, "name", e.target.value)}
-                    />
-                    <Input
-                      className="col-span-4"
-                      placeholder="Referência"
-                      value={part.reference}
-                      onChange={(e) => updatePart(idx, "reference", e.target.value)}
-                    />
-                    <Input
-                      className="col-span-2"
-                      type="number"
-                      min="1"
-                      value={part.quantity}
-                      onChange={(e) => updatePart(idx, "quantity", parseInt(e.target.value) || 1)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="col-span-1 h-8 w-8"
-                      onClick={() => removePart(idx)}
-                      disabled={formData.usedPartsList.length === 1}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" className="w-full" onClick={addPart}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar Peça
-                </Button>
-              </div>
-            )}
+      {/* Modal: Registo de Artigos (replaces old pecas_usadas) */}
+      <Dialog open={currentStep === "registo_artigos" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <div className="p-6 pb-0">
+            <ModalHeader title="Registo de Artigos" step={isReparacao ? "Passo 8" : "Passo 6"} />
           </div>
 
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handlePecasUsadasConfirm}>
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
+          <div className="flex-1 overflow-y-auto min-h-0 px-6">
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">Registe os artigos/materiais utilizados nesta reparação.</p>
+
+              {(formData.articles as ArticleEntry[]).length > 0 && (
+                <div className="space-y-2">
+                  {(formData.articles as ArticleEntry[]).map((article, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Artigo {idx + 1}</span>
+                        {!formData.articlesLocked && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input placeholder="Referência" value={article.reference} onChange={(e) => updateArticle(idx, "reference", e.target.value)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
+                        <Input placeholder="Descrição *" value={article.description} onChange={(e) => updateArticle(idx, "description", e.target.value)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input type="number" step="any" min="0" value={article.quantity} onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Valor (€)</Label>
+                          <Input type="number" step="any" min="0" value={article.unit_price} onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)} className="h-8 text-xs" disabled={formData.articlesLocked as boolean} />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Total</Label>
+                          <div className="h-8 flex items-center text-xs font-medium px-2 bg-muted rounded-md">
+                            {(article.quantity * article.unit_price).toFixed(2)} €
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!formData.articlesLocked && (
+                <Button variant="outline" className="w-full" onClick={addArticle}>
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar Artigo
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-t flex-shrink-0">
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => safeSetStep("pedir_peca")}>
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal 7/9: Pedir Peça? (only for reparar_local) */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
+      {/* Modal: Pedir Peça? */}
+      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? "Passo 9" : "Passo 7"} />
 
@@ -1432,7 +1409,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        partToOrder: { ...prev.partToOrder, name: e.target.value },
+                        partToOrder: { ...(prev.partToOrder as { name: string; reference: string }), name: e.target.value },
                       }))
                     }
                   />
@@ -1442,7 +1419,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        partToOrder: { ...prev.partToOrder, reference: e.target.value },
+                        partToOrder: { ...(prev.partToOrder as { name: string; reference: string }), reference: e.target.value },
                       }))
                     }
                   />
@@ -1455,7 +1432,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("pecas_usadas")}>
+            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <Button
@@ -1468,14 +1445,130 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               onClick={handlePedirPecaConfirm}
               disabled={isSubmitting}
             >
-              {formData.needsPartOrder ? "Pedir Peça" : "Concluir Reparação"}
-              <CheckCircle2 className="h-4 w-4 ml-1" />
+              Continuar <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal 3d: Confirmação Peça */}
+      {/* Modal: Resumo da Reparação */}
+      <Dialog open={currentStep === "resumo_reparacao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
+        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+          <div className="p-6 pb-0">
+            <ModalHeader title="Resumo da Reparação" step={isReparacao ? "Passo 10" : "Passo 8"} />
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 px-6">
+            <div className="space-y-4 py-4">
+              {(formData.articles as ArticleEntry[]).length === 0 ? (
+                <p className="text-sm text-center text-muted-foreground py-4 italic">Nenhum artigo registado.</p>
+              ) : (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-12 gap-1 text-[10px] font-medium text-muted-foreground uppercase px-2">
+                    <span className="col-span-2">Ref.</span>
+                    <span className="col-span-4">Descrição</span>
+                    <span className="col-span-2 text-center">Qtd</span>
+                    <span className="col-span-2 text-right">Unit.</span>
+                    <span className="col-span-2 text-right">Total</span>
+                  </div>
+                  {(formData.articles as ArticleEntry[]).map((article, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-1 text-xs px-2 py-1.5 bg-muted/30 rounded">
+                      <span className="col-span-2 truncate">{article.reference || "-"}</span>
+                      <span className="col-span-4 truncate">{article.description}</span>
+                      <span className="col-span-2 text-center">{article.quantity}</span>
+                      <span className="col-span-2 text-right">{article.unit_price.toFixed(2)}</span>
+                      <span className="col-span-2 text-right font-medium">{(article.quantity * article.unit_price).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="border-t pt-3 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{articlesSubtotal.toFixed(2)} €</span>
+                </div>
+
+                {!formData.articlesLocked && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">Desconto</Label>
+                      <Input type="number" step="any" min="0" value={formData.discountValue as string} onChange={(e) => setFormData(prev => ({ ...prev, discountValue: e.target.value }))} className="h-8 text-xs flex-1" placeholder="0" />
+                      <Select value={formData.discountType as string} onValueChange={(v) => setFormData(prev => ({ ...prev, discountType: v as "euro" | "percent" }))}>
+                        <SelectTrigger className="h-8 w-16 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="euro">€</SelectItem>
+                          <SelectItem value="percent">%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">IVA</Label>
+                      <Select value={String(formData.taxRate)} onValueChange={(v) => setFormData(prev => ({ ...prev, taxRate: parseInt(v) }))}>
+                        <SelectTrigger className="h-8 text-xs flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">0%</SelectItem>
+                          <SelectItem value="6">6%</SelectItem>
+                          <SelectItem value="13">13%</SelectItem>
+                          <SelectItem value="23">23%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Desconto</span>
+                    <span>-{discountAmount.toFixed(2)} €</span>
+                  </div>
+                )}
+                {taxAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">IVA ({formData.taxRate}%)</span>
+                    <span>{taxAmount.toFixed(2)} €</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold border-t pt-2">
+                  <span>Total Final</span>
+                  <span>{totalFinal.toFixed(2)} €</span>
+                </div>
+              </div>
+
+              {formData.articlesLocked && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="text-sm text-green-700 font-medium">Artigos confirmados e guardados</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-t flex-shrink-0">
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")} disabled={formData.articlesLocked as boolean}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              {!formData.articlesLocked ? (
+                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar e Guardar
+                </Button>
+              ) : (
+                <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm}>
+                  Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Confirmação Peça */}
       <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader title="Confirmação da Peça" step="Instalação" />
