@@ -421,32 +421,34 @@ export default function ServicePrintPage() {
           </>
         )}
 
-        {/* Parts Used */}
+        {/* Artigos do Serviço */}
         {usedParts.length > 0 && (
           <>
             <Separator className="my-1" />
             <section className="mb-2">
-              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Peças Utilizadas</h2>
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Artigos do Serviço</h2>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-1">Peça</th>
-                    <th className="text-left py-1">Código</th>
+                    <th className="text-left py-1">Ref.</th>
+                    <th className="text-left py-1">Descrição</th>
                     <th className="text-center py-1">Qtd</th>
-                    <th className="text-right py-1">Custo</th>
+                    <th className="text-right py-1">Valor Unit.</th>
+                    <th className="text-right py-1">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {usedParts.map((part) => (
                     <tr key={part.id} className="border-b">
-                      <td className="py-1">{part.part_name}</td>
                       <td className="py-1">{part.part_code || '-'}</td>
+                      <td className="py-1">{part.part_name}</td>
                       <td className="py-1 text-center">{part.quantity || 1}</td>
+                      <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '-'}</td>
                       <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
                     </tr>
                   ))}
                   <tr className="font-medium">
-                    <td colSpan={3} className="py-1 text-right">Total:</td>
+                    <td colSpan={4} className="py-1 text-right">Subtotal Artigos:</td>
                     <td className="py-1 text-right">{totalPartsCost.toFixed(2)} €</td>
                   </tr>
                 </tbody>

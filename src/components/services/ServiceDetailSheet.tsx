@@ -642,44 +642,50 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </div>
               </Section>
 
-              {/* Parts Used / Requested */}
+              {/* Artigos / Peças */}
               {serviceParts.length > 0 && (
                 <Section
-                  title="Peças Utilizadas/Solicitadas"
+                  title="Artigos / Peças"
                   bgColor="bg-yellow-50"
                   borderColor="border-l-yellow-500"
                 >
                   <div className="space-y-2">
-                    {serviceParts.map((part) => (
-                      <div key={part.id} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-yellow-600" />
-                            <span className="font-medium">{part.part_name}</span>
-                            {part.part_code && (
-                              <span className="text-xs text-muted-foreground">({part.part_code})</span>
-                            )}
+                    {serviceParts.map((part) => {
+                      const lineTotal = (part.cost || 0) * (part.quantity || 1);
+                      return (
+                        <div key={part.id} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-yellow-600" />
+                              <span className="font-medium">{part.part_name}</span>
+                              {part.part_code && (
+                                <span className="text-xs text-muted-foreground">({part.part_code})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <span>Qtd: {part.quantity}</span>
+                              {part.cost != null && part.cost > 0 && (
+                                <span>• Unit: {part.cost.toFixed(2)} €</span>
+                              )}
+                              {lineTotal > 0 && (
+                                <span>• Total: {lineTotal.toFixed(2)} €</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>Qtd: {part.quantity}</span>
-                            {part.cost && part.cost > 0 && (
-                              <span>• Custo: {part.cost.toFixed(2)} €</span>
+                          <div className="flex flex-col items-end gap-1">
+                            {part.arrived ? (
+                              <Badge className="bg-green-500 text-white text-xs">Chegou</Badge>
+                            ) : part.is_requested ? (
+                              <Badge className="bg-orange-500 text-white text-xs">Pedida</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">Registada</Badge>
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          {part.arrived ? (
-                            <Badge className="bg-green-500 text-white text-xs">Chegou</Badge>
-                          ) : part.is_requested ? (
-                            <Badge className="bg-orange-500 text-white text-xs">Pedida</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">Registada</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div className="flex justify-between pt-2 border-t font-medium text-sm">
-                      <span>Total Peças:</span>
+                      <span>Total Artigos:</span>
                       <span className="text-primary">
                         {serviceParts.reduce((sum, p) => sum + ((p.cost || 0) * (p.quantity || 1)), 0).toFixed(2)} €
                       </span>
