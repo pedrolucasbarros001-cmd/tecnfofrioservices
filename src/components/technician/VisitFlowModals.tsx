@@ -206,7 +206,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         console.warn(`[VisitFlow] Saved step "${savedStep}" invalid for flow, using resumo`);
         setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
       }
-      setFormData(savedState.formData);
+      setFormData({ ...INITIAL_FORM_DATA, ...savedState.formData });
       return;
     }
 
@@ -224,6 +224,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
 
       setFormData((prev) => ({
+        ...INITIAL_FORM_DATA,
         ...prev,
         detectedFault: service.detected_fault || "",
         productBrand: service.brand || "",
@@ -348,8 +349,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }));
   };
 
-  const safeArticles = (formData.articles as ArticleEntry[] | undefined) ?? [];
-  const articlesSubtotal = safeArticles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const articlesSubtotal = (formData.articles as ArticleEntry[]).reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
 
   const discountAmount = (() => {
     const val = parseFloat(formData.discountValue as string) || 0;
@@ -373,7 +373,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         .eq("service_id", service.id)
         .eq("is_requested", false);
 
-      for (const article of safeArticles) {
+      for (const article of (formData.articles as ArticleEntry[])) {
         if (!article.description.trim()) continue;
         await supabase.from("service_parts").insert({
           service_id: service.id,
