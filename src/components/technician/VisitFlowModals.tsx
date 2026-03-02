@@ -348,7 +348,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }));
   };
 
-  const articlesSubtotal = (formData.articles as ArticleEntry[]).reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const safeArticles = (formData.articles as ArticleEntry[] | undefined) ?? [];
+  const articlesSubtotal = safeArticles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
 
   const discountAmount = (() => {
     const val = parseFloat(formData.discountValue as string) || 0;
@@ -372,7 +373,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         .eq("service_id", service.id)
         .eq("is_requested", false);
 
-      for (const article of (formData.articles as ArticleEntry[])) {
+      for (const article of safeArticles) {
         if (!article.description.trim()) continue;
         await supabase.from("service_parts").insert({
           service_id: service.id,
