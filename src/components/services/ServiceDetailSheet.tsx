@@ -238,18 +238,18 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const activityLogs = activityLogsData || [];
 
   // Resolve registered_by names for service parts
-  const partRegisteredByIds = [...new Set(serviceParts.map((p: any) => p.registered_by).filter(Boolean))];
+  const partRegisteredByIds = [...new Set(serviceParts.map((p: any) => p?.registered_by).filter(Boolean))];
   const { data: partAuthorProfiles } = useQuery({
     queryKey: ['part-authors', service?.id, partRegisteredByIds.join(',')],
     queryFn: async () => {
-      if (partRegisteredByIds.length === 0) return [];
+      if (!service?.id || partRegisteredByIds.length === 0) return [];
       const { data } = await supabase
         .from('profiles')
         .select('user_id, full_name')
         .in('user_id', partRegisteredByIds);
       return data || [];
     },
-    enabled: partRegisteredByIds.length > 0 && open,
+    enabled: !!service?.id && partRegisteredByIds.length > 0 && open,
   });
 
   const partAuthorMap: Record<string, string> = {};
@@ -282,9 +282,11 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['service-full', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['service-consult', service.id] });
+      if (service?.id) {
+        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+        queryClient.invalidateQueries({ queryKey: ['service-full', service.id] });
+        queryClient.invalidateQueries({ queryKey: ['service-consult', service.id] });
+      }
       toast.success('Foto eliminada com sucesso');
     } catch (error) {
       console.error('Error deleting photo:', error);
@@ -299,8 +301,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   // Fallback: Parse pricing_description if serviceParts is empty
   const centralItems = React.useMemo(() => {
-    if (serviceParts.filter((p: any) => !p.is_requested).length > 0) return [];
-    if (!displayService.pricing_description) return [];
+    if (serviceParts.filter((p: any) => !p?.is_requested).length > 0) return [];
+    if (!displayService?.pricing_description) return [];
     try {
       const parsed = JSON.parse(displayService.pricing_description);
       return parsed.items || [];
@@ -312,6 +314,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
 
   const handleStartExecution = () => {
+    if (!service) return;
     // Navigate to appropriate technician flow
     if (service.service_type === 'entrega') {
       navigate(`/technician/delivery/${service.id}`);
@@ -325,13 +328,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   };
 
   const handleFinalize = async () => {
+    if (!service) return;
     try {
       await updateService.mutateAsync({
         id: service.id,
         status: 'finalizado',
         skipToast: true,
       });
-      toast.success(`${service.code} finalizado com sucesso!`);
+      toast.success(`${service.code || 'Serviço'} finalizado com sucesso!`);
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error finalizing service:', error);
@@ -393,15 +397,16 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="font-medium mb-4 text-sm">Progresso do Serviço</h4>
                 {(() => {
+                  if (!service) return null;
                   const progressSteps = getServiceProgressSteps(service);
-                  const currentStatus = service.status as ServiceStatus;
+                  const currentStatus = (service.status || 'por_fazer') as ServiceStatus;
 
                   return (
                     <div className="flex items-center justify-between overflow-x-auto pb-2 gap-1">
                       {progressSteps.map((step, index) => {
                         const isCompleted = step.statuses.includes(currentStatus);
                         const isCurrent = step.statuses.includes(currentStatus) &&
-                          !progressSteps[index + 1]?.statuses.includes(currentStatus);
+                          (!progressSteps[index + 1] || !progressSteps[index + 1]?.statuses.includes(currentStatus));
 
                         return (
                           <div key={step.label} className="flex flex-col items-center min-w-[60px] relative flex-1">
@@ -595,16 +600,16 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   )}
                 </div>
 
-                {service.technician?.profile && (
+                {service?.technician?.profile && (
                   <div className="flex items-center gap-3 mt-3">
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium"
-                      style={{ backgroundColor: service.technician.color || '#3B82F6' }}
+                      style={{ backgroundColor: service?.technician?.color || '#3B82F6' }}
                     >
-                      {service.technician.profile.full_name?.charAt(0) || 'T'}
+                      {service?.technician?.profile?.full_name?.charAt(0) || 'T'}
                     </div>
                     <div>
-                      <p className="font-medium">{service.technician.profile.full_name}</p>
+                      <p className="font-medium">{service?.technician?.profile?.full_name}</p>
                       <p className="text-xs text-muted-foreground">Técnico responsável</p>
                     </div>
                   </div>
@@ -656,14 +661,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                   </div>
                                   <div className="text-xs text-muted-foreground flex gap-2">
                                     <span>{part.quantity}x</span>
-                                    <span>{(part.cost || 0).toFixed(2)}€</span>
-                                    <span className="font-medium text-foreground">= {lineTotal.toFixed(2)}€</span>
+                                    <span>{(Number(part.cost) || 0).toFixed(2)}€</span>
+                                    <span className="font-medium text-foreground">= {(Number(lineTotal) || 0).toFixed(2)}€</span>
                                   </div>
                                 </div>
                               );
                             })}
                             <div className="flex justify-end text-xs text-muted-foreground pt-1">
-                              Subtotal: {groupSubtotal.toFixed(2)} €
+                              Subtotal: {(Number(groupSubtotal) || 0).toFixed(2)} €
                             </div>
                           </div>
                         );
@@ -676,8 +681,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           </div>
                           <div className="text-xs text-muted-foreground flex gap-2">
                             <span>{item.qty || item.quantity || 1}x</span>
-                            <span>{(item.unit_price || item.price || 0).toFixed(2)}€</span>
-                            <span className="font-medium text-foreground">= {((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)}€</span>
+                            <span>{(Number(item.unit_price || item.price) || 0).toFixed(2)}€</span>
+                            <span className="font-medium text-foreground">= {((Number(item.qty || item.quantity || 1) * Number(item.unit_price || item.price || 0)) || 0).toFixed(2)}€</span>
                           </div>
                         </div>
                       ))
@@ -719,39 +724,39 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal Artigos</span>
-                      <span className="font-medium">{totalArticlesAmount.toFixed(2)} €</span>
+                      <span className="font-medium">{(Number(totalArticlesAmount) || 0).toFixed(2)} €</span>
                     </div>
-                    {service.labor_cost > 0 && (
+                    {(Number(service?.labor_cost) || 0) > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Mão de Obra</span>
-                        <span className="font-medium">{service.labor_cost.toFixed(2)} €</span>
+                        <span className="font-medium">{(Number(service?.labor_cost) || 0).toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.discount > 0 && (
+                    {(Number(service?.discount) || 0) > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span>Desconto</span>
-                        <span>-{service.discount.toFixed(2)} €</span>
+                        <span>-{(Number(service?.discount) || 0).toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.final_price > 0 && (
+                    {(Number(service?.final_price) || 0) > 0 && (
                       <>
                         <Separator />
                         <div className="flex justify-between font-semibold text-lg">
                           <span>TOTAL</span>
-                          <span className="text-primary">{service.final_price.toFixed(2)} €</span>
+                          <span className="text-primary">{(Number(service?.final_price) || 0).toFixed(2)} €</span>
                         </div>
                       </>
                     )}
-                    {totalPaidAmount > 0 && (
+                    {(Number(totalPaidAmount) || 0) > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span>✅ Já Pago</span>
-                        <span>{totalPaidAmount.toFixed(2)} €</span>
+                        <span>{(Number(totalPaidAmount) || 0).toFixed(2)} €</span>
                       </div>
                     )}
-                    {service.final_price > 0 && totalPaidAmount < service.final_price && (
+                    {(Number(service?.final_price) || 0) > 0 && (Number(totalPaidAmount) || 0) < (Number(service?.final_price) || 0) && (
                       <div className="flex justify-between text-sm font-medium p-2 rounded bg-destructive/10 text-destructive">
                         <span>🔴 Em Débito</span>
-                        <span>{(service.final_price - totalPaidAmount).toFixed(2)} €</span>
+                        <span>{(Number(service?.final_price || 0) - (Number(totalPaidAmount) || 0)).toFixed(2)} €</span>
                       </div>
                     )}
                   </div>
@@ -777,7 +782,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           <div className="flex items-center gap-2">
                             <CreditCard className="h-4 w-4 text-teal-600" />
                             <div>
-                              <p className="font-medium">{payment.amount.toFixed(2)} €</p>
+                              <p className="font-medium">{(Number(payment.amount) || 0).toFixed(2)} €</p>
                               <p className="text-xs text-muted-foreground">
                                 {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt }) : '-'}
                                 {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}

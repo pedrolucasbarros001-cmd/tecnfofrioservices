@@ -43,6 +43,7 @@ import PerfilPage from "@/pages/PerfilPage";
 import PreferenciasPage from "@/pages/PreferenciasPage";
 import NotFound from "@/pages/NotFound";
 import ImportPage from "@/pages/ImportPage";
+import AuthFixJoseAlves from "@/pages/AuthFixJoseAlves";
 
 // Global error handler component
 function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
@@ -135,6 +136,11 @@ function AppContent() {
           <Route path="/importar" element={
             <ProtectedRoute allowedRoles={['dono']}>
               <ImportPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/fix-jose-alves" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <AuthFixJoseAlves />
             </ProtectedRoute>
           } />
 

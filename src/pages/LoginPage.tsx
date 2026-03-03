@@ -48,11 +48,14 @@ export default function LoginPage() {
   async function onSubmit(data: LoginFormValues) {
     if (isLoading) return;
     setIsLoading(true);
+    console.group('[LoginPage] Login attempt');
+    console.log('Email:', data.email);
 
     try {
       const { error, role: userRole } = await signIn(data.email, data.password);
 
       if (error) {
+        console.error('Login error:', error);
         const msg = error.message.toLowerCase();
         if (msg.includes('database error') || msg.includes('failed to fetch')) {
           toast({
@@ -70,24 +73,30 @@ export default function LoginPage() {
           toast({
             variant: 'destructive',
             title: 'Erro ao entrar',
-            description: 'Ocorreu um erro inesperado. Tente novamente.',
+            description: `Erro: ${error.message}`,
           });
         }
         return;
       }
 
+      console.log('User role identified:', userRole);
+
       if (!userRole) {
+        console.warn('Authentication successful but user has no role assigned.');
         toast({
           variant: 'destructive',
           title: 'Sem permissões',
-          description: 'Conta autenticada, mas sem nível de acesso associado. Contacte o administrador.',
+          description: 'Conta autenticada, mas sem nível de acesso associado (role). Contacte o administrador.',
         });
         return;
       }
 
       const from = location.state?.from?.pathname;
-      navigate(from && from !== '/login' ? from : getDefaultRouteForRole(userRole), { replace: true });
-    } catch {
+      const targetRoute = from && from !== '/login' ? from : getDefaultRouteForRole(userRole);
+      console.log('Redirecting to:', targetRoute);
+      navigate(targetRoute, { replace: true });
+    } catch (err) {
+      console.error('Critical submission error:', err);
       toast({
         variant: 'destructive',
         title: 'Erro de ligação',
@@ -95,6 +104,7 @@ export default function LoginPage() {
       });
     } finally {
       setIsLoading(false);
+      console.groupEnd();
     }
   }
 

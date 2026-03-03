@@ -83,14 +83,18 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       // Ensure arrays are initialized even if empty
       const result = data as any;
 
       const safeSort = (arr: any[], dateKey: string) => {
-        return (arr || []).sort((a, b) => {
-          const timeA = a[dateKey] ? new Date(a[dateKey]).getTime() : 0;
-          const timeB = b[dateKey] ? new Date(b[dateKey]).getTime() : 0;
+        if (!arr || !Array.isArray(arr)) return [];
+        return [...arr].sort((a, b) => {
+          const valA = a[dateKey];
+          const valB = b[dateKey];
+          const timeA = valA ? new Date(valA).getTime() : 0;
+          const timeB = valB ? new Date(valB).getTime() : 0;
           if (isNaN(timeA) && isNaN(timeB)) return 0;
           if (isNaN(timeA)) return 1;
           if (isNaN(timeB)) return -1;
@@ -141,20 +145,31 @@ export function prefetchFullServiceData(queryClient: QueryClient, serviceId: str
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       const result = data as any;
+
+      const safeDate = (d: any) => d ? new Date(d).getTime() : 0;
+      const isValid = (t: number) => !isNaN(t);
+
       return {
         ...result,
         parts: result.parts || [],
-        photos: (result.photos || []).sort((a: any, b: any) =>
-          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
-        ),
-        signatures: (result.signatures || []).sort((a: any, b: any) =>
-          new Date(a.signed_at).getTime() - new Date(b.signed_at).getTime()
-        ),
-        payments: (result.payments || []).sort((a: any, b: any) =>
-          new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
-        ),
+        photos: (result.photos || []).sort((a: any, b: any) => {
+          const tA = safeDate(a.uploaded_at);
+          const tB = safeDate(b.uploaded_at);
+          return (isValid(tB) ? tB : 0) - (isValid(tA) ? tA : 0);
+        }),
+        signatures: (result.signatures || []).sort((a: any, b: any) => {
+          const tA = safeDate(a.signed_at);
+          const tB = safeDate(b.signed_at);
+          return (isValid(tA) ? tA : 0) - (isValid(tB) ? tB : 0);
+        }),
+        payments: (result.payments || []).sort((a: any, b: any) => {
+          const tA = safeDate(a.payment_date);
+          const tB = safeDate(b.payment_date);
+          return (isValid(tB) ? tB : 0) - (isValid(tA) ? tA : 0);
+        }),
         logs: [],
       };
     },

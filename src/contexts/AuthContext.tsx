@@ -75,9 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function hydrateUser(userId: string): Promise<AppRole | null> {
     if (hydrationPromiseRef.current?.userId === userId) {
+      console.log('[AuthContext] Reusing existing hydration promise for:', userId);
       return hydrationPromiseRef.current.promise;
     }
 
+    console.log('[AuthContext] Starting hydration for user:', userId);
     const promise = (async () => {
       try {
         const [profileRes, roleRpcRes] = await Promise.all([
@@ -85,17 +87,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           supabase.rpc('get_user_role', { _user_id: userId }),
         ]);
 
-        if (profileRes.error) console.error('[AuthContext] Profile error:', profileRes.error);
-        if (roleRpcRes.error) console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
+        if (profileRes.error) {
+          console.error('[AuthContext] Profile fetch error:', profileRes.error);
+        }
+        if (roleRpcRes.error) {
+          console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
+        }
 
         const profileData = profileRes.data as Profile | null;
         const userRole = (roleRpcRes.data as AppRole | null) ?? null;
+
+        console.log('[AuthContext] Hydration result:', {
+          hasProfile: !!profileData,
+          role: userRole,
+          userId
+        });
 
         setProfile(profileData);
         setRole(userRole);
         return userRole;
       } catch (error) {
-        console.error('[AuthContext] hydrateUser error:', error);
+        console.error('[AuthContext] Unexpected hydrateUser error:', error);
         setProfile(null);
         setRole(null);
         return null;
@@ -111,27 +123,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signIn(email: string, password: string): Promise<SignInResult> {
     setLoading(true);
+    console.log('[AuthContext] Attempting signIn for:', email);
 
     try {
       queryClient.clear();
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
+        console.error('[AuthContext] signIn error:', error.message);
         setLoading(false);
         return { error };
       }
 
       if (!data.user || !data.session) {
+        console.error('[AuthContext] Session invalid after login:', { user: !!data.user, session: !!data.session });
         setLoading(false);
         return { error: new Error('Sessão inválida após login') };
       }
 
+      console.log('[AuthContext] Supabase auth successful, hydrating user...');
       setSession(data.session);
       setUser(data.user);
 
       const hydratedRole = await hydrateUser(data.user.id);
+      console.log('[AuthContext] Login complete. Final role:', hydratedRole);
+
       return { error: null, role: hydratedRole };
     } catch (error) {
+      console.error('[AuthContext] Critical signIn exception:', error);
       setLoading(false);
       return { error: error as Error };
     }
