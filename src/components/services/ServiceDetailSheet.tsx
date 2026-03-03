@@ -82,6 +82,24 @@ import {
 import { humanizeError } from '@/utils/errorMessages';
 import { formatShiftLabel } from '@/utils/dateUtils';
 
+// Helper: safe date formatting to prevent crashes on "Invalid Date"
+const safeFormat = (date: any, formatStr: string, options?: any) => {
+  if (!date) return '-';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '-';
+    return format(d, formatStr, options);
+  } catch (e) {
+    console.error('[ServiceDetailSheet] Date formatting error:', e);
+    return '-';
+  }
+};
+
+const safeNumber = (val: any) => {
+  const num = Number(val);
+  return isNaN(num) ? 0 : num;
+};
+
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
   switch (type) {
@@ -233,6 +251,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   const serviceParts = fullData?.parts || [];
   const servicePayments = fullData?.payments || [];
+  // photos already sorted in useFullServiceData
   const servicePhotos = fullData?.photos || [];
   const serviceSignatures = fullData?.signatures || [];
   const activityLogs = activityLogsData || [];
@@ -589,7 +608,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
                       {service.scheduled_date
-                        ? (service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime()) ? format(new Date(service.scheduled_date), "d 'de' MMMM", { locale: pt }) : 'Data inválida')
+                        ? safeFormat(service.scheduled_date, "d 'de' MMMM", { locale: pt })
                         : 'Não agendado'}
                     </span>
                   </div>
@@ -645,7 +664,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                               {firstDate && !isNaN(new Date(firstDate).getTime()) && (
                                 <>
                                   <span>•</span>
-                                  <span>{format(new Date(firstDate), 'dd/MM/yyyy', { locale: pt })}</span>
+                                  <span>{safeFormat(firstDate, 'dd/MM/yyyy', { locale: pt })}</span>
                                 </>
                               )}
                             </div>
@@ -726,37 +745,35 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       <span className="text-muted-foreground">Subtotal Artigos</span>
                       <span className="font-medium">{(Number(totalArticlesAmount) || 0).toFixed(2)} €</span>
                     </div>
-                    {(Number(service?.labor_cost) || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Mão de Obra</span>
-                        <span className="font-medium">{(Number(service?.labor_cost) || 0).toFixed(2)} €</span>
+                    {safeNumber(service?.labor_cost) > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Mão de obra</span>
+                        <span className="font-medium">{safeNumber(service?.labor_cost).toFixed(2)} €</span>
                       </div>
                     )}
-                    {(Number(service?.discount) || 0) > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
+                    {safeNumber(service?.discount) > 0 && (
+                      <div className="flex justify-between items-center text-sm text-destructive">
                         <span>Desconto</span>
-                        <span>-{(Number(service?.discount) || 0).toFixed(2)} €</span>
+                        <span>-{safeNumber(service?.discount).toFixed(2)} €</span>
                       </div>
                     )}
-                    {(Number(service?.final_price) || 0) > 0 && (
-                      <>
-                        <Separator />
-                        <div className="flex justify-between font-semibold text-lg">
-                          <span>TOTAL</span>
-                          <span className="text-primary">{(Number(service?.final_price) || 0).toFixed(2)} €</span>
-                        </div>
-                      </>
-                    )}
-                    {(Number(totalPaidAmount) || 0) > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>✅ Já Pago</span>
-                        <span>{(Number(totalPaidAmount) || 0).toFixed(2)} €</span>
-                      </div>
-                    )}
-                    {(Number(service?.final_price) || 0) > 0 && (Number(totalPaidAmount) || 0) < (Number(service?.final_price) || 0) && (
+                    <Separator />
+                    <div className="flex justify-between items-center text-lg font-bold">
+                      <span>Total</span>
+                      <span className="text-primary">{safeNumber(service?.final_price).toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm pt-2">
+                      <span className="text-muted-foreground">Total Pago</span>
+                      <span>{safeNumber(totalPaidAmount).toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-medium border-t border-dashed pt-2">
+                      <span>Restante</span>
+                      <span>{(safeNumber(service?.final_price) - safeNumber(totalPaidAmount)).toFixed(2)} €</span>
+                    </div>
+                    {safeNumber(service?.final_price) > 0 && safeNumber(totalPaidAmount) < safeNumber(service?.final_price) && (
                       <div className="flex justify-between text-sm font-medium p-2 rounded bg-destructive/10 text-destructive">
                         <span>🔴 Em Débito</span>
-                        <span>{(Number(service?.final_price || 0) - (Number(totalPaidAmount) || 0)).toFixed(2)} €</span>
+                        <span>{(safeNumber(service?.final_price) - safeNumber(totalPaidAmount)).toFixed(2)} €</span>
                       </div>
                     )}
                   </div>
@@ -784,7 +801,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             <div>
                               <p className="font-medium">{(Number(payment.amount) || 0).toFixed(2)} €</p>
                               <p className="text-xs text-muted-foreground">
-                                {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) ? format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: pt }) : '-'}
+                                {safeFormat(payment.payment_date, "dd/MM/yyyy", { locale: pt })}
                                 {payment.payment_method && ` • ${payment.payment_method.toUpperCase()}`}
                               </p>
                             </div>
@@ -810,8 +827,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     ))}
                     <div className="flex justify-between pt-2 border-t font-medium text-sm">
                       <span>Total Pago:</span>
-                      <span className="text-green-600">
-                        {((servicePayments || []).reduce((sum, p) => sum + (Number(p?.amount) || 0), 0) || 0).toFixed(2)} €
+                      <span className="font-medium text-primary">
+                        {((servicePayments || []).reduce((sum, p) => sum + safeNumber(p?.amount), 0)).toFixed(2)} €
                       </span>
                     </div>
                   </div>
@@ -884,7 +901,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             {getSignatureDescription(sig.signature_type)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {sig.signed_at && !isNaN(new Date(sig.signed_at).getTime()) ? format(new Date(sig.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
+                            {safeFormat(sig.signed_at, "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
                           </p>
                         </div>
                       </div>
@@ -1075,7 +1092,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             <AlertDialogDescription>
               Tem a certeza que deseja apagar o pagamento de{' '}
               <strong>{paymentToDelete?.amount.toFixed(2)} €</strong>
-              {paymentToDelete?.payment_date && ` do dia ${format(new Date(paymentToDelete.payment_date), "dd/MM/yyyy", { locale: pt })}`}
+              {paymentToDelete?.payment_date && ` do dia ${safeFormat(paymentToDelete.payment_date, "dd/MM/yyyy", { locale: pt })}`}
               ? O saldo do serviço será recalculado automaticamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1110,8 +1127,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
                   queryClient.invalidateQueries({ queryKey: ['service-payments'] });
                   queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
-                  toast.success(`Pagamento de ${paymentToDelete.amount.toFixed(2)} € eliminado. Novo total pago: ${newTotal.toFixed(2)} €`);
                   setPaymentToDelete(null);
+                  const newTotalPaid = (service?.amount_paid || 0) - (paymentToDelete?.amount || 0);
+                  toast.success(`Pagamento de ${safeNumber(paymentToDelete?.amount).toFixed(2)} € eliminado. Novo total pago: ${safeNumber(newTotalPaid).toFixed(2)} €`);
                 } catch (error) {
                   console.error('Error deleting payment:', error);
                   toast.error(humanizeError(error));
@@ -1224,7 +1242,7 @@ function ActivityLogItem({ log, isLast }: ActivityLogItemProps) {
         )}
         <p className="text-sm">{log.description}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          {log.created_at && !isNaN(new Date(log.created_at).getTime()) ? format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt }) : '-'}
+          {safeFormat(log.created_at, "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
         </p>
       </div>
     </div>

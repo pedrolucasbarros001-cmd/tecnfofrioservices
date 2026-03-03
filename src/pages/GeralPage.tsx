@@ -493,14 +493,9 @@ export default function GeralPage() {
                       <TableCell>
                         {service.scheduled_date ? <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                            {(() => {
-                              try {
-                                return format(new Date(service.scheduled_date), 'dd/MM/yy', { locale: pt });
-                              } catch (e) {
-                                return '-';
-                              }
-                            })()}
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />                            {(service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime()))
+                              ? format(new Date(service.scheduled_date), 'dd/MM/yy', { locale: pt })
+                              : '-'}
                           </div>
                           {service.scheduled_shift && <Badge variant={"outline" as any} className="text-xs">
                             {formatShiftLabel(service.scheduled_shift)}
