@@ -270,7 +270,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     .filter((p: any) => !p.is_requested)
     .reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
 
-  const totalPaidAmount = servicePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  const totalPaidAmount = (servicePayments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0);
 
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -811,7 +811,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <div className="flex justify-between pt-2 border-t font-medium text-sm">
                       <span>Total Pago:</span>
                       <span className="text-green-600">
-                        {servicePayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} €
+                        {((servicePayments || []).reduce((sum, p) => sum + (Number(p?.amount) || 0), 0) || 0).toFixed(2)} €
                       </span>
                     </div>
                   </div>
@@ -1101,7 +1101,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     .eq('service_id', service.id);
                   if (sumError) throw sumError;
 
-                  const newTotal = (remaining || []).reduce((s, p) => s + p.amount, 0);
+                  const newTotal = (remaining || []).reduce((s, p) => s + (Number(p?.amount) || 0), 0);
                   await updateService.mutateAsync({
                     id: service.id,
                     amount_paid: newTotal,
