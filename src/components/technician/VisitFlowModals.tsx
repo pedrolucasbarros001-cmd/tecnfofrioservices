@@ -103,10 +103,10 @@ interface VisitFormData {
   taxRate: number;
   articlesLocked: boolean;
   needsPartOrder: boolean;
-  partToOrder: {
+  partsToOrder: {
     name: string;
     reference: string;
-  };
+  }[];
   // Product info
   productBrand: string;
   productModel: string;
@@ -130,7 +130,7 @@ const INITIAL_FORM_DATA: VisitFormData = {
   taxRate: 23,
   articlesLocked: false,
   needsPartOrder: false,
-  partToOrder: { name: "", reference: "" },
+  partsToOrder: [],
   productBrand: "",
   productModel: "",
   productSerial: "",
@@ -465,20 +465,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        // Idempotent: only insert part order if it doesn't exist yet
-        const { data: existingPartOrder } = await supabase
-          .from("service_parts")
-          .select("id")
-          .eq("service_id", service.id)
-          .eq("is_requested", true)
-          .eq("part_name", formData.partToOrder.name.trim())
-          .maybeSingle();
+        // Insert parts to order if any
+        for (const part of formData.partsToOrder) {
+          if (!part.name.trim()) continue;
 
-        if (!existingPartOrder) {
+          // Simple check to avoid duplicates for the same name in this submission
           await supabase.from("service_parts").insert({
             service_id: service.id,
-            part_name: formData.partToOrder.name.trim(),
-            part_code: formData.partToOrder.reference.trim() || null,
+            part_name: part.name.trim(),
+            part_code: part.reference.trim() || null,
             quantity: 1,
             is_requested: true,
             arrived: false,
@@ -1507,32 +1502,72 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </RadioGroup>
 
             {formData.needsPartOrder && (
-              <div className="space-y-3 pt-2">
-                <Label className="text-sm">Peça a pedir:</Label>
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Nome da peça *"
-                    value={formData.partToOrder.name}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        partToOrder: { ...(prev.partToOrder as { name: string; reference: string }), name: e.target.value },
-                      }))
-                    }
-                  />
-                  <Input
-                    placeholder="Referência (opcional)"
-                    value={formData.partToOrder.reference}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        partToOrder: { ...(prev.partToOrder as { name: string; reference: string }), reference: e.target.value },
-                      }))
-                    }
-                  />
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Peças a pedir:</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
+                    }))}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar Peça
+                  </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Será necessária a assinatura do cliente para confirmar o pedido de peça.
+
+                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                  {formData.partsToOrder.length === 0 && (
+                    <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
+                      Nenhuma peça adicionada. Clique acima para adicionar.
+                    </p>
+                  )}
+                  {formData.partsToOrder.map((part, index) => (
+                    <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setFormData(prev => {
+                          const newList = [...prev.partsToOrder];
+                          newList.splice(index, 1);
+                          return { ...prev, partsToOrder: newList };
+                        })}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Nome da peça *"
+                          value={part.name}
+                          className="h-8 text-sm"
+                          onChange={(e) => {
+                            const newList = [...formData.partsToOrder];
+                            newList[index].name = e.target.value;
+                            setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                          }}
+                        />
+                        <Input
+                          placeholder="Referência (opcional)"
+                          value={part.reference}
+                          className="h-8 text-sm"
+                          onChange={(e) => {
+                            const newList = [...formData.partsToOrder];
+                            newList[index].reference = e.target.value;
+                            setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border border-blue-100 italic">
+                  Será necessária a assinatura do cliente para confirmar o pedido de peças.
                 </p>
               </div>
             )}

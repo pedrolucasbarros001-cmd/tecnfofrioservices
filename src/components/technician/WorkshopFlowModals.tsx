@@ -78,8 +78,10 @@ interface WorkshopFormData {
   taxRate: number;
   articlesLocked: boolean;
   needsPartOrder: boolean;
-  partToOrder: string;
-  partNotes: string;
+  partsToOrder: {
+    name: string;
+    reference: string;
+  }[];
   photoAparelho: string | null;
   photoEtiqueta: string | null;
   photosEstado: string[];
@@ -106,8 +108,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     taxRate: 23,
     articlesLocked: false,
     needsPartOrder: false,
-    partToOrder: "",
-    partNotes: "",
+    partsToOrder: [],
     photoAparelho: null,
     photoEtiqueta: null,
     photosEstado: [],
@@ -407,8 +408,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   };
 
   const handleRequestPart = async () => {
-    if (!formData.partToOrder.trim()) {
-      toast.error("Informe o nome da peça a pedir.");
+    if (formData.partsToOrder.every(p => !p.name.trim())) {
+      toast.error("Por favor, adicione pelo menos uma peça");
       return;
     }
 
@@ -416,15 +417,21 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
-      await supabase.from("service_parts").insert({
-        service_id: service.id,
-        part_name: formData.partToOrder.trim(),
-        notes: formData.partNotes || null,
-        quantity: 1,
-        is_requested: true,
-        arrived: false,
-        cost: 0,
-      });
+      for (const part of formData.partsToOrder) {
+        if (!part.name.trim()) continue;
+
+        await supabase.from("service_parts").insert({
+          service_id: service.id,
+          part_name: part.name.trim(),
+          part_code: part.reference.trim() || null,
+          quantity: 1,
+          is_requested: true,
+          arrived: false,
+          cost: 0,
+        });
+
+        await logPartRequest(service.code || "N/A", service.id, part.name.trim(), profile?.full_name || "Técnico", user?.id);
+      }
 
       const { error: rpcError } = await technicianUpdateService({
         serviceId: service.id,
@@ -435,18 +442,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
-      await logPartRequest(
-        service.code || "N/A",
-        service.id,
-        formData.partToOrder.trim(),
-        profile?.full_name || "Técnico",
-        user?.id,
-      );
-
+      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      toast.success("Pedidos de peças registados com sucesso");
       clearState();
       saveStateToDb(null as any);
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
-      toast.success(`Peça solicitada! ${service.code} aguarda aprovação.`);
       onComplete();
     } catch (error) {
       console.error("Error requesting part:", error);
@@ -542,8 +541,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       taxRate: 23,
       articlesLocked: false,
       needsPartOrder: false,
-      partToOrder: "",
-      partNotes: "",
+      partsToOrder: [],
       photoAparelho: null,
       photoEtiqueta: null,
       photosEstado: [],
@@ -1208,16 +1206,76 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 </RadioGroup>
 
                 {formData.needsPartOrder && (
-                  <div className="space-y-3 pt-2">
-                    <Label htmlFor="partToOrder" className="text-sm">Nome da peça *</Label>
-                    <Textarea id="partToOrder" value={formData.partToOrder} onChange={(e) => setFormData((prev) => ({ ...prev, partToOrder: e.target.value }))} rows={2} />
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Peças a pedir:</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
+                        }))}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar Peça
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
+                      {formData.partsToOrder.length === 0 && (
+                        <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
+                          Nenhuma peça adicionada.
+                        </p>
+                      )}
+                      {formData.partsToOrder.map((part, index) => (
+                        <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setFormData(prev => {
+                              const newList = [...prev.partsToOrder];
+                              newList.splice(index, 1);
+                              return { ...prev, partsToOrder: newList };
+                            })}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Nome da peça *"
+                              value={part.name}
+                              className="h-8 text-sm"
+                              onChange={(e) => {
+                                const newList = [...formData.partsToOrder];
+                                newList[index].name = e.target.value;
+                                setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                              }}
+                            />
+                            <Input
+                              placeholder="Referência (opcional)"
+                              value={part.reference}
+                              className="h-8 text-sm"
+                              onChange={(e) => {
+                                const newList = [...formData.partsToOrder];
+                                newList[index].reference = e.target.value;
+                                setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
               <DialogFooter className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo_reparacao")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
                 {formData.needsPartOrder ? (
-                  <Button className="flex-1 bg-yellow-500 text-black" onClick={handleRequestPart} disabled={isSubmitting || !formData.partToOrder.trim()}>Solicitar Peça</Button>
+                  <Button className="flex-1 bg-yellow-500 text-black" onClick={handleRequestPart} disabled={isSubmitting || formData.partsToOrder.length === 0 || formData.partsToOrder.every(p => !p.name.trim())}>Solicitar Peças</Button>
                 ) : (
                   <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => safeSetStep("conclusao")}>Continuar <ArrowRight className="h-4 w-4 ml-1" /></Button>
                 )}
