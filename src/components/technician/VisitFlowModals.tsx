@@ -50,7 +50,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CameraCapture } from "@/components/shared/CameraCapture";
 import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
 import { FieldPaymentStep } from "@/components/technician/FieldPaymentStep";
+import { AdminPricingReadOnly } from "@/components/technician/AdminPricingReadOnly";
 import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from "@/hooks/useFlowPersistence";
+import { parseAdminPricing, calculateAdminPricingTotals, type AdminPricingData } from "@/utils/adminPricingUtils";
 import type { Service, PhotoType } from "@/types/database";
 import type { ArticleEntry } from "@/components/technician/WorkshopFlowModals";
 
@@ -151,6 +153,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const [signatureType, setSignatureType] = useState<SignatureType>("conclusao");
   const [showPayment, setShowPayment] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
+  const [adminPricing, setAdminPricing] = useState<AdminPricingData | null>(null);
 
   // Transition guard: prevents Dialog onOpenChange from firing handleClose during step changes
   const isTransitioning = useRef(false);
@@ -246,6 +249,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
+  // Parse admin pricing from pricing_description
+  useEffect(() => {
+    if (!isOpen) return;
+    setAdminPricing(parseAdminPricing(service.pricing_description));
+  }, [isOpen, service.pricing_description]);
   const handleStartVisit = async () => {
     try {
       await ensureValidSession();
@@ -350,6 +358,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   };
 
   const articlesSubtotal = (formData.articles as ArticleEntry[]).reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const adminPricingTotals = adminPricing ? calculateAdminPricingTotals(adminPricing) : null;
+  const adminPricingTotal = adminPricingTotals?.total || 0;
 
   const discountAmount = (() => {
     const val = parseFloat(formData.discountValue as string) || 0;
@@ -358,7 +368,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   })();
 
   const taxAmount = (articlesSubtotal - discountAmount) * ((formData.taxRate as number) / 100);
-  const totalFinal = articlesSubtotal - discountAmount + taxAmount;
+  const totalFinal = articlesSubtotal - discountAmount + taxAmount + adminPricingTotal;
 
    // Save articles to service_parts (idempotent delete+insert)
   const handleConfirmArticles = async () => {
@@ -1305,6 +1315,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             <div className="space-y-4 py-4">
               <p className="text-sm text-muted-foreground">Registe os artigos/materiais utilizados nesta reparação.</p>
 
+              {/* Admin-defined pricing - read-only */}
+              {adminPricing && (
+                <AdminPricingReadOnly data={adminPricing} />
+              )}
+
               {/* Table header */}
               <div className="rounded-lg border overflow-hidden">
                 <div className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 bg-muted/50 px-3 py-2">
@@ -1489,6 +1504,11 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
           <div className="flex-1 overflow-y-auto min-h-0 px-6">
             <div className="space-y-4 py-4">
+              {/* Admin-defined pricing - read-only */}
+              {adminPricing && (
+                <AdminPricingReadOnly data={adminPricing} showSummary />
+              )}
+
               {(formData.articles as ArticleEntry[]).length === 0 ? (
                 <p className="text-sm text-center text-muted-foreground py-4 italic">Nenhum artigo registado.</p>
               ) : (
@@ -1551,6 +1571,12 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   </>
                 )}
 
+                {adminPricingTotal > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Total Adm.</span>
+                    <span>{adminPricingTotal.toFixed(2)} €</span>
+                  </div>
+                )}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Desconto</span>
