@@ -111,35 +111,34 @@ export default function ServicePrintPage() {
     enabled: !!serviceId && isAuthenticated && !authLoading,
   });
 
-  // Parse pricing_description to extract subtotal and IVA - must be before any returns
   const pricingDetails = useMemo(() => {
     if (!service?.pricing_description) {
-      return { subtotal: service?.labor_cost || 0, iva: service?.parts_cost || 0, hasItemizedPricing: false };
+      return { subtotal: service?.labor_cost || 0, iva: service?.parts_cost || 0, hasItemizedPricing: false, items: [] };
     }
 
     try {
       const parsed = JSON.parse(service.pricing_description);
       if (parsed.items && Array.isArray(parsed.items)) {
-        const subtotal = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number }) => {
+        const subtotal = parsed.items.reduce((sum: number, item: any) => {
           const qty = item.qty || item.quantity || 1;
-          const price = item.price || item.unit_price || 0;
+          const price = item.unit_price || item.price || 0;
           return sum + (qty * price);
         }, 0);
 
-        const iva = parsed.items.reduce((sum: number, item: { qty?: number; quantity?: number; price?: number; unit_price?: number; tax?: number; tax_rate?: number }) => {
+        const iva = parsed.items.reduce((sum: number, item: any) => {
           const qty = item.qty || item.quantity || 1;
-          const price = item.price || item.unit_price || 0;
-          const tax = item.tax || item.tax_rate || 0;
+          const price = item.unit_price || item.price || 0;
+          const tax = item.tax_rate || item.tax || 0;
           return sum + ((qty * price) * (tax / 100));
         }, 0);
 
-        return { subtotal, iva, hasItemizedPricing: true };
+        return { subtotal, iva, hasItemizedPricing: true, items: parsed.items };
       }
     } catch {
       // Fallback to existing fields
     }
 
-    return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false };
+    return { subtotal: service.labor_cost || 0, iva: service.parts_cost || 0, hasItemizedPricing: false, items: [] };
   }, [service?.pricing_description, service?.labor_cost, service?.parts_cost]);
 
   const handlePrint = () => {
@@ -422,7 +421,7 @@ export default function ServicePrintPage() {
         )}
 
         {/* Artigos do Serviço */}
-        {usedParts.length > 0 && (
+        {(usedParts.length > 0 || (pricingDetails.items && pricingDetails.items.length > 0)) && (
           <>
             <Separator className="my-1" />
             <section className="mb-2">
@@ -438,18 +437,30 @@ export default function ServicePrintPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usedParts.map((part) => (
-                    <tr key={part.id} className="border-b">
-                      <td className="py-1">{part.part_code || '-'}</td>
-                      <td className="py-1">{part.part_name}</td>
-                      <td className="py-1 text-center">{part.quantity || 1}</td>
-                      <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '-'}</td>
-                      <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
-                    </tr>
-                  ))}
+                  {usedParts.length > 0 ? (
+                    usedParts.map((part) => (
+                      <tr key={part.id} className="border-b">
+                        <td className="py-1">{part.part_code || '-'}</td>
+                        <td className="py-1">{part.part_name}</td>
+                        <td className="py-1 text-center">{part.quantity || 1}</td>
+                        <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
+                      </tr>
+                    ))
+                  ) : (
+                    pricingDetails.items.map((item: any, idx: number) => (
+                      <tr key={idx} className="border-b border-dashed">
+                        <td className="py-1">-</td>
+                        <td className="py-1">{item.description}</td>
+                        <td className="py-1 text-center">{item.qty || item.quantity || 1}</td>
+                        <td className="py-1 text-right">{(item.unit_price || item.price || 0).toFixed(2)} €</td>
+                        <td className="py-1 text-right">{((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)} €</td>
+                      </tr>
+                    ))
+                  )}
                   <tr className="font-medium">
                     <td colSpan={4} className="py-1 text-right">Subtotal Artigos:</td>
-                    <td className="py-1 text-right">{totalPartsCost.toFixed(2)} €</td>
+                    <td className="py-1 text-right">{(usedParts.length > 0 ? totalPartsCost : pricingDetails.subtotal).toFixed(2)} €</td>
                   </tr>
                 </tbody>
               </table>

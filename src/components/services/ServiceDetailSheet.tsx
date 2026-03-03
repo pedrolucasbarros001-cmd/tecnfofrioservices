@@ -272,6 +272,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   const totalPaidAmount = servicePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
+
   const handleDeletePhoto = async (photoId: string) => {
     try {
       const { error } = await supabase
@@ -295,6 +296,18 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   // Use fullData (which has fresh customer join) when available, fallback to prop
   const displayService = fullData || service;
+
+  // Fallback: Parse pricing_description if serviceParts is empty
+  const centralItems = React.useMemo(() => {
+    if (serviceParts.filter((p: any) => !p.is_requested).length > 0) return [];
+    if (!displayService.pricing_description) return [];
+    try {
+      const parsed = JSON.parse(displayService.pricing_description);
+      return parsed.items || [];
+    } catch (e) {
+      return [];
+    }
+  }, [serviceParts, displayService.pricing_description]);
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
 
@@ -598,62 +611,77 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 )}
               </Section>
 
-              {/* Artigos / Intervenções - Grouped by technician/location */}
-              {serviceParts.filter((p: any) => !p.is_requested).length > 0 && (
+              {/* Artigos / Intervenções - Grouped by technician/location or from Central */}
+              {(serviceParts.filter((p: any) => !p.is_requested).length > 0 || centralItems.length > 0) && (
                 <Section
                   title="Artigos / Intervenções"
                   bgColor="bg-yellow-50"
                   borderColor="border-l-yellow-500"
                 >
                   <div className="space-y-3">
-                    {Object.entries(groupedParts).map(([key, parts]: [string, any[]]) => {
-                      const nonRequestedParts = parts.filter((p: any) => !p.is_requested);
-                      if (nonRequestedParts.length === 0) return null;
-                      const [loc, byId] = key.split('__');
-                      const authorName = partAuthorMap[byId] || 'Técnico';
-                      const locationLabel = loc === 'visita' ? 'Visita' : 'Oficina';
-                      const groupSubtotal = nonRequestedParts.reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
-                      const firstDate = nonRequestedParts[0]?.created_at;
+                    {serviceParts.filter((p: any) => !p.is_requested).length > 0 ? (
+                      Object.entries(groupedParts).map(([key, parts]: [string, any[]]) => {
+                        const nonRequestedParts = parts.filter((p: any) => !p.is_requested);
+                        if (nonRequestedParts.length === 0) return null;
+                        const [loc, byId] = key.split('__');
+                        const authorName = partAuthorMap[byId] || 'Técnico';
+                        const locationLabel = loc === 'visita' ? 'Visita' : 'Oficina';
+                        const groupSubtotal = nonRequestedParts.reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
+                        const firstDate = nonRequestedParts[0]?.created_at;
 
-                      return (
-                        <div key={key} className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium border-b pb-1">
-                            <MapPin className="h-3 w-3" />
-                            <span>{locationLabel}</span>
-                            <span>•</span>
-                            <User className="h-3 w-3" />
-                            <span>{authorName}</span>
-                            {firstDate && !isNaN(new Date(firstDate).getTime()) && (
-                              <>
-                                <span>•</span>
-                                <span>{format(new Date(firstDate), 'dd/MM/yyyy', { locale: pt })}</span>
-                              </>
-                            )}
+                        return (
+                          <div key={key} className="space-y-1">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium border-b pb-1">
+                              <MapPin className="h-3 w-3" />
+                              <span>{locationLabel}</span>
+                              <span>•</span>
+                              <User className="h-3 w-3" />
+                              <span>{authorName}</span>
+                              {firstDate && !isNaN(new Date(firstDate).getTime()) && (
+                                <>
+                                  <span>•</span>
+                                  <span>{format(new Date(firstDate), 'dd/MM/yyyy', { locale: pt })}</span>
+                                </>
+                              )}
+                            </div>
+                            {nonRequestedParts.map((part: any) => {
+                              const lineTotal = (part.cost || 0) * (part.quantity || 1);
+                              return (
+                                <div key={part.id} className="flex items-center justify-between py-1 text-sm">
+                                  <div className="flex-1">
+                                    <span className="font-medium">{part.part_name}</span>
+                                    {part.part_code && (
+                                      <span className="text-xs text-muted-foreground ml-1">({part.part_code})</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground flex gap-2">
+                                    <span>{part.quantity}x</span>
+                                    <span>{(part.cost || 0).toFixed(2)}€</span>
+                                    <span className="font-medium text-foreground">= {lineTotal.toFixed(2)}€</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div className="flex justify-end text-xs text-muted-foreground pt-1">
+                              Subtotal: {groupSubtotal.toFixed(2)} €
+                            </div>
                           </div>
-                          {nonRequestedParts.map((part: any) => {
-                            const lineTotal = (part.cost || 0) * (part.quantity || 1);
-                            return (
-                              <div key={part.id} className="flex items-center justify-between py-1 text-sm">
-                                <div className="flex-1">
-                                  <span className="font-medium">{part.part_name}</span>
-                                  {part.part_code && (
-                                    <span className="text-xs text-muted-foreground ml-1">({part.part_code})</span>
-                                  )}
-                                </div>
-                                <div className="text-xs text-muted-foreground flex gap-2">
-                                  <span>{part.quantity}x</span>
-                                  <span>{(part.cost || 0).toFixed(2)}€</span>
-                                  <span className="font-medium text-foreground">= {lineTotal.toFixed(2)}€</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <div className="flex justify-end text-xs text-muted-foreground pt-1">
-                            Subtotal: {groupSubtotal.toFixed(2)} €
+                        );
+                      })
+                    ) : (
+                      centralItems.map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between py-1 text-sm border-b border-dashed last:border-0">
+                          <div className="flex-1">
+                            <span className="font-medium">{item.description}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground flex gap-2">
+                            <span>{item.qty || item.quantity || 1}x</span>
+                            <span>{(item.unit_price || item.price || 0).toFixed(2)}€</span>
+                            <span className="font-medium text-foreground">= {((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)}€</span>
                           </div>
                         </div>
-                      );
-                    })}
+                      ))
+                    )}
                   </div>
                 </Section>
               )}

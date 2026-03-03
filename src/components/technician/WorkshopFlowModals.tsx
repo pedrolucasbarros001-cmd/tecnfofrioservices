@@ -470,6 +470,31 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
+      // Auto-save articles to service_parts if not already confirmed
+      const pendingArticles = (formData.articles as ArticleEntry[]).filter((a: ArticleEntry) => a.description?.trim());
+      if (pendingArticles.length > 0 && !formData.articlesLocked) {
+        await supabase
+          .from("service_parts")
+          .delete()
+          .eq("service_id", service.id)
+          .eq("is_requested", false)
+          .eq("registered_location", "oficina");
+        for (const article of pendingArticles) {
+          await supabase.from("service_parts").insert({
+            service_id: service.id,
+            part_name: article.description,
+            part_code: article.reference || null,
+            quantity: article.quantity,
+            cost: article.unit_price,
+            is_requested: false,
+            arrived: true,
+            iva_rate: formData.taxRate ?? 23,
+            registered_by: user?.id || null,
+            registered_location: "oficina",
+          });
+        }
+      }
+
       // If price was already set by central (admin/secretary) before execution,
       // skip the pricing step and go directly to em_debito.
       const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
@@ -489,6 +514,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
+      queryClient.invalidateQueries({ queryKey: ["service-full", service.id] });
+      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
       clearState();
       saveStateToDb(null as any);
       toast.success(hasPricingPreDefined ? `${service.code} concluído! Serviço em débito.` : `${service.code} concluído! Aguarda precificação.`);

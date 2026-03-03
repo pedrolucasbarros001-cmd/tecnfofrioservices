@@ -565,6 +565,31 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
         await ensureValidSession();
 
+        // Auto-save articles to service_parts if not already confirmed
+        const pendingArticles = (formData.articles as ArticleEntry[]).filter(a => a.description?.trim());
+        if (pendingArticles.length > 0 && !formData.articlesLocked) {
+          await supabase
+            .from("service_parts")
+            .delete()
+            .eq("service_id", service.id)
+            .eq("is_requested", false)
+            .eq("registered_location", "visita");
+          for (const article of pendingArticles) {
+            await supabase.from("service_parts").insert({
+              service_id: service.id,
+              part_name: article.description,
+              part_code: article.reference || null,
+              quantity: article.quantity,
+              cost: article.unit_price,
+              is_requested: false,
+              arrived: true,
+              iva_rate: formData.taxRate as number,
+              registered_by: user?.id || null,
+              registered_location: "visita",
+            });
+          }
+        }
+
         // If price was already set by central (admin/secretary) before execution,
         // skip the pricing step and go directly to em_debito.
         const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
@@ -584,6 +609,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
+        queryClient.invalidateQueries({ queryKey: ["service-full", service.id] });
+        queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
         toast.success(hasPricingPreDefined ? "Visita concluída! Serviço em débito." : "Visita concluída com sucesso!");
       }
 
