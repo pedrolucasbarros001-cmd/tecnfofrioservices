@@ -148,7 +148,8 @@ export default function GeralPage() {
           id, code, scheduled_date, scheduled_shift,
           appliance_type, brand, fault_description,
           service_type, service_location, status,
-          technician:technicians!services_technician_id_fkey(id, color, profile:profiles(full_name))
+          technician:technicians!services_technician_id_fkey(id, color, profile:profiles(full_name)),
+          customer:customers(*)
         `)
         .not('scheduled_date', 'is', null)
         .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'na_oficina'])

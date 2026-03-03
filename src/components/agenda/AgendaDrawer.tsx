@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Service } from '@/types/database';
 import { formatShiftLabel } from '@/utils/dateUtils';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 
 interface AgendaDrawerProps {
   date: Date | null;
@@ -164,7 +165,9 @@ function ServiceDrawerCard({ service, onClick }: ServiceDrawerCardProps) {
           </Badge>
         )}
       </div>
-      <p className="font-medium text-sm">{service.customer?.name || 'Sem cliente'}</p>
+      <div className="font-medium text-sm">
+        <CustomerLink customer={service.customer} />
+      </div>
       <p className="text-xs text-muted-foreground truncate">
         {[service.appliance_type, service.brand].filter(Boolean).join(' - ') || 'Equipamento não definido'}
       </p>
