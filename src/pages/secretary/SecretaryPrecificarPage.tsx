@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/table';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { SetPriceModal } from '@/components/modals/SetPriceModal';
-import { useServices } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 import type { Service } from '@/types/database';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -81,7 +81,7 @@ export default function SecretaryPrecificarPage() {
                       {service.code}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {service.customer?.name || 'Sem cliente'}
+                      <CustomerLink customer={service.customer} />
                     </TableCell>
                     <TableCell>
                       {[service.appliance_type, service.brand]

@@ -16,8 +16,8 @@ import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementM
 import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { useServices, useUpdateService } from '@/hooks/useServices';
-import type { Service } from '@/types/database';
 import { toast } from 'sonner';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 
 export default function SecretaryConcluidosPage() {
   const [currentService, setCurrentService] = useState<Service | null>(null);
@@ -121,7 +121,7 @@ export default function SecretaryConcluidosPage() {
                         {service.code}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {service.customer?.name || 'Sem cliente'}
+                        <CustomerLink customer={service.customer} />
                       </TableCell>
                       <TableCell>{service.customer?.phone || '-'}</TableCell>
                       <TableCell>

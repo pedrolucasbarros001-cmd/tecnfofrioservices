@@ -15,6 +15,7 @@ import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { useServices } from '@/hooks/useServices';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 import type { Service } from '@/types/database';
 
 export default function SecretaryDebitoPage() {
@@ -115,7 +116,7 @@ export default function SecretaryDebitoPage() {
                         {service.code}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {service.customer?.name || 'Sem cliente'}
+                        <CustomerLink customer={service.customer} />
                       </TableCell>
                       <TableCell>{service.customer?.phone || '-'}</TableCell>
                       <TableCell>

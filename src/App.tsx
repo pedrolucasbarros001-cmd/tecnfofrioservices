@@ -13,6 +13,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layouts/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "sonner";
+import { CustomerProvider, useCustomerProfile } from "@/contexts/CustomerContext";
+import { CustomerDetailSheet } from "@/components/shared/CustomerDetailSheet";
 
 // Pages
 import LoginPage from "@/pages/LoginPage";
@@ -82,153 +84,172 @@ function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppContent() {
+  const { isOpen, closeCustomerProfile, selectedCustomer } = useCustomerProfile();
+
+  return (
+    <>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/tv-monitor" element={
+          <ProtectedRoute allowedRoles={['monitor']}>
+            <TVMonitorPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Print pages - outside AppLayout, handle own auth via session bridge */}
+        <Route path="/print/service/:serviceId" element={<ServicePrintPage />} />
+        <Route path="/print/tag/:serviceId" element={<ServiceTagPage />} />
+        <Route path="/print/budget/:budgetId" element={<BudgetPrintPage />} />
+
+        {/* Protected routes with layout */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          {/* Owner-only routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/orcamentos" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <OrcamentosPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/colaboradores" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <ColaboradoresPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/performance" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <PerformancePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/importar" element={
+            <ProtectedRoute allowedRoles={['dono']}>
+              <ImportPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Owner + Secretary routes */}
+          <Route path="/geral" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <GeralPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/oficina" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <OficinaPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/clientes" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <ClientesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/concluidos" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <SecretaryConcluidosPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/em-debito" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <SecretaryDebitoPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/precificar" element={
+            <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
+              <SecretaryPrecificarPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Technician routes */}
+          <Route path="/servicos" element={
+            <ProtectedRoute allowedRoles={['tecnico']}>
+              <ServicosPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/oficina-tecnico" element={
+            <ProtectedRoute allowedRoles={['tecnico']}>
+              <TechnicianOfficePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/perfil" element={
+            <ProtectedRoute allowedRoles={['tecnico']}>
+              <PerfilPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/technician/history" element={
+            <ProtectedRoute allowedRoles={['tecnico']}>
+              <TechnicianHistoryPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/technician/visit/:serviceId" element={<Navigate to="/servicos" replace />} />
+          <Route path="/technician/installation/:serviceId" element={<Navigate to="/servicos" replace />} />
+          <Route path="/technician/delivery/:serviceId" element={<Navigate to="/servicos" replace />} />
+          <Route path="/technician/service/:serviceId" element={
+            <ProtectedRoute allowedRoles={['tecnico']}>
+              <ServiceRedirect />
+            </ProtectedRoute>
+          } />
+
+          {/* Universal service routes - accessible by any authenticated user */}
+          <Route path="/service/:serviceId" element={<ServiceConsultPage />} />
+          <Route path="/service-detail/:serviceId" element={<ServiceDetailPage />} />
+
+          {/* Shared routes */}
+          <Route path="/preferencias" element={<PreferenciasPage />} />
+        </Route>
+
+        {/* Redirects */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* Catch-all */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      {/* Global Customer Profile Sheet */}
+      <CustomerDetailSheet
+        open={isOpen}
+        onOpenChange={(open) => !open && closeCustomerProfile()}
+        customer={selectedCustomer}
+      />
+    </>
+  );
+}
+
 function App() {
   return (
-  <ErrorBoundary>
-    <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange={false}>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <GlobalErrorHandler>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AuthProvider>
-                <DemoProvider>
-                  <OnboardingProvider>
-                    <Routes>
-                      {/* Public routes */}
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/tv-monitor" element={
-                        <ProtectedRoute allowedRoles={['monitor']}>
-                          <TVMonitorPage />
-                        </ProtectedRoute>
-                      } />
-
-                      {/* Print pages - outside AppLayout, handle own auth via session bridge */}
-                      <Route path="/print/service/:serviceId" element={<ServicePrintPage />} />
-                      <Route path="/print/tag/:serviceId" element={<ServiceTagPage />} />
-                      <Route path="/print/budget/:budgetId" element={<BudgetPrintPage />} />
-
-                      {/* Protected routes with layout */}
-                      <Route
-                        element={
-                          <ProtectedRoute>
-                            <AppLayout />
-                          </ProtectedRoute>
-                        }
-                      >
-                        {/* Owner-only routes */}
-                        <Route path="/dashboard" element={
-                          <ProtectedRoute allowedRoles={['dono']}>
-                            <DashboardPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/orcamentos" element={
-                          <ProtectedRoute allowedRoles={['dono']}>
-                            <OrcamentosPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/colaboradores" element={
-                          <ProtectedRoute allowedRoles={['dono']}>
-                            <ColaboradoresPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/performance" element={
-                          <ProtectedRoute allowedRoles={['dono']}>
-                            <PerformancePage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/importar" element={
-                          <ProtectedRoute allowedRoles={['dono']}>
-                            <ImportPage />
-                          </ProtectedRoute>
-                        } />
-
-                        {/* Owner + Secretary routes */}
-                        <Route path="/geral" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <GeralPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/oficina" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <OficinaPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/clientes" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <ClientesPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/concluidos" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <SecretaryConcluidosPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/em-debito" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <SecretaryDebitoPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/precificar" element={
-                          <ProtectedRoute allowedRoles={['dono', 'secretaria']}>
-                            <SecretaryPrecificarPage />
-                          </ProtectedRoute>
-                        } />
-
-                        {/* Technician routes */}
-                        <Route path="/servicos" element={
-                          <ProtectedRoute allowedRoles={['tecnico']}>
-                            <ServicosPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/oficina-tecnico" element={
-                          <ProtectedRoute allowedRoles={['tecnico']}>
-                            <TechnicianOfficePage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/perfil" element={
-                          <ProtectedRoute allowedRoles={['tecnico']}>
-                            <PerfilPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/technician/history" element={
-                          <ProtectedRoute allowedRoles={['tecnico']}>
-                            <TechnicianHistoryPage />
-                          </ProtectedRoute>
-                        } />
-                        <Route path="/technician/visit/:serviceId" element={<Navigate to="/servicos" replace />} />
-                        <Route path="/technician/installation/:serviceId" element={<Navigate to="/servicos" replace />} />
-                        <Route path="/technician/delivery/:serviceId" element={<Navigate to="/servicos" replace />} />
-                        <Route path="/technician/service/:serviceId" element={
-                          <ProtectedRoute allowedRoles={['tecnico']}>
-                            <ServiceRedirect />
-                          </ProtectedRoute>
-                        } />
-
-                        {/* Universal service routes - accessible by any authenticated user */}
-                        <Route path="/service/:serviceId" element={<ServiceConsultPage />} />
-                        <Route path="/service-detail/:serviceId" element={<ServiceDetailPage />} />
-
-                        {/* Shared routes */}
-                        <Route path="/preferencias" element={<PreferenciasPage />} />
-                      </Route>
-
-                      {/* Redirects */}
-                      <Route path="/" element={<Navigate to="/login" replace />} />
-
-                      {/* Catch-all */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </OnboardingProvider>
-                </DemoProvider>
-              </AuthProvider>
-            </BrowserRouter>
-          </GlobalErrorHandler>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
-  </ErrorBoundary>
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange={false}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <GlobalErrorHandler>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AuthProvider>
+                  <DemoProvider>
+                    <OnboardingProvider>
+                      <CustomerProvider>
+                        <AppContent />
+                      </CustomerProvider>
+                    </OnboardingProvider>
+                  </DemoProvider>
+                </AuthProvider>
+              </BrowserRouter>
+            </GlobalErrorHandler>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -15,6 +15,7 @@ import { InstallationFlowModals } from '@/components/technician/InstallationFlow
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
 import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Service } from '@/types/database';
 
@@ -183,9 +184,9 @@ export default function ServicosPage() {
 
             {/* Client Name + Phone */}
             <div className="flex items-center justify-between">
-              <p className="font-medium text-base">
-                {service.customer?.name || 'Cliente'}
-              </p>
+              <div className="font-medium text-base">
+                <CustomerLink customer={service.customer} />
+              </div>
               {(service.contact_phone || service.customer?.phone) && (
                 <a
                   href={`tel:${service.contact_phone || service.customer?.phone}`}

@@ -12,8 +12,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateCustomerModal } from '@/components/modals/CreateCustomerModal';
-import { CustomerDetailSheet } from '@/components/shared/CustomerDetailSheet';
 import { PaginationControls } from '@/components/shared/PaginationControls';
+import { CustomerLink } from '@/components/shared/CustomerLink';
+import { useCustomerProfile } from '@/contexts/CustomerContext';
 import { usePaginatedCustomers, useDeleteCustomer } from '@/hooks/useCustomers';
 import type { Customer } from '@/types/database';
 
@@ -23,8 +24,7 @@ export default function ClientesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [showDetailSheet, setShowDetailSheet] = useState(false);
+  const { openCustomerProfile } = useCustomerProfile();
 
   const PAGE_SIZE = 50;
 
@@ -63,8 +63,7 @@ export default function ClientesPage() {
   };
 
   const handleRowClick = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setShowDetailSheet(true);
+    openCustomerProfile(customer);
   };
 
   const handleModalClose = (open: boolean) => {
@@ -74,8 +73,7 @@ export default function ClientesPage() {
 
   const handleCreateSuccess = (customer: Customer) => {
     // Automatically open the detail sheet for the new customer
-    setSelectedCustomer(customer);
-    setShowDetailSheet(true);
+    openCustomerProfile(customer);
   };
 
   return (
@@ -150,7 +148,9 @@ export default function ClientesPage() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleRowClick(customer)}
                   >
-                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <CustomerLink customer={customer} />
+                    </TableCell>
                     <TableCell>{customer.phone || '-'}</TableCell>
                     <TableCell>{customer.email || '-'}</TableCell>
                     <TableCell>
@@ -207,13 +207,6 @@ export default function ClientesPage() {
           onOpenChange={handleModalClose}
           customer={editingCustomer}
           onSuccess={handleCreateSuccess}
-        />
-
-        <CustomerDetailSheet
-          open={showDetailSheet}
-          onOpenChange={setShowDetailSheet}
-          customer={selectedCustomer}
-          onUpdate={() => { /* handled by query invalidation */ }}
         />
       </div >
     </ErrorBoundary >

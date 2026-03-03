@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PhotoGalleryModal } from "@/components/shared/PhotoGalleryModal";
+import { CustomerLink } from "@/components/shared/CustomerLink";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -254,7 +255,9 @@ export default function ServiceDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div>
               <span className="text-muted-foreground">Nome: </span>
-              <span className="font-medium">{service.contact_name || service.customer?.name || "N/A"}</span>
+              <span className="font-medium">
+                <CustomerLink customer={service.customer} label={service.contact_name || service.customer?.name} />
+              </span>
             </div>
             <div>
               <span className="text-muted-foreground">Telefone: </span>

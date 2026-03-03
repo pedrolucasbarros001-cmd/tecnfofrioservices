@@ -13,6 +13,7 @@ import { SendTaskModal } from '@/components/modals/SendTaskModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
+import { CustomerLink } from '@/components/shared/CustomerLink';
 import { cn } from '@/lib/utils';
 
 export default function OficinaPage() {
@@ -68,19 +69,19 @@ export default function OficinaPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Oficina</h1>
             <p className="text-muted-foreground">Serviços com equipamentos fisicamente na oficina.</p>
+          </div>
         </div>
-      </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar por código, cliente, aparelho, técnico..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar por código, cliente, aparelho, técnico..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowTaskModal(true)}>
@@ -146,9 +147,9 @@ export default function OficinaPage() {
 
                   {/* Customer & Equipment */}
                   <div className="mb-3">
-                    <p className="font-semibold text-lg truncate">
-                      {service.customer?.name || 'Cliente não definido'}
-                    </p>
+                    <div className="font-semibold text-lg truncate">
+                      <CustomerLink customer={service.customer} />
+                    </div>
                     <p className="text-sm text-muted-foreground truncate">
                       {[service.appliance_type, service.brand, service.model]
                         .filter(Boolean)
