@@ -34,7 +34,9 @@ import { CameraCapture } from "@/components/shared/CameraCapture";
 
 import { ServicePreviousSummary } from "@/components/technician/ServicePreviousSummary";
 import { DiagnosisPhotosGallery } from "@/components/technician/DiagnosisPhotosGallery";
+import { AdminPricingReadOnly } from "@/components/technician/AdminPricingReadOnly";
 import { useFlowPersistence, deriveStepFromDb, isValidStepForFlow } from "@/hooks/useFlowPersistence";
+import { parseAdminPricing, calculateAdminPricingTotals, type AdminPricingData } from "@/utils/adminPricingUtils";
 import type { Service } from "@/types/database";
 
 type ModalStep =
@@ -121,6 +123,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const [isResuming, setIsResuming] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [previousArticles, setPreviousArticles] = useState<{ reference: string; description: string; quantity: number; unit_price: number; registeredByName: string; registeredLocation: string; created_at: string }[]>([]);
+  const [adminPricing, setAdminPricing] = useState<AdminPricingData | null>(null);
 
   // Transition guard
   const isTransitioning = useRef(false);
@@ -245,6 +248,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     loadPreviousArticles();
   }, [isOpen, service.id]);
 
+  // Parse admin pricing from pricing_description
+  useEffect(() => {
+    if (!isOpen) return;
+    setAdminPricing(parseAdminPricing(service.pricing_description));
+  }, [isOpen, service.pricing_description]);
+
   useEffect(() => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       saveState(currentStep, formData);
@@ -313,6 +322,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   const articlesSubtotal = formData.articles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
   const previousArticlesSubtotal = previousArticles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
+  const adminPricingTotals = adminPricing ? calculateAdminPricingTotals(adminPricing) : null;
+  const adminPricingTotal = adminPricingTotals?.total || 0;
   const combinedSubtotal = articlesSubtotal + previousArticlesSubtotal;
 
   const discountAmount = (() => {
@@ -322,7 +333,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   })();
 
   const taxAmount = (combinedSubtotal - discountAmount) * (formData.taxRate / 100);
-  const totalFinal = combinedSubtotal - discountAmount + taxAmount;
+  const totalFinal = combinedSubtotal - discountAmount + taxAmount + adminPricingTotal;
 
   const handleConfirmArticles = async () => {
     setIsSubmitting(true);
@@ -843,6 +854,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">Registe os artigos utilizados nesta reparação.</p>
 
+                {/* Admin-defined pricing - read-only */}
+                {adminPricing && (
+                  <AdminPricingReadOnly data={adminPricing} />
+                )}
+
                 {/* Previous visit articles - read-only */}
                 {previousArticles.length > 0 && (
                   <div className="rounded-lg border border-dashed border-muted-foreground/30 overflow-hidden opacity-60">
@@ -946,6 +962,11 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             <>
               <ModalHeader title="Resumo da Reparação" step="Passo 4" />
               <div className="space-y-4">
+                {/* Admin-defined pricing - read-only */}
+                {adminPricing && (
+                  <AdminPricingReadOnly data={adminPricing} showSummary />
+                )}
+
                 {/* Previous visit articles - read-only */}
                 {previousArticles.length > 0 && (
                   <div className="opacity-60">
@@ -1058,6 +1079,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                     </>
                   )}
 
+                  {adminPricingTotal > 0 && (
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Total Adm.</span>
+                      <span>{adminPricingTotal.toFixed(2)} €</span>
+                    </div>
+                  )}
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Desconto</span>
