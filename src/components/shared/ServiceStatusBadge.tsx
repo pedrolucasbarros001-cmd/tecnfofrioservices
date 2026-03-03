@@ -4,7 +4,7 @@ import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types
 import { cn } from '@/lib/utils';
 
 interface ServiceStatusBadgeProps {
-    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price'>;
+    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type'>;
     className?: string;
 }
 
@@ -18,8 +18,15 @@ interface ServiceStatusBadgeProps {
  */
 export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatusBadgeProps>(
     ({ service, className }, ref) => {
-        const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
-            ?? { label: service.status, color: 'bg-muted text-muted-foreground' };
+        const isClientSideRepair =
+            service.status === 'concluidos' &&
+            (service.service_location === 'cliente' || service.service_type === 'visita');
+
+        const statusConfig = {
+            ...(SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
+                ?? { label: service.status, color: 'bg-muted text-muted-foreground' }),
+            ...(isClientSideRepair ? { label: 'Concluído' } : {}),
+        };
 
         const needsPricing =
             service.pending_pricing === true && (service.final_price ?? 0) === 0;
