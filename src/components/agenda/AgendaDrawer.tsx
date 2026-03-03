@@ -72,7 +72,10 @@ export function AgendaDrawer({
                   service={service}
                   onClick={() => {
                     onOpenChange(false);
-                    onServiceClick(service);
+                    // Prevent Radix UI focus/scroll-lock collisions by delaying the next sheet
+                    setTimeout(() => {
+                      onServiceClick(service);
+                    }, 50);
                   }}
                 />
               ))}
