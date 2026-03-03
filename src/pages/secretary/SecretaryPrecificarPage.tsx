@@ -17,6 +17,7 @@ import { CustomerLink } from '@/components/shared/CustomerLink';
 import type { Service } from '@/types/database';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useServices } from '@/hooks/useServices';
 
 export default function SecretaryPrecificarPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -34,7 +35,7 @@ export default function SecretaryPrecificarPage() {
     setShowDetailSheet(true);
   };
 
-  const handleSetPrice = (service: Service, e: React.MouseEvent) => {
+  const handleSetPrice = (service: Service, e: MouseEvent) => {
     e.stopPropagation();
     setPriceService(service);
     setShowSetPriceModal(true);

@@ -249,6 +249,37 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
+  // Load existing visit articles into formData (so pre-existing ones appear editable)
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadVisitArticles = async () => {
+      try {
+        const { data: parts } = await supabase
+          .from("service_parts")
+          .select("*")
+          .eq("service_id", service.id)
+          .eq("is_requested", false)
+          .eq("registered_location", "visita");
+
+        if (parts && parts.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            articles: parts.map(p => ({
+              reference: p.part_code || "",
+              description: p.part_name,
+              quantity: p.quantity || 1,
+              unit_price: p.cost || 0,
+            })),
+            taxRate: parts[0]?.iva_rate ?? prev.taxRate,
+          }));
+        }
+      } catch (err) {
+        console.warn("Error loading visit articles:", err);
+      }
+    };
+    loadVisitArticles();
+  }, [isOpen, service.id]);
+
   // Parse admin pricing from pricing_description
   useEffect(() => {
     if (!isOpen) return;
@@ -370,7 +401,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const taxAmount = (articlesSubtotal - discountAmount) * ((formData.taxRate as number) / 100);
   const totalFinal = articlesSubtotal - discountAmount + taxAmount + adminPricingTotal;
 
-   // Save articles to service_parts (idempotent delete+insert)
+  // Save articles to service_parts (idempotent delete+insert)
   const handleConfirmArticles = async () => {
     setIsSubmitting(true);
     try {

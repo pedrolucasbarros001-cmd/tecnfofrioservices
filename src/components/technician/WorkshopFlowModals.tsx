@@ -248,6 +248,37 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     loadPreviousArticles();
   }, [isOpen, service.id]);
 
+  // Load existing workshop articles into formData (so they appear editable)
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadWorkshopArticles = async () => {
+      try {
+        const { data: parts } = await supabase
+          .from("service_parts")
+          .select("*")
+          .eq("service_id", service.id)
+          .eq("is_requested", false)
+          .eq("registered_location", "oficina");
+
+        if (parts && parts.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            articles: parts.map(p => ({
+              reference: p.part_code || "",
+              description: p.part_name,
+              quantity: p.quantity || 1,
+              unit_price: p.cost || 0,
+            })),
+            taxRate: parts[0]?.iva_rate ?? prev.taxRate,
+          }));
+        }
+      } catch (err) {
+        console.warn("Error loading workshop articles:", err);
+      }
+    };
+    loadWorkshopArticles();
+  }, [isOpen, service.id]);
+
   // Parse admin pricing from pricing_description
   useEffect(() => {
     if (!isOpen) return;
