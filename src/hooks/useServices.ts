@@ -148,28 +148,18 @@ export function prefetchFullServiceData(queryClient: QueryClient, serviceId: str
       if (!data) return null;
 
       const result = data as any;
-
-      const safeDate = (d: any) => d ? new Date(d).getTime() : 0;
-      const isValid = (t: number) => !isNaN(t);
+      const safeDate = (d: any) => {
+        if (!d) return 0;
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+      };
 
       return {
         ...result,
         parts: result.parts || [],
-        photos: (result.photos || []).sort((a: any, b: any) => {
-          const tA = safeDate(a.uploaded_at);
-          const tB = safeDate(b.uploaded_at);
-          return (isValid(tB) ? tB : 0) - (isValid(tA) ? tA : 0);
-        }),
-        signatures: (result.signatures || []).sort((a: any, b: any) => {
-          const tA = safeDate(a.signed_at);
-          const tB = safeDate(b.signed_at);
-          return (isValid(tA) ? tA : 0) - (isValid(tB) ? tB : 0);
-        }),
-        payments: (result.payments || []).sort((a: any, b: any) => {
-          const tA = safeDate(a.payment_date);
-          const tB = safeDate(b.payment_date);
-          return (isValid(tB) ? tB : 0) - (isValid(tA) ? tA : 0);
-        }),
+        photos: (result.photos || []).sort((a: any, b: any) => safeDate(b.uploaded_at) - safeDate(a.uploaded_at)),
+        signatures: (result.signatures || []).sort((a: any, b: any) => safeDate(a.signed_at) - safeDate(b.signed_at)),
+        payments: (result.payments || []).sort((a: any, b: any) => safeDate(b.payment_date) - safeDate(a.payment_date)),
         logs: [],
       };
     },

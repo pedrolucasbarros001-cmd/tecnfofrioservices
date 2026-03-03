@@ -79,10 +79,10 @@ export function StateActionButtons({
   const isSecretaria = role === 'secretaria';
   const isTecnico = role === 'tecnico';
 
-  const isWarrantyService = service.is_warranty || false;
-  const isServicePriced = (service.final_price || 0) > 0 || isWarrantyService;
-  const isServiceInDebit = !isWarrantyService && isServicePriced && (service.amount_paid || 0) < (service.final_price || 0);
-  const canBeFinalized = (isServicePriced || isWarrantyService) && !isServiceInDebit && service.status === 'concluidos';
+  const isWarrantyService = service?.is_warranty || false;
+  const isServicePriced = (service?.final_price || 0) > 0 || isWarrantyService;
+  const isServiceInDebit = !isWarrantyService && isServicePriced && (service?.amount_paid || 0) < (service?.final_price || 0);
+  const canBeFinalized = (isServicePriced || isWarrantyService) && !isServiceInDebit && service?.status === 'concluidos';
 
   // Unified button style - all actions are primary blue
   const primaryButtonClass = 'bg-primary text-primary-foreground hover:bg-primary/90';
@@ -94,11 +94,11 @@ export function StateActionButtons({
     const contextStatus: ServiceStatus =
       viewContext && viewContext !== 'all'
         ? viewContext as ServiceStatus
-        : (service.status as ServiceStatus);
+        : (service?.status as ServiceStatus);
 
     switch (contextStatus) {
       case 'por_fazer':
-        if (!service.technician_id) {
+        if (!service?.technician_id) {
           return {
             label: 'Atribuir Técnico',
             icon: UserPlus,
@@ -165,7 +165,7 @@ export function StateActionButtons({
 
       // Serviços finalizados que ainda precisam de precificação
       case 'finalizado':
-        if ((isDono || isSecretaria) && service.pending_pricing && onSetPrice) {
+        if ((isDono || isSecretaria) && service?.pending_pricing && onSetPrice) {
           return {
             label: 'Orçamentar',
             icon: DollarSign,
@@ -177,7 +177,7 @@ export function StateActionButtons({
 
       case 'concluidos': {
         // Priority 1: Pricing must be resolved first
-        const needsPricing = service.pending_pricing || !isServicePriced;
+        const needsPricing = service?.pending_pricing || !isServicePriced;
         if (needsPricing && (isDono || isSecretaria) && onSetPrice) {
           return {
             label: 'Orçamentar',
@@ -187,7 +187,7 @@ export function StateActionButtons({
           };
         }
         // Priority 2: Delivery management after pricing is done
-        if (!needsPricing && (isDono || isSecretaria) && service.service_location === 'oficina' && onManageDelivery) {
+        if (!needsPricing && (isDono || isSecretaria) && service?.service_location === 'oficina' && onManageDelivery) {
           return {
             label: 'Gerir Entrega',
             icon: Truck,
@@ -254,13 +254,13 @@ export function StateActionButtons({
           </DropdownMenuItem>
 
           {/* Assign/Reassign Technician */}
-          {!service.technician_id && (isDono || isSecretaria) && (
+          {!service?.technician_id && (isDono || isSecretaria) && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignTechnician(); }}>
               <UserPlus className="h-4 w-4 mr-2" />
               Atribuir Técnico
             </DropdownMenuItem>
           )}
-          {service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && (
+          {service?.technician_id && service?.status !== 'finalizado' && (isDono || isSecretaria) && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignTechnician(); }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Reatribuir Técnico
@@ -268,7 +268,7 @@ export function StateActionButtons({
           )}
 
           {/* Reschedule Service - Dono or Secretaria */}
-          {service.technician_id && service.status !== 'finalizado' && (isDono || isSecretaria) && onReschedule && (
+          {service?.technician_id && service?.status !== 'finalizado' && (isDono || isSecretaria) && onReschedule && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onReschedule(); }}>
               <CalendarClock className="h-4 w-4 mr-2" />
               Reagendar Serviço
@@ -276,7 +276,7 @@ export function StateActionButtons({
           )}
 
           {/* Request Part - Technician or Dono during execution */}
-          {(service.status === 'em_execucao' || service.status === 'na_oficina') && onRequestPart && (isTecnico || isDono || isSecretaria) && (
+          {(service?.status === 'em_execucao' || service?.status === 'na_oficina') && onRequestPart && (isTecnico || isDono || isSecretaria) && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRequestPart(); }}>
               <Package className="h-4 w-4 mr-2" />
               Solicitar Peça
@@ -284,7 +284,7 @@ export function StateActionButtons({
           )}
 
           {/* Set Price - Dono or Secretaria */}
-          {(service.pending_pricing || service.status === 'a_precificar' || (service.status === 'concluidos' && !isServicePriced)) && (isDono || isSecretaria) && onSetPrice && (
+          {(service?.pending_pricing || service?.status === 'a_precificar' || (service?.status === 'concluidos' && !isServicePriced)) && (isDono || isSecretaria) && onSetPrice && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSetPrice(); }}>
               <DollarSign className="h-4 w-4 mr-2" />
               Orçamentar
@@ -308,7 +308,7 @@ export function StateActionButtons({
           )}
 
           {/* Manage Delivery - Concluidos with workshop location AND pricing resolved */}
-          {service.status === 'concluidos' && service.service_location === 'oficina' && !service.pending_pricing && isServicePriced && (isDono || isSecretaria) && onManageDelivery && (
+          {service?.status === 'concluidos' && service?.service_location === 'oficina' && !service?.pending_pricing && isServicePriced && (isDono || isSecretaria) && onManageDelivery && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onManageDelivery(); }}>
               <Truck className="h-4 w-4 mr-2" />
               Gerir Entrega
