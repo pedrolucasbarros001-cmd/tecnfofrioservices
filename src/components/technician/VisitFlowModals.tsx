@@ -564,10 +564,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         await ensureValidSession();
+
+        // If price was already set by central (admin/secretary) before execution,
+        // skip the pricing step and go directly to em_debito.
+        const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
+
         await updateService.mutateAsync({
           id: service.id,
-          status: "concluidos",
-          pending_pricing: true,
+          status: hasPricingPreDefined ? "em_debito" : "concluidos",
+          pending_pricing: hasPricingPreDefined ? false : true,
           detected_fault: formData.detectedFault,
           work_performed: mode === "continuacao_peca" ? "Peça instalada e serviço concluído" : "Reparado no local do cliente",
           last_status_before_part_request: null,
@@ -579,7 +584,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-        toast.success("Visita concluída com sucesso!");
+        toast.success(hasPricingPreDefined ? "Visita concluída! Serviço em débito." : "Visita concluída com sucesso!");
       }
 
       clearState();

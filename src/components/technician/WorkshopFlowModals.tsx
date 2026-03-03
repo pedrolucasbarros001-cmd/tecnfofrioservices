@@ -470,10 +470,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
+      // If price was already set by central (admin/secretary) before execution,
+      // skip the pricing step and go directly to em_debito.
+      const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
+
       const { error: rpcError } = await technicianUpdateService({
         serviceId: service.id,
-        status: 'concluidos',
-        pendingPricing: true,
+        status: hasPricingPreDefined ? 'em_debito' : 'concluidos',
+        pendingPricing: hasPricingPreDefined ? false : true,
         detectedFault: formData.detectedFault || null,
         workPerformed: finalWorkPerformed,
       });
@@ -487,7 +491,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       clearState();
       saveStateToDb(null as any);
-      toast.success(`${service.code} concluído! Aguarda precificação.`);
+      toast.success(hasPricingPreDefined ? `${service.code} concluído! Serviço em débito.` : `${service.code} concluído! Aguarda precificação.`);
       onComplete();
     } catch (error) {
       console.error("Error completing repair:", error);

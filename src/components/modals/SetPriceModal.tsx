@@ -164,12 +164,12 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     item => item.description && item.description.trim() !== ''
   );
   const { subtotal: additionalSubtotal, totalTax: additionalTax, total: additionalTotal } = calculateTotals(validAdditionalItems);
-  
+
   // Combined subtotal: history + additional
   const combinedSubtotal = historySubtotal + additionalSubtotal;
   const combinedTax = additionalTax; // History IVA is already in the parts cost
   const combinedTotal = historySubtotal + additionalTotal;
-  
+
   const discountAmount = calculateDiscount(combinedSubtotal, discountValue, discountType);
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
   const finalPrice = warrantyCoversAll ? 0 : Math.max(0, combinedTotal - discountAmount + adjustmentAmount);
@@ -204,9 +204,17 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
     const currentStatus = service.status as ServiceStatus;
 
+    // Determine next status:
+    // - a_precificar: oficina que precisa de preço
+    // - concluidos + pending_pricing: visita/entrega concluída que aguarda preço
+    // Both go to em_debito after pricing is confirmed (or finalizado if warranty)
+    const needsPricingConfirmation =
+      currentStatus === 'a_precificar' ||
+      (currentStatus === 'concluidos' && service.pending_pricing === true);
+
     let newStatus: ServiceStatus | undefined;
 
-    if (currentStatus === 'a_precificar') {
+    if (needsPricingConfirmation) {
       if (warrantyCoversAll) {
         newStatus = isClientLocation ? 'finalizado' : 'concluidos';
       } else {
