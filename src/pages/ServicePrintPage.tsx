@@ -215,6 +215,7 @@ export default function ServicePrintPage() {
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status];
   const usedParts = parts.filter(p => !p.is_requested);
+  const requestedParts = parts.filter(p => p.is_requested);
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -464,6 +465,50 @@ export default function ServicePrintPage() {
                   </tr>
                 </tbody>
               </table>
+            </section>
+          </>
+        )}
+
+        {/* Peças Solicitadas / Pedidas */}
+        {requestedParts.length > 0 && (
+          <>
+            <Separator className="my-1" />
+            <section className="mb-2">
+              <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5 flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-0.5" />
+                Peças Solicitadas
+              </h2>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1">Peça</th>
+                    <th className="text-left py-1">Referência</th>
+                    <th className="text-left py-1">Data do Pedido</th>
+                    <th className="text-left py-1">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestedParts.map((part) => (
+                    <tr key={part.id} className="border-b border-dashed">
+                      <td className="py-1 font-medium">{part.part_name}</td>
+                      <td className="py-1 text-muted-foreground">{part.part_code || '-'}</td>
+                      <td className="py-1">
+                        {part.created_at
+                          ? format(new Date(part.created_at), 'dd/MM/yyyy', { locale: pt })
+                          : '-'}
+                      </td>
+                      <td className="py-1">
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-medium">
+                          Solicitada
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-[10px] text-muted-foreground mt-1 italic">
+                Peças listadas aguardam encomenda ou chegada.
+              </p>
             </section>
           </>
         )}
