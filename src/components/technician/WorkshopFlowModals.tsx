@@ -806,7 +806,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   <span className="text-destructive">*</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {formData.photosEstado.filter(p => p !== '__photo_exists__').map((p, idx) => (
+                  {(formData.photosEstado || []).filter(p => p !== '__photo_exists__').map((p, idx) => (
                     <div key={idx} className="relative aspect-square">
                       <img src={p} alt={`Estado ${idx}`} className="w-full h-full object-cover rounded-lg" />
                     </div>
@@ -956,7 +956,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                     <span></span>
                   </div>
 
-                  {formData.articles.map((article, idx) => (
+                  {(formData.articles || []).map((article, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 px-3 py-2 border-t items-start">
                       <Textarea
                         placeholder="Referência"
@@ -1076,7 +1076,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                       <span className="col-span-2 text-right">Unit.</span>
                       <span className="col-span-2 text-right">Total</span>
                     </div>
-                    {formData.articles.map((article, idx) => (
+                    {(formData.articles || []).map((article, idx) => (
                       <div key={idx} className="grid grid-cols-12 gap-1 text-xs px-2 py-1.5 bg-muted/30 rounded">
                         <span className="col-span-2 truncate">{article.reference || "-"}</span>
                         <span className="col-span-4 truncate">{article.description}</span>
@@ -1229,7 +1229,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                           Nenhuma peça adicionada.
                         </p>
                       )}
-                      {formData.partsToOrder.map((part, index) => (
+                      {(formData.partsToOrder || []).map((part, index) => (
                         <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
                           <Button
                             type="button"

@@ -32,7 +32,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hydrationPromiseRef = useRef<{ userId: string; promise: Promise<AppRole | null> } | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
+    // Immediately fetch session to unblock loading state if event is delayed
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (mounted) {
+          if (initialSession?.user) {
+            setSession(initialSession);
+            setUser(initialSession.user);
+            await hydrateUser(initialSession.user.id);
+          } else {
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('[AuthContext] Initialization error:', error);
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return;
+
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
@@ -68,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener('message', handleSessionRequest);
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       window.removeEventListener('message', handleSessionRequest);
     };
@@ -108,8 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return userRole;
       } catch (error) {
         console.error('[AuthContext] Unexpected hydrateUser error:', error);
-        setProfile(null);
-        setRole(null);
+        // Do not clear existing profile/role on transient network errors during token refresh
+        setLoading(false);
         return null;
       } finally {
         hydrationPromiseRef.current = null;

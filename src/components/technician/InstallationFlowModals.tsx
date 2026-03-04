@@ -554,7 +554,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               <div className="space-y-2">
                 <Label className="text-sm">Materiais registados:</Label>
                 <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                  {formData.usedMaterials.map((m, idx) => (
+                  {(formData.usedMaterials || []).map((m, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span>{m.name}</span>
                       <span className="text-muted-foreground">x{m.quantity}</span>

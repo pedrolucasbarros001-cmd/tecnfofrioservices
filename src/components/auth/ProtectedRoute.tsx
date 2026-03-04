@@ -17,7 +17,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">A carregar...</p>
+          <p className="text-muted-foreground">A validar acesso...</p>
         </div>
       </div>
     );
@@ -27,8 +27,16 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to={getDefaultRouteForRole(role)} replace />;
+  if (allowedRoles) {
+    if (!role) {
+      // User is authenticated but role failed to hydrate (network error, orphan, etc.)
+      console.warn('[ProtectedRoute] Authenticated user missing role. Redirecting to login.');
+      return <Navigate to="/login" state={{ from: location, error: 'missing_role' }} replace />;
+    }
+
+    if (!allowedRoles.includes(role)) {
+      return <Navigate to={getDefaultRouteForRole(role)} replace />;
+    }
   }
 
   return <>{children}</>;
