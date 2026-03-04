@@ -95,7 +95,9 @@ export default function SecretaryPrecificarPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {format(new Date(service.updated_at), "dd/MM/yyyy", { locale: pt })}
+                      {service.updated_at && !isNaN(new Date(service.updated_at).getTime())
+                        ? format(new Date(service.updated_at), "dd/MM/yyyy", { locale: pt })
+                        : "Data indisponível"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

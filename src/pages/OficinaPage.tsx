@@ -206,11 +206,10 @@ export default function OficinaPage() {
                     </div>
                   )}
 
-                  {/* Entry Time */}
                   <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     <span>
-                      Entrada: {format(new Date(service.created_at), "dd/MM 'às' HH:mm")}
+                      Entrada: {service.created_at && !isNaN(new Date(service.created_at).getTime()) ? format(new Date(service.created_at), "dd/MM 'às' HH:mm") : 'Inválida'}
                     </span>
                   </div>
                 </CardContent>

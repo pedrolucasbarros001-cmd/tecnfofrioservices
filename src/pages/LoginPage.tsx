@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { useAuth, getDefaultRouteForRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, role, isAuthenticated, loading } = useAuth();
+  const { signIn, signOut, role, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -106,6 +106,44 @@ export default function LoginPage() {
       setIsLoading(false);
       console.groupEnd();
     }
+  }
+
+  // Se o utilizador está autenticado mas a internet falhou e não conseguiu o ROLE
+  if (isAuthenticated && !role && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-0 bg-slate-900/50 backdrop-blur-xl">
+          <CardContent className="p-8 text-center space-y-6">
+            <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto" />
+            <h2 className="text-xl font-bold text-white">Falha ao Carregar Permissões</h2>
+            <p className="text-slate-300 text-sm">
+              Sessão iniciada, mas ocorreu um erro de ligação ao tentar obter o nível de acesso da sua conta.
+              Isto ocorre devido a falhas na internet. Requer uma ligação estável para continuar.
+            </p>
+            <div className="space-y-3 pt-4">
+              <Button
+                onClick={() => window.location.reload()}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                Tentar Ligar Novamente
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setIsLoading(true);
+                  await signOut();
+                  window.location.reload();
+                }}
+                disabled={isLoading}
+                className="w-full border-white/20 text-slate-300 hover:text-white bg-transparent hover:bg-white/10"
+              >
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sair e Limpar Sessão'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

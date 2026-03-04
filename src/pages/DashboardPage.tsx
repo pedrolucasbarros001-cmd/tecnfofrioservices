@@ -212,22 +212,25 @@ export default function DashboardPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {activityLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-shrink-0 w-16 text-xs text-muted-foreground">
-                    {format(new Date(log.created_at), 'HH:mm')}
+              {activityLogs.map((log) => {
+                const isValidDate = log.created_at && !isNaN(new Date(log.created_at).getTime());
+                return (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-16 text-xs text-muted-foreground">
+                      {isValidDate ? format(new Date(log.created_at), 'HH:mm') : '--:--'}
+                    </div>
+                    <div className="flex-1 text-sm">
+                      {log.description}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {isValidDate ? formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: pt }) : 'data inválida'}
+                    </div>
                   </div>
-                  <div className="flex-1 text-sm">
-                    {log.description}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: pt })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

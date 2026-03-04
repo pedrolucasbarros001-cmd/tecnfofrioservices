@@ -267,34 +267,40 @@ export default function TVMonitorPage() {
                             {activityLogs.length === 0 ? (
                                 <span className="text-white/30 text-base font-bold uppercase italic tracking-wider">Aguardando atualizações do sistema...</span>
                             ) : (
-                                activityLogs.map((log) => (
+                                activityLogs.map((log) => {
+                                    const isValidDate = log.created_at && !isNaN(new Date(log.created_at).getTime());
+                                    return (
+                                        <div
+                                            key={log.id}
+                                            className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-1.5 backdrop-blur-sm"
+                                        >
+                                            <span className="text-base text-yellow-300 font-mono font-bold">
+                                                [{isValidDate ? format(new Date(log.created_at), "HH:mm") : "--:--"}]
+                                            </span>
+                                            <span className="text-lg text-white font-bold tracking-tight uppercase">
+                                                {log.description}
+                                            </span>
+                                        </div>
+                                    )
+                                })
+                            )}
+                            {/* Duplicate for Marquee Loop */}
+                            {activityLogs.length > 0 && activityLogs.map((log) => {
+                                const isValidDate = log.created_at && !isNaN(new Date(log.created_at).getTime());
+                                return (
                                     <div
-                                        key={log.id}
+                                        key={`${log.id}-dup`}
                                         className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-1.5 backdrop-blur-sm"
                                     >
                                         <span className="text-base text-yellow-300 font-mono font-bold">
-                                            [{format(new Date(log.created_at), "HH:mm")}]
+                                            [{isValidDate ? format(new Date(log.created_at), "HH:mm") : "--:--"}]
                                         </span>
                                         <span className="text-lg text-white font-bold tracking-tight uppercase">
                                             {log.description}
                                         </span>
                                     </div>
-                                ))
-                            )}
-                            {/* Duplicate for Marquee Loop */}
-                            {activityLogs.length > 0 && activityLogs.map((log) => (
-                                <div
-                                    key={`${log.id}-dup`}
-                                    className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-1.5 backdrop-blur-sm"
-                                >
-                                    <span className="text-base text-yellow-300 font-mono font-bold">
-                                        [{format(new Date(log.created_at), "HH:mm")}]
-                                    </span>
-                                    <span className="text-lg text-white font-bold tracking-tight uppercase">
-                                        {log.description}
-                                    </span>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 </div>

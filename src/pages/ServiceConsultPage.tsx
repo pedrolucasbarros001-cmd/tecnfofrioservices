@@ -77,7 +77,7 @@ export default function ServiceConsultPage() {
     queryKey: ['service-consult', serviceId],
     queryFn: async () => {
       if (!serviceId) throw new Error('ID do serviço não fornecido');
-      
+
       const { data, error } = await supabase
         .from('services')
         .select(`
@@ -90,7 +90,7 @@ export default function ServiceConsultPage() {
         `)
         .eq('id', serviceId)
         .single();
-      
+
       if (error) throw error;
       return data as FullService;
     },
@@ -140,9 +140,9 @@ export default function ServiceConsultPage() {
       <div className="max-w-lg mx-auto space-y-6">
         {/* Header with Logo */}
         <div className="text-center py-4">
-          <img 
-            src={tecnofrioLogoFull} 
-            alt="TECNOFRIO" 
+          <img
+            src={tecnofrioLogoFull}
+            alt="TECNOFRIO"
             className="h-12 mx-auto mb-2"
           />
           <p className="text-sm text-muted-foreground">
@@ -158,14 +158,14 @@ export default function ServiceConsultPage() {
 
         {/* Status Card - Main Focus */}
         <Card className="border-2 shadow-lg overflow-hidden">
-          <div 
+          <div
             className="h-2"
             style={{ backgroundColor: statusConfig?.color || '#888' }}
           />
           <CardContent className="pt-6 text-center space-y-4">
-            <Badge 
+            <Badge
               className="text-base px-4 py-2"
-              style={{ 
+              style={{
                 backgroundColor: statusConfig?.color + '20',
                 borderColor: statusConfig?.color,
                 color: statusConfig?.color
@@ -232,11 +232,13 @@ export default function ServiceConsultPage() {
                 Entrada
               </div>
               <p className="font-medium">
-                {format(new Date(service.created_at), "dd 'de' MMMM", { locale: pt })}
+                {service.created_at && !isNaN(new Date(service.created_at).getTime())
+                  ? format(new Date(service.created_at), "dd 'de' MMMM", { locale: pt })
+                  : "Data indisponível"}
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="pt-4 space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -367,7 +369,7 @@ export default function ServiceConsultPage() {
                         </span>
                       )}
                     </div>
-                    {payment.payment_date && (
+                    {payment.payment_date && !isNaN(new Date(payment.payment_date).getTime()) && (
                       <span className="text-xs text-muted-foreground">
                         {format(new Date(payment.payment_date), 'dd/MM/yyyy')}
                       </span>
@@ -413,8 +415,8 @@ export default function ServiceConsultPage() {
           <p className="text-xs text-muted-foreground">
             Link de acesso a esta página:
           </p>
-          <a 
-            href={window.location.href} 
+          <a
+            href={window.location.href}
             className="text-sm text-primary underline break-all font-mono"
           >
             {window.location.href}
