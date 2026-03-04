@@ -77,7 +77,7 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
       try {
         const { data } = await supabase
           .from('customers')
-          .select('id, name')
+          .select('id, name, address, postal_code, city')
           .eq('phone', phone.trim())
           .limit(1)
           .maybeSingle();
@@ -85,6 +85,10 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
         if (data) {
           setExistingCustomer(data);
           form.setValue('customer_name', data.name);
+          // Auto-fill address if customer has one saved
+          if (data.address) form.setValue('customer_address', data.address);
+          if (data.postal_code) form.setValue('customer_postal_code', data.postal_code);
+          if (data.city) form.setValue('customer_city', data.city);
         } else {
           setExistingCustomer(null);
         }
