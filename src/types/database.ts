@@ -15,7 +15,8 @@ export type ServiceStatus =
   | 'a_precificar'
   | 'concluidos'
   | 'em_debito'
-  | 'finalizado';
+  | 'finalizado'
+  | 'cancelado';
 
 export type ScheduledShift = 'manha' | 'tarde' | 'noite' | string;
 
@@ -255,6 +256,7 @@ export const SERVICE_STATUS_CONFIG: Record<ServiceStatus, {
   concluidos: { label: 'Oficina Reparados', color: 'bg-primary/20 text-primary font-medium', intensity: 'active' },
   em_debito: { label: 'Em Débito', color: 'bg-primary/10 text-primary border-l-2 border-l-destructive', intensity: 'normal' },
   finalizado: { label: 'Concluídos', color: 'bg-primary/5 text-primary/60', intensity: 'dim' },
+  cancelado: { label: 'Cancelado', color: 'bg-destructive/5 text-destructive/60 line-through', intensity: 'dim' },
 };
 
 export const SERVICE_TYPE_CONFIG: Record<ServiceType, { label: string; icon: string }> = {

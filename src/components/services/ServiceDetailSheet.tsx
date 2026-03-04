@@ -226,6 +226,8 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<ServicePayment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
@@ -380,6 +382,24 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error deleting service:', error);
+    }
+  };
+
+  const handleCancelService = async () => {
+    if (!service) return;
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'cancelado',
+        skipToast: true,
+      });
+      toast.success(`Serviço ${service.code || ''} desativado. Todos os dados foram preservados.`);
+      setShowCancelDialog(false);
+      setCancelReason('');
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error cancelling service:', error);
+      toast.error('Erro ao desativar o serviço. Tente novamente.');
     }
   };
 
@@ -957,6 +977,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}
               onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
               onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
+              onCancel={(role === 'dono' || role === 'secretaria') && service.status !== 'cancelado' && service.status !== 'finalizado' ? () => setShowCancelDialog(true) : undefined}
             />
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
@@ -1080,6 +1101,28 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel (Deactivate) Service Confirmation */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar Serviço</AlertDialogTitle>
+            <AlertDialogDescription>
+              O serviço <strong>{service.code}</strong> ficará inativo e visualmente marcado como cancelado.
+              Todos os registos, fotos e histórico serão preservados. Pode reativar o serviço a qualquer momento via &quot;Mudar Status (Forçado)&quot;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelService}
+              className="bg-muted text-muted-foreground hover:bg-muted/80"
+            >
+              Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

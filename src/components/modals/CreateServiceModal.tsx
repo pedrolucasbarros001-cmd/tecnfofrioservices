@@ -272,9 +272,10 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         service_type: 'reparacao',
         status: initialStatus,
         pending_pricing: true,
-        service_address: null,
-        service_postal_code: null,
-        service_city: null,
+        // Auto-fill address from selected customer or from form
+        service_address: values.customer_address || selectedCustomer?.address || null,
+        service_postal_code: values.customer_postal_code || selectedCustomer?.postal_code || null,
+        service_city: values.customer_city || selectedCustomer?.city || null,
         contact_name: values.customer_name,
         contact_phone: values.customer_phone,
         contact_email: values.customer_email || null,

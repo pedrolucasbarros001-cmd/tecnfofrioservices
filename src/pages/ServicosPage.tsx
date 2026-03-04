@@ -166,7 +166,7 @@ export default function ServicosPage() {
 
     return (
       <Card
-        className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder)}
+        className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder, service.status === 'cancelado' && 'opacity-40 grayscale')}
         data-tour="service-cards"
         data-demo="service-cards"
       >

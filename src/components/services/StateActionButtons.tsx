@@ -14,6 +14,7 @@ import {
   Trash2,
   CalendarClock,
   Pencil,
+  Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +44,7 @@ interface StateActionButtonsProps {
   onDelete?: () => void;
   onReschedule?: () => void;
   onEditDetails?: () => void;
+  onCancel?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -72,6 +74,7 @@ export function StateActionButtons({
   onDelete,
   onReschedule,
   onEditDetails,
+  onCancel,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -351,6 +354,20 @@ export function StateActionButtons({
                   Eliminar Serviço
                 </DropdownMenuItem>
               )}
+            </>
+          )}
+
+          {/* Cancel Service - Dono or Secretaria */}
+          {onCancel && (isDono || isSecretaria) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => { e.stopPropagation(); onCancel(); }}
+                className="text-muted-foreground"
+              >
+                <Ban className="h-4 w-4 mr-2" />
+                Desativar Serviço
+              </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
