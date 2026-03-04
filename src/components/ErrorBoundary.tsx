@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCcw } from 'lucide-react';
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: React.ErrorInfo | null;
 }
 
 interface ErrorBoundaryProps {
@@ -15,64 +16,78 @@ interface ErrorBoundaryProps {
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    // Renderiza a UI de fallback na próxima renderização.
+    return { hasError: true, error, errorInfo: null };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
       return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-          <div className="max-w-md w-full text-center space-y-6">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 z-[9999] relative">
+          <div className="max-w-3xl w-full text-center space-y-4 bg-white dark:bg-zinc-900 p-6 rounded-xl border border-red-200 dark:border-red-900 shadow-2xl">
             <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="h-8 w-8 text-destructive" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-xl font-semibold text-foreground">
-                Ocorreu um erro
+              <h1 className="text-2xl font-bold text-foreground">
+                Ocorreu um erro ao abrir a tela
               </h1>
-              <p className="text-muted-foreground text-sm">
-                Algo correu mal. Por favor, tente novamente ou contacte o suporte se o problema persistir.
+              <p className="text-sm font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-100 dark:border-red-800/30">
+                🚨 POR FAVOR, TIRE UMA FOTO DESTA TELA COMPLETA E ENVIE AO SUPORTE. 🚨<br />
+                Isso nos dirá exatamente em qual linha de código o sistema falhou.
               </p>
             </div>
-            <div className="flex flex-col gap-3">
-              <Button onClick={this.handleRetry} className="w-full">
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Tentar Novamente
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => window.location.href = '/login'}
-                className="w-full"
-              >
-                Voltar ao Login
-              </Button>
-            </div>
-            {import.meta.env.DEV && this.state.error && (
-              <details className="text-left text-xs bg-muted p-3 rounded-lg">
-                <summary className="cursor-pointer text-muted-foreground">
-                  Detalhes do erro (desenvolvimento)
+
+            {this.state.error && (
+              <details open className="text-left text-xs bg-muted/50 p-4 rounded-lg mt-4 border border-border shadow-inner overflow-auto max-h-[50vh]">
+                <summary className="cursor-pointer text-destructive font-bold mb-3 text-sm">
+                  Detalhes Técnicos do Erro
                 </summary>
-                <pre className="mt-2 overflow-auto text-destructive">
-                  {this.state.error.toString()}
-                </pre>
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-semibold text-foreground mb-1">Mensagem do Erro (Causa):</p>
+                    <pre className="whitespace-pre-wrap text-destructive font-mono text-[11px] p-2 bg-destructive/5 rounded">
+                      {this.state.error.toString()}
+                    </pre>
+                  </div>
+                  {this.state.errorInfo && (
+                    <div>
+                      <p className="font-semibold text-foreground mt-2 mb-1">Rastreamento (Árvore de Componentes):</p>
+                      <pre className="text-muted-foreground whitespace-pre-wrap font-mono text-[10px] leading-relaxed p-2 bg-background/50 rounded border border-border">
+                        {this.state.errorInfo.componentStack}
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </details>
             )}
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border mt-4">
+              <Button onClick={this.handleRetry} className="flex-1" variant="default">
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Tentar Recarregar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/'}
+                className="flex-1"
+              >
+                Forçar Voltar ao Início
+              </Button>
+            </div>
           </div>
         </div>
       );
