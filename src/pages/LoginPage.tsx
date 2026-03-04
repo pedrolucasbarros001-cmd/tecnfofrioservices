@@ -220,14 +220,8 @@ export default function LoginPage() {
                 className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 transition-all duration-200"
                 disabled={isLoading}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    A entrar...
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <span>{isLoading ? 'A entrar...' : 'Entrar'}</span>
               </Button>
             </form>
           </Form>

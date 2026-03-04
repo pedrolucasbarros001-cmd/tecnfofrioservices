@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
@@ -46,9 +45,9 @@ interface RequestPartModalProps {
   requireSignature?: boolean;
 }
 
-export function RequestPartModal({ 
-  service, 
-  open, 
+export function RequestPartModal({
+  service,
+  open,
   onOpenChange,
   requireSignature = false,
 }: RequestPartModalProps) {
@@ -87,7 +86,6 @@ export function RequestPartModal({
 
     setIsSubmitting(true);
     try {
-      // Insert all part requests
       const inserts = validParts.map(p => ({
         service_id: service.id,
         part_name: p.partName.trim(),
@@ -105,10 +103,7 @@ export function RequestPartModal({
 
       if (partError) throw partError;
 
-      // Save current status before changing to para_pedir_peca
       const currentStatus = service.status;
-
-      // Update service status to para_pedir_peca
       await updateService.mutateAsync({
         id: service.id,
         status: 'para_pedir_peca',
@@ -116,7 +111,6 @@ export function RequestPartModal({
         skipToast: true,
       });
 
-      // Notify owners and secretaries about the part request
       const technicianName = profile?.full_name || 'Técnico';
       const partNames = validParts.map(p => p.partName.trim()).join(', ');
       await notifyPartRequested(
@@ -127,13 +121,14 @@ export function RequestPartModal({
       );
 
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      
+
       const count = validParts.length;
-      toast.success(
-        count === 1
-          ? `Peça "${validParts[0].partName.trim()}" solicitada! ${service.code} aguarda aprovação.`
-          : `${count} peças solicitadas! ${service.code} aguarda aprovação.`
-      );
+      if (count === 1) {
+        toast.success(`Peça "${validParts[0].partName.trim()}" solicitada! ${service.code} aguarda aprovação.`);
+      } else {
+        toast.success(`${count} peças solicitadas! ${service.code} aguarda aprovação.`);
+      }
+
       onOpenChange(false);
       resetForm();
     } catch (error) {
@@ -154,15 +149,24 @@ export function RequestPartModal({
     resetForm();
   };
 
+  const validCount = parts.filter(p => p.partName.trim()).length;
+  const confirmLabel = isSubmitting
+    ? 'A solicitar...'
+    : validCount > 1
+      ? `Confirmar Pedido (${validCount})`
+      : 'Confirmar Pedido';
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-yellow-600" />
-            Solicitar Peça{parts.length > 1 ? 's' : ''}
+            <span>{parts.length > 1 ? 'Solicitar Peças' : 'Solicitar Peça'}</span>
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.</p>
+          <p className="text-sm text-muted-foreground">
+            Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.
+          </p>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6">
@@ -171,18 +175,18 @@ export function RequestPartModal({
               <div className="p-3 bg-muted rounded-lg text-sm">
                 <p className="font-medium">{service.code}</p>
                 <p className="text-muted-foreground">
-                  {service.appliance_type} {service.brand} {service.model}
+                  {[service.appliance_type, service.brand, service.model].filter(Boolean).join(' ')}
                 </p>
               </div>
             )}
 
             {parts.map((part, index) => (
               <div key={index} className="space-y-3">
-                {index > 0 && <Separator />}
-                
+                {index > 0 ? <Separator /> : null}
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">
-                    Peça {parts.length > 1 ? `${index + 1}` : ''}
+                    <span>{parts.length > 1 ? `Peça ${index + 1}` : 'Peça'}</span>
                   </span>
                   {parts.length > 1 && (
                     <Button
@@ -247,7 +251,6 @@ export function RequestPartModal({
               </div>
             ))}
 
-            {/* Add another part button */}
             <Button
               type="button"
               variant="outline"
@@ -256,7 +259,7 @@ export function RequestPartModal({
               onClick={addPart}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Adicionar outra peça
+              <span>Adicionar outra peça</span>
             </Button>
 
             {requireSignature && (
@@ -280,15 +283,16 @@ export function RequestPartModal({
         </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
-          <Button variant="outline" onClick={handleClose}>
-            Cancelar
+          <Button type="button" variant="outline" onClick={handleClose}>
+            <span>Cancelar</span>
           </Button>
           <Button
+            type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !hasValidParts || (requireSignature && !clientApproved)}
             className="bg-yellow-600 hover:bg-yellow-700"
           >
-            {isSubmitting ? 'A solicitar...' : `Confirmar Pedido${parts.filter(p => p.partName.trim()).length > 1 ? ` (${parts.filter(p => p.partName.trim()).length})` : ''}`}
+            <span>{confirmLabel}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

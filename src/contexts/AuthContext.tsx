@@ -58,12 +58,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
 
+      // On SIGNED_IN events, if we already have the same user hydrated, skip re-hydration.
+      // This prevents the race where signIn() + onAuthStateChange both call hydrateUser.
+      if (event === 'SIGNED_IN' && nextSession?.user) {
+        const alreadyHydrated =
+          hydrationPromiseRef.current?.userId === nextSession.user.id;
+        setSession(nextSession);
+        setUser(nextSession.user);
+        if (!alreadyHydrated) {
+          void hydrateUser(nextSession.user.id);
+        }
+        return;
+      }
+
+      // TOKEN_REFRESHED: update session tokens only, no re-hydration needed
+      if (event === 'TOKEN_REFRESHED' && nextSession?.user) {
+        setSession(nextSession);
+        return;
+      }
+
+      // SIGNED_OUT or USER_DELETED etc.
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
-      if (nextSession?.user) {
-        void hydrateUser(nextSession.user.id);
-      } else {
+      if (!nextSession?.user) {
         setProfile(null);
         setRole(null);
         setLoading(false);

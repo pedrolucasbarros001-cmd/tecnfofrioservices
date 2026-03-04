@@ -78,14 +78,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border mt-4">
               <Button onClick={this.handleRetry} className="flex-1" variant="default">
                 <RefreshCcw className="h-4 w-4 mr-2" />
-                Tentar Recarregar
+                <span>Tentar Recarregar</span>
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.location.href = '/'}
                 className="flex-1"
               >
-                Forçar Voltar ao Início
+                <span>Forçar Voltar ao Início</span>
               </Button>
             </div>
           </div>
