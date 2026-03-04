@@ -644,16 +644,17 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   const handlePedirPecaConfirm = () => {
     if (formData.needsPartOrder) {
-      if (!((formData as any).partToOrder?.name || '').trim()) {
-        toast.error("Informe o nome da peça a pedir.");
+      // Validate that at least one part has a name filled in
+      const hasValidPart = (formData.partsToOrder || []).some(
+        (p) => p.name && p.name.trim().length > 0
+      );
+      if (!hasValidPart) {
+        toast.error("Adicione pelo menos uma peça com o nome preenchido.");
         return;
       }
-      // Go to resumo_reparacao before signature
-      safeSetStep("resumo_reparacao");
-    } else {
-      // Go to resumo_reparacao before payment
-      safeSetStep("resumo_reparacao");
     }
+    // Proceed to summary regardless of needsPartOrder
+    safeSetStep("resumo_reparacao");
   };
 
   const handleResumoReparacaoConfirm = () => {
