@@ -1,57 +1,26 @@
 
 
-## Plano: Mostrar Artigos/Preço Definidos pela Administração nos Fluxos do Técnico
+## Diagnóstico
 
-### Contexto
+O erro React #310 significa **"Rendered fewer hooks than expected"** — isto é, o componente chamou menos hooks numa renderização do que na anterior.
 
-Quando a administração ou secretária define um preço no `SetPriceModal`, os artigos adicionais, descontos e IVA são salvos em `pricing_description` (JSON) na tabela `services`. Atualmente, o técnico não vê esses dados nas suas etapas de registo de artigos nem no resumo. O objectivo é mostrar esses dados como read-only em ambos os fluxos (Visita e Oficina).
+**Causa raiz**: No `ServiceDetailSheet.tsx`, o `useMemo` de `centralItems` (linha 322) está **depois** do `if (!service) return null;` (linha 316). Quando `service` muda de não-nulo para nulo (ou vice-versa), o número de hooks chamados muda, violando as regras de hooks do React.
 
-### O que mostrar
+## Correção
 
-Quando `service.pricing_description` contém dados JSON válidos com artigos (`items`), desconto (`discount`) e ajuste (`adjustment`):
-- **Etapa "registo_artigos"**: Mostrar uma secção read-only "Artigos Definidos pela Administração" acima da tabela editável do técnico (opacity-60, não editável)
-- **Etapa "resumo_reparacao"**: Mostrar a mesma secção read-only antes dos artigos do técnico, com subtotal, desconto e IVA administrativos incluídos no cálculo do total final
+**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx`
 
-### Ficheiros afectados
+Mover o `useMemo` de `centralItems` (linhas 322-331) para **antes** do early return na linha 316. Adicionar guard para `service`/`displayService` nulo dentro do memo:
 
-#### 1. `src/components/technician/WorkshopFlowModals.tsx`
-
-- Extrair e parsear `service.pricing_description` no `useEffect` de inicialização
-- Guardar num estado `adminPricing` com: `items[]`, `discount`, `adjustment`, `subtotal`
-- Na etapa `registo_artigos`: renderizar secção read-only "Artigos Adm." (similar ao bloco de `previousArticles` da visita) acima da tabela editável
-- Na etapa `resumo_reparacao`: incluir secção read-only "Artigos Adm." e somar o subtotal administrativo ao cálculo final
-
-#### 2. `src/components/technician/VisitFlowModals.tsx`
-
-- Mesma lógica: parsear `service.pricing_description` e guardar em `adminPricing`
-- Na etapa `registo_artigos`: mostrar secção read-only acima da tabela editável
-- Na etapa `resumo_reparacao`: incluir no cálculo do total final
-
-#### 3. Lógica de parsing (reutilizável)
-
-Criar uma função utilitária ou inline que parseia `pricing_description`:
 ```ts
-interface AdminPricingData {
-  items: { ref: string; desc: string; qty: number; price: number; tax: number }[];
-  discount?: { type: 'euro' | 'percent'; value: number };
-  adjustment?: number;
-  historySubtotal?: number;
-}
+const centralItems = React.useMemo(() => {
+    if (!displayService) return [];
+    if (serviceParts.filter(...).length > 0) return [];
+    // rest stays the same
+}, [serviceParts, displayService?.pricing_description]);
 ```
 
-### Regras de exibição
+Também verificar se `displayService` (linha 319) não causa problemas ao ser definido antes do early return — mover a atribuição `const displayService = fullData || service;` para antes do memo, junto com os outros dados derivados.
 
-- O técnico vê os artigos administrativos mas **não pode alterar nem apagar**
-- Opacity-60, borda tracejada, label "Definido pela Administração"
-- Os subtotais administrativos são somados ao total final no resumo
-- Se não existir `pricing_description` ou estiver vazio, nada muda — comportamento actual mantido
-
-### Impacto no cálculo
-
-No `resumo_reparacao`, o total final passa a ser:
-```
-(previousArticlesSubtotal + adminPricingSubtotal + articlesSubtotal - discount + tax)
-```
-
-Onde `adminPricingSubtotal` vem dos artigos definidos no `SetPriceModal`.
+Na prática, o bloco inteiro `displayService` + `centralItems` deve ficar entre as linhas ~293 e 316, antes do `if (!service) return null`.
 
