@@ -313,13 +313,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
-  if (!service) return null;
-
   // Use fullData (which has fresh customer join) when available, fallback to prop
   const displayService = fullData || service;
 
   // Fallback: Parse pricing_description if serviceParts is empty
   const centralItems = React.useMemo(() => {
+    if (!displayService) return [];
     if (serviceParts.filter((p: any) => !p?.is_requested).length > 0) return [];
     if (!displayService?.pricing_description) return [];
     try {
@@ -328,7 +327,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     } catch (e) {
       return [];
     }
-  }, [serviceParts, displayService.pricing_description]);
+  }, [serviceParts, displayService?.pricing_description]);
+
+  if (!service) return null;
 
   const statusConfig = SERVICE_STATUS_CONFIG[service.status as keyof typeof SERVICE_STATUS_CONFIG] || { label: 'Desconhecido', color: 'bg-gray-500 text-white' };
 
