@@ -115,6 +115,7 @@ export default function GeralPage() {
   const [showConfirmPartOrderModal, setShowConfirmPartOrderModal] = useState(false);
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -283,6 +284,29 @@ export default function GeralPage() {
   const handleEditDetails = (service: Service) => {
     setCurrentService(service);
     setShowEditDetailsModal(true);
+  };
+
+  const handleDeactivateService = (service: Service) => {
+    if (service.status === 'cancelado' || service.status === 'finalizado') return;
+    setCurrentService(service);
+    setShowCancelDialog(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!currentService) return;
+    try {
+      await updateService.mutateAsync({
+        id: currentService.id,
+        status: 'cancelado',
+        skipToast: true,
+      });
+      toast.success(`Serviço ${currentService.code} desativado. Todos os dados foram preservados.`);
+      setShowCancelDialog(false);
+      setCurrentService(null);
+    } catch (error) {
+      console.error('Error cancelling service:', error);
+      toast.error('Erro ao desativar o serviço. Tente novamente.');
+    }
   };
 
   // Skeleton rows for loading state
@@ -505,7 +529,7 @@ export default function GeralPage() {
 
                       {/* Ações */}
                       <TableCell className="text-right">
-                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} onEditDetails={() => handleEditDetails(service)} viewContext={selectedStatus} />
+                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} onEditDetails={() => handleEditDetails(service)} onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined} viewContext={selectedStatus} />
                       </TableCell>
                     </TableRow>;
                   })}
@@ -582,6 +606,30 @@ export default function GeralPage() {
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Cancel (Deactivate) Service Confirmation */}
+        {showCancelDialog && currentService && (
+          <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Desativar Serviço</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O serviço <strong>{currentService.code}</strong> ficará inativo e marcado como cancelado.
+                  Todos os registos e histórico serão preservados. Pode reativar via &quot;Mudar Status (Forçado)&quot;.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={confirmCancel}
+                  className="bg-muted text-muted-foreground hover:bg-muted/80"
+                >
+                  Desativar
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
