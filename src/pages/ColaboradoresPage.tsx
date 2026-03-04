@@ -49,10 +49,11 @@ interface UserWithRole {
   is_active: boolean;
 }
 
-const ROLE_LABELS = {
+const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   dono: { label: 'Administrador', color: 'bg-purple-500 text-white' },
   secretaria: { label: 'Secretária', color: 'bg-green-500 text-white' },
   tecnico: { label: 'Técnico', color: 'bg-blue-500 text-white' },
+  monitor: { label: 'Monitor', color: 'bg-orange-500 text-white' },
 };
 
 const ROLE_COLORS = [
@@ -110,6 +111,12 @@ export default function ColaboradoresPage() {
       const usersWithRoles: UserWithRole[] = profilesRes.data.map((profile) => {
         const userRole = rolesRes.data.find((r) => r.user_id === profile.user_id);
         const technician = techniciansRes.data.find((t) => t.profile_id === profile.id);
+        const role = userRole?.role || null;
+
+        // is_active only matters for technicians — non-technicians are always active
+        const is_active = role === 'tecnico' && technician
+          ? technician.active !== false
+          : true;
 
         return {
           id: profile.id,
@@ -117,8 +124,8 @@ export default function ColaboradoresPage() {
           full_name: profile.full_name,
           email: profile.email,
           phone: profile.phone,
-          role: userRole?.role || null,
-          is_active: technician ? technician.active !== false : true,
+          role,
+          is_active,
         };
       });
 
