@@ -496,7 +496,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           await logPartRequest(
             service.code || "N/A",
             service.id,
-            formData.partToOrder.name.trim(),
+            ((formData as any).partToOrder?.name || '').trim(),
             profile?.full_name || "Técnico",
             user?.id,
           );
@@ -644,7 +644,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   const handlePedirPecaConfirm = () => {
     if (formData.needsPartOrder) {
-      if (!formData.partToOrder.name.trim()) {
+      if (!((formData as any).partToOrder?.name || '').trim()) {
         toast.error("Informe o nome da peça a pedir.");
         return;
       }

@@ -35,7 +35,7 @@ export default function SecretaryPrecificarPage() {
     setShowDetailSheet(true);
   };
 
-  const handleSetPrice = (service: Service, e: MouseEvent) => {
+  const handleSetPrice = (service: Service, e: React.MouseEvent) => {
     e.stopPropagation();
     setPriceService(service);
     setShowSetPriceModal(true);

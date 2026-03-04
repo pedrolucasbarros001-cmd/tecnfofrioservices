@@ -256,7 +256,7 @@ export default function ServiceDetailPage() {
             <div>
               <span className="text-muted-foreground">Nome: </span>
               <span className="font-medium">
-                <CustomerLink customer={service.customer} label={service.contact_name || service.customer?.name} />
+                <CustomerLink customer={service.customer} />
               </span>
             </div>
             <div>

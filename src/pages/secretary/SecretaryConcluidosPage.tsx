@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { Service } from '@/types/database';
 import { CheckCircle2, Truck, Phone, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

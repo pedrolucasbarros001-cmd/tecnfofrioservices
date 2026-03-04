@@ -20,7 +20,7 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
     ({ service, className }, ref) => {
         const isClientSideRepair =
             service.status === 'concluidos' &&
-            (service.service_location === 'cliente' || service.service_type === 'visita');
+            (service.service_location === 'cliente' || (service.service_type as string) === 'visita');
 
         const statusConfig = {
             ...(SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
