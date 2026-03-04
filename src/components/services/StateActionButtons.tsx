@@ -45,6 +45,7 @@ interface StateActionButtonsProps {
   onReschedule?: () => void;
   onEditDetails?: () => void;
   onCancel?: () => void;
+  onReopen?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -75,6 +76,7 @@ export function StateActionButtons({
   onReschedule,
   onEditDetails,
   onCancel,
+  onReopen,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -367,6 +369,20 @@ export function StateActionButtons({
               >
                 <Ban className="h-4 w-4 mr-2" />
                 Desativar Serviço
+              </DropdownMenuItem>
+            </>
+          )}
+
+          {/* Reopen Service - Dono or Secretaria */}
+          {service.status === 'cancelado' && (isDono || isSecretaria) && onReopen && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => { e.stopPropagation(); onReopen(); }}
+                className="text-primary font-medium"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reabrir Serviço
               </DropdownMenuItem>
             </>
           )}

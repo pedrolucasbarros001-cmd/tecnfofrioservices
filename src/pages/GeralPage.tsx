@@ -292,6 +292,19 @@ export default function GeralPage() {
     setShowCancelDialog(true);
   };
 
+  const handleReopenService = async (service: Service) => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'por_fazer'
+      });
+      toast.success(`Serviço ${service.code} reaberto com sucesso!`);
+    } catch (error) {
+      console.error('Error reopening service:', error);
+      toast.error('Erro ao reabrir o serviço.');
+    }
+  };
+
   const confirmCancel = async () => {
     if (!currentService) return;
     try {
@@ -529,7 +542,26 @@ export default function GeralPage() {
 
                       {/* Ações */}
                       <TableCell className="text-right">
-                        <StateActionButtons service={service} onAssignTechnician={() => handleAssignTechnician(service)} onViewDetails={() => handleServiceClick(service)} onSetPrice={() => handleSetPrice(service)} onRegisterPayment={() => handleRegisterPayment(service)} onRequestPart={() => handleRequestPart(service)} onManageDelivery={() => handleManageDelivery(service)} onFinalize={() => handleFinalize(service)} onConfirmPartOrder={() => handleConfirmPartOrder(service)} onMarkPartArrived={() => handleMarkPartArrived(service)} onForceState={() => handleForceState(service)} onContactClient={() => handleContactClient(service)} onDelete={() => handleDeleteService(service)} onReschedule={() => handleReschedule(service)} onEditDetails={() => handleEditDetails(service)} onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined} viewContext={selectedStatus} />
+                        <StateActionButtons
+                          service={service}
+                          onAssignTechnician={() => handleAssignTechnician(service)}
+                          onViewDetails={() => handleServiceClick(service)}
+                          onSetPrice={() => handleSetPrice(service)}
+                          onRegisterPayment={() => handleRegisterPayment(service)}
+                          onRequestPart={() => handleRequestPart(service)}
+                          onManageDelivery={() => handleManageDelivery(service)}
+                          onFinalize={() => handleFinalize(service)}
+                          onConfirmPartOrder={() => handleConfirmPartOrder(service)}
+                          onMarkPartArrived={() => handleMarkPartArrived(service)}
+                          onForceState={() => handleForceState(service)}
+                          onContactClient={() => handleContactClient(service)}
+                          onDelete={() => handleDeleteService(service)}
+                          onReschedule={() => handleReschedule(service)}
+                          onEditDetails={() => handleEditDetails(service)}
+                          onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined}
+                          onReopen={service.status === 'cancelado' ? () => handleReopenService(service) : undefined}
+                          viewContext={selectedStatus}
+                        />
                       </TableCell>
                     </TableRow>;
                   })}
