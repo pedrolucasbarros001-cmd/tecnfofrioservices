@@ -170,17 +170,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[AuthContext] Attempting signIn for:', email);
 
     try {
+      // 1. Clear stale query cache
       queryClient.clear();
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        console.error('[AuthContext] signIn error:', error.message);
-        setLoading(false);
-        return { error };
+      // 2. Clean previous auth session (preserve technician draft keys)
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (cleanupErr) {
+        console.warn('[AuthContext] Pre-login cleanup warning:', cleanupErr);
+      }
+      // Remove only auth-related localStorage keys, keep drafts
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      // 3. Attempt login with retry on network errors
+      let lastError: Error | null = null;
+      let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'] | null = null;
+      const MAX_RETRIES = 2;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const result = await supabase.auth.signInWithPassword({ email, password });
+        if (!result.error) {
+          data = result.data;
+          lastError = null;
+          break;
+        }
+        const msg = result.error.message.toLowerCase();
+        const isNetworkError = msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('timeout');
+        if (!isNetworkError || attempt === MAX_RETRIES) {
+          lastError = result.error;
+          break;
+        }
+        console.warn(`[AuthContext] Network error on attempt ${attempt + 1}, retrying...`);
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
 
-      if (!data.user || !data.session) {
-        console.error('[AuthContext] Session invalid after login:', { user: !!data.user, session: !!data.session });
+      if (lastError) {
+        console.error('[AuthContext] signIn error:', lastError.message);
+        setLoading(false);
+        return { error: lastError };
+      }
+
+      if (!data?.user || !data?.session) {
+        console.error('[AuthContext] Session invalid after login:', { user: !!data?.user, session: !!data?.session });
         setLoading(false);
         return { error: new Error('Sessão inválida após login') };
       }
