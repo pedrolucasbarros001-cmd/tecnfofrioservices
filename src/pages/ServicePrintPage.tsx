@@ -451,8 +451,8 @@ export default function ServicePrintPage() {
                   ) : (
                     pricingDetails.items.map((item: any, idx: number) => (
                       <tr key={idx} className="border-b border-dashed">
-                        <td className="py-1">-</td>
-                        <td className="py-1">{item.description}</td>
+                        <td className="py-1">{item.ref || item.article || '-'}</td>
+                        <td className="py-1">{item.desc || item.description || '-'}</td>
                         <td className="py-1 text-center">{item.qty || item.quantity || 1}</td>
                         <td className="py-1 text-right">{(item.unit_price || item.price || 0).toFixed(2)} €</td>
                         <td className="py-1 text-right">{((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)} €</td>
