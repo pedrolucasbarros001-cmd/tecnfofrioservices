@@ -93,10 +93,10 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
   const currentRole = form.watch('role');
 
   useEffect(() => {
-    if (user && user.role === 'tecnico') {
+    if (open && user && user.role === 'tecnico') {
       loadTechnicianData();
     }
-  }, [user]);
+  }, [user, open]);
 
   const loadTechnicianData = async () => {
     if (!user) return;
