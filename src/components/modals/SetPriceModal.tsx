@@ -283,7 +283,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-            <ScrollArea className="flex-1 max-h-[calc(90vh-200px)] px-6">
+            <ScrollArea className="flex-1 px-6" style={{ maxHeight: 'calc(90vh - 160px)' }}>
               <div className="space-y-6 py-4 pr-4">
                 {/* Warranty Option */}
                 {isWarrantyService && (

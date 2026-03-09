@@ -31,6 +31,12 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
         const needsPricing =
             service.pending_pricing === true && (service.final_price ?? 0) === 0;
 
+        const isDebtState =
+            (service.final_price ?? 0) > 0 &&
+            service.status !== 'finalizado' &&
+            service.status !== 'em_debito' &&
+            (service.status === 'em_espera_de_peca' || service.status === 'para_pedir_peca');
+
         return (
             <span ref={ref} className={cn('inline-flex flex-wrap items-center gap-1', className)}>
                 <Badge className={cn('text-xs font-medium', statusConfig.color)}>
