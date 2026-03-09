@@ -47,6 +47,11 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                         Orçamentar
                     </Badge>
                 )}
+                {isDebtState && (
+                    <Badge className="text-xs bg-red-100 text-red-700 border border-red-300">
+                        Em Débito
+                    </Badge>
+                )}
             </span>
         );
     }
