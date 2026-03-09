@@ -7,15 +7,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 
-const STATUS_LABELS: Record<string, string> = {
-  por_fazer: 'Aberto',
-  em_execucao: 'Em Execução',
-  na_oficina: 'Oficina',
-  concluidos: 'Oficina Reparados',
-  em_debito: 'Em Débito',
-  finalizado: 'Concluídos',
-  entregas: 'Entrega',
-};
+// STATUS_LABELS removed — now using ServiceStatusBadge component for consistent rendering
 
 export default function PerformancePage() {
   const { data: technicians = [] } = useTechnicians(false);
