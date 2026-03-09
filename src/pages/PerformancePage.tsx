@@ -221,11 +221,11 @@ export default function PerformancePage() {
                               )}
                               <ServiceStatusBadge
                                 service={{
-                                  status: service.status,
+                                  status: service.status as any,
                                   pending_pricing: service.pending_pricing,
                                   final_price: service.final_price ?? 0,
-                                  service_location: service.service_location,
-                                  service_type: service.service_type,
+                                  service_location: service.service_location as any,
+                                  service_type: service.service_type as any,
                                 }}
                               />
                             </div>
