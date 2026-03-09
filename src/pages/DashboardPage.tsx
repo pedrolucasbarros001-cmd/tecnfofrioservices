@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
-import type { ServiceStatus } from '@/types/database';
+
 
 interface DashboardStats {
   por_fazer: number;
@@ -107,41 +107,50 @@ export default function DashboardPage() {
       };
 
       services?.forEach((service) => {
-        const status = service.status as ServiceStatus;
+        const status = service.status as string;
+        const finalPrice = service.final_price || 0;
+        const amountPaid = service.amount_paid || 0;
+        const isWarranty = service.is_warranty || false;
 
-        // "A Precificar" = pending_pricing=true (estado financeiro, não operacional)
+        // --- Financial overlays (independent of operational status) ---
+        // "Orçamentar" = pending_pricing=true (needs pricing)
         if (service.pending_pricing) {
           counts.a_precificar++;
         }
 
-        // "Em Débito" = tem preço, não é garantia, e amount_paid < final_price (estado financeiro calculado)
-        const finalPrice = service.final_price || 0;
-        const amountPaid = service.amount_paid || 0;
-        const isWarranty = service.is_warranty || false;
+        // "Em Débito" = has price, not warranty, and not fully paid
         if (!isWarranty && finalPrice > 0 && amountPaid < finalPrice) {
           counts.em_debito++;
         }
 
-        // Count for "Oficina" card based on LOCATION
-        // Includes any service physically in workshop, excluding finalized/concluded
+        // --- Operational status counts ---
+        // "Oficina" card = location-based: any service physically in workshop, not finalized/concluded
         if (service.service_location === 'oficina' && status !== 'finalizado' && status !== 'concluidos') {
           counts.na_oficina++;
         }
 
-        // Count for "Oficina Reparados" - must be in workshop AND concluded
+        // "Oficina Reparados" = workshop AND concluded status
         if (service.service_location === 'oficina' && status === 'concluidos') {
           counts.concluidos++;
         }
 
-        // Other operacional status counts (excluding na_oficina and concluidos which are location-based above)
-        if (
-          status !== 'a_precificar' &&
-          status !== 'em_debito' &&
-          status !== 'na_oficina' &&
-          status !== 'concluidos' &&
-          status in counts
-        ) {
-          counts[status as keyof Omit<DashboardStats, 'orcamentos' | 'a_precificar' | 'em_debito' | 'na_oficina' | 'concluidos'>]++;
+        // Direct status-based counts (these statuses are NOT location-dependent)
+        switch (status) {
+          case 'por_fazer':
+            counts.por_fazer++;
+            break;
+          case 'em_execucao':
+            counts.em_execucao++;
+            break;
+          case 'para_pedir_peca':
+            counts.para_pedir_peca++;
+            break;
+          case 'em_espera_de_peca':
+            counts.em_espera_de_peca++;
+            break;
+          case 'finalizado':
+            counts.finalizado++;
+            break;
         }
       });
 
