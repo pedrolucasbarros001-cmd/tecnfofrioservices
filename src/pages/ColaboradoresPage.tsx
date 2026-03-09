@@ -131,7 +131,7 @@ export default function ColaboradoresPage() {
 
       return usersWithRoles;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos - evita refetch desnecessário
+    staleTime: 1000 * 30, // 30 seconds
     refetchOnWindowFocus: false, // Não refetch ao voltar à janela
     refetchOnMount: 'always', // Garante dados frescos ao montar
   });
@@ -256,7 +256,9 @@ export default function ColaboradoresPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Telefone</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
-                  <TableHead>Estado</TableHead>
+                  {filteredUsers.some(u => u.role === 'tecnico') && (
+                    <TableHead>Estado</TableHead>
+                  )}
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -294,14 +296,19 @@ export default function ColaboradoresPage() {
                           <Badge variant="secondary">Sem acesso</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={user.is_active ? 'default' : 'secondary'}
-                          className={user.is_active ? 'bg-green-500' : 'bg-gray-400'}
-                        >
-                          {user.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
+                      {user.role === 'tecnico' && (
+                        <TableCell>
+                          <Badge
+                            variant={user.is_active ? 'default' : 'secondary'}
+                            className={user.is_active ? 'bg-green-500' : 'bg-gray-400'}
+                          >
+                            {user.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {user.role !== 'tecnico' && filteredUsers.some(u => u.role === 'tecnico') && (
+                        <TableCell />
+                      )}
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
