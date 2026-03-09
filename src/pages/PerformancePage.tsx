@@ -219,18 +219,15 @@ export default function PerformancePage() {
                                   {new Date(service.scheduled_date).toLocaleDateString('pt-PT')}
                                 </p>
                               )}
-                              <Badge
-                                variant="outline"
-                                className={
-                                  service.status === 'concluidos' || service.status === 'finalizado'
-                                    ? 'border-green-500 text-green-700'
-                                    : service.status === 'em_debito'
-                                      ? 'border-orange-500 text-orange-700'
-                                      : 'border-blue-500 text-blue-700'
-                                }
-                              >
-                                {STATUS_LABELS[service.status] || service.status}
-                              </Badge>
+                              <ServiceStatusBadge
+                                service={{
+                                  status: service.status,
+                                  pending_pricing: service.pending_pricing,
+                                  final_price: service.final_price ?? 0,
+                                  service_location: service.service_location,
+                                  service_type: service.service_type,
+                                }}
+                              />
                             </div>
                           </div>
                         );
