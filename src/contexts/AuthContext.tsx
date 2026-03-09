@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { queryClient } from '@/lib/queryClient';
@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const hydrationPromiseRef = useRef<{ userId: string; promise: Promise<AppRole | null> } | null>(null);
+  const suppressAuthEventsRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
+      if (suppressAuthEventsRef.current) return;
 
       // On SIGNED_IN events, if we already have the same user hydrated, skip re-hydration.
       // This prevents the race where signIn() + onAuthStateChange both call hydrateUser.
@@ -174,6 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.clear();
 
       // 2. Clean previous auth session (preserve technician draft keys)
+      // Suppress auth events during cleanup to prevent race condition
+      suppressAuthEventsRef.current = true;
       try {
         await supabase.auth.signOut({ scope: 'local' });
       } catch (cleanupErr) {
@@ -226,10 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const hydratedRole = await hydrateUser(data.user.id);
       console.log('[AuthContext] Login complete. Final role:', hydratedRole);
+      suppressAuthEventsRef.current = false;
 
       return { error: null, role: hydratedRole };
     } catch (error) {
       console.error('[AuthContext] Critical signIn exception:', error);
+      suppressAuthEventsRef.current = false;
       setLoading(false);
       return { error: error as Error };
     }
