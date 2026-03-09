@@ -3,6 +3,7 @@ import { Package, Wrench, Truck } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 
