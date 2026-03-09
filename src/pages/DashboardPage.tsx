@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
-import type { ServiceStatus } from '@/types/database';
+
 
 interface DashboardStats {
   por_fazer: number;
