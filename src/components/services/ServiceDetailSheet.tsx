@@ -745,10 +745,10 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
-              {/* Peças Pedidas */}
+              {/* Artigos Encomendados */}
               {serviceParts.filter((p: any) => p.is_requested).length > 0 && (
                 <Section
-                  title="Peças Pedidas"
+                  title="Artigos Encomendados"
                   bgColor="bg-orange-50"
                   borderColor="border-l-orange-500"
                 >
