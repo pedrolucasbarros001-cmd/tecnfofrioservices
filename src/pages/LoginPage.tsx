@@ -122,7 +122,10 @@ export default function LoginPage() {
             </p>
             <div className="space-y-3 pt-4">
               <Button
-                onClick={() => window.location.reload()}
+                onClick={async () => {
+                  await signOut();
+                  window.location.replace('/login');
+                }}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 Tentar Ligar Novamente
@@ -229,7 +232,11 @@ export default function LoginPage() {
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <button
               onClick={() => {
-                localStorage.clear();
+                Object.keys(localStorage).forEach((key) => {
+                  if (key.startsWith('sb-')) {
+                    localStorage.removeItem(key);
+                  }
+                });
                 window.location.reload();
               }}
               className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"
