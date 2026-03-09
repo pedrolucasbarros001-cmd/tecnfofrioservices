@@ -22,6 +22,8 @@ import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useQuery } from '@tanstack/react-query';
+import { logActivity } from '@/utils/activityLogUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Part {
   id?: string;
@@ -54,6 +56,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess }: EditServiceDetailsModalProps) {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [applianceType, setApplianceType] = useState('');
   const [brand, setBrand] = useState('');
@@ -241,6 +244,14 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
         .eq('id', service.id);
 
       if (serviceError) throw serviceError;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'servico_editado',
+        description: `Serviço ${service.code} editado (Detalhes, diagnóstico ou artigos atualizados)`,
+        isPublic: true,
+      });
 
       toast.success('Serviço atualizado com sucesso');
       onSuccess();

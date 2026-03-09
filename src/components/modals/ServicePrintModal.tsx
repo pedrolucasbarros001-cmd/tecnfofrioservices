@@ -93,12 +93,12 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
 
   const handleDownloadPDF = async () => {
     if (!printSheetRef.current || !service) return;
-    
+
     setIsGenerating(true);
     try {
-      await generatePDF({ 
-        element: printSheetRef.current, 
-        filename: `Ficha-${service.code}` 
+      await generatePDF({
+        element: printSheetRef.current,
+        filename: `Ficha-${service.code}`
       });
     } finally {
       setIsGenerating(false);
@@ -113,19 +113,50 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
 
+  // Parse pricing articles
+  let pricingArticles: any[] = [];
+  try {
+    if (service.pricing_description) {
+      const parsed = JSON.parse(service.pricing_description);
+      if (parsed && parsed.items && Array.isArray(parsed.items)) {
+        pricingArticles = parsed.items;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing pricing_description for print:", e);
+  }
+
+  // Determine if we should use pricing articles or fallback to service_parts
+  const hasPricingItems = pricingArticles.length > 0;
+  const displayItems = hasPricingItems
+    ? pricingArticles.map(item => ({
+      name: item.desc,
+      code: item.ref,
+      qty: item.qty,
+      price: item.price,
+      tax: item.tax
+    }))
+    : usedParts.map(p => ({
+      name: p.part_name,
+      code: p.part_code,
+      qty: p.quantity,
+      price: p.cost,
+      tax: p.iva_rate || 23
+    }));
+
   // Print content component - rendered via portal
   const PrintContent = () => (
     <div className="print-portal print-only">
       <div className="print-content">
         {/* Watermark */}
-        <div 
+        <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           aria-hidden="true"
           style={{ opacity: 0.04 }}
         >
-          <img 
-            src={tecnofrioLogoIcon} 
-            alt="" 
+          <img
+            src={tecnofrioLogoIcon}
+            alt=""
             style={{ width: '180mm', height: '180mm', objectFit: 'contain' }}
           />
         </div>
@@ -133,9 +164,9 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         {/* Header */}
         <div className="flex items-start justify-between mb-3 relative z-10">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <img 
-              src={tecnofrioLogoFull} 
-              alt="TECNOFRIO" 
+            <img
+              src={tecnofrioLogoFull}
+              alt="TECNOFRIO"
               style={{ height: '40px', objectFit: 'contain' }}
             />
             <div style={{ marginTop: '4px', fontSize: '10px', color: '#666', lineHeight: 1.3 }}>
@@ -216,7 +247,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             <div style={{ gridColumn: 'span 2' }}>
               <span style={{ color: '#666' }}>Data Agendada:</span>{' '}
               <span style={{ fontWeight: '500' }}>
-                {service.scheduled_date 
+                {service.scheduled_date
                   ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
@@ -290,34 +321,35 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
           </>
         )}
 
-        {/* Parts Used */}
-        {usedParts.length > 0 && (
+        {/* Parts/Articles Used */}
+        {displayItems.length > 0 && (
           <>
             <Separator className="my-2" />
             <section className="mb-3">
-              <h2 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '4px', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px' }}>Peças Utilizadas</h2>
+              <h2 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '4px', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px' }}>Artigos / Materiais</h2>
               <table style={{ width: '100%', fontSize: '10px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ textAlign: 'left', padding: '4px' }}>Peça</th>
-                    <th style={{ textAlign: 'left', padding: '4px' }}>Código</th>
+                    <th style={{ textAlign: 'left', padding: '4px' }}>Descrição</th>
+                    <th style={{ textAlign: 'left', padding: '4px' }}>Ref</th>
                     <th style={{ textAlign: 'center', padding: '4px' }}>Qtd</th>
-                    <th style={{ textAlign: 'right', padding: '4px' }}>Custo</th>
+                    <th style={{ textAlign: 'center', padding: '4px' }}>IVA</th>
+                    <th style={{ textAlign: 'right', padding: '4px' }}>P. Unit</th>
+                    <th style={{ textAlign: 'right', padding: '4px' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usedParts.map((part) => (
-                    <tr key={part.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '4px' }}>{part.part_name}</td>
-                      <td style={{ padding: '4px' }}>{part.part_code || '-'}</td>
-                      <td style={{ textAlign: 'center', padding: '4px' }}>{part.quantity || 1}</td>
-                      <td style={{ textAlign: 'right', padding: '4px' }}>{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
+                  {displayItems.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '4px' }}>{item.name}</td>
+                      <td style={{ padding: '4px' }}>{item.code || '-'}</td>
+                      <td style={{ textAlign: 'center', padding: '4px' }}>{item.qty || 1}</td>
+                      <td style={{ textAlign: 'center', padding: '4px' }}>{item.tax}%</td>
+                      <td style={{ textAlign: 'right', padding: '4px' }}>{(item.price || 0).toFixed(2)} €</td>
+                      <td style={{ textAlign: 'right', padding: '4px' }}>{((item.price || 0) * (item.qty || 1)).toFixed(2)} €</td>
                     </tr>
                   ))}
-                  <tr style={{ fontWeight: '500' }}>
-                    <td colSpan={3} style={{ textAlign: 'right', padding: '4px' }}>Total:</td>
-                    <td style={{ textAlign: 'right', padding: '4px' }}>{totalPartsCost.toFixed(2)} €</td>
-                  </tr>
+                  {/* Total is shown in the Financial Summary below */}
                 </tbody>
               </table>
             </section>
@@ -389,7 +421,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                   {payments.map((payment) => (
                     <tr key={payment.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                       <td style={{ padding: '4px' }}>
-                        {payment.payment_date 
+                        {payment.payment_date
                           ? format(new Date(payment.payment_date), "dd/MM/yy", { locale: pt })
                           : '-'}
                       </td>
@@ -416,9 +448,9 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {signatures.map((sig) => (
                   <div key={sig.id} style={{ display: 'flex', gap: '16px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
-                    <img 
-                      src={sig.file_url} 
-                      alt="Assinatura" 
+                    <img
+                      src={sig.file_url}
+                      alt="Assinatura"
                       style={{ width: '120px', height: '80px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -447,8 +479,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 IMPORTANTE - Termos de Guarda
               </h3>
               <p style={{ color: '#a16207', lineHeight: '1.4' }}>
-                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
+                Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após
+                conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong>
                 pela guarda ou danos.
               </p>
             </section>
@@ -466,7 +498,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         <div className="no-print flex items-center justify-between p-3 border-b bg-muted/30">
           <h2 className="font-semibold text-foreground">Pré-visualização da Ficha</h2>
           <div className="flex gap-2">
-            <Button 
+            <Button
               onClick={() => {
                 // Garantir que o scroll está no topo para renderizar tudo
                 if (printSheetRef.current) {
@@ -476,8 +508,8 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 setTimeout(() => {
                   printServiceSheet();
                 }, 100);
-              }} 
-              size="sm" 
+              }}
+              size="sm"
               variant="outline"
             >
               <Printer className="h-4 w-4 mr-2" />
@@ -497,341 +529,341 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
         {/* Conteúdo A4 - isto é o que será impresso */}
         <div ref={printSheetRef} className="print-sheet relative bg-white">
           {/* Watermark */}
-          <div 
+          <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
             aria-hidden="true"
           >
-            <img 
-              src={tecnofrioLogoIcon} 
-              alt="" 
+            <img
+              src={tecnofrioLogoIcon}
+              alt=""
               className="w-[180mm] h-[180mm] object-contain"
             />
           </div>
 
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3 relative z-10">
-              <div className="flex flex-col">
-                <img 
-                  src={tecnofrioLogoFull} 
-                  alt="TECNOFRIO" 
-                  className="h-10 object-contain"
-                />
-                <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
-                  <p>R. Dom Pedro IV 3 R/C, Bairro da Coxa</p>
-                  <p>5300-124 Bragança</p>
-                  <p>Tel: 273 332 772 | tecno.frio@sapo.pt</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <h1 className="text-lg font-bold">Ficha de Serviço</h1>
+          {/* Header */}
+          <div className="flex items-start justify-between mb-3 relative z-10">
+            <div className="flex flex-col">
+              <img
+                src={tecnofrioLogoFull}
+                alt="TECNOFRIO"
+                className="h-10 object-contain"
+              />
+              <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                <p>R. Dom Pedro IV 3 R/C, Bairro da Coxa</p>
+                <p>5300-124 Bragança</p>
+                <p>Tel: 273 332 772 | tecno.frio@sapo.pt</p>
               </div>
             </div>
-
-            <div className="mb-3">
-              <p className="text-base font-mono font-bold">Código: {service.code}</p>
-              <p className="text-xs text-muted-foreground">
-                Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
-              </p>
+            <div className="text-right">
+              <h1 className="text-lg font-bold">Ficha de Serviço</h1>
             </div>
+          </div>
 
-            <Separator className="my-2" />
+          <div className="mb-3">
+            <p className="text-base font-mono font-bold">Código: {service.code}</p>
+            <p className="text-xs text-muted-foreground">
+              Data de Entrada: {format(new Date(service.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+            </p>
+          </div>
 
-            {/* Customer Data */}
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-2 border-b pb-1">Dados do Cliente</h2>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Nome:</span>{' '}
-                  <span className="font-medium">{service.customer?.name || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Contribuinte:</span>{' '}
-                  <span className="font-medium">{service.customer?.nif || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Telefone:</span>{' '}
-                  <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Email:</span>{' '}
-                  <span className="font-medium">{service.customer?.email || 'N/A'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Morada:</span>{' '}
-                  <span className="font-medium">
-                    {[service.customer?.address, service.customer?.postal_code, service.customer?.city]
-                      .filter(Boolean)
-                      .join(', ') || 'N/A'}
-                  </span>
-                </div>
+          <Separator className="my-2" />
+
+          {/* Customer Data */}
+          <section className="mb-3">
+            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Dados do Cliente</h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              <div>
+                <span className="text-muted-foreground">Nome:</span>{' '}
+                <span className="font-medium">{service.customer?.name || 'N/A'}</span>
               </div>
-            </section>
-
-            <Separator className="my-2" />
-
-            {/* Service Details */}
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Serviço</h2>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Categoria:</span>{' '}
-                  <span className="font-medium capitalize">{service.service_type || 'Reparação'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Tipo:</span>{' '}
-                  <span className="font-medium">
-                    {service.service_location === 'cliente' ? 'Visita' : 'Oficina'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Estado:</span>{' '}
-                  <span className="font-medium">{statusConfig?.label || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Prioridade:</span>{' '}
-                  <span className="font-medium">{service.is_urgent ? 'Urgente' : 'Normal'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Data Agendada:</span>{' '}
-                  <span className="font-medium">
-                    {service.scheduled_date 
-                      ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
-                      : 'Não agendado'}
-                  </span>
-                </div>
+              <div>
+                <span className="text-muted-foreground">Contribuinte:</span>{' '}
+                <span className="font-medium">{service.customer?.nif || 'N/A'}</span>
               </div>
-            </section>
-
-            <Separator className="my-2" />
-
-            {/* Equipment Details */}
-            <section className="mb-3">
-              <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Equipamento</h2>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Tipo:</span>{' '}
-                  <span className="font-medium">{service.appliance_type || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Marca:</span>{' '}
-                  <span className="font-medium">{service.brand || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Modelo:</span>{' '}
-                  <span className="font-medium">{service.model || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Nº Série:</span>{' '}
-                  <span className="font-medium">{service.serial_number || 'N/A'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Avaria:</span>{' '}
-                  <span className="font-medium">{service.fault_description || 'N/A'}</span>
-                </div>
-                {service.detected_fault && (
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Diagnóstico:</span>{' '}
-                    <span className="font-medium">{service.detected_fault}</span>
-                  </div>
-                )}
+              <div>
+                <span className="text-muted-foreground">Telefone:</span>{' '}
+                <span className="font-medium">{service.customer?.phone || 'N/A'}</span>
               </div>
-            </section>
+              <div>
+                <span className="text-muted-foreground">Email:</span>{' '}
+                <span className="font-medium">{service.customer?.email || 'N/A'}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Morada:</span>{' '}
+                <span className="font-medium">
+                  {[service.customer?.address, service.customer?.postal_code, service.customer?.city]
+                    .filter(Boolean)
+                    .join(', ') || 'N/A'}
+                </span>
+              </div>
+            </div>
+          </section>
 
-            {/* Warranty Section */}
-            {service.is_warranty && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3 bg-purple-50 rounded p-2">
-                  <h2 className="text-sm font-semibold mb-1 text-purple-800">Serviço em Garantia</h2>
-                  <div className="grid grid-cols-2 gap-x-6 text-xs">
-                    <div>
-                      <span className="text-purple-600">Marca:</span>{' '}
-                      <span className="font-medium">{service.warranty_brand || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-purple-600">Processo:</span>{' '}
-                      <span className="font-medium">{service.warranty_process_number || 'N/A'}</span>
-                    </div>
+          <Separator className="my-2" />
+
+          {/* Service Details */}
+          <section className="mb-3">
+            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Serviço</h2>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+              <div>
+                <span className="text-muted-foreground">Categoria:</span>{' '}
+                <span className="font-medium capitalize">{service.service_type || 'Reparação'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Tipo:</span>{' '}
+                <span className="font-medium">
+                  {service.service_location === 'cliente' ? 'Visita' : 'Oficina'}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Estado:</span>{' '}
+                <span className="font-medium">{statusConfig?.label || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Prioridade:</span>{' '}
+                <span className="font-medium">{service.is_urgent ? 'Urgente' : 'Normal'}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Data Agendada:</span>{' '}
+                <span className="font-medium">
+                  {service.scheduled_date
+                    ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                    : 'Não agendado'}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <Separator className="my-2" />
+
+          {/* Equipment Details */}
+          <section className="mb-3">
+            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Detalhes do Equipamento</h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              <div>
+                <span className="text-muted-foreground">Tipo:</span>{' '}
+                <span className="font-medium">{service.appliance_type || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Marca:</span>{' '}
+                <span className="font-medium">{service.brand || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Modelo:</span>{' '}
+                <span className="font-medium">{service.model || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Nº Série:</span>{' '}
+                <span className="font-medium">{service.serial_number || 'N/A'}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Avaria:</span>{' '}
+                <span className="font-medium">{service.fault_description || 'N/A'}</span>
+              </div>
+              {service.detected_fault && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Diagnóstico:</span>{' '}
+                  <span className="font-medium">{service.detected_fault}</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Warranty Section */}
+          {service.is_warranty && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3 bg-purple-50 rounded p-2">
+                <h2 className="text-sm font-semibold mb-1 text-purple-800">Serviço em Garantia</h2>
+                <div className="grid grid-cols-2 gap-x-6 text-xs">
+                  <div>
+                    <span className="text-purple-600">Marca:</span>{' '}
+                    <span className="font-medium">{service.warranty_brand || 'N/A'}</span>
                   </div>
-                </section>
-              </>
-            )}
-
-            {/* Work Performed */}
-            {service.work_performed && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3">
-                  <h2 className="text-sm font-semibold mb-1 border-b pb-1">Trabalho Realizado</h2>
-                  <p className="text-xs whitespace-pre-wrap">{service.work_performed}</p>
-                </section>
-              </>
-            )}
-
-            {/* Parts Used */}
-            {usedParts.length > 0 && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3">
-                  <h2 className="text-sm font-semibold mb-1 border-b pb-1">Peças Utilizadas</h2>
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-1">Peça</th>
-                        <th className="text-left py-1">Código</th>
-                        <th className="text-center py-1">Qtd</th>
-                        <th className="text-right py-1">Custo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usedParts.map((part) => (
-                        <tr key={part.id} className="border-b">
-                          <td className="py-1">{part.part_name}</td>
-                          <td className="py-1">{part.part_code || '-'}</td>
-                          <td className="py-1 text-center">{part.quantity || 1}</td>
-                          <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
-                        </tr>
-                      ))}
-                      <tr className="font-medium">
-                        <td colSpan={3} className="py-1 text-right">Total:</td>
-                        <td className="py-1 text-right">{totalPartsCost.toFixed(2)} €</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </section>
-              </>
-            )}
-
-            {/* Pricing Summary */}
-            {service.final_price > 0 && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3">
-                  <h2 className="text-sm font-semibold mb-1 border-b pb-1">Resumo Financeiro</h2>
-                  <div className="grid grid-cols-2 gap-1 text-xs max-w-xs ml-auto">
-                    {service.labor_cost > 0 && (
-                      <div className="flex justify-between col-span-2">
-                        <span className="text-muted-foreground">Mão de Obra:</span>
-                        <span>{service.labor_cost.toFixed(2)} €</span>
-                      </div>
-                    )}
-                    {service.parts_cost > 0 && (
-                      <div className="flex justify-between col-span-2">
-                        <span className="text-muted-foreground">Peças:</span>
-                        <span>{service.parts_cost.toFixed(2)} €</span>
-                      </div>
-                    )}
-                    {service.discount > 0 && (
-                      <div className="flex justify-between col-span-2 text-green-600">
-                        <span>Desconto:</span>
-                        <span>-{service.discount.toFixed(2)} €</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between col-span-2 font-bold text-sm border-t pt-1">
-                      <span>TOTAL:</span>
-                      <span>{service.final_price.toFixed(2)} €</span>
-                    </div>
-                    {totalPayments > 0 && (
-                      <div className="flex justify-between col-span-2 text-green-600">
-                        <span>Pago:</span>
-                        <span>{totalPayments.toFixed(2)} €</span>
-                      </div>
-                    )}
-                    {service.final_price > totalPayments && (
-                      <div className="flex justify-between col-span-2 text-red-600 font-medium">
-                        <span>Em Débito:</span>
-                        <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
-                      </div>
-                    )}
+                  <div>
+                    <span className="text-purple-600">Processo:</span>{' '}
+                    <span className="font-medium">{service.warranty_process_number || 'N/A'}</span>
                   </div>
-                </section>
-              </>
-            )}
+                </div>
+              </section>
+            </>
+          )}
 
-            {/* Payment History */}
-            {payments.length > 0 && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3">
-                  <h2 className="text-sm font-semibold mb-1 border-b pb-1">Histórico de Pagamentos</h2>
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-1">Data</th>
-                        <th className="text-left py-1">Método</th>
-                        <th className="text-left py-1">Descrição</th>
-                        <th className="text-right py-1">Valor</th>
+          {/* Work Performed */}
+          {service.work_performed && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3">
+                <h2 className="text-sm font-semibold mb-1 border-b pb-1">Trabalho Realizado</h2>
+                <p className="text-xs whitespace-pre-wrap">{service.work_performed}</p>
+              </section>
+            </>
+          )}
+
+          {/* Parts/Articles Used */}
+          {displayItems.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3">
+                <h2 className="text-sm font-semibold mb-1 border-b pb-1">Artigos / Materiais</h2>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1">Descrição</th>
+                      <th className="text-left py-1">Ref</th>
+                      <th className="text-center py-1">Qtd</th>
+                      <th className="text-center py-1">IVA</th>
+                      <th className="text-right py-1">P. Unit</th>
+                      <th className="text-right py-1">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayItems.map((item, idx) => (
+                      <tr key={idx} className="border-b">
+                        <td className="py-1">{item.name}</td>
+                        <td className="py-1">{item.code || '-'}</td>
+                        <td className="py-1 text-center">{item.qty || 1}</td>
+                        <td className="py-1 text-center">{item.tax}%</td>
+                        <td className="py-1 text-right">{(item.price || 0).toFixed(2)} €</td>
+                        <td className="py-1 text-right">{((item.price || 0) * (item.qty || 1)).toFixed(2)} €</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map((payment) => (
-                        <tr key={payment.id} className="border-b">
-                          <td className="py-1">
-                            {payment.payment_date 
-                              ? format(new Date(payment.payment_date), "dd/MM/yy", { locale: pt })
-                              : '-'}
-                          </td>
-                          <td className="py-1 capitalize">{payment.payment_method || '-'}</td>
-                          <td className="py-1">{payment.description || '-'}</td>
-                          <td className="py-1 text-right">{payment.amount.toFixed(2)} €</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-              </>
-            )}
-
-            {/* Service Signatures */}
-            {signatures.length > 0 && (
-              <>
-                <Separator className="my-2" />
-                <section className="mb-3">
-                  <h2 className="text-sm font-semibold mb-2 border-b pb-1 flex items-center gap-1">
-                    <PenTool className="h-4 w-4" />
-                    Assinaturas Recolhidas
-                  </h2>
-                  <div className="space-y-3">
-                    {signatures.map((sig) => (
-                      <div key={sig.id} className="flex gap-4 p-3 border rounded bg-gray-50">
-                        <img 
-                          src={sig.file_url} 
-                          alt="Assinatura" 
-                          className="w-32 h-20 object-contain border bg-white rounded"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed break-words">
-                            {getSignatureDescription(sig.signature_type)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(sig.signed_at), "dd/MM/yy HH:mm")}
-                          </p>
-                        </div>
-                      </div>
                     ))}
-                  </div>
-                </section>
-              </>
-            )}
+                  </tbody>
+                </table>
+              </section>
+            </>
+          )}
 
-            {/* Terms Section - Only for workshop services */}
-            {service.service_location === 'oficina' && (
-              <>
-                <Separator className="my-2" />
-                <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-                  <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    IMPORTANTE - Termos de Guarda
-                  </h3>
-                  <p className="text-amber-700 leading-tight">
-                    Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após 
-                    conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong> 
-                    pela guarda ou danos.
-                  </p>
-                </section>
-              </>
-            )}
+          {/* Pricing Summary */}
+          {service.final_price > 0 && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3">
+                <h2 className="text-sm font-semibold mb-1 border-b pb-1">Resumo Financeiro</h2>
+                <div className="grid grid-cols-2 gap-1 text-xs max-w-xs ml-auto">
+                  {service.labor_cost > 0 && (
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-muted-foreground">Mão de Obra:</span>
+                      <span>{service.labor_cost.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.parts_cost > 0 && (
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-muted-foreground">Peças:</span>
+                      <span>{service.parts_cost.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.discount > 0 && (
+                    <div className="flex justify-between col-span-2 text-green-600">
+                      <span>Desconto:</span>
+                      <span>-{service.discount.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between col-span-2 font-bold text-sm border-t pt-1">
+                    <span>TOTAL:</span>
+                    <span>{service.final_price.toFixed(2)} €</span>
+                  </div>
+                  {totalPayments > 0 && (
+                    <div className="flex justify-between col-span-2 text-green-600">
+                      <span>Pago:</span>
+                      <span>{totalPayments.toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {service.final_price > totalPayments && (
+                    <div className="flex justify-between col-span-2 text-red-600 font-medium">
+                      <span>Em Débito:</span>
+                      <span>{(service.final_price - totalPayments).toFixed(2)} €</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Payment History */}
+          {payments.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3">
+                <h2 className="text-sm font-semibold mb-1 border-b pb-1">Histórico de Pagamentos</h2>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1">Data</th>
+                      <th className="text-left py-1">Método</th>
+                      <th className="text-left py-1">Descrição</th>
+                      <th className="text-right py-1">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((payment) => (
+                      <tr key={payment.id} className="border-b">
+                        <td className="py-1">
+                          {payment.payment_date
+                            ? format(new Date(payment.payment_date), "dd/MM/yy", { locale: pt })
+                            : '-'}
+                        </td>
+                        <td className="py-1 capitalize">{payment.payment_method || '-'}</td>
+                        <td className="py-1">{payment.description || '-'}</td>
+                        <td className="py-1 text-right">{payment.amount.toFixed(2)} €</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            </>
+          )}
+
+          {/* Service Signatures */}
+          {signatures.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <section className="mb-3">
+                <h2 className="text-sm font-semibold mb-2 border-b pb-1 flex items-center gap-1">
+                  <PenTool className="h-4 w-4" />
+                  Assinaturas Recolhidas
+                </h2>
+                <div className="space-y-3">
+                  {signatures.map((sig) => (
+                    <div key={sig.id} className="flex gap-4 p-3 border rounded bg-gray-50">
+                      <img
+                        src={sig.file_url}
+                        alt="Assinatura"
+                        className="w-32 h-20 object-contain border bg-white rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{sig.signer_name || 'Cliente'}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed break-words">
+                          {getSignatureDescription(sig.signature_type)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(sig.signed_at), "dd/MM/yy HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Terms Section - Only for workshop services */}
+          {service.service_location === 'oficina' && (
+            <>
+              <Separator className="my-2" />
+              <section className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                <h3 className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  IMPORTANTE - Termos de Guarda
+                </h3>
+                <p className="text-amber-700 leading-tight">
+                  Os equipamentos só podem permanecer nas instalações por <strong>30 dias</strong> após
+                  conclusão e notificação. Após este prazo, a empresa <strong>não se responsabiliza</strong>
+                  pela guarda ou danos.
+                </p>
+              </section>
+            </>
+          )}
 
         </div>
       </DialogContent>

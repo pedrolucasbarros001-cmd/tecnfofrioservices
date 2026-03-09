@@ -33,6 +33,8 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatShiftLabel } from '@/utils/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { logPartArrival } from '@/utils/activityLogUtils';
 import type { Service, ServicePart, ScheduledShift } from '@/types/database';
 
 interface PartArrivedModalProps {
@@ -44,6 +46,7 @@ interface PartArrivedModalProps {
 // Removed SHIFTS constant - replaced by time input
 
 export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedModalProps) {
+  const { user } = useAuth();
   const [technicianId, setTechnicianId] = useState<string>('');
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
   const [scheduledShift, setScheduledShift] = useState<string>('');
@@ -136,6 +139,19 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         // It will be cleared when the technician completes the continuation flow
         skipToast: true,
       });
+
+      // Log arrival for each part
+      if (pendingParts.length > 0) {
+        const logPromises = pendingParts.map(part =>
+          logPartArrival(
+            service.code || 'N/A',
+            service.id,
+            part.part_name,
+            user?.id
+          )
+        );
+        await Promise.all(logPromises);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
       queryClient.invalidateQueries({ queryKey: ['pending-parts'] });

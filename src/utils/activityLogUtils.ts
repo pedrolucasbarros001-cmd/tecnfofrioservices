@@ -8,6 +8,7 @@ export type ActivityActionType =
   | 'inicio_execucao'
   | 'levantamento'
   | 'pedido_peca'
+  | 'peca_encomendada'
   | 'peca_chegou'
   | 'conclusao'
   | 'precificacao'
@@ -19,6 +20,7 @@ export type ActivityActionType =
   | 'transferencia_recusada'
   | 'nota_adicionada'
   | 'criacao'
+  | 'cancelamento'
   | 'servico_editado';
 
 export interface ActivityLogData {
@@ -130,7 +132,7 @@ export async function logPartRequest(
     serviceId,
     actorId,
     actionType: 'pedido_peca',
-    description: `Técnico ${technicianName} solicitou peça "${partName}" para ${serviceCode}`,
+    description: `Técnico ${technicianName} solicitou artigo "${partName}" para ${serviceCode}`,
     isPublic: true,
   });
 }
@@ -148,7 +150,26 @@ export async function logPartArrival(
     serviceId,
     actorId,
     actionType: 'peca_chegou',
-    description: `Peça "${partName}" chegou para ${serviceCode}`,
+    description: `Artigo "${partName}" chegou para ${serviceCode}`,
+    isPublic: true,
+  });
+}
+
+/**
+ * Log part ordered
+ */
+export async function logPartOrdered(
+  serviceCode: string,
+  serviceId: string,
+  partNames: string,
+  estimatedArrival: string,
+  actorId?: string
+): Promise<void> {
+  await logActivity({
+    serviceId,
+    actorId,
+    actionType: 'peca_encomendada',
+    description: `Artigo(s) "${partNames}" encomendado(s) para ${serviceCode} (Previsão: ${estimatedArrival})`,
     isPublic: true,
   });
 }

@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { addBusinessDays } from '@/utils/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { logPartOrdered } from '@/utils/activityLogUtils';
 import type { Service, ServicePart } from '@/types/database';
 
 interface ConfirmPartOrderModalProps {
@@ -47,6 +49,7 @@ const emptyNewPart = (): NewPartEntry => ({ name: '', code: '', quantity: '1' })
 const BUSINESS_DAYS_ESTIMATE = 5;
 
 export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPartOrderModalProps) {
+  const { user } = useAuth();
   const [supplier, setSupplier] = useState('');
   const [cost, setCost] = useState('');
   const [ivaRate, setIvaRate] = useState('0');
@@ -155,6 +158,15 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         skipToast: true,
       });
 
+      const partNames = [...pendingParts.map(p => p.part_name), ...validNewParts.map(p => p.name)].join(', ');
+      await logPartOrdered(
+        service.code || 'N/A',
+        service.id,
+        partNames,
+        estimatedArrivalFormatted,
+        user?.id
+      );
+
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
       queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -199,7 +211,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             {/* Pending Parts */}
             {pendingParts.length > 0 && (
               <div className="space-y-2">
-                <Label>Peças Solicitadas</Label>
+                <Label>Artigos Solicitados</Label>
                 <div className="space-y-1">
                   {pendingParts.map((part) => (
                     <div key={part.id} className="p-2 bg-muted/50 rounded text-sm flex justify-between items-center">

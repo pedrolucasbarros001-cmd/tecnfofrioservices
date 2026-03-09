@@ -578,13 +578,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     steps = ["resumo_continuacao", "confirmacao_peca", "conclusao"];
   } else {
     steps = hasPreviousHistory
-      ? ["resumo", needsProductStep ? "produto" : null, "diagnostico", "registo_artigos", "resumo_reparacao", "pedir_peca", "conclusao"].filter(Boolean) as ModalStep[]
+      ? ["resumo", "produto", "diagnostico", "registo_artigos", "resumo_reparacao", "pedir_peca", "conclusao"].filter(Boolean) as ModalStep[]
       : [
         "resumo",
         "foto_aparelho",
         "foto_etiqueta",
         "foto_estado",
-        needsProductStep ? "produto" : null,
+        "produto",
         "diagnostico",
         "registo_artigos",
         "resumo_reparacao",
@@ -637,7 +637,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         onOpenChange={(open) => !open && handleClose()}
       >
         <DialogContent
-          className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"
+          className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6 bg-card"
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
         >
@@ -693,13 +693,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           {/* Step: Confirmação Peça */}
           {currentStep === "confirmacao_peca" && (
             <>
-              <ModalHeader title="Confirmação da Peça" step="Instalação" />
+              <ModalHeader title="Confirmação do Artigo" step="Instalação" />
               <div className="space-y-4 py-4">
                 <div className="flex flex-col items-center text-center gap-3">
                   <Package className="h-12 w-12 text-blue-500 bg-blue-100 p-2 rounded-full" />
-                  <h3 className="font-semibold text-lg">A peça encomendada foi instalada?</h3>
+                  <h3 className="font-semibold text-lg">O artigo encomendado foi instalado?</h3>
                   <p className="text-sm text-muted-foreground">
-                    Confirme se a peça que chegou foi instalada com sucesso.
+                    Confirme se o artigo que chegou foi instalado com sucesso.
                   </p>
                 </div>
 
@@ -866,7 +866,10 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 </div>
               </div>
               <DialogFooter className="flex gap-2 mt-6">
-                <Button variant="outline" onClick={() => safeSetStep("foto_estado")} className="flex items-center gap-1">
+                <Button variant="outline" onClick={() => {
+                  if (hasPreviousHistory) safeSetStep("resumo");
+                  else safeSetStep("foto_estado");
+                }} className="flex items-center gap-1">
                   <ArrowLeft className="h-4 w-4" /> Voltar
                 </Button>
                 <Button onClick={handleProductoConfirm} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
@@ -1188,12 +1191,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </>
           )}
 
-          {/* Step: Pedir Peça */}
+          {/* Step: Pedir Artigo */}
           {currentStep === "pedir_peca" && (
             <>
-              <ModalHeader title="Pedir Peça?" step="Passo 5" />
+              <ModalHeader title="Pedir Artigo?" step="Passo 5" />
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">É necessário pedir alguma peça?</p>
+                <p className="text-sm text-muted-foreground">É necessário pedir algum artigo?</p>
                 <RadioGroup value={formData.needsPartOrder ? "sim" : "nao"} onValueChange={(val) => setFormData((prev) => ({ ...prev, needsPartOrder: val === "sim" }))} className="flex gap-4">
                   <label htmlFor="needsPart_nao" className={cn("flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer", !formData.needsPartOrder ? "border-green-500 bg-green-50" : "border-muted")}>
                     <RadioGroupItem value="nao" id="needsPart_nao" />
@@ -1208,7 +1211,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 {formData.needsPartOrder && (
                   <div className="space-y-4 pt-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm">Peças a pedir:</Label>
+                      <Label className="text-sm">Artigos a pedir:</Label>
                       <Button
                         type="button"
                         variant="ghost"
@@ -1219,14 +1222,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                           partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
                         }))}
                       >
-                        <Plus className="h-3 w-3 mr-1" /> Adicionar Peça
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
                       </Button>
                     </div>
 
                     <div className="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
                       {formData.partsToOrder.length === 0 && (
                         <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
-                          Nenhuma peça adicionada.
+                          Nenhum artigo adicionado.
                         </p>
                       )}
                       {(formData.partsToOrder || []).map((part, index) => (
@@ -1246,7 +1249,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                           </Button>
                           <div className="space-y-2">
                             <Input
-                              placeholder="Nome da peça *"
+                              placeholder="Descrição do artigo *"
                               value={part.name}
                               className="h-8 text-sm"
                               onChange={(e) => {
@@ -1275,7 +1278,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               <DialogFooter className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo_reparacao")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
                 {formData.needsPartOrder ? (
-                  <Button className="flex-1 bg-yellow-500 text-black" onClick={handleRequestPart} disabled={isSubmitting || formData.partsToOrder.length === 0 || formData.partsToOrder.every(p => !p.name.trim())}>Solicitar Peças</Button>
+                  <Button className="flex-1 bg-yellow-500 text-black" onClick={handleRequestPart} disabled={isSubmitting || formData.partsToOrder.length === 0 || formData.partsToOrder.every(p => !p.name.trim())}>Solicitar Artigos</Button>
                 ) : (
                   <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => safeSetStep("conclusao")}>Continuar <ArrowRight className="h-4 w-4 ml-1" /></Button>
                 )}

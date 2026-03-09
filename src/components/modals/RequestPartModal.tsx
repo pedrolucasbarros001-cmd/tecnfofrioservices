@@ -18,6 +18,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { notifyPartRequested } from '@/utils/notificationUtils';
+import { logPartRequest } from '@/utils/activityLogUtils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import type { Service } from '@/types/database';
@@ -120,6 +121,14 @@ export function RequestPartModal({
         partNames
       );
 
+      await logPartRequest(
+        service.code || 'N/A',
+        service.id,
+        partNames,
+        technicianName,
+        profile?.user_id
+      );
+
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
 
       const count = validParts.length;
@@ -162,7 +171,7 @@ export function RequestPartModal({
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-yellow-600" />
-            <span>{parts.length > 1 ? 'Solicitar Peças' : 'Solicitar Peça'}</span>
+            <span>{parts.length > 1 ? 'Solicitar Artigos' : 'Solicitar Artigo'}</span>
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
             Ao confirmar, o pedido ficará disponível para o Dono registar oficialmente a encomenda.

@@ -20,19 +20,20 @@ import {
 } from '@/components/ui/select';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
+import { logActivity } from '@/utils/activityLogUtils';
 import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types/database';
 
 // Impact warnings based on status transitions
 const getImpactWarnings = (fromStatus: ServiceStatus, toStatus: ServiceStatus): string[] => {
   const warnings: string[] = [];
-  
+
   // If going back to earlier statuses from completed states
-  if (['por_fazer', 'em_execucao', 'na_oficina'].includes(toStatus) && 
-      ['concluidos', 'em_debito', 'finalizado'].includes(fromStatus)) {
+  if (['por_fazer', 'em_execucao', 'na_oficina'].includes(toStatus) &&
+    ['concluidos', 'em_debito', 'finalizado'].includes(fromStatus)) {
     warnings.push('O serviço será reaberto e poderá requerer novo agendamento.');
     warnings.push('O técnico verá este serviço novamente na sua lista de trabalho.');
   }
-  
+
   // If jumping directly to finalizado
   if (toStatus === 'finalizado') {
     warnings.push('O serviço será marcado como entregue ao cliente.');
@@ -40,23 +41,23 @@ const getImpactWarnings = (fromStatus: ServiceStatus, toStatus: ServiceStatus): 
       warnings.push('Etapas intermediárias serão ignoradas (precificação, pagamento, entrega).');
     }
   }
-  
+
   // If changing to/from part-related statuses
   if (['para_pedir_peca', 'em_espera_de_peca'].includes(toStatus) ||
-      ['para_pedir_peca', 'em_espera_de_peca'].includes(fromStatus)) {
+    ['para_pedir_peca', 'em_espera_de_peca'].includes(fromStatus)) {
     warnings.push('O fluxo de peças pode ficar inconsistente.');
   }
-  
+
   // If going to a_precificar from early states
   if (toStatus === 'a_precificar' && ['por_fazer', 'em_execucao'].includes(fromStatus)) {
     warnings.push('O serviço irá para precificação sem diagnóstico completo.');
   }
-  
+
   // If going to concluidos
   if (toStatus === 'concluidos' && !['a_precificar', 'em_debito'].includes(fromStatus)) {
     warnings.push('O serviço será marcado como concluído e pronto para entrega.');
   }
-  
+
   return warnings;
 };
 
@@ -69,8 +70,8 @@ interface ForceStateModalProps {
 export function ForceStateModal({ service, open, onOpenChange }: ForceStateModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<ServiceStatus | ''>('');
   const updateService = useUpdateService();
-  const { role } = useAuth();
-  
+  const { role, user } = useAuth();
+
   const isAdmin = role === 'dono';
 
   // Calculate impact warnings when status changes
@@ -96,11 +97,21 @@ export function ForceStateModal({ service, open, onOpenChange }: ForceStateModal
         updatePayload.service_location = 'oficina';
       }
 
+      const oldStatus = service.status;
       await updateService.mutateAsync(updatePayload);
 
-      // Show warning toast with transition details
       const oldLabel = SERVICE_STATUS_CONFIG[oldStatus]?.label || oldStatus;
       const newLabel = SERVICE_STATUS_CONFIG[selectedStatus]?.label || selectedStatus;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'servico_editado',
+        description: `Mudança de estado FORÇADA: ${oldLabel} → ${newLabel}`,
+        isPublic: false,
+      });
+
+      // Show warning toast with transition details
       toast.warning(`Estado forçado: ${oldLabel} → ${newLabel}`);
 
       onOpenChange(false);
@@ -155,59 +166,59 @@ export function ForceStateModal({ service, open, onOpenChange }: ForceStateModal
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-         <div className="space-y-4 py-4">
-          {service && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              <p className="font-medium">{service.code}</p>
-              <p className="text-muted-foreground">
-                Estado atual: {SERVICE_STATUS_CONFIG[service.status]?.label || service.status}
-              </p>
+          <div className="space-y-4 py-4">
+            {service && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p className="font-medium">{service.code}</p>
+                <p className="text-muted-foreground">
+                  Estado atual: {SERVICE_STATUS_CONFIG[service.status]?.label || service.status}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Novo Estado</Label>
+              <Select
+                value={selectedStatus}
+                onValueChange={(v) => setSelectedStatus(v as ServiceStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SERVICE_STATUS_CONFIG).map(([status, config]) => (
+                    <SelectItem
+                      key={status}
+                      value={status}
+                      disabled={status === service?.status}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${config.color}`} />
+                        {config.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="status">Novo Estado</Label>
-            <Select 
-              value={selectedStatus} 
-              onValueChange={(v) => setSelectedStatus(v as ServiceStatus)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar estado" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SERVICE_STATUS_CONFIG).map(([status, config]) => (
-                  <SelectItem 
-                    key={status} 
-                    value={status}
-                    disabled={status === service?.status}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${config.color}`} />
-                      {config.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Dynamic Impact Warnings */}
+            {impactWarnings.length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
+                <p className="font-medium text-red-800 mb-2">⚠️ IMPACTOS DESTA MUDANÇA:</p>
+                <ul className="list-disc list-inside space-y-1 text-red-700">
+                  {impactWarnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          {/* Dynamic Impact Warnings */}
-          {impactWarnings.length > 0 && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
-              <p className="font-medium text-red-800 mb-2">⚠️ IMPACTOS DESTA MUDANÇA:</p>
-              <ul className="list-disc list-inside space-y-1 text-red-700">
-                {impactWarnings.map((warning, index) => (
-                  <li key={index}>{warning}</li>
-                ))}
-              </ul>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <p className="font-medium">⚠️ Atenção</p>
+              <p>Esta operação ignora as regras normais de transição de estados e pode causar inconsistências nos dados.</p>
             </div>
-          )}
-
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-            <p className="font-medium">⚠️ Atenção</p>
-            <p>Esta operação ignora as regras normais de transição de estados e pode causar inconsistências nos dados.</p>
           </div>
-         </div>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t flex-shrink-0">

@@ -27,6 +27,7 @@ import {
   DollarSign,
   ClipboardList,
   Pencil,
+  Plus,
   X,
   ChevronLeft,
   ChevronRight,
@@ -68,6 +69,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { logActivity } from '@/utils/activityLogUtils';
 import { openInNewTabPreservingQuery } from '@/utils/openInNewTab';
 import {
   AlertDialog,
@@ -206,7 +208,7 @@ const getServiceProgressSteps = (service: Service) => {
 
 export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdated }: ServiceDetailSheetProps) {
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const queryClient = useQueryClient();
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
@@ -393,6 +395,15 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         status: 'cancelado',
         skipToast: true,
       });
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'cancelamento',
+        description: `Serviço ${service.code || ''} desativado/cancelado.`,
+        isPublic: true,
+      });
+
       toast.success(`Serviço ${service.code || ''} desativado. Todos os dados foram preservados.`);
       setShowCancelDialog(false);
       setCancelReason('');
@@ -1238,6 +1249,7 @@ const ACTION_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className
   inicio_execucao: { icon: Play, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
   levantamento: { icon: Package, bgColor: 'bg-orange-100', iconColor: 'text-orange-600' },
   pedido_peca: { icon: ShoppingCart, bgColor: 'bg-yellow-100', iconColor: 'text-yellow-600' },
+  peca_encomendada: { icon: Clock, bgColor: 'bg-blue-50', iconColor: 'text-blue-500' },
   peca_chegou: { icon: CheckCircle, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
   conclusao: { icon: CheckCircle2, bgColor: 'bg-emerald-100', iconColor: 'text-emerald-600' },
   precificacao: { icon: DollarSign, bgColor: 'bg-purple-100', iconColor: 'text-purple-600' },
@@ -1245,6 +1257,12 @@ const ACTION_TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className
   entrega: { icon: Truck, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
   tarefa: { icon: ClipboardList, bgColor: 'bg-gray-100', iconColor: 'text-gray-600' },
   nota_adicionada: { icon: Pencil, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' },
+  criacao: { icon: Plus, bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
+  cancelamento: { icon: X, bgColor: 'bg-red-100', iconColor: 'text-red-600' },
+  servico_editado: { icon: Pencil, bgColor: 'bg-slate-100', iconColor: 'text-slate-600' },
+  transferencia_solicitada: { icon: UserPlus, bgColor: 'bg-indigo-50', iconColor: 'text-indigo-600' },
+  transferencia_aceite: { icon: CheckCircle2, bgColor: 'bg-green-50', iconColor: 'text-green-600' },
+  transferencia_recusada: { icon: X, bgColor: 'bg-red-50', iconColor: 'text-red-600' },
 };
 
 interface ActivityLogItemProps {

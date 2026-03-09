@@ -53,6 +53,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
+  const [applianceType, setApplianceType] = useState('');
   const [detectedFault, setDetectedFault] = useState('');
   const [workPerformed, setWorkPerformed] = useState('');
 
@@ -81,6 +82,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       setBrand(service.brand || '');
       setModel(service.model || '');
       setSerialNumber(service.serial_number || '');
+      setApplianceType(service.appliance_type || '');
       setDetectedFault(service.detected_fault || '');
       setWorkPerformed(service.work_performed || '');
       setPartsToDelete([]);
@@ -126,6 +128,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: ${brand}`); }
       if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: ${model}`); }
       if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: ${serialNumber}`); }
+      if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: ${applianceType}`); }
 
       // Use technician_update_service RPC for status-safe fields
       if (detectedFault !== (service.detected_fault || '') || workPerformed !== (service.work_performed || '')) {
@@ -157,9 +160,9 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
         if (delError) {
           console.warn('Technician marked parts for deletion but likely lacked RLS permissions:', delError);
-          changes.push(`${partsToDelete.length} peça(s) marcadas para remoção (aguarda admin)`);
+          changes.push(`${partsToDelete.length} artigo(s) marcados para remoção (aguarda admin)`);
         } else {
-          changes.push(`${partsToDelete.length} peça(s) removida(s)`);
+          changes.push(`${partsToDelete.length} artigo(s) removido(s)`);
         }
       }
 
@@ -178,7 +181,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             }))
           );
           if (insertError) throw insertError;
-          changes.push(`${validParts.length} peça(s) adicionada(s)`);
+          changes.push(`${validParts.length} artigo(s) adicionado(s)`);
         }
       }
 
@@ -209,7 +212,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0"
+        className="sm:max-w-xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0 bg-card"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
@@ -231,9 +234,15 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                 <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Modelo" />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Nº de Série</Label>
-              <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Nº de Série" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Nº de Série</Label>
+                <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Nº de Série" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo de Aparelho</Label>
+                <Input value={applianceType} onChange={e => setApplianceType(e.target.value)} placeholder="Ex: Frigorífico" />
+              </div>
             </div>
           </section>
 
@@ -302,7 +311,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-green-600 uppercase tracking-widest flex items-center gap-2">
-                  <Wrench className="h-4 w-4" /> Peças Usadas
+                  <Wrench className="h-4 w-4" /> Artigos Utilizados
                 </h3>
                 <Button variant="outline" size="sm" onClick={() => handleAddNewPart(false)} className="gap-1 text-[10px] h-7 border-green-200 text-green-700 hover:bg-green-50">
                   <Plus className="h-3 w-3" /> Adicionar
@@ -349,10 +358,10 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4" /> Solicitar Encomenda
+                  <ShoppingCart className="h-4 w-4" /> Solicitar Artigo
                 </h3>
                 <Button variant="outline" size="sm" onClick={() => handleAddNewPart(true)} className="gap-1 text-[10px] h-7 border-amber-200 text-amber-700 hover:bg-amber-50">
-                  <Plus className="h-3 w-3" /> Solicitar
+                  <Plus className="h-3 w-3" /> Pedir Artigo
                 </Button>
               </div>
 
@@ -399,7 +408,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             </div>
 
             {existingParts.length === 0 && newParts.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma peça ou encomenda registada</p>
+              <p className="text-xs text-muted-foreground text-center py-4">Nenhum artigo ou encomenda registada</p>
             )}
           </section>
         </div>
@@ -430,7 +439,7 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
     )}>
       <div className="flex items-center justify-between">
         <span className={cn("text-[10px] font-bold uppercase", isRequested ? "text-amber-700" : "text-green-700")}>
-          {isRequested ? "Nova Encomenda" : "Nova Peça Usada"}
+          {isRequested ? "Novo Pedido de Artigo" : "Novo Artigo Utilizado"}
         </span>
         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onRemove}>
           <Trash2 className="h-3 w-3" />
@@ -438,7 +447,7 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Input
-          placeholder="Nome da peça *"
+          placeholder="Descrição do artigo *"
           value={part.part_name}
           onChange={e => onUpdate('part_name', e.target.value)}
           className="text-xs h-8"

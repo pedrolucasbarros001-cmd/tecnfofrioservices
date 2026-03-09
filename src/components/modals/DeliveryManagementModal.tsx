@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { useUpdateService } from '@/hooks/useServices';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
+import { logDelivery } from '@/utils/activityLogUtils';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Service } from '@/types/database';
 
 interface DeliveryManagementModalProps {
@@ -25,6 +27,7 @@ export function DeliveryManagementModal({
   onAssignDelivery,
 }: DeliveryManagementModalProps) {
   const updateService = useUpdateService();
+  const { user } = useAuth();
 
   const handleClientPickup = async () => {
     if (!service) return;
@@ -39,6 +42,14 @@ export function DeliveryManagementModal({
 
       // Contextual feedback
       const customerName = service.customer?.name || 'cliente';
+
+      await logDelivery(
+        service.code || 'N/A',
+        service.id,
+        customerName,
+        user?.id
+      );
+
       toast.success(`${service.code} finalizado — ${customerName} recolheu o equipamento.`);
       onOpenChange(false);
     } catch (error) {
