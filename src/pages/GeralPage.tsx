@@ -286,6 +286,33 @@ export default function GeralPage() {
     setShowEditDetailsModal(true);
   };
 
+  const handleCancelPartOrder = async (service: Service) => {
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'para_pedir_peca',
+        skipToast: true,
+      });
+
+      // Also clear estimated_arrival from parts that were waiting
+      const { error } = await supabase
+        .from('service_parts')
+        .update({ estimated_arrival: null })
+        .eq('service_id', service.id)
+        .eq('is_requested', true)
+        .eq('arrived', false);
+
+      if (error) throw error;
+
+      toast.success('Pedido de artigo cancelado. O serviço voltou para "Pedir Peça".');
+      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
+      queryClient.invalidateQueries({ queryKey: ['all-pending-parts'] });
+    } catch (error) {
+      console.error('Error cancelling part order:', error);
+      toast.error('Erro ao cancelar o pedido do artigo.');
+    }
+  };
+
   const handleDeactivateService = (service: Service) => {
     if (service.status === 'cancelado' || service.status === 'finalizado') return;
     setCurrentService(service);
@@ -558,6 +585,7 @@ export default function GeralPage() {
                           onDelete={() => handleDeleteService(service)}
                           onReschedule={() => handleReschedule(service)}
                           onEditDetails={() => handleEditDetails(service)}
+                          onCancelPartOrder={() => handleCancelPartOrder(service)}
                           onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined}
                           onReopen={service.status === 'cancelado' ? () => handleReopenService(service) : undefined}
                           viewContext={selectedStatus}

@@ -328,26 +328,30 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     }
   };
 
-  const handlePhotoCapture = async (imageData: string) => {
+  const handlePhotoCapture = async (data: string | string[]) => {
     try {
+      const images = Array.isArray(data) ? data : [data];
       await ensureValidSession();
       const { uploadServicePhoto } = await import('@/utils/photoUpload');
-      const publicUrl = await uploadServicePhoto(service.id, imageData, currentPhotoType, getPhotoDescription(currentPhotoType));
-      queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
 
-      // Update form data based on photo type
-      if (currentPhotoType === "aparelho") {
-        setFormData((prev) => ({ ...prev, photoAparelho: publicUrl }));
-      } else if (currentPhotoType === "etiqueta") {
-        setFormData((prev) => ({ ...prev, photoEtiqueta: publicUrl }));
-      } else if (currentPhotoType === "estado") {
-        setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, publicUrl] }));
-      } else {
-        setFormData((prev) => ({ ...prev, photoFile: publicUrl }));
+      for (const img of images) {
+        const publicUrl = await uploadServicePhoto(service.id, img, currentPhotoType, getPhotoDescription(currentPhotoType));
+
+        // Update form data based on photo type
+        if (currentPhotoType === "aparelho") {
+          setFormData((prev) => ({ ...prev, photoAparelho: publicUrl }));
+        } else if (currentPhotoType === "etiqueta") {
+          setFormData((prev) => ({ ...prev, photoEtiqueta: publicUrl }));
+        } else if (currentPhotoType === "estado") {
+          setFormData((prev) => ({ ...prev, photosEstado: [...prev.photosEstado, publicUrl] }));
+        } else {
+          setFormData((prev) => ({ ...prev, photoFile: publicUrl }));
+        }
       }
 
+      queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
       setShowCamera(false);
-      toast.success("Foto guardada!");
+      toast.success(images.length > 1 ? `${images.length} fotos guardadas!` : "Foto guardada!");
     } catch (error) {
       console.error("Error saving photo:", error);
       toast.error(humanizeError(error));
@@ -1397,7 +1401,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                         </Button>
                       )}
                       <div className="grid grid-cols-12 gap-2">
-                        <div className="col-span-3 space-y-1">
+                        <div className="col-span-2 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                           <Input
                             placeholder="Ref"
@@ -1407,7 +1411,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                             disabled={(formData.articlesLocked as boolean) || article.isExisting}
                           />
                         </div>
-                        <div className="col-span-5 space-y-1">
+                        <div className="col-span-4 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
                           <Input
                             placeholder="Descrição"
@@ -1429,7 +1433,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                           />
                         </div>
                         <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor Unit.</Label>
                           <Input
                             type="number"
                             placeholder="0,00"
@@ -1438,6 +1442,15 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                             className="h-8 text-sm px-2 text-right"
                             disabled={(formData.articlesLocked as boolean) || article.isExisting}
                           />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Total</Label>
+                          <div className={cn(
+                            "h-8 flex items-center justify-end px-2 bg-muted/50 rounded text-xs font-medium",
+                            (formData.articlesLocked || article.isExisting) && "opacity-50"
+                          )}>
+                            {(article.quantity * article.unit_price).toFixed(2)} €
+                          </div>
                         </div>
                       </div>
                     </div>

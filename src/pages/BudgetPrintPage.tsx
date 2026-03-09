@@ -47,10 +47,10 @@ export default function BudgetPrintPage() {
   const navigate = useNavigate();
   const printSheetRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   // Session bridge for new tab authentication
   const { isSettling: sessionSettling } = usePrintSessionBridge();
-  
+
   // Auth state from context
   const { isAuthenticated, loading: authLoading } = useAuth();
 
@@ -76,30 +76,30 @@ export default function BudgetPrintPage() {
   // Parse pricing_description to extract items
   const pricingDetails = useMemo(() => {
     if (!budget?.pricing_description) {
-      return { 
-        items: [] as BudgetItem[], 
-        subtotal: budget?.estimated_labor || 0, 
+      return {
+        items: [] as BudgetItem[],
+        subtotal: budget?.estimated_labor || 0,
         iva: budget?.estimated_parts || 0,
         total: budget?.estimated_total || 0
       };
     }
-    
+
     try {
       const parsed = JSON.parse(budget.pricing_description);
       if (parsed.items && Array.isArray(parsed.items)) {
         const items: BudgetItem[] = parsed.items;
-        
+
         const subtotal = items.reduce((sum, item) => {
           return sum + (item.qty * item.price);
         }, 0);
-        
+
         const iva = items.reduce((sum, item) => {
           return sum + ((item.qty * item.price) * (item.tax / 100));
         }, 0);
-        
-        return { 
-          items, 
-          subtotal, 
+
+        return {
+          items,
+          subtotal,
           iva,
           total: subtotal + iva
         };
@@ -107,10 +107,10 @@ export default function BudgetPrintPage() {
     } catch {
       // Fallback to existing fields
     }
-    
-    return { 
-      items: [] as BudgetItem[], 
-      subtotal: budget.estimated_labor || 0, 
+
+    return {
+      items: [] as BudgetItem[],
+      subtotal: budget.estimated_labor || 0,
       iva: budget.estimated_parts || 0,
       total: budget.estimated_total || 0
     };
@@ -129,12 +129,12 @@ export default function BudgetPrintPage() {
 
   const handleDownloadPDF = async () => {
     if (!printSheetRef.current || !budget) return;
-    
+
     setIsGenerating(true);
     try {
-      await generatePDF({ 
-        element: printSheetRef.current, 
-        filename: `Orcamento-${budget.code}` 
+      await generatePDF({
+        element: printSheetRef.current,
+        filename: `Orcamento-${budget.code}`
       });
     } finally {
       setIsGenerating(false);
@@ -143,10 +143,10 @@ export default function BudgetPrintPage() {
 
   // Combined loading state
   const isLoading = authLoading || sessionSettling || loadingBudget;
-  
+
   // If session bridge is done and we're still not authenticated, show login prompt
   const showLoginPrompt = !sessionSettling && !authLoading && !isAuthenticated;
-  
+
   if (showLoginPrompt) {
     return (
       <div className="print-page">
@@ -165,7 +165,7 @@ export default function BudgetPrintPage() {
       </div>
     );
   }
-  
+
   if (isLoading) {
     return (
       <div className="print-page">
@@ -224,22 +224,22 @@ export default function BudgetPrintPage() {
       {/* A4 Sheet - this is what prints */}
       <div ref={printSheetRef} className="print-sheet relative bg-white">
         {/* Watermark */}
-        <div 
+        <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
           aria-hidden="true"
         >
-          <img 
-            src={tecnofrioLogoIcon} 
-            alt="" 
+          <img
+            src={tecnofrioLogoIcon}
+            alt=""
             className="w-[180mm] h-[180mm] object-contain"
           />
         </div>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-1.5 relative z-10">
-          <img 
-            src={tecnofrioLogoFull} 
-            alt="TECNOFRIO" 
+          <img
+            src={tecnofrioLogoFull}
+            alt="TECNOFRIO"
             className="h-10 object-contain"
           />
           <div className="text-right">
@@ -344,27 +344,27 @@ export default function BudgetPrintPage() {
           </>
         )}
 
-        {/* Items Table */}
         <section className="mb-3">
           <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Artigos</h2>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="text-left py-1.5 px-1 font-medium">Ref.</th>
-                <th className="text-left py-1.5 px-1 font-medium">Descrição</th>
-                <th className="text-center py-1.5 px-1 font-medium">Qtd</th>
-                <th className="text-right py-1.5 px-1 font-medium">Valor</th>
-                <th className="text-center py-1.5 px-1 font-medium">IVA</th>
-                <th className="text-right py-1.5 px-1 font-medium">Total</th>
+                <th className="text-left py-1.5 px-1 font-medium w-[15%]">Ref.</th>
+                <th className="text-left py-1.5 px-1 font-medium w-[45%]">Descrição</th>
+                <th className="text-center py-1.5 px-1 font-medium w-[10%]">Qtd</th>
+                <th className="text-right py-1.5 px-1 font-medium w-[15%]">Valor Unit.</th>
+                <th className="text-right py-1.5 px-1 font-medium w-[15%]">Total</th>
               </tr>
             </thead>
             <tbody>
               {pricingDetails.items.length > 0 ? (
                 pricingDetails.items.map((item, index) => {
                   const lineSubtotal = item.qty * item.price;
-                  const lineTax = lineSubtotal * (item.tax / 100);
-                  const lineTotal = lineSubtotal + lineTax;
-                  
+                  // Total per line excluding tax if that's the standard, or including it?
+                  // The user reference shows "Valor Unit." and "Total". Usually Total = Qty * UnitPrice.
+                  // Taxes are usually shown at the bottom.
+                  const lineTotal = lineSubtotal;
+
                   return (
                     <tr key={index} className="border-b">
                       <td className="py-1.5 px-1">{item.ref || '-'}</td>
@@ -378,14 +378,13 @@ export default function BudgetPrintPage() {
                       </td>
                       <td className="py-1.5 px-1 text-center">{item.qty}</td>
                       <td className="py-1.5 px-1 text-right">{formatCurrency(item.price)}</td>
-                      <td className="py-1.5 px-1 text-center">{item.tax}%</td>
                       <td className="py-1.5 px-1 text-right font-medium">{formatCurrency(lineTotal)}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-2 text-center text-muted-foreground">
+                  <td colSpan={5} className="py-2 text-center text-muted-foreground">
                     Sem artigos detalhados
                   </td>
                 </tr>

@@ -215,7 +215,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                   {editableParts.map((part, index) => (
                     <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group">
                       <div className="grid grid-cols-12 gap-2">
-                        <div className="col-span-3 space-y-1">
+                        <div className="col-span-2 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                           <Input
                             placeholder="Ref"
@@ -228,7 +228,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                             className="h-8 text-sm px-2"
                           />
                         </div>
-                        <div className="col-span-5 space-y-1">
+                        <div className="col-span-4 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
                           <Input
                             placeholder="Artigo"
@@ -256,7 +256,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                           />
                         </div>
                         <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor Unit.</Label>
                           <Input
                             type="text"
                             placeholder="0,00"
@@ -268,6 +268,12 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                             }}
                             className="h-8 text-sm text-right px-2"
                           />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Total</Label>
+                          <div className="h-8 flex items-center justify-end px-2 bg-muted/50 rounded text-xs font-medium">
+                            {((parseInt(part.quantity?.toString()) || 0) * (parseFloat(part.cost?.toString().replace(',', '.')) || 0)).toFixed(2)} €
+                          </div>
                         </div>
                       </div>
                     </div>

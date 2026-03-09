@@ -418,6 +418,34 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     onServiceUpdated?.();
   };
 
+  const handleCancelPartOrder = async () => {
+    if (!service) return;
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'para_pedir_peca',
+        skipToast: true,
+      });
+
+      // Also clear estimated_arrival from parts that were waiting
+      const { error } = await supabase
+        .from('service_parts')
+        .update({ estimated_arrival: null })
+        .eq('service_id', service.id)
+        .eq('is_requested', true)
+        .eq('arrived', false);
+
+      if (error) throw error;
+
+      toast.success('Pedido de artigo cancelado. O serviço voltou para "Pedir Peça".');
+      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
+      queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
+    } catch (error) {
+      console.error('Error cancelling part order:', error);
+      toast.error('Erro ao cancelar o pedido do artigo.');
+    }
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -674,7 +702,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   bgColor="bg-yellow-50"
                   borderColor="border-l-yellow-500"
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {serviceParts.filter((p: any) => !p.is_requested).length > 0 ? (
                       Object.entries(groupedParts).map(([key, parts]: [string, any[]]) => {
                         const nonRequestedParts = parts.filter((p: any) => !p.is_requested);
@@ -686,60 +714,81 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                         const firstDate = nonRequestedParts[0]?.created_at;
 
                         return (
-                          <div key={key} className="space-y-1">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium border-b pb-1">
-                              <MapPin className="h-3 w-3" />
-                              <span>{locationLabel}</span>
-                              <span>•</span>
-                              <User className="h-3 w-3" />
-                              <span>{authorName}</span>
+                          <div key={key} className="space-y-2 border rounded-lg p-2 bg-white/50">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium border-b pb-1 mb-2">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                <span>{locationLabel}</span>
+                                <span>•</span>
+                                <User className="h-3 w-3" />
+                                <span>{authorName}</span>
+                              </div>
                               {firstDate && !isNaN(new Date(firstDate).getTime()) && (
-                                <>
-                                  <span>•</span>
-                                  <span>{safeFormat(firstDate, 'dd/MM/yyyy', { locale: pt })}</span>
-                                </>
+                                <span>{safeFormat(firstDate, 'dd/MM/yyyy', { locale: pt })}</span>
                               )}
                             </div>
-                            {nonRequestedParts.map((part: any) => {
-                              const lineTotal = (part.cost || 0) * (part.quantity || 1);
-                              return (
-                                <div key={part.id} className="flex items-center justify-between py-1 text-sm">
-                                  <div className="flex-1">
-                                    <span className="font-medium">{part.part_name}</span>
-                                    {part.part_code && (
-                                      <span className="text-xs text-muted-foreground ml-1">({part.part_code})</span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground flex gap-2">
-                                    <span>{part.quantity}x</span>
-                                    <span>{(Number(part.cost) || 0).toFixed(2)}€</span>
-                                    <span className="font-medium text-foreground">= {(Number(lineTotal) || 0).toFixed(2)}€</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div className="flex justify-end text-xs text-muted-foreground pt-1">
+
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-muted-foreground border-b border-dashed">
+                                  <th className="text-left py-1 font-normal">Ref.</th>
+                                  <th className="text-left py-1 font-normal">Descrição</th>
+                                  <th className="text-center py-1 font-normal">Qtd</th>
+                                  <th className="text-right py-1 font-normal">Preço</th>
+                                  <th className="text-right py-1 font-normal">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {nonRequestedParts.map((part: any) => {
+                                  const lineTotal = (part.cost || 0) * (part.quantity || 1);
+                                  return (
+                                    <tr key={part.id} className="border-b border-dashed last:border-0">
+                                      <td className="py-2 text-muted-foreground">{part.part_code || '-'}</td>
+                                      <td className="py-2 font-medium">{part.part_name}</td>
+                                      <td className="py-2 text-center">{part.quantity}</td>
+                                      <td className="py-2 text-right">{(Number(part.cost) || 0).toFixed(2)}€</td>
+                                      <td className="py-2 text-right font-semibold">{(Number(lineTotal) || 0).toFixed(2)}€</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                            <div className="flex justify-end text-[11px] font-bold border-t pt-1 mt-1 text-primary">
                               Subtotal: {(Number(groupSubtotal) || 0).toFixed(2)} €
                             </div>
                           </div>
                         );
                       })
                     ) : (
-                      centralItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between py-1 text-sm border-b border-dashed last:border-0">
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium">{item.desc || item.description || '-'}</span>
-                            {(item.ref || item.article) && (
-                              <span className="text-xs text-muted-foreground ml-1">({item.ref || item.article})</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex gap-2 shrink-0">
-                            <span>{item.qty || item.quantity || 1}x</span>
-                            <span>{(Number(item.unit_price || item.price) || 0).toFixed(2)}€</span>
-                            <span className="font-medium text-foreground">= {((Number(item.qty || item.quantity || 1) * Number(item.unit_price || item.price || 0)) || 0).toFixed(2)}€</span>
-                          </div>
-                        </div>
-                      ))
+                      <div className="border rounded-lg p-2 bg-white/50">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-muted-foreground border-b border-dashed">
+                              <th className="text-left py-1 font-normal">Ref.</th>
+                              <th className="text-left py-1 font-normal">Descrição</th>
+                              <th className="text-center py-1 font-normal">Qtd</th>
+                              <th className="text-right py-1 font-normal">Preço</th>
+                              <th className="text-right py-1 font-normal">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {centralItems.map((item: any, idx: number) => {
+                              const qty = Number(item.qty || item.quantity || 1);
+                              const price = Number(item.unit_price || item.price || 0);
+                              const lineTotal = qty * price;
+                              return (
+                                <tr key={idx} className="border-b border-dashed last:border-0">
+                                  <td className="py-2 text-muted-foreground">{item.ref || item.article || '-'}</td>
+                                  <td className="py-2 font-medium">{item.desc || item.description || '-'}</td>
+                                  <td className="py-2 text-center">{qty}</td>
+                                  <td className="py-2 text-right">{price.toFixed(2)}€</td>
+                                  <td className="py-2 text-right font-semibold">{lineTotal.toFixed(2)}€</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 </Section>
@@ -990,6 +1039,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}
               onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
               onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
+              onCancelPartOrder={(role === 'dono' || role === 'secretaria') ? handleCancelPartOrder : undefined}
               onCancel={(role === 'dono' || role === 'secretaria') && service.status !== 'cancelado' && service.status !== 'finalizado' ? () => setShowCancelDialog(true) : undefined}
             />
             <p className="text-xs text-muted-foreground text-center mt-3">

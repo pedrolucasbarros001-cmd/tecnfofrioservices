@@ -46,6 +46,7 @@ interface StateActionButtonsProps {
   onEditDetails?: () => void;
   onCancel?: () => void;
   onReopen?: () => void;
+  onCancelPartOrder?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -77,6 +78,7 @@ export function StateActionButtons({
   onEditDetails,
   onCancel,
   onReopen,
+  onCancelPartOrder,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -257,6 +259,14 @@ export function StateActionButtons({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
               <Eye className="h-4 w-4 mr-2" />
               Ver Detalhes
+            </DropdownMenuItem>
+          )}
+
+          {/* Cancel Part Order - Dono or Secretaria when in waiting state */}
+          {service?.status === 'em_espera_de_peca' && (isDono || isSecretaria) && onCancelPartOrder && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCancelPartOrder(); }} className="text-amber-600">
+              <Package className="h-4 w-4 mr-2" />
+              Cancelar Pedido de Artigo
             </DropdownMenuItem>
           )}
 

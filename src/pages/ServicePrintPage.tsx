@@ -430,11 +430,11 @@ export default function ServicePrintPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-1">Ref.</th>
-                    <th className="text-left py-1">Descrição</th>
-                    <th className="text-center py-1">Qtd</th>
-                    <th className="text-right py-1">Valor Unit.</th>
-                    <th className="text-right py-1">Total</th>
+                    <th className="text-left py-1 w-[15%]">Ref.</th>
+                    <th className="text-left py-1 w-[45%]">Descrição</th>
+                    <th className="text-center py-1 w-[10%]">Qtd</th>
+                    <th className="text-right py-1 w-[15%]">Valor Unit.</th>
+                    <th className="text-right py-1 w-[15%]">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -444,7 +444,7 @@ export default function ServicePrintPage() {
                         <td className="py-1">{part.part_code || '-'}</td>
                         <td className="py-1">{part.part_name}</td>
                         <td className="py-1 text-center">{part.quantity || 1}</td>
-                        <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '0.00 €'}</td>
                         <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
                       </tr>
                     ))
