@@ -1,26 +1,26 @@
 
 
-## Problema: Referência e Descrição dos artigos não aparecem no painel e na impressão
+## Diagnóstico
 
-### Diagnóstico
+O erro React #310 significa **"Rendered fewer hooks than expected"** — isto é, o componente chamou menos hooks numa renderização do que na anterior.
 
-Analisei o screenshot e o código. A secção "ARTIGOS / INTERVENÇÕES" no `ServiceDetailSheet` mostra apenas quantidades e valores (ex: "2x 5.00€ = 10.00€") sem qualquer texto descritivo. Há dois caminhos de renderização:
+**Causa raiz**: No `ServiceDetailSheet.tsx`, o `useMemo` de `centralItems` (linha 322) está **depois** do `if (!service) return null;` (linha 316). Quando `service` muda de não-nulo para nulo (ou vice-versa), o número de hooks chamados muda, violando as regras de hooks do React.
 
-1. **Caminho `serviceParts`** (dados da tabela `service_parts`): Linhas 695-706 — usa `part.part_name` e `part.part_code`. Funciona correctamente SE os dados existirem na BD.
+## Correção
 
-2. **Caminho `centralItems`** (fallback do JSON `pricing_description`): Linhas 717-728 — é o que aparece no screenshot (separadores tracejados). Este caminho tem dois problemas:
-   - **Não mostra referência** — não existe nenhum render de `item.ref` ou `item.article`
-   - **Usa apenas `item.description`** — mas o schema do JSON usa `desc` como chave primária (com `description` como fallback). Se o JSON tem `desc`, nada aparece.
+**Ficheiro**: `src/components/services/ServiceDetailSheet.tsx`
 
-A ficha de impressão (`ServicePrintPage`) já tem os fallbacks correctos no caminho `pricingDetails.items` (linha 454-455: `item.ref || item.article`, `item.desc || item.description`), mas preciso confirmar que ambos os caminhos estão consistentes.
+Mover o `useMemo` de `centralItems` (linhas 322-331) para **antes** do early return na linha 316. Adicionar guard para `service`/`displayService` nulo dentro do memo:
 
-### Correcções
+```ts
+const centralItems = React.useMemo(() => {
+    if (!displayService) return [];
+    if (serviceParts.filter(...).length > 0) return [];
+    // rest stays the same
+}, [serviceParts, displayService?.pricing_description]);
+```
 
-**Ficheiro 1: `src/components/services/ServiceDetailSheet.tsx`**
-- Linha 718-728 (centralItems render): Adicionar exibição de referência (`item.ref || item.article`) e corrigir descrição para `item.desc || item.description`
-- Manter o layout actual com ref entre parêntesis, consistente com o caminho serviceParts
+Também verificar se `displayService` (linha 319) não causa problemas ao ser definido antes do early return — mover a atribuição `const displayService = fullData || service;` para antes do memo, junto com os outros dados derivados.
 
-**Ficheiro 2: `src/pages/ServicePrintPage.tsx`**
-- Verificar e garantir consistência — já tem fallbacks correctos, mas confirmar que o caminho `usedParts` também funciona bem
+Na prática, o bloco inteiro `displayService` + `centralItems` deve ficar entre as linhas ~293 e 316, antes do `if (!service) return null`.
 
-São alterações de renderização apenas, sem impacto na BD.

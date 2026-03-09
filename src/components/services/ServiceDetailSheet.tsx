@@ -716,10 +716,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     ) : (
                       centralItems.map((item: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between py-1 text-sm border-b border-dashed last:border-0">
-                          <div className="flex-1">
-                            <span className="font-medium">{item.description}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{item.desc || item.description || '-'}</span>
+                            {(item.ref || item.article) && (
+                              <span className="text-xs text-muted-foreground ml-1">({item.ref || item.article})</span>
+                            )}
                           </div>
-                          <div className="text-xs text-muted-foreground flex gap-2">
+                          <div className="text-xs text-muted-foreground flex gap-2 shrink-0">
                             <span>{item.qty || item.quantity || 1}x</span>
                             <span>{(Number(item.unit_price || item.price) || 0).toFixed(2)}€</span>
                             <span className="font-medium text-foreground">= {((Number(item.qty || item.quantity || 1) * Number(item.unit_price || item.price || 0)) || 0).toFixed(2)}€</span>
