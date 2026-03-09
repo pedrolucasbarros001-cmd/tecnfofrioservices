@@ -967,7 +967,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
             <StateActionButtons
               service={service}
               onAssignTechnician={() => setShowAssignModal(true)}
-              onViewDetails={() => { }}
               onStartExecution={role === 'tecnico' ? handleStartExecution : undefined}
               onSetPrice={(role === 'dono' || role === 'secretaria') ? () => setShowSetPriceModal(true) : undefined}
               onRegisterPayment={(role === 'dono' || role === 'secretaria') ? () => setShowPaymentModal(true) : undefined}

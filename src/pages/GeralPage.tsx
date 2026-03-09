@@ -313,12 +313,12 @@ export default function GeralPage() {
         status: 'cancelado',
         skipToast: true,
       });
-      toast.success(`Serviço ${currentService.code} desativado. Todos os dados foram preservados.`);
+      toast.success(`Serviço ${currentService.code} cancelado. Todos os dados foram preservados.`);
       setShowCancelDialog(false);
       setCurrentService(null);
     } catch (error) {
       console.error('Error cancelling service:', error);
-      toast.error('Erro ao desativar o serviço. Tente novamente.');
+      toast.error('Erro ao cancelar o serviço. Tente novamente.');
     }
   };
 
@@ -649,7 +649,7 @@ export default function GeralPage() {
           <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Desativar Serviço</AlertDialogTitle>
+                <AlertDialogTitle>Cancelar Serviço</AlertDialogTitle>
                 <AlertDialogDescription>
                   O serviço <strong>{currentService.code}</strong> ficará inativo e marcado como cancelado.
                   Todos os registos e histórico serão preservados. Pode reativar via &quot;Mudar Status (Forçado)&quot;.
@@ -661,7 +661,7 @@ export default function GeralPage() {
                   onClick={confirmCancel}
                   className="bg-muted text-muted-foreground hover:bg-muted/80"
                 >
-                  Desativar
+                  Confirmar Cancelamento
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

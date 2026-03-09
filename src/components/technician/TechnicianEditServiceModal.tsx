@@ -74,6 +74,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
     enabled: open,
   });
 
+  const [parsedPricing, setParsedPricing] = useState<{ items: any[], discount?: any, adjustment?: number }>({ items: [] });
+
   useEffect(() => {
     if (open) {
       setBrand(service.brand || '');
@@ -83,6 +85,16 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       setWorkPerformed(service.work_performed || '');
       setPartsToDelete([]);
       setNewParts([]);
+
+      if (service.pricing_description) {
+        try {
+          setParsedPricing(JSON.parse(service.pricing_description));
+        } catch {
+          setParsedPricing({ items: [] });
+        }
+      } else {
+        setParsedPricing({ items: [] });
+      }
     }
   }, [open, service]);
 
@@ -241,6 +253,48 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           </section>
 
           <Separator />
+
+          {/* Read-Only Admin Pricing/Articles Section */}
+          {(parsedPricing.items.length > 0 || (service.final_price && service.final_price > 0)) && (
+            <>
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  <h3 className="text-sm font-semibold text-indigo-900 uppercase tracking-wider">
+                    Artigos Registados (Administração)
+                  </h3>
+                </div>
+
+                {parsedPricing.items.length > 0 ? (
+                  <div className="bg-white border rounded-lg overflow-hidden text-sm">
+                    <table className="w-full text-left">
+                      <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
+                        <tr>
+                          <th className="p-2 font-medium">Ref</th>
+                          <th className="p-2 font-medium">Descrição</th>
+                          <th className="p-2 font-medium text-center">Qtd</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {parsedPricing.items.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-muted/30">
+                            <td className="p-2 text-xs font-mono">{item.ref || '-'}</td>
+                            <td className="p-2 font-medium">{item.desc}</td>
+                            <td className="p-2 text-center text-xs">{item.qty || 1}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-lg text-sm text-indigo-800">
+                    Consta valor a ser cobrado ou já orçamentado neste serviço.
+                  </div>
+                )}
+              </section>
+              <Separator />
+            </>
+          )}
 
           {/* Parts Sections */}
           <section className="space-y-6 pb-4">

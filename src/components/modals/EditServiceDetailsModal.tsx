@@ -12,9 +12,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Trash2, Wrench, FileText, Check, X } from 'lucide-react';
+import { Package, Plus, Trash2, Wrench, FileText, Check, X, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/components/pricing/PriceLineItems';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useQuery } from '@tanstack/react-query';
 
 interface Part {
   id?: string;
@@ -29,9 +36,22 @@ interface Part {
 interface EditServiceDetailsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  service: any;
+  service: any; // We receive raw service data
   onSuccess: () => void;
 }
+
+// Reuse the exact same schema from SetPriceModal for consistency
+const formSchema = z.object({
+  items: z.array(z.object({
+    reference: z.string().optional(),
+    description: z.string(),
+    quantity: z.number().min(0, 'Quantidade inválida'),
+    unit_price: z.number().min(0, 'Preço inválido'),
+    tax_rate: z.number(),
+  })).min(1, 'Adicione pelo menos um artigo'),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess }: EditServiceDetailsModalProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -45,8 +65,38 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
   const [workPerformed, setWorkPerformed] = useState('');
   const [notes, setNotes] = useState('');
 
-  const [parts, setParts] = useState<Part[]>([]);
-  const [deletedPartIds, setDeletedPartIds] = useState<string[]>([]);
+  // Pricing Modifiers
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [adjustment, setAdjustment] = useState<string>('');
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      items: [{ ...DEFAULT_LINE_ITEM }],
+    },
+  });
+
+  // Fetch ONLY to see if we need to migrate parts into pricing
+  const { data: oldParts = [], isLoading: historyLoading } = useQuery({
+    queryKey: ['service-parts-for-edit', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_parts')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!service?.id && open,
+  });
+
+  useEffect(() => {
+    if (open) setHasInitialized(false);
+  }, [open]);
 
   useEffect(() => {
     if (open && service) {
@@ -59,54 +109,114 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
       setDetectedFault(service.detected_fault || '');
       setWorkPerformed(service.work_performed || '');
       setNotes(service.notes || '');
-
-      fetchParts();
     }
   }, [open, service]);
 
-  const fetchParts = async () => {
-    if (!service?.id) return;
-    const { data, error } = await supabase
-      .from('service_parts')
-      .select('*')
-      .eq('service_id', service.id);
+  useEffect(() => {
+    if (service && open && !historyLoading && !hasInitialized) {
+      setHasInitialized(true);
 
-    if (error) {
-      console.error('Error fetching parts:', error);
-      return;
+      let existingItems: LineItem[] = [];
+      let existingDiscount: { type: 'euro' | 'percent'; value: number } | null = null;
+      let existingAdjustment = 0;
+
+      if (service.pricing_description) {
+        try {
+          const parsed = JSON.parse(service.pricing_description);
+          if (parsed.items && Array.isArray(parsed.items)) {
+            existingItems = parsed.items.map((item: any) => ({
+              reference: item.ref || '',
+              description: item.desc || '',
+              quantity: item.qty || 1,
+              unit_price: item.price || 0,
+              tax_rate: item.tax || 23,
+            }));
+          }
+          if (parsed.discount) existingDiscount = parsed.discount;
+          if (parsed.adjustment !== undefined) existingAdjustment = parsed.adjustment;
+        } catch { }
+      }
+
+      // If no pricing_description yet, migrate from service_parts or base costs
+      if (existingItems.length === 0) {
+        if (oldParts.length > 0) {
+          existingItems = oldParts.map((p: any) => ({
+            reference: p.part_code || '',
+            description: p.part_name || '',
+            quantity: p.quantity || 1,
+            unit_price: p.cost || 0,
+            tax_rate: p.iva_rate || 23,
+          }));
+        } else {
+          const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
+          if (existingPrice > 0) {
+            existingItems = [{
+              reference: '',
+              description: 'Serviço',
+              quantity: 1,
+              unit_price: existingPrice,
+              tax_rate: 23,
+            }];
+          }
+        }
+      }
+
+      if (existingItems.length > 0) {
+        form.reset({ items: existingItems });
+      } else {
+        form.reset({ items: [{ ...DEFAULT_LINE_ITEM }] });
+      }
+
+      if (existingDiscount) {
+        setDiscountType(existingDiscount.type);
+        setDiscountValue(existingDiscount.value.toString());
+      } else if (service.discount && service.discount > 0) {
+        setDiscountType('euro');
+        setDiscountValue(service.discount.toString());
+      } else {
+        setDiscountValue('');
+        setDiscountType('euro');
+      }
+
+      setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
     }
+  }, [service, open, historyLoading, hasInitialized, form, oldParts]);
 
-    setParts(data || []);
-    setDeletedPartIds([]);
+  const watchItems = form.watch('items') || [];
+  const validItems = watchItems.filter(item => item.description && item.description.trim() !== '');
+  const { subtotal, totalTax, total: baseTotal } = calculateTotals(validItems);
+
+  // Discount calc
+  const calculateDiscount = (base: number, dValue: string, dType: string) => {
+    const val = parseFloat(dValue.replace(',', '.')) || 0;
+    if (val <= 0) return 0;
+    if (dType === 'percent') return base * (val / 100);
+    return val;
   };
 
-  const addPart = (isRequested: boolean) => {
-    setParts(prev => [...prev, {
-      part_name: '',
-      part_code: '',
-      quantity: 1,
-      cost: 0,
-      is_requested: isRequested,
-      arrived: false
-    }]);
-  };
-
-  const updatePart = (index: number, field: keyof Part, value: any) => {
-    setParts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
-  };
-
-  const removePart = (index: number) => {
-    const partToRemove = parts[index];
-    if (partToRemove.id) {
-      setDeletedPartIds(prev => [...prev, partToRemove.id!]);
-    }
-    setParts(prev => prev.filter((_, i) => i !== index));
-  };
+  const discountAmount = calculateDiscount(subtotal, discountValue, discountType);
+  const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
+  const finalPrice = Math.max(0, baseTotal - discountAmount + adjustmentAmount);
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // 1. Update Service details
+      // Create Pricing Data matching the format in SetPriceModal
+      const pricingData = {
+        items: validItems.map(item => ({
+          ref: item.reference,
+          desc: item.description,
+          qty: item.quantity,
+          price: item.unit_price,
+          tax: item.tax_rate,
+        })),
+        discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
+        adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+      };
+
+      const finalValForDB = finalPrice;
+      const amountPaid = service.amount_paid || 0;
+
       const { error: serviceError } = await supabase
         .from('services')
         .update({
@@ -119,53 +229,18 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           detected_fault: detectedFault || null,
           work_performed: workPerformed || null,
           notes: notes || null,
+
+          // Pricing Updates
+          pricing_description: JSON.stringify(pricingData),
+          parts_cost: subtotal,
+          labor_cost: 0,
+          discount: discountAmount,
+          final_price: finalValForDB,
+          status: amountPaid < finalValForDB && (service.status === 'finalizado' || service.status === 'em_debito') ? 'em_debito' : service.status
         })
         .eq('id', service.id);
 
       if (serviceError) throw serviceError;
-
-      // 2. Handle Part deletions
-      if (deletedPartIds.length > 0) {
-        const { error: delError } = await supabase
-          .from('service_parts')
-          .delete()
-          .in('id', deletedPartIds);
-        if (delError) throw delError;
-      }
-
-      // 3. Handle Part updates and insertions
-      for (const part of parts) {
-        if (!part.part_name.trim()) continue;
-
-        if (part.id) {
-          // Update existing
-          const { error: upError } = await supabase
-            .from('service_parts')
-            .update({
-              part_name: part.part_name,
-              part_code: part.part_code,
-              quantity: part.quantity,
-              cost: part.cost,
-              is_requested: part.is_requested
-            })
-            .eq('id', part.id);
-          if (upError) throw upError;
-        } else {
-          // Insert new
-          const { error: inError } = await supabase
-            .from('service_parts')
-            .insert({
-              service_id: service.id,
-              part_name: part.part_name,
-              part_code: part.part_code,
-              quantity: part.quantity,
-              is_requested: part.is_requested,
-              arrived: false,
-              cost: part.cost
-            });
-          if (inError) throw inError;
-        }
-      }
 
       toast.success('Serviço atualizado com sucesso');
       onSuccess();
@@ -182,8 +257,8 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0">
-        <div className="px-6 pt-6 pb-4 flex-shrink-0">
+      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0 bg-gray-50/50">
+        <div className="px-6 pt-6 pb-4 flex-shrink-0 bg-white border-b">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-indigo-600" />
@@ -192,11 +267,11 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           </DialogHeader>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
           {/* Section: Equipamento */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 border-b pb-1 mb-2">
-              <Package className="h-4 w-4 text-muted-foreground" />
+          <div className="bg-white p-5 rounded-xl border border-border/50 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Equipamento</h3>
             </div>
 
@@ -224,86 +299,106 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
             </div>
           </div>
 
-          {/* Section: Peças */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b pb-1 mb-2">
-              <div className="flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Peças</h3>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => addPart(false)} className="h-7 text-[10px]">
-                  <Plus className="h-3 w-3 mr-1" /> Usada
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => addPart(true)} className="h-7 text-[10px]">
-                  <Plus className="h-3 w-3 mr-1" /> Pedida
-                </Button>
-              </div>
+          {/* Section: Artigos (Substitui Peças antigas) */}
+          <div className="bg-white p-5 rounded-xl border border-border/50 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Artigos</h3>
             </div>
 
-            <div className="space-y-2">
-              {parts.length === 0 ? (
-                <p className="text-xs text-center py-4 text-muted-foreground italic">Nenhuma peça registada.</p>
-              ) : (
-                parts.map((part, idx) => (
-                  <div key={idx} className={cn(
-                    "grid grid-cols-12 gap-2 p-2 rounded-lg border items-center",
-                    part.is_requested ? "bg-amber-50/30 border-amber-100" : "bg-green-50/30 border-green-100"
-                  )}>
-                    <div className="col-span-12 md:col-span-4">
-                      <Input
-                        placeholder="Peça"
-                        value={part.part_name}
-                        onChange={e => updatePart(idx, 'part_name', e.target.value)}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="col-span-7 md:col-span-3">
-                      <Input
-                        placeholder="Referência"
-                        value={part.part_code}
-                        onChange={e => updatePart(idx, 'part_code', e.target.value)}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="col-span-2 md:col-span-1">
-                      <Input
-                        type="number"
-                        step="any"
-                        value={part.quantity}
-                        onChange={e => updatePart(idx, 'quantity', parseFloat(e.target.value) || 1)}
-                        className="h-8 text-xs px-1 text-center"
-                        placeholder="Qtd"
-                      />
-                    </div>
-                    <div className="col-span-3 md:col-span-2">
-                      <Input
-                        type="number"
-                        step="any"
-                        value={part.cost}
-                        onChange={e => updatePart(idx, 'cost', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-xs"
-                        placeholder="Valor unit. €"
-                      />
-                    </div>
-                    <div className="col-span-2 md:col-span-1 flex justify-center">
-                      <Badge variant={part.is_requested ? "subtle-urgent" : "outline"} className="text-[9px] h-5 px-1 uppercase tracking-tighter">
-                        {part.is_requested ? "Pedida" : "Usada"}
-                      </Badge>
-                    </div>
-                    <div className="col-span-1 md:col-span-1 flex justify-end">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removePart(idx)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+            <Form {...form}>
+              <div className="space-y-4">
+                <PriceLineItems form={form} fieldName="items" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed">
+                  {/* Modifiers */}
+                  <div className="space-y-4 bg-gray-50/50 p-4 rounded-lg border">
+                    <h4 className="text-sm font-medium">Ajustes</h4>
+                    <div className="flex gap-2">
+                      <div className="flex-1 space-y-2">
+                        <Label>Desconto</Label>
+                        <div className="flex gap-2">
+                          <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="euro">€</SelectItem>
+                              <SelectItem value="percent">%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            value={discountValue}
+                            onChange={(e) => setDiscountValue(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-2">
+                        <Label>Ajuste Manual (€)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="+/- 0,00"
+                          value={adjustment}
+                          onChange={(e) => setAdjustment(e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+
+                  {/* Financial Summary */}
+                  <div className="bg-[#f2fff8] border border-green-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-green-900 mb-4">Resumo Financeiro</h4>
+
+                    <div className="space-y-2 text-sm text-green-800">
+                      <div className="flex justify-between">
+                        <span>Subtotal Artigos</span>
+                        <span>{subtotal.toFixed(2)} €</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>IVA</span>
+                        <span>{totalTax.toFixed(2)} €</span>
+                      </div>
+                      {discountAmount > 0 && (
+                        <div className="flex justify-between text-green-700">
+                          <span>Desconto</span>
+                          <span>-{discountAmount.toFixed(2)} €</span>
+                        </div>
+                      )}
+                      {adjustmentAmount !== 0 && (
+                        <div className="flex justify-between text-green-700">
+                          <span>Ajuste</span>
+                          <span>{adjustmentAmount > 0 ? '+' : ''}{adjustmentAmount.toFixed(2)} €</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 mt-2 border-t border-green-200">
+                        <div className="flex justify-between items-center text-lg font-bold text-green-950">
+                          <span>Total</span>
+                          <span>{finalPrice.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-medium mt-1 text-green-800">
+                          <span>Total Pago</span>
+                          <span>{(service.amount_paid || 0).toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-bold mt-1 text-green-950 pt-1 border-t border-green-200/50">
+                          <span>Restante</span>
+                          <span>{Math.max(0, finalPrice - (service.amount_paid || 0)).toFixed(2)} €</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Form>
           </div>
 
           {/* Section: Diagnóstico e Trabalho */}
-          <div className="space-y-4">
+          <div className="bg-white p-5 rounded-xl border border-border/50 shadow-sm space-y-4">
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                 <FileText className="h-3 w-3" /> Avaria Detectada
@@ -353,10 +448,10 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t flex-shrink-0">
+        <div className="px-6 py-4 border-t bg-white flex-shrink-0">
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button onClick={handleSave} disabled={isLoading || validItems.length === 0} className="bg-indigo-600 hover:bg-indigo-700 text-white">
               {isLoading ? 'A guardar...' : 'Guardar Alterações'}
             </Button>
           </DialogFooter>

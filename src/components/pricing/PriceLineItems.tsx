@@ -129,11 +129,11 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input 
-                              placeholder="Ref" 
+                            <Input
+                              placeholder="Ref"
                               className="h-8 text-sm"
                               disabled={disabled}
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                         </FormItem>
@@ -147,11 +147,11 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input 
-                              placeholder="Descrição do artigo" 
+                            <Input
+                              placeholder="Descrição do artigo"
                               className="h-8 text-sm"
                               disabled={disabled}
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                         </FormItem>
@@ -167,11 +167,12 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                           <FormControl>
                             <Input
                               type="number"
-                              min={1}
+                              min={0.01}
+                              step="any"
                               className="h-8 text-sm"
                               disabled={disabled}
                               {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
                           </FormControl>
                         </FormItem>

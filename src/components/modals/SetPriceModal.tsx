@@ -35,7 +35,7 @@ import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingS
 const lineItemSchema = z.object({
   reference: z.string().optional(),
   description: z.string().min(1, 'Descrição é obrigatória'),
-  quantity: z.number().min(1, 'Mínimo 1'),
+  quantity: z.number().min(0, 'A quantidade deve ser positiva'),
   unit_price: z.number().min(0, 'Valor deve ser positivo'),
   tax_rate: z.number(),
 });
@@ -86,9 +86,16 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     },
   });
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  useEffect(() => {
+    if (open) setHasInitialized(false);
+  }, [open]);
+
   // Load existing pricing data when modal opens
   useEffect(() => {
-    if (service && open) {
+    if (service && open && !historyLoading && !hasInitialized) {
+      setHasInitialized(true);
       let existingItems: LineItem[] = [];
       let existingDiscount: { type: 'euro' | 'percent'; value: number } | null = null;
       let existingAdjustment = 0;
@@ -112,27 +119,31 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             existingAdjustment = parsed.adjustment;
           }
         } catch {
+          // fallback
+        }
+      }
+
+      if (existingItems.length === 0) {
+        const parts = groupedParts.flatMap(g => g.parts).filter(p => !p.is_requested);
+        if (parts.length > 0) {
+          existingItems = parts.map(p => ({
+            reference: p.part_code || '',
+            description: p.part_name || '',
+            quantity: p.quantity || 1,
+            unit_price: p.cost || 0,
+            tax_rate: p.iva_rate || 23,
+          }));
+        } else {
           const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
-          if (existingPrice > 0 || service.pricing_description) {
+          if (existingPrice > 0) {
             existingItems = [{
               reference: '',
-              description: service.pricing_description || 'Serviço',
+              description: 'Serviço',
               quantity: 1,
               unit_price: existingPrice,
               tax_rate: 23,
             }];
           }
-        }
-      } else {
-        const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
-        if (existingPrice > 0) {
-          existingItems = [{
-            reference: '',
-            description: 'Serviço',
-            quantity: 1,
-            unit_price: existingPrice,
-            tax_rate: 23,
-          }];
         }
       }
 
@@ -156,27 +167,20 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
       setWarrantyCoversAll(isWarrantyService);
     }
-  }, [service, open, isWarrantyService, form]);
+  }, [service, open, historyLoading, hasInitialized, form, groupedParts, isWarrantyService]);
 
   const watchItems = form.watch('items') || [];
   // Filter out empty additional items for calculation
   const validAdditionalItems = (watchItems as LineItem[]).filter(
     item => item.description && item.description.trim() !== ''
   );
-  const { subtotal: additionalSubtotal, totalTax: additionalTax, total: additionalTotal } = calculateTotals(validAdditionalItems);
-
-  // Combined subtotal: history + additional
-  const combinedSubtotal = historySubtotal + additionalSubtotal;
-  const combinedTax = additionalTax; // History IVA is already in the parts cost
-  const combinedTotal = historySubtotal + additionalTotal;
+  const { subtotal: combinedSubtotal, totalTax: combinedTax, total: combinedTotal } = calculateTotals(validAdditionalItems);
 
   const discountAmount = calculateDiscount(combinedSubtotal, discountValue, discountType);
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
   const finalPrice = warrantyCoversAll ? 0 : Math.max(0, combinedTotal - discountAmount + adjustmentAmount);
 
-  const hasHistory = groupedParts.length > 0;
-  const hasValidAdditionalItems = validAdditionalItems.length > 0;
-  const canSubmit = hasHistory || hasValidAdditionalItems;
+  const canSubmit = validAdditionalItems.length > 0;
 
   const handleSubmit = async (values: FormValues) => {
     if (!service) return;
@@ -198,7 +202,6 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       })),
       discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
       adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
-      historySubtotal: historySubtotal > 0 ? historySubtotal : undefined,
     };
 
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
@@ -313,23 +316,14 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                   </div>
                 )}
 
-                {/* History Section — read-only */}
-                {!historyLoading && hasHistory && (
-                  <ServicePartsHistory
-                    groupedParts={groupedParts}
-                    historySubtotal={historySubtotal}
-                  />
-                )}
 
                 {/* Additional Line Items Table */}
                 <div className="space-y-2">
                   <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    Artigos Adicionais
+                    Artigos / Intervenções
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    {hasHistory
-                      ? 'Adicione artigos ou ajustes extras. Se não houver nada a adicionar, confirme como está.'
-                      : 'Adicione os artigos para definir o preço do serviço.'}
+                    Edite os artigos do histórico ou adicione novos para definir o preço do serviço.
                   </p>
                   <PriceLineItems
                     form={form}

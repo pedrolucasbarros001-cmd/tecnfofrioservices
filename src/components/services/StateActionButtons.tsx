@@ -30,7 +30,7 @@ import type { Service, ServiceStatus } from '@/types/database';
 interface StateActionButtonsProps {
   service: Service;
   onAssignTechnician: () => void;
-  onViewDetails: () => void;
+  onViewDetails?: () => void;
   onStartExecution?: () => void;
   onSetPrice?: () => void;
   onRegisterPayment?: () => void;
@@ -253,10 +253,12 @@ export function StateActionButtons({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="bg-popover">
-          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
-            <Eye className="h-4 w-4 mr-2" />
-            Ver Detalhes
-          </DropdownMenuItem>
+          {onViewDetails && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
+              <Eye className="h-4 w-4 mr-2" />
+              Ver Detalhes
+            </DropdownMenuItem>
+          )}
 
           {/* Assign/Reassign Technician */}
           {!service?.technician_id && (isDono || isSecretaria) && (
@@ -368,7 +370,7 @@ export function StateActionButtons({
                 className="text-muted-foreground"
               >
                 <Ban className="h-4 w-4 mr-2" />
-                Desativar Serviço
+                Cancelar Serviço
               </DropdownMenuItem>
             </>
           )}
