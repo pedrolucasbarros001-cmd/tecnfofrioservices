@@ -41,13 +41,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CustomerLink } from '@/components/shared/CustomerLink';
-import { useRealtime } from '@/hooks/useRealtime';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // Realtime: admin/secretary sees service changes without refresh
-  useRealtime('services', [['services-paginated']]);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);

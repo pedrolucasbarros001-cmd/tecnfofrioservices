@@ -17,16 +17,12 @@ import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceM
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRealtime } from '@/hooks/useRealtime';
 import type { Service } from '@/types/database';
 
 type FlowType = 'visit' | 'installation' | 'delivery' | null;
 
 export default function ServicosPage() {
   const { profile } = useAuth();
-
-  // Realtime: technician sees new assignments without refresh
-  useRealtime('services', [['technician-services', profile?.id ?? '']]);
 
   // Current date state for daily navigation
   const [currentDate, setCurrentDate] = useState(() => new Date());
