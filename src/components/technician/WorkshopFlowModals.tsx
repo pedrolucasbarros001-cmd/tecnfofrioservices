@@ -59,6 +59,7 @@ export interface ArticleEntry {
   description: string;
   quantity: number;
   unit_price: number;
+  isExisting?: boolean;
 }
 
 interface WorkshopFlowModalsProps {
@@ -81,6 +82,7 @@ interface WorkshopFormData {
   partsToOrder: {
     name: string;
     reference: string;
+    cost: string;
   }[];
   photoAparelho: string | null;
   photoEtiqueta: string | null;
@@ -206,78 +208,57 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   // Load previous visit articles as read-only
   useEffect(() => {
     if (!isOpen) return;
-    const loadPreviousArticles = async () => {
+    const loadServiceArticles = async () => {
       try {
         const { data: parts } = await supabase
           .from("service_parts")
           .select("*")
-          .eq("service_id", service.id)
-          .eq("is_requested", false)
-          .eq("registered_location", "visita");
-
-        if (!parts || parts.length === 0) {
-          setPreviousArticles([]);
-          return;
-        }
-
-        // Resolve technician names
-        const uniqueUserIds = [...new Set(parts.map(p => (p as any).registered_by).filter(Boolean))];
-        let nameMap: Record<string, string> = {};
-        if (uniqueUserIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, full_name")
-            .in("user_id", uniqueUserIds);
-          if (profiles) {
-            profiles.forEach(p => { nameMap[p.user_id] = p.full_name || "Técnico"; });
-          }
-        }
-
-        setPreviousArticles(parts.map(p => ({
-          reference: p.part_code || "",
-          description: p.part_name,
-          quantity: p.quantity || 1,
-          unit_price: p.cost || 0,
-          registeredByName: nameMap[(p as any).registered_by] || "Técnico",
-          registeredLocation: (p as any).registered_location || "visita",
-          created_at: p.created_at,
-        })));
-      } catch (err) {
-        console.warn("Error loading previous articles:", err);
-      }
-    };
-    loadPreviousArticles();
-  }, [isOpen, service.id]);
-
-  // Load existing workshop articles into formData (so they appear editable)
-  useEffect(() => {
-    if (!isOpen) return;
-    const loadWorkshopArticles = async () => {
-      try {
-        const { data: parts } = await supabase
-          .from("service_parts")
-          .select("*")
-          .eq("service_id", service.id)
-          .eq("is_requested", false)
-          .eq("registered_location", "oficina");
+          .eq("service_id", service.id);
 
         if (parts && parts.length > 0) {
+          // Resolve technician names for history display
+          const uniqueUserIds = [...new Set(parts.map(p => (p as any).registered_by).filter(Boolean))];
+          let nameMap: Record<string, string> = {};
+          if (uniqueUserIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, full_name")
+              .in("user_id", uniqueUserIds);
+            if (profiles) {
+              profiles.forEach(p => { nameMap[p.user_id] = p.full_name || "Técnico"; });
+            }
+          }
+
+          // Articles that are already installed or available (not pending)
+          const availableParts = parts.filter(p => p.arrived || !p.is_requested);
+
           setFormData(prev => ({
             ...prev,
-            articles: parts.map(p => ({
+            articles: availableParts.map(p => ({
               reference: p.part_code || "",
               description: p.part_name,
               quantity: p.quantity || 1,
               unit_price: p.cost || 0,
+              isExisting: true,
             })),
             taxRate: parts[0]?.iva_rate ?? prev.taxRate,
           }));
+
+          setPreviousArticles(parts.map(p => ({
+            reference: p.part_code || "",
+            description: p.part_name,
+            quantity: p.quantity || 1,
+            unit_price: p.cost || 0,
+            registeredByName: nameMap[(p as any).registered_by] || "Técnico",
+            registeredLocation: (p as any).registered_location || "externo",
+            created_at: p.created_at,
+          })));
         }
       } catch (err) {
-        console.warn("Error loading workshop articles:", err);
+        console.warn("Error loading articles:", err);
       }
     };
-    loadWorkshopArticles();
+    loadServiceArticles();
   }, [isOpen, service.id]);
 
   // Parse admin pricing from pricing_description
@@ -338,10 +319,17 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }));
   };
 
-  const updateArticle = (index: number, field: keyof ArticleEntry, value: string | number) => {
+  const updateArticle = (index: number, field: keyof ArticleEntry | 'cost', value: string | number) => {
+    if (field === 'cost') {
+      setFormData(prev => ({
+        ...prev,
+        partsToOrder: prev.partsToOrder.map((p, i) => i === index ? { ...p, cost: value as string } : p),
+      }));
+      return;
+    }
     setFormData(prev => ({
       ...prev,
-      articles: prev.articles.map((a, i) => i === index ? { ...a, [field]: value } : a),
+      articles: prev.articles.map((a, i) => i === index ? { ...a, [field as keyof ArticleEntry]: value } : a),
     }));
   };
 
@@ -372,16 +360,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
-      // Delete only workshop-registered non-requested parts, preserve visit articles
-      await supabase
-        .from("service_parts")
-        .delete()
-        .eq("service_id", service.id)
-        .eq("is_requested", false)
-        .eq("registered_location", "oficina");
+      const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description.trim());
 
-      for (const article of formData.articles) {
-        if (!article.description.trim()) continue;
+      for (const article of newArticles) {
         await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: article.description,
@@ -427,7 +408,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           quantity: 1,
           is_requested: true,
           arrived: false,
-          cost: 0,
+          cost: part.cost ? parseFloat(part.cost.replace(',', '.')) : 0,
         });
 
         await logPartRequest(service.code || "N/A", service.id, part.name.trim(), profile?.full_name || "Técnico", user?.id);
@@ -457,7 +438,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
   const handleComplete = async () => {
     const finalWorkPerformed = mode === "continuacao_peca"
-      ? (formData.workPerformed || "Peça instalada e reparação concluída")
+      ? (formData.workPerformed || "Artigo instalada e reparação concluída")
       : formData.workPerformed;
 
     if (!finalWorkPerformed.trim()) {
@@ -469,16 +450,9 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     try {
       await ensureValidSession();
 
-      // Auto-save articles to service_parts if not already confirmed
-      const pendingArticles = (formData.articles as ArticleEntry[]).filter((a: ArticleEntry) => a.description?.trim());
-      if (pendingArticles.length > 0 && !formData.articlesLocked) {
-        await supabase
-          .from("service_parts")
-          .delete()
-          .eq("service_id", service.id)
-          .eq("is_requested", false)
-          .eq("registered_location", "oficina");
-        for (const article of pendingArticles) {
+      const newArticles = (formData.articles as ArticleEntry[]).filter((a: ArticleEntry) => !a.isExisting && a.description?.trim());
+      if (newArticles.length > 0 && !formData.articlesLocked) {
+        for (const article of newArticles) {
           await supabase.from("service_parts").insert({
             service_id: service.id,
             part_name: article.description,
@@ -645,7 +619,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           {(currentStep === "resumo" || currentStep === "resumo_continuacao") && (
             <>
               <ModalHeader
-                title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
+                title={mode === "continuacao_peca" ? "Resumo Cont. Artigo" : "Resumo do Serviço"}
                 step="Passo 1"
               />
 
@@ -690,7 +664,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             </>
           )}
 
-          {/* Step: Confirmação Peça */}
+          {/* Step: Confirmação Artigo */}
           {currentStep === "confirmacao_peca" && (
             <>
               <ModalHeader title="Confirmação do Artigo" step="Instalação" />
@@ -922,92 +896,84 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   <AdminPricingReadOnly data={adminPricing} />
                 )}
 
-                {/* Previous visit articles - read-only */}
-                {previousArticles.length > 0 && (
-                  <div className="rounded-lg border border-dashed border-muted-foreground/30 overflow-hidden opacity-60">
-                    <div className="flex items-center justify-between bg-muted/30 px-3 py-1.5">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigos da Visita</span>
-                      <span className="text-[10px] text-muted-foreground">{previousArticles[0]?.registeredByName}</span>
-                    </div>
-                    <div className="grid grid-cols-[1fr_1.5fr_70px_90px] gap-1 bg-muted/20 px-3 py-1">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Ref.</span>
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Descrição</span>
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Qtd</span>
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">Valor €</span>
-                    </div>
-                    {previousArticles.map((article, idx) => (
-                      <div key={`prev-${idx}`} className="grid grid-cols-[1fr_1.5fr_70px_90px] gap-1 px-3 py-1.5 border-t text-xs text-muted-foreground">
-                        <span className="truncate">{article.reference || "-"}</span>
-                        <span className="truncate">{article.description}</span>
-                        <span>{article.quantity}</span>
-                        <span>{article.unit_price.toFixed(2)}</span>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Artigos Utilizados</Label>
+                    {!formData.articlesLocked && (
+                      <Button type="button" variant="outline" size="sm" className="h-7 text-xs border-dashed" onClick={addArticle}>
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    {(formData.articles as ArticleEntry[]).map((article, idx) => (
+                      <div key={idx} className="p-3 border rounded-lg bg-muted/20 relative group">
+                        {!formData.articlesLocked && !article.isExisting && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeArticle(idx)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <div className="grid grid-cols-12 gap-2">
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                            <Input
+                              placeholder="Ref"
+                              value={article.reference}
+                              onChange={(e) => updateArticle(idx, "reference", e.target.value)}
+                              className="h-8 text-sm px-2"
+                              disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                            />
+                          </div>
+                          <div className="col-span-5 space-y-1">
+                            <Label className="text-[10px] uppercase text-muted-foreground">Nome do artigo *</Label>
+                            <Input
+                              placeholder="Descrição"
+                              value={article.description}
+                              onChange={(e) => updateArticle(idx, "description", e.target.value)}
+                              className="h-8 text-sm"
+                              disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={article.quantity}
+                              onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 1)}
+                              className="h-8 text-sm text-center px-1"
+                              disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                            <Input
+                              type="number"
+                              placeholder="0,00"
+                              value={article.unit_price}
+                              onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm px-2 text-right"
+                              disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
-                    <div className="flex justify-end px-3 py-1.5 border-t text-xs font-medium text-muted-foreground">
-                      Subtotal: {previousArticlesSubtotal.toFixed(2)} €
-                    </div>
-                  </div>
-                )}
 
-                {/* Table header */}
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 bg-muted/50 px-3 py-2">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigo</span>
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase">Descrição</span>
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase">Qtd</span>
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase">Valor €</span>
-                    <span></span>
-                  </div>
-
-                  {(formData.articles || []).map((article, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 px-3 py-2 border-t items-start">
-                      <Textarea
-                        placeholder="Referência"
-                        value={article.reference}
-                        onChange={(e) => updateArticle(idx, "reference", e.target.value)}
-                        className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
-                        rows={2}
-                      />
-                      <Textarea
-                        placeholder="Descrição *"
-                        value={article.description}
-                        onChange={(e) => updateArticle(idx, "description", e.target.value)}
-                        className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
-                        rows={2}
-                      />
-                      <div>
-                        <Input
-                          type="number" step="any" min="0"
-                          value={article.quantity}
-                          onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)}
-                          className="h-8 text-xs"
-                        />
-                        <span className="text-[10px] text-muted-foreground mt-0.5 block">Unid.</span>
+                    {(formData.articles as ArticleEntry[]).length === 0 && (
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-2 border-dashed rounded-lg">
+                        Nenhum artigo adicionado.
                       </div>
-                      <Input
-                        type="number" step="any" min="0"
-                        value={article.unit_price}
-                        onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                        className="h-8 text-xs"
-                      />
-                      <div className="flex items-start pt-1">
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {formData.articles.length === 0 && (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-t">
-                      Nenhum artigo adicionado.
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-
-                <Button variant="outline" className="w-full" onClick={addArticle}>
-                  <Plus className="h-4 w-4 mr-1" /> Adicionar Artigo
-                </Button>
               </div>
               <DialogFooter className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}>
@@ -1219,7 +1185,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                         className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         onClick={() => setFormData(prev => ({
                           ...prev,
-                          partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
+                          partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "", cost: "" }]
                         }))}
                       >
                         <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
@@ -1247,27 +1213,61 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                          <div className="space-y-2">
-                            <Input
-                              placeholder="Descrição do artigo *"
-                              value={part.name}
-                              className="h-8 text-sm"
-                              onChange={(e) => {
-                                const newList = [...formData.partsToOrder];
-                                newList[index].name = e.target.value;
-                                setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                              }}
-                            />
-                            <Input
-                              placeholder="Referência (opcional)"
-                              value={part.reference}
-                              className="h-8 text-sm"
-                              onChange={(e) => {
-                                const newList = [...formData.partsToOrder];
-                                newList[index].reference = e.target.value;
-                                setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                              }}
-                            />
+                          <div className="grid grid-cols-12 gap-2 mt-1">
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                              <Input
+                                placeholder="Ref"
+                                value={part.reference}
+                                className="h-8 text-sm px-2"
+                                onChange={(e) => {
+                                  const newList = [...formData.partsToOrder];
+                                  newList[index].reference = e.target.value;
+                                  setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-6 space-y-1">
+                              <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                              <Input
+                                placeholder="Nome do artigo"
+                                value={part.name}
+                                className="h-8 text-sm"
+                                onChange={(e) => {
+                                  const newList = [...formData.partsToOrder];
+                                  newList[index].name = e.target.value;
+                                  setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                placeholder="1"
+                                value={part.quantity || "1"}
+                                className="h-8 text-sm text-center px-1"
+                                onChange={(e) => {
+                                  const newList = [...formData.partsToOrder];
+                                  newList[index].quantity = e.target.value;
+                                  setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor (€)</Label>
+                              <Input
+                                placeholder="0,00"
+                                value={part.cost}
+                                className="h-8 text-sm px-2 text-right"
+                                onChange={(e) => {
+                                  const newList = [...formData.partsToOrder];
+                                  newList[index].cost = e.target.value;
+                                  setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}

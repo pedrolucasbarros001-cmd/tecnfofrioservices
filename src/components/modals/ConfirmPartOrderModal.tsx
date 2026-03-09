@@ -118,11 +118,12 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             .from('service_parts')
             .update({
               estimated_arrival: estimatedArrival,
-              cost: cost ? parseCurrencyInput(cost) : null,
-              iva_rate: parseFloat(ivaRate),
-              part_code: partReference || part.part_code,
-              supplier: supplier || part.supplier,
-              notes: notes ? `${part.notes || ''}\nNotas: ${notes}`.trim() : part.notes,
+              cost: part.cost ? parseCurrencyInput(part.cost.toString()) : null,
+              iva_rate: 23, // Default to 23 if not specific
+              part_code: part.part_code,
+              part_name: part.part_name,
+              quantity: part.quantity,
+              notes: notes ? `${part.notes || ''}\nNotas Admin: ${notes}`.trim() : part.notes,
             })
             .eq('id', part.id)
         );
@@ -143,9 +144,8 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
               is_requested: true,
               arrived: false,
               estimated_arrival: estimatedArrival,
-              cost: cost ? parseCurrencyInput(cost) : null,
-              iva_rate: parseFloat(ivaRate),
-              supplier: supplier || null,
+              cost: (p as any).value ? parseCurrencyInput((p as any).value.toString()) : null,
+              iva_rate: 23,
             }))
           );
         if (insertError) throw insertError;
@@ -171,7 +171,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
       queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
 
-      toast.success(`Pedido registado! Peça prevista para ${estimatedArrivalFormatted}.`);
+      toast.success(`Pedido registado! Artigo previsto para ${estimatedArrivalFormatted}.`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error confirming part order:', error);
@@ -191,7 +191,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
-            Registar Pedido de Peça
+            Registar Pedido de Artigo
           </DialogTitle>
           <p className="text-sm text-muted-foreground">Confirme os detalhes do pedido. A previsão de chegada serve como termómetro de urgência.</p>
         </DialogHeader>
@@ -208,75 +208,147 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
               </div>
             )}
 
-            {/* Pending Parts */}
+            {/* Pending Articles */}
             {pendingParts.length > 0 && (
-              <div className="space-y-2">
-                <Label>Artigos Solicitados</Label>
-                <div className="space-y-1">
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Artigos Solicitados</Label>
+                <div className="space-y-3">
                   {pendingParts.map((part) => (
-                    <div key={part.id} className="p-2 bg-muted/50 rounded text-sm flex justify-between items-center">
-                      <span>{part.part_name}</span>
-                      <span className="text-muted-foreground">x{part.quantity}</span>
+                    <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group">
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                          <Input
+                            placeholder="Ref"
+                            defaultValue={part.part_code || ''}
+                            onChange={(e) => {
+                              part.part_code = e.target.value;
+                            }}
+                            className="h-8 text-sm px-2"
+                          />
+                        </div>
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                          <Input
+                            placeholder="Artigo"
+                            defaultValue={part.part_name}
+                            onChange={(e) => {
+                              part.part_name = e.target.value;
+                            }}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            defaultValue={part.quantity || 1}
+                            onChange={(e) => {
+                              part.quantity = parseInt(e.target.value) || 1;
+                            }}
+                            className="h-8 text-sm text-center px-1"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                          <Input
+                            type="text"
+                            placeholder="0,00"
+                            defaultValue={part.cost || ''}
+                            onChange={(e) => {
+                              part.cost = e.target.value;
+                            }}
+                            className="h-8 text-sm text-right px-2"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* New Parts Section */}
-            {newParts.length > 0 && (
-              <div className="space-y-3">
-                <Separator />
-                <Label>Peças Adicionais</Label>
-                {newParts.map((part, index) => (
-                  <div key={index} className="space-y-2 p-3 border border-dashed rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Peça {index + 1}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => removeNewPart(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Input
-                      placeholder="Nome da peça *"
-                      value={part.name}
-                      onChange={(e) => updateNewPart(index, 'name', e.target.value)}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+            {/* Additional Articles */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Artigos Adicionais</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs border-dashed"
+                  onClick={addNewPart}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Adicionar Artigo
+                </Button>
+              </div>
+
+              {newParts.length === 0 && pendingParts.length === 0 && (
+                <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
+                  Nenhum artigo registado.
+                </p>
+              )}
+
+              {newParts.map((part, index) => (
+                <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeNewPart(index)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                       <Input
-                        placeholder="Código/Referência"
+                        placeholder="Ref"
                         value={part.code}
                         onChange={(e) => updateNewPart(index, 'code', e.target.value)}
+                        className="h-8 text-sm px-2"
                       />
+                    </div>
+                    <div className="col-span-5 space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                      <Input
+                        placeholder="Artigo"
+                        value={part.name}
+                        onChange={(e) => updateNewPart(index, 'name', e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
                       <Input
                         type="number"
                         min="1"
-                        placeholder="Qtd"
                         value={part.quantity}
                         onChange={(e) => updateNewPart(index, 'quantity', e.target.value)}
+                        className="h-8 text-sm text-center px-1"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                      <Input
+                        type="text"
+                        placeholder="0,00"
+                        value={(part as any).value || ''}
+                        onChange={(e) => {
+                          const newList = [...newParts];
+                          (newList[index] as any).value = e.target.value;
+                          setNewParts(newList);
+                        }}
+                        className="h-8 text-sm text-right px-2"
                       />
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add Part Button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full border-dashed"
-              onClick={addNewPart}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Peça
-            </Button>
+                </div>
+              ))}
+            </div>
 
             {/* Estimated Arrival Info */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -292,77 +364,6 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                 </div>
               </div>
             </div>
-
-            {/* Part Reference */}
-            <div className="space-y-2">
-              <Label htmlFor="reference">Referência da Peça</Label>
-              <Input
-                id="reference"
-                placeholder="Ex: REF-12345"
-                value={partReference}
-                onChange={(e) => setPartReference(e.target.value)}
-              />
-            </div>
-
-            {/* Supplier */}
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Fornecedor</Label>
-              <Input
-                id="supplier"
-                placeholder="Nome do fornecedor"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Cost (optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="cost">Preço Base (€)</Label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="cost"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="Ex: 150,00"
-                    value={cost}
-                    onChange={(e) => setCost(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              {/* IVA Dropdown */}
-              <div className="space-y-2">
-                <Label htmlFor="iva">IVA (%)</Label>
-                <Select value={ivaRate} onValueChange={setIvaRate}>
-                  <SelectTrigger id="iva">
-                    <SelectValue placeholder="IVA" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0% (Isento)</SelectItem>
-                    <SelectItem value="6">6% (Reduzida)</SelectItem>
-                    <SelectItem value="13">13% (Intermédia)</SelectItem>
-                    <SelectItem value="23">23% (Normal)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Total Calculation Display */}
-            {baseCost > 0 && (
-              <div className="p-3 bg-muted/30 rounded border border-dashed text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span>Total IVA ({ivaRate}%):</span>
-                  <span>{ivaAmount.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</span>
-                </div>
-                <div className="flex justify-between font-bold text-base pt-1 border-t">
-                  <span>Total c/ IVA:</span>
-                  <span>{totalCost.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</span>
-                </div>
-              </div>
-            )}
 
             {/* Notes (optional) */}
             <div className="space-y-2">

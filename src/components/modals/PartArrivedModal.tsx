@@ -51,6 +51,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
   const [scheduledShift, setScheduledShift] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [editableParts, setEditableParts] = useState<ServicePart[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateService = useUpdateService();
@@ -74,6 +75,13 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
     },
     enabled: !!service?.id && open,
   });
+
+  // Update local state when pendingParts change
+  useEffect(() => {
+    if (pendingParts.length > 0) {
+      setEditableParts(pendingParts);
+    }
+  }, [pendingParts]);
 
   // Reset form when modal opens and pre-fill with previous technician
   useEffect(() => {
@@ -105,12 +113,17 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
 
     setIsSubmitting(true);
     try {
-      // Mark all pending parts as arrived
-      if (pendingParts.length > 0) {
-        const updatePromises = pendingParts.map(part =>
+      // Update and mark all edited parts as arrived
+      if (editableParts.length > 0) {
+        const updatePromises = editableParts.map(part =>
           supabase
             .from('service_parts')
-            .update({ arrived: true })
+            .update({
+              arrived: true,
+              part_name: part.part_name,
+              part_code: part.part_code,
+              cost: typeof part.cost === 'string' ? parseFloat((part.cost as string).replace(',', '.')) : part.cost
+            })
             .eq('id', part.id)
         );
         await Promise.all(updatePromises);
@@ -134,15 +147,15 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         technician_id: technicianId,
         scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
         scheduled_shift: (scheduledShift as any) || null,
-        notes: notes ? `${service.notes || ''}\n[Peça chegou] ${notes}`.trim() : service.notes,
+        notes: notes ? `${service.notes || ''}\n[Artigo chegou] ${notes}`.trim() : service.notes,
         // Keep last_status_before_part_request so UI shows "Continuar" button
         // It will be cleared when the technician completes the continuation flow
         skipToast: true,
       });
 
       // Log arrival for each part
-      if (pendingParts.length > 0) {
-        const logPromises = pendingParts.map(part =>
+      if (editableParts.length > 0) {
+        const logPromises = editableParts.map(part =>
           logPartArrival(
             service.code || 'N/A',
             service.id,
@@ -158,11 +171,11 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
       queryClient.invalidateQueries({ queryKey: ['services'] });
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
-      toast.success(`Peça chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} - ${formatShiftLabel(scheduledShift)} (${techName}).`);
+      toast.success(`Artigo chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} - ${formatShiftLabel(scheduledShift)} (${techName}).`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error marking part arrived:', error);
-      toast.error('Erro ao registar chegada da peça');
+      toast.error('Erro ao registar chegada do artigo');
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +191,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            Peça Chegou - Agendar Continuação
+            Artigo Chegou - Agendar Continuação
           </DialogTitle>
         </DialogHeader>
 
@@ -194,15 +207,69 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
               </div>
             )}
 
-            {/* Arrived Parts */}
-            {pendingParts.length > 0 && (
-              <div className="space-y-2">
-                <Label>Peças que Chegaram</Label>
-                <div className="space-y-1">
-                  {pendingParts.map((part) => (
-                    <div key={part.id} className="p-2 bg-green-50 border border-green-200 rounded text-sm flex justify-between items-center">
-                      <span className="text-green-800">{part.part_name}</span>
-                      <span className="text-green-600">x{part.quantity}</span>
+            {/* Arrived Articles */}
+            {editableParts.length > 0 && (
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold">Artigos que Chegaram</Label>
+                <div className="space-y-3">
+                  {editableParts.map((part, index) => (
+                    <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group">
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                          <Input
+                            placeholder="Ref"
+                            value={part.part_code || ''}
+                            onChange={(e) => {
+                              const newList = [...editableParts];
+                              newList[index] = { ...part, part_code: e.target.value };
+                              setEditableParts(newList);
+                            }}
+                            className="h-8 text-sm px-2"
+                          />
+                        </div>
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                          <Input
+                            placeholder="Artigo"
+                            value={part.part_name}
+                            onChange={(e) => {
+                              const newList = [...editableParts];
+                              newList[index] = { ...part, part_name: e.target.value };
+                              setEditableParts(newList);
+                            }}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={part.quantity || 1}
+                            onChange={(e) => {
+                              const newList = [...editableParts];
+                              newList[index] = { ...part, quantity: parseInt(e.target.value) || 1 };
+                              setEditableParts(newList);
+                            }}
+                            className="h-8 text-sm text-center px-1"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                          <Input
+                            type="text"
+                            placeholder="0,00"
+                            value={part.cost || ''}
+                            onChange={(e) => {
+                              const newList = [...editableParts];
+                              newList[index] = { ...part, cost: e.target.value as any };
+                              setEditableParts(newList);
+                            }}
+                            className="h-8 text-sm text-right px-2"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

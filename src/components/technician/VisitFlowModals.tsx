@@ -252,32 +252,34 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   // Load existing visit articles into formData (so pre-existing ones appear editable)
   useEffect(() => {
     if (!isOpen) return;
-    const loadVisitArticles = async () => {
+    const loadServiceArticles = async () => {
       try {
         const { data: parts } = await supabase
           .from("service_parts")
           .select("*")
-          .eq("service_id", service.id)
-          .eq("is_requested", false)
-          .eq("registered_location", "visita");
+          .eq("service_id", service.id);
 
         if (parts && parts.length > 0) {
+          // Articles that are already installed or available (not pending)
+          const availableParts = parts.filter(p => p.arrived || !p.is_requested);
+
           setFormData(prev => ({
             ...prev,
-            articles: parts.map(p => ({
+            articles: availableParts.map(p => ({
               reference: p.part_code || "",
               description: p.part_name,
               quantity: p.quantity || 1,
               unit_price: p.cost || 0,
+              isExisting: true,
             })),
             taxRate: parts[0]?.iva_rate ?? prev.taxRate,
           }));
         }
       } catch (err) {
-        console.warn("Error loading visit articles:", err);
+        console.warn("Error loading articles:", err);
       }
     };
-    loadVisitArticles();
+    loadServiceArticles();
   }, [isOpen, service.id]);
 
   // Parse admin pricing from pricing_description
@@ -411,16 +413,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     try {
       await ensureValidSession();
 
-      // Delete only visit-registered non-requested parts, preserve workshop articles
-      await supabase
-        .from("service_parts")
-        .delete()
-        .eq("service_id", service.id)
-        .eq("is_requested", false)
-        .eq("registered_location", "visita");
+      const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description.trim());
 
-      for (const article of (formData.articles as ArticleEntry[])) {
-        if (!article.description.trim()) continue;
+      for (const article of newArticles) {
         await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: article.description,
@@ -565,15 +560,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         await ensureValidSession();
 
         // Auto-save articles to service_parts if not already confirmed
-        const pendingArticles = (formData.articles as ArticleEntry[]).filter(a => a.description?.trim());
-        if (pendingArticles.length > 0 && !formData.articlesLocked) {
-          await supabase
-            .from("service_parts")
-            .delete()
-            .eq("service_id", service.id)
-            .eq("is_requested", false)
-            .eq("registered_location", "visita");
-          for (const article of pendingArticles) {
+        const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description?.trim());
+        if (newArticles.length > 0 && !formData.articlesLocked) {
+          for (const article of newArticles) {
             await supabase.from("service_parts").insert({
               service_id: service.id,
               part_name: article.description,
@@ -598,7 +587,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           status: hasPricingPreDefined ? "em_debito" : "concluidos",
           pending_pricing: hasPricingPreDefined ? false : true,
           detected_fault: formData.detectedFault,
-          work_performed: mode === "continuacao_peca" ? "Peça instalada e serviço concluído" : "Reparado no local do cliente",
+          work_performed: mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente",
           last_status_before_part_request: null,
           skipToast: true,
         });
@@ -833,7 +822,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <ModalHeader
-            title={mode === "continuacao_peca" ? "Resumo Cont. Peça" : "Resumo do Serviço"}
+            title={mode === "continuacao_peca" ? "Resumo Cont. Artigo" : "Resumo do Serviço"}
             step="Passo 1"
           />
 
@@ -1383,73 +1372,84 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                 <AdminPricingReadOnly data={adminPricing} />
               )}
 
-              {/* Table header */}
-              <div className="rounded-lg border overflow-hidden">
-                <div className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 bg-muted/50 px-3 py-2">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Artigo</span>
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Descrição</span>
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Qtd</span>
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase">Valor €</span>
-                  <span></span>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Artigos Utilizados</Label>
+                  {!formData.articlesLocked && (
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs border-dashed" onClick={addArticle}>
+                      <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
+                    </Button>
+                  )}
                 </div>
 
-                {((formData.articles || []) as ArticleEntry[]).map((article, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_1.5fr_70px_90px_36px] gap-1 px-3 py-2 border-t items-start">
-                    <Textarea
-                      placeholder="Referência"
-                      value={article.reference}
-                      onChange={(e) => updateArticle(idx, "reference", e.target.value)}
-                      className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
-                      rows={2}
-                      disabled={formData.articlesLocked as boolean}
-                    />
-                    <Textarea
-                      placeholder="Descrição *"
-                      value={article.description}
-                      onChange={(e) => updateArticle(idx, "description", e.target.value)}
-                      className="min-h-0 h-auto text-xs resize-y p-1.5 border-muted"
-                      rows={2}
-                      disabled={formData.articlesLocked as boolean}
-                    />
-                    <div>
-                      <Input
-                        type="number" step="any" min="0"
-                        value={article.quantity}
-                        onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 0)}
-                        className="h-8 text-xs"
-                        disabled={formData.articlesLocked as boolean}
-                      />
-                      <span className="text-[10px] text-muted-foreground mt-0.5 block">Unid.</span>
-                    </div>
-                    <Input
-                      type="number" step="any" min="0"
-                      value={article.unit_price}
-                      onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                      className="h-8 text-xs"
-                      disabled={formData.articlesLocked as boolean}
-                    />
-                    <div className="flex items-start pt-1">
-                      {!formData.articlesLocked && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeArticle(idx)}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                <div className="space-y-3">
+                  {(formData.articles as ArticleEntry[]).map((article, idx) => (
+                    <div key={idx} className="p-3 border rounded-lg bg-muted/20 relative group">
+                      {!formData.articlesLocked && !article.isExisting && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeArticle(idx)}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       )}
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                          <Input
+                            placeholder="Ref"
+                            value={article.reference}
+                            onChange={(e) => updateArticle(idx, "reference", e.target.value)}
+                            className="h-8 text-sm px-2"
+                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                          />
+                        </div>
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                          <Input
+                            placeholder="Descrição"
+                            value={article.description}
+                            onChange={(e) => updateArticle(idx, "description", e.target.value)}
+                            className="h-8 text-sm"
+                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={article.quantity}
+                            onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 1)}
+                            className="h-8 text-sm text-center px-1"
+                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                          <Input
+                            type="number"
+                            placeholder="0,00"
+                            value={article.unit_price}
+                            onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                            className="h-8 text-sm px-2 text-right"
+                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {(formData.articles as ArticleEntry[]).length === 0 && (
-                  <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-t">
-                    Nenhum artigo adicionado.
-                  </div>
-                )}
+                  {(formData.articles as ArticleEntry[]).length === 0 && (
+                    <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-2 border-dashed rounded-lg">
+                      Nenhum artigo adicionado.
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {!formData.articlesLocked && (
-                <Button variant="outline" className="w-full" onClick={addArticle}>
-                  <Plus className="h-4 w-4 mr-1" /> Adicionar Artigo
-                </Button>
-              )}
             </div>
           </div>
 
@@ -1466,10 +1466,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Pedir Peça? */}
+      {/* Modal: Pedir Artigo? */}
       <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Precisa Pedir Peça?" step={isReparacao ? "Passo 9" : "Passo 7"} />
+          <ModalHeader title="Precisa Pedir Artigo?" step={isReparacao ? "Passo 9" : "Passo 7"} />
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Precisa pedir alguma peça?</p>
@@ -1509,7 +1509,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             {formData.needsPartOrder && (
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm">Peças a pedir:</Label>
+                  <Label className="text-sm">Artigos a pedir:</Label>
                   <Button
                     type="button"
                     variant="ghost"
@@ -1520,14 +1520,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                       partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
                     }))}
                   >
-                    <Plus className="h-3 w-3 mr-1" /> Adicionar Peça
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
                   </Button>
                 </div>
 
                 <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
                   {formData.partsToOrder.length === 0 && (
                     <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
-                      Nenhuma peça adicionada. Clique acima para adicionar.
+                      Nenhum artigo adicionado. Clique acima para adicionar.
                     </p>
                   )}
                   {(formData.partsToOrder || []).map((part, index) => (
@@ -1545,27 +1545,43 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                       >
                         <X className="h-3 w-3" />
                       </Button>
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="Nome da peça *"
-                          value={part.name}
-                          className="h-8 text-sm"
-                          onChange={(e) => {
-                            const newList = [...formData.partsToOrder];
-                            newList[index].name = e.target.value;
-                            setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                          }}
-                        />
-                        <Input
-                          placeholder="Referência (opcional)"
-                          value={part.reference}
-                          className="h-8 text-sm"
-                          onChange={(e) => {
-                            const newList = [...formData.partsToOrder];
-                            newList[index].reference = e.target.value;
-                            setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                          }}
-                        />
+                      <div className="grid grid-cols-12 gap-2 mt-1">
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                          <Input
+                            placeholder="Ref"
+                            value={part.reference}
+                            className="h-8 text-sm px-2"
+                            onChange={(e) => {
+                              const newList = [...formData.partsToOrder];
+                              newList[index].reference = e.target.value;
+                              setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-7 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Nome do artigo *</Label>
+                          <Input
+                            placeholder="Nome do artigo"
+                            value={part.name}
+                            className="h-8 text-sm"
+                            onChange={(e) => {
+                              const newList = [...formData.partsToOrder];
+                              newList[index].name = e.target.value;
+                              setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value="1"
+                            readOnly
+                            className="h-8 text-sm text-center px-1 bg-muted/50"
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1726,10 +1742,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Confirmação Peça */}
+      {/* Modal: Confirmação Artigo */}
       <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
         <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Confirmação da Peça" step="Instalação" />
+          <ModalHeader title="Confirmação da Artigo" step="Instalação" />
 
           <div className="space-y-4 py-4">
             <div className="flex flex-col items-center text-center gap-3">

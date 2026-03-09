@@ -27,6 +27,7 @@ interface PartEntry {
   partName: string;
   partCode: string;
   quantity: string;
+  value: string;
   estimatedArrival: string;
   notes: string;
 }
@@ -35,6 +36,7 @@ const emptyPart = (): PartEntry => ({
   partName: '',
   partCode: '',
   quantity: '1',
+  value: '',
   estimatedArrival: '',
   notes: '',
 });
@@ -81,7 +83,7 @@ export function RequestPartModal({
     const validParts = parts.filter(p => p.partName.trim());
 
     if (requireSignature && !clientApproved) {
-      toast.error('É necessária a aprovação do cliente para pedir peça fora da oficina.');
+      toast.error('É necessária a aprovação do cliente para pedir artigo fora da oficina.');
       return;
     }
 
@@ -92,6 +94,7 @@ export function RequestPartModal({
         part_name: p.partName.trim(),
         part_code: p.partCode.trim() || null,
         quantity: parseInt(p.quantity) || 1,
+        cost: p.value ? parseFloat(p.value.replace(',', '.')) : null,
         estimated_arrival: p.estimatedArrival || null,
         is_requested: true,
         arrived: false,
@@ -133,9 +136,9 @@ export function RequestPartModal({
 
       const count = validParts.length;
       if (count === 1) {
-        toast.success(`Peça "${validParts[0].partName.trim()}" solicitada! ${service.code} aguarda aprovação.`);
+        toast.success(`Artigo "${validParts[0].partName.trim()}" solicitado! ${service.code} aguarda aprovação.`);
       } else {
-        toast.success(`${count} peças solicitadas! ${service.code} aguarda aprovação.`);
+        toast.success(`${count} artigos solicitados! ${service.code} aguarda aprovação.`);
       }
 
       onOpenChange(false);
@@ -195,7 +198,7 @@ export function RequestPartModal({
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">
-                    <span>{parts.length > 1 ? `Peça ${index + 1}` : 'Peça'}</span>
+                    Artigo {index + 1}
                   </span>
                   {parts.length > 1 && (
                     <Button
@@ -210,31 +213,44 @@ export function RequestPartModal({
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Nome da Peça *</Label>
-                  <Input
-                    placeholder="Ex: Compressor, Termostato..."
-                    value={part.partName}
-                    onChange={(e) => updatePart(index, 'partName', e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Código/Referência</Label>
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-3 space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                     <Input
-                      placeholder="Código da peça"
+                      placeholder="Ref"
                       value={part.partCode}
                       onChange={(e) => updatePart(index, 'partCode', e.target.value)}
+                      className="h-8 text-sm px-2"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Quantidade</Label>
+                  <div className="col-span-5 space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
+                    <Input
+                      placeholder="Artigo"
+                      value={part.partName}
+                      onChange={(e) => updatePart(index, 'partName', e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
                     <Input
                       type="number"
                       min="1"
                       value={part.quantity}
                       onChange={(e) => updatePart(index, 'quantity', e.target.value)}
+                      className="h-8 text-sm text-center px-1"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor €</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={part.value}
+                      onChange={(e) => updatePart(index, 'value', e.target.value)}
+                      className="h-8 text-sm text-right px-2"
                     />
                   </div>
                 </div>
@@ -268,7 +284,7 @@ export function RequestPartModal({
               onClick={addPart}
             >
               <Plus className="h-4 w-4 mr-2" />
-              <span>Adicionar outra peça</span>
+              <span>Adicionar outro artigo</span>
             </Button>
 
             {requireSignature && (
