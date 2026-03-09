@@ -150,6 +150,8 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleStartInstallation = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await ensureValidSession();
       const { error } = await technicianUpdateService({
@@ -169,6 +171,8 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     } catch (error) {
       console.error('Error starting installation:', error);
       toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -426,9 +430,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
             <Button
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
               onClick={handleStartInstallation}
-              disabled={isResuming}
+              disabled={isResuming || isSubmitting}
             >
-              {isResuming ? "A carregar..." : "Iniciar Instalação"}
+              {(isResuming || isSubmitting) ? "A carregar..." : "Iniciar Instalação"}
             </Button>
           </DialogFooter>
         </DialogContent>
