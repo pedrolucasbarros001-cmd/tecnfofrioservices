@@ -257,7 +257,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0 bg-gray-50/50">
+      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0 bg-gray-50">
         <div className="px-6 pt-6 pb-4 flex-shrink-0 bg-white border-b">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed">
                   {/* Modifiers */}
-                  <div className="space-y-4 bg-gray-50/50 p-4 rounded-lg border">
+                  <div className="space-y-4 bg-gray-100 p-4 rounded-lg border">
                     <h4 className="text-sm font-medium">Ajustes</h4>
                     <div className="flex gap-2">
                       <div className="flex-1 space-y-2">

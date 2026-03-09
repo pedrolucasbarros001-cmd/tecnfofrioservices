@@ -49,9 +49,9 @@ export function PricingSummary({
   return (
     <div className={cn(
       "w-full sm:w-[320px] p-4 rounded-lg space-y-3",
-      warrantyCoversAll 
-        ? "bg-green-50 border border-green-200" 
-        : "bg-muted/50 border border-border"
+      warrantyCoversAll
+        ? "bg-green-50 border border-green-200"
+        : "bg-slate-50 border border-border"
     )}>
       {/* Subtotal */}
       <div className="flex justify-between text-sm">
