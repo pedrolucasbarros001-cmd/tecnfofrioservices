@@ -137,6 +137,8 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
   }, [isOpen, currentStep, formData, saveState, saveStateToDb]);
 
   const handleStartDelivery = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await ensureValidSession();
       const { error } = await technicianUpdateService({
@@ -156,6 +158,8 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
     } catch (error) {
       console.error('Error starting delivery:', error);
       toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -338,9 +342,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
             <Button
               className="flex-1 bg-green-500 hover:bg-green-600 font-bold"
               onClick={handleStartDelivery}
-              disabled={isResuming}
+              disabled={isResuming || isSubmitting}
             >
-              {isResuming ? "A carregar..." : "Iniciar Entrega"}
+              {(isResuming || isSubmitting) ? "A carregar..." : "Iniciar Entrega"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -286,6 +286,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     setAdminPricing(parseAdminPricing(service.pricing_description));
   }, [isOpen, service.pricing_description]);
   const handleStartVisit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await ensureValidSession();
       // Mark service as em_execucao on server
@@ -306,6 +308,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     } catch (error) {
       console.error("Error starting visit:", error);
       toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -881,9 +885,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             <Button
               className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
               onClick={handleStartVisit}
-              disabled={isResuming}
+              disabled={isResuming || isSubmitting}
             >
-              {isResuming ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}
+              {(isResuming || isSubmitting) ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}
             </Button>
           </DialogFooter>
         </DialogContent>
