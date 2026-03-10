@@ -303,17 +303,52 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
 
   const handleDeletePart = async (partId: string) => {
     try {
-      const { error } = await supabase
+      // Get the part name before updating for the log
+      const partToDelete = serviceParts.find(p => p.id === partId);
+      const partName = partToDelete?.part_name || 'Artigo';
+
+      // 1. Update part: is_requested = false, estimated_arrival = null
+      const { error: updatePartError } = await supabase
         .from('service_parts')
-        .delete()
+        .update({
+          is_requested: false,
+          estimated_arrival: null,
+          notes: `[Cancelado em ${new Date().toLocaleDateString('pt-PT')}]`
+        })
         .eq('id', partId);
 
-      if (error) throw error;
+      if (updatePartError) throw updatePartError;
 
-      toast.success('Pedido de peça cancelado com sucesso');
+      // 2. Log the activity
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'cancelamento',
+        description: `Cancelado pedido do artigo: ${partName}`,
+        isPublic: true,
+      });
+
+      // 3. Check if any other parts are still pending
+      const remainingPendingParts = serviceParts.filter(
+        p => p.id !== partId && p.is_requested && !p.arrived
+      );
+
+      if (remainingPendingParts.length === 0) {
+        // Revert service status to 'por_fazer' (Aberto)
+        await updateService.mutateAsync({
+          id: service.id,
+          status: 'por_fazer',
+          skipToast: true,
+        });
+        toast.success(`Artigo "${partName}" cancelado. O serviço voltou para "Aberto".`);
+      } else {
+        toast.success(`Pedido do artigo "${partName}" cancelado.`);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+      queryClient.invalidateQueries({ queryKey: ['full-service-data', service.id] });
     } catch (err) {
-      console.error('Error deleting part:', err);
+      console.error('Error cancelling part:', err);
       toast.error('Erro ao cancelar pedido de peça');
     }
   };
