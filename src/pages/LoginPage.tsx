@@ -38,12 +38,17 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
+  // Redirect is handled sequentially in onSubmit after successful login.
+  // A useEffect watching isAuthenticated causes race conditions with concurrent sessions.
+  // We only redirect here if the user navigates to /login while already having a valid session.
   useEffect(() => {
-    if (isAuthenticated && role && !loading) {
+    if (!loading && isAuthenticated && role) {
       const from = location.state?.from?.pathname;
-      navigate(from && from !== '/login' ? from : getDefaultRouteForRole(role), { replace: true });
+      const target = from && from !== '/login' ? from : getDefaultRouteForRole(role);
+      navigate(target, { replace: true });
     }
-  }, [isAuthenticated, role, loading, navigate, location.state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]); // Only run once when loading finishes, not on every isAuthenticated/role change
 
   async function onSubmit(data: LoginFormValues) {
     if (isLoading) return;
