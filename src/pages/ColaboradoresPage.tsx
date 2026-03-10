@@ -424,7 +424,7 @@ export default function ColaboradoresPage() {
                   const result = await res.json();
                   if (!res.ok) throw new Error(result.error || 'Erro ao excluir');
                   toast.success('Colaborador excluído com sucesso');
-                  refetch();
+                  queryClient.invalidateQueries({ queryKey: ['collaborators'] });
                 } catch (error: any) {
                   console.error('Delete user error:', error);
                   toast.error(error.message || 'Erro ao excluir colaborador');
