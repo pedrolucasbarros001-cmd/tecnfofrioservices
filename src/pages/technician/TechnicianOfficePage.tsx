@@ -26,7 +26,7 @@ export default function TechnicianOfficePage() {
   const updateService = useUpdateService();
 
   // Query for services assigned to current technician
-  const { data: services = [], isLoading, refetch } = useQuery({
+  const { data: services = [], isLoading } = useQuery({
     queryKey: ['technician-office-services', profile?.id],
     queryFn: async () => {
       if (!profile) return [];
