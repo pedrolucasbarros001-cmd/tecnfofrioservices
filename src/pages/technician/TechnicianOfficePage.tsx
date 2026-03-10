@@ -249,9 +249,10 @@ export default function TechnicianOfficePage() {
               <Button
                 className="w-full bg-slate-600 hover:bg-slate-700 h-9"
                 onClick={() => handleAssumeService(service)}
+                disabled={assumingServiceId === service.id}
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Assumir Serviço
+                {assumingServiceId === service.id ? 'A assumir...' : 'Assumir Serviço'}
               </Button>
             ) : isAwaitingPart ? (
               <Button
