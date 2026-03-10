@@ -94,7 +94,7 @@ export default function ColaboradoresPage() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const { user: currentUser } = useAuth();
 
-  const { data: users = [], isLoading, refetch } = useQuery({
+  const { data: users = [], isLoading } = useQuery({
     queryKey: ['collaborators'],
     queryFn: async () => {
       // Get all data in parallel for faster loading

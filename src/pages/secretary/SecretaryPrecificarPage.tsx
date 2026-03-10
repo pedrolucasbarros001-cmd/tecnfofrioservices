@@ -25,7 +25,7 @@ export default function SecretaryPrecificarPage() {
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
   const [priceService, setPriceService] = useState<Service | null>(null);
 
-  const { data: allServices = [], isLoading, refetch } = useServices({ status: 'all' });
+  const { data: allServices = [], isLoading } = useServices({ status: 'all' });
 
   // Filter services with pending_pricing = true
   const precificarServices = allServices.filter((s) => s.pending_pricing === true);
