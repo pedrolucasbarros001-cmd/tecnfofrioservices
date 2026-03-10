@@ -176,7 +176,7 @@ export default function ColaboradoresPage() {
       toast.success(
         userToDeactivate.is_active ? 'Utilizador desativado' : 'Utilizador ativado'
       );
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['collaborators'] });
     } catch (error) {
       console.error('Error toggling user status:', error);
       toast.error('Erro ao alterar estado do utilizador');
