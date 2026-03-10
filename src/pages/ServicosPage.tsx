@@ -124,7 +124,7 @@ export default function ServicosPage() {
     setSelectedService(null);
     setActiveFlow(null);
     setFlowMode("normal");
-    refetch();
+    queryClient.invalidateQueries({ queryKey: ['technician-services'] });
   };
 
   // Get button config based on service type
