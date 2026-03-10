@@ -52,7 +52,8 @@ interface PricingData {
     desc: string;
     qty: number;
     price: number;
-    tax: number;
+    tax_rate: number;
+    tax?: number; // For backward compatibility migration
   }>;
   discount?: { type: 'euro' | 'percent'; value: number };
   adjustment?: number;
@@ -109,7 +110,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               description: item.desc || '',
               quantity: item.qty || 1,
               unit_price: item.price || 0,
-              tax_rate: item.tax || 23,
+              tax_rate: item.tax_rate || item.tax || 23,
             }));
           }
           if (parsed.discount) {
@@ -198,7 +199,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
         desc: item.description,
         qty: item.quantity,
         price: item.unit_price,
-        tax: item.tax_rate,
+        tax_rate: item.tax_rate,
       })),
       discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
       adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
