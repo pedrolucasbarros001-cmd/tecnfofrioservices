@@ -20,6 +20,7 @@ import { pt } from 'date-fns/locale';
 import { useServices } from '@/hooks/useServices';
 
 export default function SecretaryPrecificarPage() {
+  const queryClient = useQueryClient();
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
