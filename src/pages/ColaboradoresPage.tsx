@@ -358,7 +358,7 @@ export default function ColaboradoresPage() {
       <CreateUserModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['collaborators'] })}
       />
 
       {/* Edit User Modal */}
