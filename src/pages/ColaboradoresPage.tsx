@@ -366,7 +366,7 @@ export default function ColaboradoresPage() {
         open={showEditModal}
         onOpenChange={setShowEditModal}
         user={selectedUser}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['collaborators'] })}
       />
 
       {/* Deactivate Confirmation Dialog */}
