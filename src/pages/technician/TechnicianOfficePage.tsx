@@ -101,8 +101,8 @@ export default function TechnicianOfficePage() {
       if (rpcError) throw rpcError;
 
       toast.success('Serviço assumido com sucesso!');
-      refetch();
-      refetchAvailable();
+      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
     } catch (error) {
       console.error('Error assuming service:', error);
