@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, FileText, Check, X, ArrowRight, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
