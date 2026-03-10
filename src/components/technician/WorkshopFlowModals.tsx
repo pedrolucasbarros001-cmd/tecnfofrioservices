@@ -83,6 +83,7 @@ interface WorkshopFormData {
     name: string;
     reference: string;
     cost: string;
+    quantity: string;
   }[];
   photoAparelho: string | null;
   photoEtiqueta: string | null;
