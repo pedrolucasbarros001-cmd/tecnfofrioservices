@@ -81,6 +81,7 @@ function getInitials(name: string | null): string {
 }
 
 export default function ColaboradoresPage() {
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
