@@ -319,8 +319,8 @@ export default function ServicosPage() {
         </div>
       )}
 
-      {/* Flow Modals */}
-      {selectedService && activeFlow === 'visit' && (
+      {/* Flow Modals — use ternary to avoid DOM removal crashes */}
+      {selectedService && activeFlow === 'visit' ? (
         <VisitFlowModals
           service={selectedService}
           isOpen={true}
@@ -328,25 +328,25 @@ export default function ServicosPage() {
           onComplete={handleFlowComplete}
           mode={flowMode}
         />
-      )}
+      ) : null}
 
-      {selectedService && activeFlow === 'installation' && (
+      {selectedService && activeFlow === 'installation' ? (
         <InstallationFlowModals
           service={selectedService}
           isOpen={true}
           onClose={handleCloseFlow}
           onComplete={handleFlowComplete}
         />
-      )}
+      ) : null}
 
-      {selectedService && activeFlow === 'delivery' && (
+      {selectedService && activeFlow === 'delivery' ? (
         <DeliveryFlowModals
           service={selectedService}
           isOpen={true}
           onClose={handleCloseFlow}
           onComplete={handleFlowComplete}
         />
-      )}
+      ) : null}
       {/* Quick Create FAB */}
       <Button
         size="icon"

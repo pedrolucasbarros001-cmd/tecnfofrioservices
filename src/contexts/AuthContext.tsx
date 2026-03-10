@@ -183,12 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (cleanupErr) {
         console.warn('[AuthContext] Pre-login cleanup warning:', cleanupErr);
       }
-      // Remove only auth-related localStorage keys, keep drafts
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith('sb-')) {
-          localStorage.removeItem(key);
-        }
-      });
+      // Let supabase.auth.signOut() handle localStorage cleanup natively.
+      // Manual sb-* key deletion can corrupt token state and cause race conditions.
 
       // 3. Attempt login with retry on network errors
       let lastError: Error | null = null;

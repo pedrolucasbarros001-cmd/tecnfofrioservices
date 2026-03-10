@@ -236,12 +236,8 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <button
-              onClick={() => {
-                Object.keys(localStorage).forEach((key) => {
-                  if (key.startsWith('sb-')) {
-                    localStorage.removeItem(key);
-                  }
-                });
+              onClick={async () => {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
                 window.location.reload();
               }}
               className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"

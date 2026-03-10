@@ -120,7 +120,8 @@ export default function TechnicianOfficePage() {
     setFlowOpen(false);
     setSelectedService(null);
     setFlowMode("normal");
-    refetch();
+    queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+    queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
   };
 
   const handleFlowClose = () => {
