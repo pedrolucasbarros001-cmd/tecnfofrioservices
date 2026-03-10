@@ -377,7 +377,7 @@ export default function OrcamentosPage() {
         open={showDetailPanel}
         onOpenChange={setShowDetailPanel}
         budget={selectedBudget}
-        onUpdate={() => refetch()}
+        onUpdate={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Edit Budget Details Modal */}
