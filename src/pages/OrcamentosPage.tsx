@@ -65,7 +65,7 @@ export default function OrcamentosPage() {
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<any | null>(null);
 
-  const { data: budgets = [], isLoading, refetch } = useQuery({
+  const { data: budgets = [], isLoading } = useQuery({
     queryKey: ['budgets'],
     queryFn: async () => {
       const { data, error } = await supabase
