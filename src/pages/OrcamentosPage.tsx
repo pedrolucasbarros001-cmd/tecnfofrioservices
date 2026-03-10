@@ -53,6 +53,7 @@ const STATUS_CONFIG = {
 };
 
 export default function OrcamentosPage() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
