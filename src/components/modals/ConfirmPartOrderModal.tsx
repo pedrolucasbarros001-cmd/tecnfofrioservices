@@ -259,7 +259,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                             defaultValue={part.cost || ''}
                             onChange={(e) => {
                               (part as any).cost = e.target.value;
-                            }
+                            }}
                             className="h-8 text-sm text-right px-2"
                           />
                         </div>
