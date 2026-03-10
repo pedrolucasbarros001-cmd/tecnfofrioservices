@@ -105,7 +105,7 @@ export default function OrcamentosPage() {
         recusado: 'Orçamento recusado.',
       };
       toast.success(statusMessages[newStatus] || 'Estado atualizado');
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (error) {
       console.error('Error updating budget:', error);
       toast.error('Erro ao atualizar orçamento');
