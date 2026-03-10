@@ -361,7 +361,7 @@ export default function OrcamentosPage() {
       <CreateBudgetModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Convert Budget Modal */}
