@@ -15,9 +15,11 @@ export default function ServiceRedirect() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (serviceId) {
-      redirectToFlow(serviceId);
+      redirectToFlow(serviceId, isMounted);
     }
+    return () => { isMounted = false; };
   }, [serviceId]);
 
   async function redirectToFlow(id: string) {
