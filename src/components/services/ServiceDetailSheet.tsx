@@ -455,6 +455,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await updateService.mutateAsync({
         id: service.id,
         status: 'cancelado',
+        pending_pricing: false,
         skipToast: true,
       });
 

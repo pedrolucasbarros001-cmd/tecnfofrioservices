@@ -2,7 +2,7 @@ import { useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const THROTTLE_MS = 15_000; // 4 invalidations/min max per subscription
+const THROTTLE_MS = 3_000; // 20 invalidations/min max per subscription
 
 export function useRealtime(
   table: string,

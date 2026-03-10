@@ -29,9 +29,10 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
         };
 
         const needsPricing =
-            service.pending_pricing === true && (service.final_price ?? 0) === 0;
+            service.status !== 'cancelado' && service.pending_pricing === true && (service.final_price ?? 0) === 0;
 
         const isDebtState =
+            service.status !== 'cancelado' &&
             (service.final_price ?? 0) > 0 &&
             service.status !== 'finalizado' &&
             service.status !== 'em_debito' &&

@@ -338,6 +338,7 @@ export default function GeralPage() {
       await updateService.mutateAsync({
         id: currentService.id,
         status: 'cancelado',
+        pending_pricing: false,
         skipToast: true,
       });
       toast.success(`Serviço ${currentService.code} cancelado. Todos os dados foram preservados.`);
