@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,12 +21,13 @@ import { pt } from 'date-fns/locale';
 import { useServices } from '@/hooks/useServices';
 
 export default function SecretaryPrecificarPage() {
+  const queryClient = useQueryClient();
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
   const [priceService, setPriceService] = useState<Service | null>(null);
 
-  const { data: allServices = [], isLoading, refetch } = useServices({ status: 'all' });
+  const { data: allServices = [], isLoading } = useServices({ status: 'all' });
 
   // Filter services with pending_pricing = true
   const precificarServices = allServices.filter((s) => s.pending_pricing === true);
@@ -120,7 +122,7 @@ export default function SecretaryPrecificarPage() {
         service={selectedService}
         open={showDetailSheet}
         onOpenChange={setShowDetailSheet}
-        onServiceUpdated={refetch}
+        onServiceUpdated={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
       />
 
       <SetPriceModal
@@ -128,7 +130,7 @@ export default function SecretaryPrecificarPage() {
         open={showSetPriceModal}
         onOpenChange={(open) => {
           setShowSetPriceModal(open);
-          if (!open) refetch();
+          if (!open) queryClient.invalidateQueries({ queryKey: ['services'] });
         }}
       />
     </div>

@@ -15,12 +15,14 @@ export default function ServiceRedirect() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (serviceId) {
-      redirectToFlow(serviceId);
+      redirectToFlow(serviceId, isMounted);
     }
+    return () => { isMounted = false; };
   }, [serviceId]);
 
-  async function redirectToFlow(id: string) {
+  async function redirectToFlow(id: string, isMounted: boolean) {
     try {
       const { data: service, error: fetchError } = await supabase
         .from('services')
@@ -28,6 +30,7 @@ export default function ServiceRedirect() {
         .eq('id', id)
         .maybeSingle();
 
+      if (!isMounted) return;
       if (fetchError) throw fetchError;
 
       if (!service) {
@@ -46,6 +49,7 @@ export default function ServiceRedirect() {
         navigate(`/technician/visit/${service.id}`, { replace: true });
       }
     } catch (err) {
+      if (!isMounted) return;
       console.error('Error redirecting:', err);
       setError('Erro ao carregar serviço. Verifique se está autenticado.');
     }

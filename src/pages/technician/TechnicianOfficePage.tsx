@@ -22,11 +22,12 @@ export default function TechnicianOfficePage() {
   const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
   const [transferService, setTransferService] = useState<Service | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [assumingServiceId, setAssumingServiceId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const updateService = useUpdateService();
 
   // Query for services assigned to current technician
-  const { data: services = [], isLoading, refetch } = useQuery({
+  const { data: services = [], isLoading } = useQuery({
     queryKey: ['technician-office-services', profile?.id],
     queryFn: async () => {
       if (!profile) return [];
@@ -57,7 +58,7 @@ export default function TechnicianOfficePage() {
   });
 
   // Query for available services (no technician assigned)
-  const { data: availableServices = [], isLoading: isLoadingAvailable, refetch: refetchAvailable } = useQuery({
+  const { data: availableServices = [], isLoading: isLoadingAvailable } = useQuery({
     queryKey: ['available-workshop-services'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -75,9 +76,10 @@ export default function TechnicianOfficePage() {
     refetchOnWindowFocus: true,
   });
 
-  // Handle assuming a service
+  // Handle assuming a service (with double-click guard)
   const handleAssumeService = async (service: Service) => {
-    if (!profile) return;
+    if (!profile || assumingServiceId) return;
+    setAssumingServiceId(service.id);
 
     try {
       // Get technician ID
@@ -101,12 +103,14 @@ export default function TechnicianOfficePage() {
       if (rpcError) throw rpcError;
 
       toast.success('Serviço assumido com sucesso!');
-      refetch();
-      refetchAvailable();
+      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
     } catch (error) {
       console.error('Error assuming service:', error);
       toast.error('Erro ao assumir serviço');
+    } finally {
+      setAssumingServiceId(null);
     }
   };
 
@@ -120,7 +124,8 @@ export default function TechnicianOfficePage() {
     setFlowOpen(false);
     setSelectedService(null);
     setFlowMode("normal");
-    refetch();
+    queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+    queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
   };
 
   const handleFlowClose = () => {
@@ -244,9 +249,10 @@ export default function TechnicianOfficePage() {
               <Button
                 className="w-full bg-slate-600 hover:bg-slate-700 h-9"
                 onClick={() => handleAssumeService(service)}
+                disabled={assumingServiceId === service.id}
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Assumir Serviço
+                {assumingServiceId === service.id ? 'A assumir...' : 'Assumir Serviço'}
               </Button>
             ) : isAwaitingPart ? (
               <Button

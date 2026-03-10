@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Users, Plus, Pencil, Power, Search, Trash2, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,7 @@ function getInitials(name: string | null): string {
 }
 
 export default function ColaboradoresPage() {
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
@@ -93,7 +94,7 @@ export default function ColaboradoresPage() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const { user: currentUser } = useAuth();
 
-  const { data: users = [], isLoading, refetch } = useQuery({
+  const { data: users = [], isLoading } = useQuery({
     queryKey: ['collaborators'],
     queryFn: async () => {
       // Get all data in parallel for faster loading
@@ -175,7 +176,7 @@ export default function ColaboradoresPage() {
       toast.success(
         userToDeactivate.is_active ? 'Utilizador desativado' : 'Utilizador ativado'
       );
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['collaborators'] });
     } catch (error) {
       console.error('Error toggling user status:', error);
       toast.error('Erro ao alterar estado do utilizador');
@@ -357,7 +358,7 @@ export default function ColaboradoresPage() {
       <CreateUserModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['collaborators'] })}
       />
 
       {/* Edit User Modal */}
@@ -365,7 +366,7 @@ export default function ColaboradoresPage() {
         open={showEditModal}
         onOpenChange={setShowEditModal}
         user={selectedUser}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['collaborators'] })}
       />
 
       {/* Deactivate Confirmation Dialog */}
@@ -423,7 +424,7 @@ export default function ColaboradoresPage() {
                   const result = await res.json();
                   if (!res.ok) throw new Error(result.error || 'Erro ao excluir');
                   toast.success('Colaborador excluído com sucesso');
-                  refetch();
+                  queryClient.invalidateQueries({ queryKey: ['collaborators'] });
                 } catch (error: any) {
                   console.error('Delete user error:', error);
                   toast.error(error.message || 'Erro ao excluir colaborador');

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,12 +39,17 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
+  // Redirect is handled sequentially in onSubmit after successful login.
+  // A useEffect watching isAuthenticated causes race conditions with concurrent sessions.
+  // We only redirect here if the user navigates to /login while already having a valid session.
   useEffect(() => {
-    if (isAuthenticated && role && !loading) {
+    if (!loading && isAuthenticated && role) {
       const from = location.state?.from?.pathname;
-      navigate(from && from !== '/login' ? from : getDefaultRouteForRole(role), { replace: true });
+      const target = from && from !== '/login' ? from : getDefaultRouteForRole(role);
+      navigate(target, { replace: true });
     }
-  }, [isAuthenticated, role, loading, navigate, location.state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]); // Only run once when loading finishes, not on every isAuthenticated/role change
 
   async function onSubmit(data: LoginFormValues) {
     if (isLoading) return;
@@ -231,12 +237,8 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <button
-              onClick={() => {
-                Object.keys(localStorage).forEach((key) => {
-                  if (key.startsWith('sb-')) {
-                    localStorage.removeItem(key);
-                  }
-                });
+              onClick={async () => {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
                 window.location.reload();
               }}
               className="text-xs text-slate-500 hover:text-slate-400 underline underline-offset-4"

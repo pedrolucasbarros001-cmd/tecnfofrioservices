@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, FileText, Check, X, ArrowRight, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -53,6 +53,7 @@ const STATUS_CONFIG = {
 };
 
 export default function OrcamentosPage() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -65,7 +66,7 @@ export default function OrcamentosPage() {
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<any | null>(null);
 
-  const { data: budgets = [], isLoading, refetch } = useQuery({
+  const { data: budgets = [], isLoading } = useQuery({
     queryKey: ['budgets'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -104,7 +105,7 @@ export default function OrcamentosPage() {
         recusado: 'Orçamento recusado.',
       };
       toast.success(statusMessages[newStatus] || 'Estado atualizado');
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (error) {
       console.error('Error updating budget:', error);
       toast.error('Erro ao atualizar orçamento');
@@ -123,7 +124,7 @@ export default function OrcamentosPage() {
       if (error) throw error;
       
       toast.success('Orçamento excluído com sucesso!');
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (error) {
       console.error('Error deleting budget:', error);
       toast.error('Erro ao excluir orçamento');
@@ -360,7 +361,7 @@ export default function OrcamentosPage() {
       <CreateBudgetModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Convert Budget Modal */}
@@ -368,7 +369,7 @@ export default function OrcamentosPage() {
         open={showConvertModal}
         onOpenChange={setShowConvertModal}
         budget={budgetToConvert}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Budget Detail Panel */}
@@ -376,7 +377,7 @@ export default function OrcamentosPage() {
         open={showDetailPanel}
         onOpenChange={setShowDetailPanel}
         budget={selectedBudget}
-        onUpdate={() => refetch()}
+        onUpdate={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Edit Budget Details Modal */}
@@ -384,7 +385,7 @@ export default function OrcamentosPage() {
         open={showEditBudgetModal}
         onOpenChange={setShowEditBudgetModal}
         budget={budgetToEdit}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Delete Confirmation Dialog */}
