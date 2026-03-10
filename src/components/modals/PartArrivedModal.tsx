@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, Calendar, UserPlus, Clock } from 'lucide-react';
+import { CheckCircle, Calendar, UserPlus, Clock, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -214,7 +214,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                 <div className="space-y-3">
                   {editableParts.map((part, index) => (
                     <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group">
-                      <div className="grid grid-cols-12 gap-2">
+                      <div className="grid grid-cols-12 gap-2 pr-8">
                         <div className="col-span-2 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                           <Input
@@ -276,6 +276,22 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                           </div>
                         </div>
                       </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={() => {
+                          const newList = editableParts.filter((_, i) => i !== index);
+                          setEditableParts(newList);
+                          if (newList.length === 0) {
+                            toast.info("Nenhum artigo selecionado para chegar. A fechar...");
+                            onOpenChange(false);
+                          }
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
