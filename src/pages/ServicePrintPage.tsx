@@ -438,17 +438,7 @@ export default function ServicePrintPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usedParts.length > 0 ? (
-                    usedParts.map((part) => (
-                      <tr key={part.id} className="border-b">
-                        <td className="py-1">{part.part_code || '-'}</td>
-                        <td className="py-1">{part.part_name}</td>
-                        <td className="py-1 text-center">{part.quantity || 1}</td>
-                        <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '0.00 €'}</td>
-                        <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
-                      </tr>
-                    ))
-                  ) : (
+                  {pricingDetails.hasItemizedPricing && pricingDetails.items.length > 0 ? (
                     pricingDetails.items.map((item: any, idx: number) => (
                       <tr key={idx} className="border-b border-dashed">
                         <td className="py-1">{item.ref || item.article || '-'}</td>
@@ -458,10 +448,20 @@ export default function ServicePrintPage() {
                         <td className="py-1 text-right">{((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)} €</td>
                       </tr>
                     ))
+                  ) : (
+                    usedParts.map((part) => (
+                      <tr key={part.id} className="border-b">
+                        <td className="py-1">{part.part_code || '-'}</td>
+                        <td className="py-1">{part.part_name}</td>
+                        <td className="py-1 text-center">{part.quantity || 1}</td>
+                        <td className="py-1 text-right">{(part.cost != null && part.cost > 0) ? part.cost.toFixed(2) + ' €' : '0.00 €'}</td>
+                        <td className="py-1 text-right">{((part.cost || 0) * (part.quantity || 1)).toFixed(2)} €</td>
+                      </tr>
+                    ))
                   )}
                   <tr className="font-medium">
                     <td colSpan={4} className="py-1 text-right">Subtotal Artigos:</td>
-                    <td className="py-1 text-right">{(usedParts.length > 0 ? totalPartsCost : pricingDetails.subtotal).toFixed(2)} €</td>
+                    <td className="py-1 text-right">{(pricingDetails.hasItemizedPricing ? pricingDetails.subtotal : totalPartsCost).toFixed(2)} €</td>
                   </tr>
                 </tbody>
               </table>

@@ -1194,7 +1194,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                         className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         onClick={() => setFormData(prev => ({
                           ...prev,
-                          partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "", cost: "" }]
+                          partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "", cost: "", quantity: "1" }]
                         }))}
                       >
                         <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo

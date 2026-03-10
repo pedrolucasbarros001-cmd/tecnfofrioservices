@@ -124,7 +124,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       }
 
       if (existingItems.length === 0) {
-        const parts = groupedParts.flatMap(g => g.parts).filter(p => !p.is_requested);
+        const parts = groupedParts.flatMap(g => g.parts);
         if (parts.length > 0) {
           existingItems = parts.map(p => ({
             reference: p.part_code || '',

@@ -187,7 +187,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
   const watchItems = form.watch('items') || [];
   const validItems = watchItems.filter(item => item.description && item.description.trim() !== '');
-  const { subtotal, totalTax, total: baseTotal } = calculateTotals(validItems);
+  const { subtotal, totalTax, total: baseTotal } = calculateTotals(validItems as LineItem[]);
 
   // Discount calc
   const calculateDiscount = (base: number, dValue: string, dType: string) => {
