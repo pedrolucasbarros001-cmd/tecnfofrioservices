@@ -320,18 +320,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   // Use fullData (which has fresh customer join) when available, fallback to prop
   const displayService = fullData || service;
 
-  // Fallback: Parse pricing_description if serviceParts is empty
+  // Priority: pricing_description (admin-edited) > service_parts (technician-registered)
   const centralItems = React.useMemo(() => {
     if (!displayService) return [];
-    if (serviceParts.filter((p: any) => !p?.is_requested).length > 0) return [];
-    if (!displayService?.pricing_description) return [];
-    try {
-      const parsed = JSON.parse(displayService.pricing_description);
-      return parsed.items || [];
-    } catch (e) {
-      return [];
+    // If pricing_description exists with items, always use it (it's the admin's final version)
+    if (displayService?.pricing_description) {
+      try {
+        const parsed = JSON.parse(displayService.pricing_description);
+        if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          return parsed.items;
+        }
+      } catch (e) {
+        // fall through to service_parts
+      }
     }
-  }, [serviceParts, displayService?.pricing_description]);
+    return [];
+  }, [displayService?.pricing_description]);
 
   if (!service) return null;
 
