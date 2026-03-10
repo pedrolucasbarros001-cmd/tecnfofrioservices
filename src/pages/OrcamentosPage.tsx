@@ -385,7 +385,7 @@ export default function OrcamentosPage() {
         open={showEditBudgetModal}
         onOpenChange={setShowEditBudgetModal}
         budget={budgetToEdit}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Delete Confirmation Dialog */}
