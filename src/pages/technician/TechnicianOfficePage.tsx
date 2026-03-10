@@ -22,6 +22,7 @@ export default function TechnicianOfficePage() {
   const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
   const [transferService, setTransferService] = useState<Service | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [assumingServiceId, setAssumingServiceId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const updateService = useUpdateService();
 
