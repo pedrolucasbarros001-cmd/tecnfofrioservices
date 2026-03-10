@@ -166,15 +166,16 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       console.warn(`[VisitFlow] Invalid step "${step}" for flow "${persistenceFlowTypeRef}", falling back to resumo`);
       step = (mode === "continuacao_peca" ? "resumo_continuacao" : "resumo") as ModalStep;
     }
-    isTransitioning.current = true;
+
+    // Auto-save current state before moving
+    saveState(currentStep, formData);
+    saveStateToDb(currentStep, formData);
+
     setCurrentStep(step);
-    // Use 350ms to safely cover Dialog unmount/mount animation cycles
-    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
     if (open) return;
-    if (isTransitioning.current) return;
     handleClose();
   };
 
@@ -450,6 +451,21 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     try {
       await ensureValidSession();
 
+      // STEP 1: Persist all current form data to the service explicitly (Atomic Save)
+      // This ensures that even if status update fails, we didn't lose the diagnostic/products/articles
+      const { error: saveError } = await updateService.mutateAsync({
+        id: service.id,
+        detected_fault: formData.detectedFault || (service as any).detected_fault,
+        brand: formData.productBrand || service.brand,
+        model: formData.productModel || service.model,
+        serial_number: formData.productSerial || service.serial_number,
+        pnc: formData.productPNC || (service as any).pnc,
+        appliance_type: formData.productType || service.appliance_type,
+      } as any);
+
+      if (saveError) throw new Error(`Falha ao salvar dados do serviço: ${saveError.message}`);
+
+      // STEP 2: Execute Flow-specific Action
       if (signatureType === "pedido_peca") {
         // Idempotent: only insert signature if it doesn't exist yet
         const { data: existingSig } = await supabase
@@ -471,8 +487,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         // Insert parts to order if any
         for (const part of formData.partsToOrder) {
           if (!part.name.trim()) continue;
-
-          // Simple check to avoid duplicates for the same name in this submission
           await supabase.from("service_parts").insert({
             service_id: service.id,
             part_name: part.name.trim(),
@@ -484,32 +498,27 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        // Update service status
-        await ensureValidSession();
+        // Update service status (Transaction Phase 2)
         await updateService.mutateAsync({
           id: service.id,
           status: "para_pedir_peca",
           last_status_before_part_request: service.status,
-          detected_fault: formData.detectedFault,
           skipToast: true,
         });
 
-        // Log activity - pedido de peça (only if signature was new)
         if (!existingSig) {
           await logPartRequest(
             service.code || "N/A",
             service.id,
-            ((formData as any).partToOrder?.name || '').trim(),
+            (formData.partsToOrder?.[0]?.name || '').trim(),
             profile?.full_name || "Técnico",
             user?.id,
           );
         }
 
-        queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-        queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
-        toast.success("Pedido de peça registado com assinatura!");
+        toast.success("Pedido de peça registado com sucesso!");
       } else if (signatureType === "recolha") {
-        // Idempotent: only insert signature if it doesn't exist yet
+        // Idempotent signature
         const { data: existingSig } = await supabase
           .from("service_signatures")
           .select("id")
@@ -536,15 +545,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         if (!existingSig) {
           await logWorkshopPickup(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
-
-        queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-        queryClient.invalidateQueries({ queryKey: ["services"] });
-        queryClient.invalidateQueries({ queryKey: ["technician-services"] });
-        queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
-        queryClient.invalidateQueries({ queryKey: ["available-workshop-services"] });
         toast.success("Aparelho recolhido para oficina!");
       } else {
-        // Idempotent: only insert signature if it doesn't exist yet
+        // Idempotent signature for completion
         const { data: existingSig } = await supabase
           .from("service_signatures")
           .select("id")
@@ -561,36 +564,13 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           });
         }
 
-        await ensureValidSession();
-
-        // Auto-save articles to service_parts if not already confirmed
-        const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description?.trim());
-        if (newArticles.length > 0 && !formData.articlesLocked) {
-          for (const article of newArticles) {
-            await supabase.from("service_parts").insert({
-              service_id: service.id,
-              part_name: article.description,
-              part_code: article.reference || null,
-              quantity: article.quantity,
-              cost: article.unit_price,
-              is_requested: false,
-              arrived: true,
-              iva_rate: formData.taxRate as number,
-              registered_by: user?.id || null,
-              registered_location: "visita",
-            });
-          }
-        }
-
-        // If price was already set by central (admin/secretary) before execution,
-        // skip the pricing step and go directly to em_debito.
+        // Final Status Update (Transaction Phase 2)
         const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
 
         await updateService.mutateAsync({
           id: service.id,
           status: hasPricingPreDefined ? "em_debito" : "concluidos",
-          pending_pricing: hasPricingPreDefined ? false : true,
-          detected_fault: formData.detectedFault,
+          pending_pricing: !hasPricingPreDefined,
           work_performed: mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente",
           last_status_before_part_request: null,
           skipToast: true,
@@ -599,19 +579,20 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         if (!existingSig) {
           await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
-
-        queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-        queryClient.invalidateQueries({ queryKey: ["service-full", service.id] });
-        queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
-        toast.success(hasPricingPreDefined ? "Visita concluída! Serviço em débito." : "Visita concluída com sucesso!");
+        toast.success("Visita concluída com sucesso!");
       }
+
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
+      queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
+      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
 
       clearState();
       saveStateToDb(null as any);
       setShowSignature(false);
       onComplete();
     } catch (error) {
-      console.error("Error completing visit:", error);
+      console.error("Error completing transaction:", error);
       toast.error(humanizeError(error));
     } finally {
       setIsSubmitting(false);
@@ -755,7 +736,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       </div>
       {showProgress && <ProgressBar />}
       <div className="flex items-center gap-2">
-        <Badge className="bg-blue-100 text-blue-700 text-[10px]">{step}</Badge>
+        <Badge variant="type-visita" className="text-[10px]">{step}</Badge>
         <span className="font-semibold text-sm">{title}</span>
       </div>
     </DialogHeader>
@@ -818,80 +799,73 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
 
 
-  if (!isOpen) return null;
-
-  return (
-    <>
-      {/* Modal 1: Resumo (Normal or Continuation) */}
-      <Dialog open={(currentStep === "resumo" || currentStep === "resumo_continuacao") && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader
-            title={mode === "continuacao_peca" ? "Resumo Cont. Artigo" : "Resumo do Serviço"}
-            step="Passo 1"
-          />
-
-          <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-muted-foreground text-xs">Cliente</p>
-                <p className="font-medium">{service.customer?.name || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Telefone</p>
-                {(service.contact_phone || service.customer?.phone) ? (
-                  <a href={`tel:${service.contact_phone || service.customer?.phone}`} className="font-medium text-primary hover:underline">
-                    {service.contact_phone || service.customer?.phone}
-                  </a>
-                ) : (
-                  <p className="font-medium">N/A</p>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> Morada
-              </p>
-              <p className="font-medium">{service.service_address || service.customer?.address || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Aparelho</p>
-              <p className="font-medium">{service.appliance_type || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Avaria Reportada</p>
-              <p className="font-medium">{service.fault_description || "Sem descrição"}</p>
-            </div>
-
-            {/* Show previous diagnosis in continuation mode */}
-            {mode === "continuacao_peca" && service.detected_fault && (
-              <div className="pt-2 border-t mt-2">
-                <p className="text-muted-foreground text-xs">Diagnóstico Anterior</p>
-                <p className="font-medium text-amber-600">{service.detected_fault}</p>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
-              onClick={handleStartVisit}
-              disabled={isResuming || isSubmitting}
-            >
-              {(isResuming || isSubmitting) ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal 2: Deslocação */}
-      <Dialog open={currentStep === "deslocacao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Deslocação" step="Passo 2" />
-
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case "resumo":
+      case "resumo_continuacao":
+        return (
           <div className="space-y-4">
+            <ModalHeader
+              title={mode === "continuacao_peca" ? "Resumo Cont. Artigo" : "Resumo do Serviço"}
+              step="Passo 1"
+            />
+            <div className="space-y-3 bg-muted/50 rounded-lg p-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground text-xs">Cliente</p>
+                  <p className="font-medium">{service.customer?.name || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Telefone</p>
+                  {(service.contact_phone || service.customer?.phone) ? (
+                    <a href={`tel:${service.contact_phone || service.customer?.phone}`} className="font-medium text-primary hover:underline">
+                      {service.contact_phone || service.customer?.phone}
+                    </a>
+                  ) : (
+                    <p className="font-medium">N/A</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> Morada
+                </p>
+                <p className="font-medium">{service.service_address || service.customer?.address || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Aparelho</p>
+                <p className="font-medium">{service.appliance_type || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Avaria Reportada</p>
+                <p className="font-medium">{service.fault_description || "Sem descrição"}</p>
+              </div>
+              {mode === "continuacao_peca" && service.detected_fault && (
+                <div className="pt-2 border-t mt-2">
+                  <p className="text-muted-foreground text-xs">Diagnóstico Anterior</p>
+                  <p className="font-medium text-amber-600">{service.detected_fault}</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600 font-bold"
+                onClick={handleStartVisit}
+                disabled={isResuming || isSubmitting}
+              >
+                {(isResuming || isSubmitting) ? "A carregar..." : (mode === "continuacao_peca" ? "Continuar Visita" : "Iniciar Visita")}
+              </Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "deslocacao":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Deslocação" step="Passo 2" />
             <div className="bg-blue-50 rounded-lg p-4 text-sm">
               <p className="text-muted-foreground text-xs flex items-center gap-1 mb-1">
                 <MapPin className="h-3 w-3" /> Morada do Cliente
@@ -902,887 +876,297 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   {[service.service_postal_code || service.customer?.postal_code, service.service_city || service.customer?.city].filter(Boolean).join(', ')}
                 </p>
               )}
-              <p className="text-muted-foreground mt-2">{service.customer?.phone || ""}</p>
             </div>
-
             <Button variant="outline" className="w-full h-14 text-base" onClick={handleNavigateToClient}>
               <Navigation className="h-5 w-5 mr-2" />
               Caminho para o Cliente
             </Button>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={() => safeSetStep(isReparacao ? "foto_aparelho" : "foto")}
+              >
+                Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
           </div>
+        );
 
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("resumo")}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => safeSetStep(isReparacao ? "foto_aparelho" : "foto")}
-            >
-              Cheguei ao Local <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal 3a: Foto do Aparelho (only for reparacao) */}
-      {isReparacao && (
-        <Dialog
-          open={currentStep === "foto_aparelho" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={handleStepDialogOpenChange}
-        >
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
+      case "foto_aparelho":
+        return (
+          <div className="space-y-4">
             <ModalHeader title="Foto do Aparelho" step="Passo 3" />
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <Camera className="h-4 w-4 text-blue-500" />
-                <span>Tire uma foto geral do aparelho</span>
-                <span className="text-destructive">*</span>
-              </div>
-
-              {isRealPhoto(formData.photoAparelho) ? (
-                <div className="relative">
-                  <img
-                    src={formData.photoAparelho!}
-                    alt="Foto do aparelho"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="absolute bottom-2 right-2"
-                    onClick={() => openCamera("aparelho")}
-                  >
-                    Nova Foto
-                  </Button>
-                </div>
-              ) : formData.photoAparelho === '__photo_exists__' ? (
-                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  <span>Foto já registada</span>
-                  <Button variant="outline" size="sm" onClick={() => openCamera("aparelho")}>Tirar Nova</Button>
-                </div>
-              ) : (
-                <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("aparelho")}>
-                  <Camera className="h-8 w-8 text-muted-foreground" />
-                  <span>Tirar Foto do Aparelho</span>
-                </Button>
-              )}
+            <div className="flex items-center gap-2 text-sm">
+              <Camera className="h-4 w-4 text-blue-500" />
+              <span>Tire uma foto geral do aparelho</span>
+              <span className="text-destructive">*</span>
             </div>
-
-            <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+            {isRealPhoto(formData.photoAparelho) ? (
+              <div className="relative">
+                <img src={formData.photoAparelho!} alt="Foto" className="w-full h-48 object-cover rounded-lg" />
+                <Button variant="secondary" size="sm" className="absolute bottom-2 right-2" onClick={() => openCamera("aparelho")}>Nova Foto</Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("aparelho")}>
+                <Camera className="h-8 w-8 text-muted-foreground" />
+                <span>Tirar Foto</span>
               </Button>
-              <Button
-                className="flex-1 bg-blue-500 hover:bg-blue-600"
-                onClick={goToNextPhotoStep}
-                disabled={!canProceedFromFotoAparelho}
-              >
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
+            )}
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={goToNextPhotoStep} disabled={!canProceedFromFotoAparelho}>Continuar</Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Modal 3b: Foto da Etiqueta (only for reparacao) */}
-      {isReparacao && (
-        <Dialog
-          open={currentStep === "foto_etiqueta" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={handleStepDialogOpenChange}
-        >
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <Tag className="h-4 w-4 text-blue-500" />
-                <span>Tire uma foto da etiqueta do aparelho</span>
-                <span className="text-destructive">*</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Capture a etiqueta com número de série, modelo, etc.</p>
-
-              {isRealPhoto(formData.photoEtiqueta) ? (
-                <div className="relative">
-                  <img
-                    src={formData.photoEtiqueta!}
-                    alt="Foto da etiqueta"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="absolute bottom-2 right-2"
-                    onClick={() => openCamera("etiqueta")}
-                  >
-                    Nova Foto
-                  </Button>
-                </div>
-              ) : formData.photoEtiqueta === '__photo_exists__' ? (
-                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  <span>Foto já registada</span>
-                  <Button variant="outline" size="sm" onClick={() => openCamera("etiqueta")}>Tirar Nova</Button>
-                </div>
-              ) : (
-                <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("etiqueta")}>
-                  <Tag className="h-8 w-8 text-muted-foreground" />
-                  <span>Tirar Foto da Etiqueta</span>
-                </Button>
-              )}
-            </div>
-
-            <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-              </Button>
-              <Button
-                className="flex-1 bg-blue-500 hover:bg-blue-600"
-                onClick={goToNextPhotoStep}
-                disabled={!canProceedFromFotoEtiqueta}
-              >
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Modal 3c: Foto do Estado (only for reparacao) */}
-      {isReparacao && (
-        <Dialog
-          open={currentStep === "foto_estado" && !showCamera && !showSignature && !showPayment}
-          onOpenChange={handleStepDialogOpenChange}
-        >
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <ModalHeader title="Estado do Aparelho" step="Passo 5" />
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <ClipboardList className="h-4 w-4 text-blue-500" />
-                <span>Registe o estado físico do aparelho</span>
-                <span className="text-destructive">*</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Fotografe amassados, riscos, ou danos visíveis</p>
-
-              {formData.photosEstado.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {(formData.photosEstado || []).filter(p => p !== '__photo_exists__').map((photo, idx) => (
-                    <div key={idx} className="relative group">
-                      <img src={photo} alt={`Estado ${idx + 1}`} className="w-full h-20 object-cover rounded-lg" />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => removeEstadoPhoto(idx)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                  {formData.photosEstado.some(p => p === '__photo_exists__') && (
-                    <div className="flex items-center justify-center h-20 rounded-lg border bg-muted/50">
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    </div>
-                  )}
-                  <button
-                    onClick={() => openCamera("estado")}
-                    className="flex flex-col items-center justify-center h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30 transition-colors"
-                  >
-                    <Plus className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Mais</span>
-                  </button>
-                </div>
-              )}
-
-              {formData.photosEstado.length === 0 && (
-                <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("estado")}>
-                  <ClipboardList className="h-8 w-8 text-muted-foreground" />
-                  <span>Tirar Foto do Estado</span>
-                </Button>
-              )}
-            </div>
-
-            <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-              </Button>
-              <Button
-                className="flex-1 bg-blue-500 hover:bg-blue-600"
-                onClick={goToNextPhotoStep}
-                disabled={!canProceedFromFotoEstado}
-              >
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Modal 3 (legacy): Foto (for non-reparacao services) */}
-      {!isReparacao && (
-        <Dialog open={currentStep === "foto" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-          <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-            <ModalHeader title="Tirar Foto" step="Passo 3" />
-
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Tire uma foto do aparelho antes de iniciar o diagnóstico.</p>
-
-              {isRealPhoto(formData.photoFile) ? (
-                <div className="relative">
-                  <img
-                    src={formData.photoFile!}
-                    alt="Foto do aparelho"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="absolute bottom-2 right-2"
-                    onClick={() => openCamera("visita")}
-                  >
-                    Nova Foto
-                  </Button>
-                </div>
-              ) : formData.photoFile === '__photo_exists__' ? (
-                <div className="w-full h-32 flex flex-col items-center justify-center gap-2 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  <span>Foto já registada</span>
-                  <Button variant="outline" size="sm" onClick={() => openCamera("visita")}>Tirar Nova</Button>
-                </div>
-              ) : (
-                <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("visita")}>
-                  <Camera className="h-8 w-8 text-muted-foreground" />
-                  <span>Tirar Foto</span>
-                </Button>
-              )}
-            </div>
-
-            <DialogFooter className="flex gap-2 mt-4">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-              </Button>
-              <Button
-                className="flex-1 bg-blue-500 hover:bg-blue-600"
-                onClick={() => safeSetStep("diagnostico")}
-                disabled={!canProceedFromFoto}
-              >
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Modal: Informação do Produto (aparece só quando falta marca/modelo) */}
-      <Dialog open={currentStep === "produto" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="prod_type" className="text-sm">Tipo de Aparelho</Label>
-              <Input
-                id="prod_type"
-                placeholder="Ex: Máquina de Lavar, Frigorífico..."
-                value={formData.productType as string}
-                onChange={(e) => setFormData((prev) => ({ ...prev, productType: e.target.value }))}
-                className="mt-1"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="prod_brand" className="text-sm">Marca</Label>
-                <Input
-                  id="prod_brand"
-                  placeholder="Ex: Bosch, LG..."
-                  value={formData.productBrand as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productBrand: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="prod_model" className="text-sm">Modelo</Label>
-                <Input
-                  id="prod_model"
-                  placeholder="Ex: WAT24469ES"
-                  value={formData.productModel as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productModel: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="prod_serial" className="text-sm">Nº de Série</Label>
-                <Input
-                  id="prod_serial"
-                  placeholder="Número de série"
-                  value={formData.productSerial as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productSerial: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="prod_pnc" className="text-sm">PNC</Label>
-                <Input
-                  id="prod_pnc"
-                  placeholder="Product Number Code"
-                  value={formData.productPNC as string}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, productPNC: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Preencha o que estiver visível na placa do aparelho. Campos opcionais.
-            </p>
           </div>
+        );
 
-          <DialogFooter className="flex gap-2 mt-6">
-            <Button variant="outline" onClick={goToPreviousPhotoStep} className="flex items-center gap-1">
-              <ArrowLeft className="h-4 w-4" /> Voltar
-            </Button>
-            <Button onClick={handleProductoConfirm} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white">
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal 4/6: Diagnóstico */}
-      <Dialog open={currentStep === "diagnostico" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
-
+      case "foto_etiqueta":
+        return (
           <div className="space-y-4">
+            <ModalHeader title="Foto da Etiqueta" step="Passo 4" />
+            <div className="flex items-center gap-2 text-sm">
+              <Tag className="h-4 w-4 text-blue-500" />
+              <span>Tire uma foto da etiqueta do aparelho</span>
+              <span className="text-destructive">*</span>
+            </div>
+            {isRealPhoto(formData.photoEtiqueta) ? (
+              <div className="relative">
+                <img src={formData.photoEtiqueta!} alt="Etiqueta" className="w-full h-48 object-cover rounded-lg" />
+                <Button variant="secondary" size="sm" className="absolute bottom-2 right-2" onClick={() => openCamera("etiqueta")}>Nova Foto</Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("etiqueta")}>
+                <Tag className="h-8 w-8 text-muted-foreground" />
+                <span>Tirar Foto</span>
+              </Button>
+            )}
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={goToNextPhotoStep} disabled={!canProceedFromFotoEtiqueta}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "foto_estado":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Estado do Aparelho" step="Passo 5" />
+            <div className="flex items-center gap-2 text-sm">
+              <ClipboardList className="h-4 w-4 text-blue-500" />
+              <span>Registe o estado físico do aparelho</span>
+              <span className="text-destructive">*</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {formData.photosEstado.map((photo, idx) => (
+                <div key={idx} className="relative group">
+                  <img src={photo} alt={`Estado ${idx}`} className="w-full h-20 object-cover rounded-lg" />
+                  <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeEstadoPhoto(idx)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <button onClick={() => openCamera("estado")} className="h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center">
+                <Plus className="h-5 w-5" />
+                <span className="text-[10px]">Mais</span>
+              </button>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={goToNextPhotoStep} disabled={!canProceedFromFotoEstado}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "foto":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Tirar Foto" step="Passo 3" />
+            {isRealPhoto(formData.photoFile) ? (
+              <div className="relative">
+                <img src={formData.photoFile!} alt="Foto" className="w-full h-48 object-cover rounded-lg" />
+                <Button variant="secondary" size="sm" className="absolute bottom-2 right-2" onClick={() => openCamera("visita")}>Nova Foto</Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full h-32 flex-col gap-2" onClick={() => openCamera("visita")}>
+                <Camera className="h-8 w-8 text-muted-foreground" />
+                <span>Tirar Foto</span>
+              </Button>
+            )}
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("deslocacao")}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={() => safeSetStep("diagnostico")} disabled={!canProceedFromFoto}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "produto":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Informação do Produto" step={isReparacao ? "Passo 6" : "Passo 4"} />
+            <div className="space-y-3">
+              <div>
+                <Label>Tipo de Aparelho</Label>
+                <Input value={formData.productType} onChange={(e) => setFormData(prev => ({ ...prev, productType: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Marca</Label>
+                  <Input value={formData.productBrand} onChange={(e) => setFormData(prev => ({ ...prev, productBrand: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Modelo</Label>
+                  <Input value={formData.productModel} onChange={(e) => setFormData(prev => ({ ...prev, productModel: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={handleProductoConfirm}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "diagnostico":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Diagnóstico" step={isReparacao ? "Passo 6" : "Passo 4"} />
             <div>
-              <Label htmlFor="detected_fault" className="text-sm">
-                Avaria Detectada <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="detected_fault" className="text-sm">Avaria Detectada *</Label>
               <Textarea
                 id="detected_fault"
-                placeholder="Descreva a avaria que detectou no local..."
+                placeholder="Descreva a avaria..."
                 value={formData.detectedFault}
-                onChange={(e) => setFormData((prev) => ({ ...prev, detectedFault: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, detectedFault: e.target.value }))}
                 rows={4}
-                className="mt-1.5 text-sm"
+                className="mt-1.5"
               />
             </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={() => safeSetStep("decisao")} disabled={!canProceedFromDiagnostico}>Continuar</Button>
+            </DialogFooter>
           </div>
+        );
 
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className="flex-1 bg-blue-500 hover:bg-blue-600"
-              onClick={() => safeSetStep("decisao")}
-              disabled={!canProceedFromDiagnostico}
-            >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal 5/7: Decisão */}
-      <Dialog open={currentStep === "decisao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
-
-          <p className="text-sm text-muted-foreground mb-4">Qual será o próximo passo?</p>
-
-          <RadioGroup
-            value={formData.decision}
-            onValueChange={(val) => setFormData((prev) => ({ ...prev, decision: val as DecisionType }))}
-            className="space-y-3"
-          >
-            <label
-              htmlFor="reparar_local"
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                formData.decision === "reparar_local"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-muted hover:border-muted-foreground/30",
-              )}
-            >
-              <RadioGroupItem value="reparar_local" id="reparar_local" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-blue-500 shrink-0" />
-                  <span className="font-medium text-sm">Reparar no Local</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Serviço concluído no local do cliente</p>
-              </div>
-            </label>
-
-            <label
-              htmlFor="levantar_oficina"
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                formData.decision === "levantar_oficina"
-                  ? "border-orange-500 bg-orange-50"
-                  : "border-muted hover:border-muted-foreground/30",
-              )}
-            >
-              <RadioGroupItem value="levantar_oficina" id="levantar_oficina" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-orange-500 shrink-0" />
-                  <span className="font-medium text-sm">Levantar para Oficina</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Recolher aparelho para reparação na oficina</p>
-              </div>
-            </label>
-          </RadioGroup>
-
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className={cn(
-                "flex-1",
-                formData.decision === "reparar_local"
-                  ? "bg-blue-500 hover:bg-blue-600"
-                  : "bg-orange-500 hover:bg-orange-600",
-              )}
-              onClick={handleDecisionConfirm}
-              disabled={isSubmitting}
-            >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal: Registo de Artigos (replaces old pecas_usadas) */}
-      <Dialog open={currentStep === "registo_artigos" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <div className="p-6 pb-0">
-            <ModalHeader title="Registo de Artigos" step={isReparacao ? "Passo 8" : "Passo 6"} />
-          </div>
-
-          <div className="flex-1 overflow-y-auto min-h-0 px-6">
-            <div className="space-y-4 py-4">
-              <p className="text-sm text-muted-foreground">Registe os artigos/materiais utilizados nesta reparação.</p>
-
-              {/* Admin-defined pricing - read-only */}
-              {adminPricing && (
-                <AdminPricingReadOnly data={adminPricing} />
-              )}
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Artigos Utilizados</Label>
-                  {!formData.articlesLocked && (
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs border-dashed" onClick={addArticle}>
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
-                    </Button>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {(formData.articles as ArticleEntry[]).map((article, idx) => (
-                    <div key={idx} className="p-3 border rounded-lg bg-muted/20 relative group">
-                      {!formData.articlesLocked && !article.isExisting && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeArticle(idx)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <div className="grid grid-cols-12 gap-2">
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
-                          <Input
-                            placeholder="Ref"
-                            value={article.reference}
-                            onChange={(e) => updateArticle(idx, "reference", e.target.value)}
-                            className="h-8 text-sm px-2"
-                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
-                          />
-                        </div>
-                        <div className="col-span-4 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
-                          <Input
-                            placeholder="Descrição"
-                            value={article.description}
-                            onChange={(e) => updateArticle(idx, "description", e.target.value)}
-                            className="h-8 text-sm"
-                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={article.quantity}
-                            onChange={(e) => updateArticle(idx, "quantity", parseFloat(e.target.value) || 1)}
-                            className="h-8 text-sm text-center px-1"
-                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor Unit.</Label>
-                          <Input
-                            type="number"
-                            placeholder="0,00"
-                            value={article.unit_price}
-                            onChange={(e) => updateArticle(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-sm px-2 text-right"
-                            disabled={(formData.articlesLocked as boolean) || article.isExisting}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Total</Label>
-                          <div className={cn(
-                            "h-8 flex items-center justify-end px-2 bg-muted/50 rounded text-xs font-medium",
-                            (formData.articlesLocked || article.isExisting) && "opacity-50"
-                          )}>
-                            {(article.quantity * article.unit_price).toFixed(2)} €
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {(formData.articles as ArticleEntry[]).length === 0 && (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground italic border-2 border-dashed rounded-lg">
-                      Nenhum artigo adicionado.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t flex-shrink-0">
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-              </Button>
-              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => safeSetStep("pedir_peca")}>
-                Continuar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal: Pedir Artigo? */}
-      <Dialog open={currentStep === "pedir_peca" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Precisa Pedir Artigo?" step={isReparacao ? "Passo 9" : "Passo 7"} />
-
+      case "decisao":
+        return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Precisa pedir alguma peça?</p>
-
-            <RadioGroup
-              value={formData.needsPartOrder ? "sim" : "nao"}
-              onValueChange={(val) => setFormData((prev) => ({ ...prev, needsPartOrder: val === "sim" }))}
-              className="flex gap-4"
-            >
-              <label
-                htmlFor="needsPart_nao"
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                  !formData.needsPartOrder
-                    ? "border-green-500 bg-green-50"
-                    : "border-muted hover:border-muted-foreground/30",
-                )}
-              >
-                <RadioGroupItem value="nao" id="needsPart_nao" />
-                <span className="font-medium text-sm">Não</span>
+            <ModalHeader title="Decisão" step={isReparacao ? "Passo 7" : "Passo 5"} />
+            <RadioGroup value={formData.decision} onValueChange={(val) => setFormData(prev => ({ ...prev, decision: val as DecisionType }))} className="space-y-3">
+              <label htmlFor="reparar_local" className={cn("flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer", formData.decision === "reparar_local" ? "border-blue-500 bg-blue-50" : "border-muted")}>
+                <RadioGroupItem value="reparar_local" id="reparar_local" />
+                <div className="flex-1">
+                  <span className="font-medium text-sm">Reparar no Local</span>
+                  <p className="text-xs text-muted-foreground">Serviço concluído no cliente</p>
+                </div>
               </label>
-
-              <label
-                htmlFor="needsPart_sim"
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors",
-                  formData.needsPartOrder
-                    ? "border-yellow-500 bg-yellow-50"
-                    : "border-muted hover:border-muted-foreground/30",
-                )}
-              >
-                <RadioGroupItem value="sim" id="needsPart_sim" />
-                <span className="font-medium text-sm">Sim</span>
+              <label htmlFor="levantar_oficina" className={cn("flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer", formData.decision === "levantar_oficina" ? "border-orange-500 bg-orange-50" : "border-muted")}>
+                <RadioGroupItem value="levantar_oficina" id="levantar_oficina" />
+                <div className="flex-1">
+                  <span className="font-medium text-sm">Levantar para Oficina</span>
+                  <p className="text-xs text-muted-foreground">Recolher aparelho</p>
+                </div>
               </label>
             </RadioGroup>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("diagnostico")}>Anterior</Button>
+              <Button className={cn("flex-1", formData.decision === "reparar_local" ? "bg-blue-500" : "bg-orange-500")} onClick={handleDecisionConfirm}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
 
+      case "registo_artigos":
+        return (
+          <div className="space-y-4 max-h-[80vh] flex flex-col">
+            <ModalHeader title="Registo de Artigos" step={isReparacao ? "Passo 8" : "Passo 6"} />
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {formData.articles.map((article, idx) => (
+                <div key={idx} className="p-3 border rounded-lg bg-muted/20 relative">
+                  <Input placeholder="Descrição" value={article.description} onChange={(e) => updateArticle(idx, "description", e.target.value)} />
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addArticle} className="w-full border-dashed"><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
+            </div>
+            <DialogFooter className="flex gap-2 pt-4 border-t mt-auto">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>Anterior</Button>
+              <Button className="flex-1 bg-blue-500" onClick={() => safeSetStep("pedir_peca")}>Continuar</Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "pedir_peca":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Precisa Pedir Artigo?" step={isReparacao ? "Passo 9" : "Passo 7"} />
+            <RadioGroup value={formData.needsPartOrder ? "sim" : "nao"} onValueChange={(val) => setFormData(prev => ({ ...prev, needsPartOrder: val === "sim" }))} className="flex gap-4">
+              <label htmlFor="needsPart_nao" className={cn("flex-1 p-3 rounded-lg border-2 text-center cursor-pointer", !formData.needsPartOrder ? "border-green-500 bg-green-50" : "border-muted")}>
+                <RadioGroupItem value="nao" id="needsPart_nao" className="sr-only" />
+                <span className="font-medium">Não</span>
+              </label>
+              <label htmlFor="needsPart_sim" className={cn("flex-1 p-3 rounded-lg border-2 text-center cursor-pointer", formData.needsPartOrder ? "border-yellow-500 bg-yellow-50" : "border-muted")}>
+                <RadioGroupItem value="sim" id="needsPart_sim" className="sr-only" />
+                <span className="font-medium">Sim</span>
+              </label>
+            </RadioGroup>
             {formData.needsPartOrder && (
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Artigos a pedir:</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                    onClick={() => setFormData(prev => ({
-                      ...prev,
-                      partsToOrder: [...(prev.partsToOrder || []), { name: "", reference: "" }]
-                    }))}
-                  >
-                    <Plus className="h-3 w-3 mr-1" /> Adicionar Artigo
-                  </Button>
-                </div>
-
-                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
-                  {formData.partsToOrder.length === 0 && (
-                    <p className="text-xs text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
-                      Nenhum artigo adicionado. Clique acima para adicionar.
-                    </p>
-                  )}
-                  {(formData.partsToOrder || []).map((part, index) => (
-                    <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => setFormData(prev => {
-                          const newList = [...prev.partsToOrder];
-                          newList.splice(index, 1);
-                          return { ...prev, partsToOrder: newList };
-                        })}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      <div className="grid grid-cols-12 gap-2 mt-1">
-                        <div className="col-span-3 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
-                          <Input
-                            placeholder="Ref"
-                            value={part.reference}
-                            className="h-8 text-sm px-2"
-                            onChange={(e) => {
-                              const newList = [...formData.partsToOrder];
-                              newList[index].reference = e.target.value;
-                              setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                            }}
-                          />
-                        </div>
-                        <div className="col-span-7 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Nome do artigo *</Label>
-                          <Input
-                            placeholder="Nome do artigo"
-                            value={part.name}
-                            className="h-8 text-sm"
-                            onChange={(e) => {
-                              const newList = [...formData.partsToOrder];
-                              newList[index].name = e.target.value;
-                              setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                            }}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value="1"
-                            readOnly
-                            className="h-8 text-sm text-center px-1 bg-muted/50"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border border-blue-100 italic">
-                  Será necessária a assinatura do cliente para confirmar o pedido de peças.
-                </p>
+              <div className="space-y-2">
+                {formData.partsToOrder.map((part, index) => (
+                  <Input key={index} placeholder="Nome do artigo" value={part.name} onChange={(e) => {
+                    const newList = [...formData.partsToOrder];
+                    newList[index].name = e.target.value;
+                    setFormData(prev => ({ ...prev, partsToOrder: newList }));
+                  }} />
+                ))}
+                <Button variant="ghost" size="sm" onClick={() => setFormData(prev => ({ ...prev, partsToOrder: [...prev.partsToOrder, { name: "", reference: "" }] }))}>+ Adicionar</Button>
               </div>
             )}
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}>Anterior</Button>
+              <Button className="flex-1 bg-primary" onClick={handlePedirPecaConfirm}>Continuar</Button>
+            </DialogFooter>
           </div>
+        );
 
-          <DialogFooter className="flex gap-2 mt-4">
-            <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <Button
-              className={cn(
-                "flex-1",
-                formData.needsPartOrder
-                  ? "bg-yellow-500 hover:bg-yellow-600 text-black"
-                  : "bg-green-500 hover:bg-green-600",
-              )}
-              onClick={handlePedirPecaConfirm}
-              disabled={isSubmitting}
-            >
-              Continuar <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal: Resumo da Reparação */}
-      <Dialog open={currentStep === "resumo_reparacao" && !showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <div className="p-6 pb-0">
-            <ModalHeader title="Resumo da Reparação" step={isReparacao ? "Passo 10" : "Passo 8"} />
-          </div>
-
-          <div className="flex-1 overflow-y-auto min-h-0 px-6">
-            <div className="space-y-4 py-4">
-              {/* Admin-defined pricing - read-only */}
-              {adminPricing && (
-                <AdminPricingReadOnly data={adminPricing} showSummary />
-              )}
-
-              {(formData.articles as ArticleEntry[]).length === 0 ? (
-                <p className="text-sm text-center text-muted-foreground py-4 italic">Nenhum artigo registado.</p>
-              ) : (
-                <div className="space-y-1">
-                  <div className="grid grid-cols-12 gap-1 text-[10px] font-medium text-muted-foreground uppercase px-2">
-                    <span className="col-span-2">Ref.</span>
-                    <span className="col-span-4">Descrição</span>
-                    <span className="col-span-2 text-center">Qtd</span>
-                    <span className="col-span-2 text-right">Unit.</span>
-                    <span className="col-span-2 text-right">Total</span>
-                  </div>
-                  {((formData.articles || []) as ArticleEntry[]).map((article, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-1 text-xs px-2 py-1.5 bg-muted/30 rounded">
-                      <span className="col-span-2 truncate">{article.reference || "-"}</span>
-                      <span className="col-span-4 truncate">{article.description}</span>
-                      <span className="col-span-2 text-center">{article.quantity}</span>
-                      <span className="col-span-2 text-right">{article.unit_price.toFixed(2)}</span>
-                      <span className="col-span-2 text-right font-medium">{(article.quantity * article.unit_price).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="border-t pt-3 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">{articlesSubtotal.toFixed(2)} €</span>
-                </div>
-
-                {!formData.articlesLocked && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs whitespace-nowrap">Desconto</Label>
-                      <Input type="number" step="any" min="0" value={formData.discountValue as string} onChange={(e) => setFormData(prev => ({ ...prev, discountValue: e.target.value }))} className="h-8 text-xs flex-1" placeholder="0" />
-                      <Select value={formData.discountType as string} onValueChange={(v) => setFormData(prev => ({ ...prev, discountType: v as "euro" | "percent" }))}>
-                        <SelectTrigger className="h-8 w-16 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="euro">€</SelectItem>
-                          <SelectItem value="percent">%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs whitespace-nowrap">IVA</Label>
-                      <Select value={String(formData.taxRate)} onValueChange={(v) => setFormData(prev => ({ ...prev, taxRate: parseInt(v) }))}>
-                        <SelectTrigger className="h-8 text-xs flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">0%</SelectItem>
-                          <SelectItem value="6">6%</SelectItem>
-                          <SelectItem value="13">13%</SelectItem>
-                          <SelectItem value="23">23%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
-
-                {adminPricingTotal > 0 && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Total Adm.</span>
-                    <span>{adminPricingTotal.toFixed(2)} €</span>
-                  </div>
-                )}
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Desconto</span>
-                    <span>-{discountAmount.toFixed(2)} €</span>
-                  </div>
-                )}
-                {taxAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">IVA ({formData.taxRate}%)</span>
-                    <span>{taxAmount.toFixed(2)} €</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-base font-bold border-t pt-2">
-                  <span>Total Final</span>
-                  <span>{totalFinal.toFixed(2)} €</span>
-                </div>
+      case "resumo_reparacao":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Resumo Final" step="Final" />
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between font-bold text-lg border-t pt-2">
+                <span>Total Final</span>
+                <span>{totalFinal.toFixed(2)} €</span>
               </div>
-
-              {formData.articlesLocked && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="text-sm text-green-700 font-medium">Artigos confirmados e guardados</span>
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="px-6 py-4 border-t flex-shrink-0">
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")} disabled={formData.articlesLocked as boolean}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-              </Button>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>Anterior</Button>
               {!formData.articlesLocked ? (
-                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
-                  <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar e Guardar
-                </Button>
+                <Button className="flex-1 bg-green-600" onClick={handleConfirmArticles}>Guardar Artigos</Button>
               ) : (
-                <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm}>
-                  Continuar <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+                <Button className="flex-1 bg-blue-500" onClick={handleResumoReparacaoConfirm}>Concluir</Button>
               )}
-            </div>
+            </DialogFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+        );
 
-      {/* Modal: Confirmação Artigo */}
-      <Dialog open={currentStep === "confirmacao_peca" && !showCamera && !showSignature} onOpenChange={handleStepDialogOpenChange}>
-        <DialogContent className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
-          <ModalHeader title="Confirmação da Artigo" step="Instalação" />
+      default:
+        return <div className="p-4 text-center">Passo "{currentStep}" em desenvolvimento...</div>;
+    }
+  };
 
-          <div className="space-y-4 py-4">
-            <div className="flex flex-col items-center text-center gap-3">
-              <Package className="h-12 w-12 text-blue-500 bg-blue-100 p-2 rounded-full" />
-              <h3 className="font-semibold text-lg">A peça encomendada foi instalada?</h3>
-              <p className="text-sm text-muted-foreground">
-                Confirme se a peça que chegou foi instalada com sucesso e o aparelho está a funcionar.
-              </p>
-            </div>
+  if (!isOpen) return null;
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <Button variant="outline" className="h-20 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={handleClose}>
-                <X className="h-6 w-6 text-red-500" />
-                <span>Ainda não</span>
-              </Button>
-              <Button className="h-20 flex flex-col gap-1 bg-green-600 hover:bg-green-700" onClick={() => {
-                setFormData(prev => ({ ...prev, partInstalled: true }));
-                handleConfirmacaoPeca();
-              }}>
-                <CheckCircle2 className="h-6 w-6" />
-                <span>Sim, instalada</span>
-              </Button>
-            </div>
-          </div>
+  return (
+    <>
+      <Dialog open={!showCamera && !showSignature && !showPayment} onOpenChange={handleStepDialogOpenChange}>
+        <DialogContent
+          className="max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto p-6"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          translate="no"
+        >
+          {renderStepContent()}
         </DialogContent>
       </Dialog>
       <CameraCapture

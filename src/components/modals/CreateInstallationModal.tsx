@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, UserPlus } from 'lucide-react';
+import { CalendarIcon, Check, UserPlus, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import {
@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +32,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,14 +43,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 
 import { Separator } from '@/components/ui/separator';
@@ -59,7 +57,7 @@ import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
-import { parseCurrencyInput } from '@/utils/currencyUtils';
+import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/components/pricing/PriceLineItems';
 import type { Customer } from '@/types/database';
 
 const formSchema = z.object({
@@ -88,7 +86,13 @@ const formSchema = z.object({
   notes: z.string().optional(),
 
   // Pricing
-  final_price: z.number().optional(),
+  items: z.array(z.object({
+    reference: z.string().optional(),
+    description: z.string(),
+    quantity: z.number().min(0, 'Quantidade inválida'),
+    unit_price: z.number().min(0, 'Preço inválido'),
+    tax_rate: z.number(),
+  })).min(1, 'Adicione pelo menos um artigo'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -99,11 +103,17 @@ interface CreateInstallationModalProps {
 }
 
 export function CreateInstallationModal({ open, onOpenChange }: CreateInstallationModalProps) {
+  const { user } = useAuth();
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
+
+  // Pricing Modifiers
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [adjustment, setAdjustment] = useState<string>('');
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
@@ -118,6 +128,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
       customer_address: '',
       appliance_type: '',
       pnc: '',
+      items: [{ ...DEFAULT_LINE_ITEM }],
     },
   });
 
@@ -185,6 +196,22 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
     setFoundCustomer(null);
   };
 
+  const watchItems = form.watch('items') || [];
+  const validItems = watchItems.filter(item => item.description && item.description.trim() !== '');
+  const { subtotal, totalTax, total: baseTotal } = calculateTotals(validItems);
+
+  // Discount calc
+  const calculateDiscount = (base: number, dValue: string, dType: string) => {
+    const val = parseFloat(dValue.replace(',', '.')) || 0;
+    if (val <= 0) return 0;
+    if (dType === 'percent') return base * (val / 100);
+    return val;
+  };
+
+  const discountAmount = calculateDiscount(subtotal, discountValue, discountType);
+  const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
+  const finalPrice = Math.max(0, baseTotal - discountAmount + adjustmentAmount);
+
   const handleSubmit = async (values: FormValues) => {
     if (!selectedCustomer && !foundCustomer) {
       setPendingFormValues(values);
@@ -212,11 +239,19 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         finalCustomerId = newCustomer.id;
       }
 
-      // Status operacional - sempre por_fazer na criacao
-      // O debito e calculado dinamicamente via final_price > amount_paid
-      // pending_pricing só é marcado na CONCLUSÃO pelo técnico, nunca na criação
+      const pricingData = {
+        items: validItems.map(item => ({
+          ref: item.reference,
+          desc: item.description,
+          qty: item.quantity,
+          price: item.unit_price,
+          tax: item.tax_rate,
+        })),
+        discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
+        adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+      };
 
-      await createService.mutateAsync({
+      const newService = await createService.mutateAsync({
         customer_id: finalCustomerId,
         appliance_type: values.appliance_type,
         brand: values.brand,
@@ -231,8 +266,15 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         service_type: 'instalacao',
         is_installation: true,
         status: 'por_fazer',
-        final_price: values.final_price || null,
-        pending_pricing: !values.final_price,
+
+        // Pricing
+        pricing_description: JSON.stringify(pricingData),
+        parts_cost: subtotal,
+        labor_cost: 0,
+        discount: discountAmount,
+        final_price: finalPrice,
+        pending_pricing: finalPrice === 0,
+
         service_address: values.customer_address,
         service_postal_code: values.customer_postal_code,
         service_city: values.customer_city,
@@ -240,6 +282,31 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         contact_phone: values.customer_phone,
         contact_email: values.customer_email || null,
       });
+
+      // Insert items into service_parts
+      if (newService?.id && validItems.length > 0) {
+        const partsToInsert = validItems.map(item => ({
+          service_id: newService.id,
+          part_name: item.description,
+          part_code: item.reference || '',
+          quantity: item.quantity,
+          cost: item.unit_price,
+          iva_rate: item.tax_rate,
+          is_requested: false,
+          arrived: true,
+          registered_by: user?.id,
+          registered_location: 'visita'
+        }));
+
+        const { error: partsError } = await supabase
+          .from('service_parts')
+          .insert(partsToInsert);
+
+        if (partsError) {
+          console.error('Error inserting service parts:', partsError);
+          // Don't toast error here as service was created, but log it
+        }
+      }
 
       handleClose();
     } catch (error: any) {
@@ -262,12 +329,14 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
     setFoundCustomer(null);
     setShowFoundCustomerBox(false);
     setPendingFormValues(null);
+    setDiscountValue('');
+    setAdjustment('');
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[700px] max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
+        <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle className="text-xl">Nova Instalação</DialogTitle>
             <p className="text-sm text-muted-foreground">O técnico receberá os detalhes para realizar a instalação no local indicado.</p>
@@ -498,6 +567,98 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
 
                   <Separator />
 
+                  {/* Pricing Section (Integrado) */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-lg text-foreground">Precificação (Artigos)</h3>
+                    </div>
+
+                    <div className="border rounded-xl p-4 bg-white/50 space-y-6">
+                      <PriceLineItems form={form} fieldName="items" />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed">
+                        {/* Modifiers */}
+                        <div className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <h4 className="text-sm font-medium">Ajustes</h4>
+                          <div className="flex gap-2">
+                            <div className="flex-1 space-y-2">
+                              <Label className="text-xs">Desconto</Label>
+                              <div className="flex gap-2">
+                                <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
+                                  <SelectTrigger className="w-20 h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="euro">€</SelectItem>
+                                    <SelectItem value="percent">%</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0,00"
+                                  className="h-9"
+                                  value={discountValue}
+                                  onChange={(e) => setDiscountValue(e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex-1 space-y-2">
+                              <Label className="text-xs">Ajuste Manual (€)</Label>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="+/- 0,00"
+                                className="h-9"
+                                value={adjustment}
+                                onChange={(e) => setAdjustment(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Financial Summary */}
+                        <div className="bg-[#f0fdf4] border border-green-100 rounded-lg p-5">
+                          <h4 className="font-semibold text-green-900 mb-4 text-sm">Resumo Financeiro</h4>
+
+                          <div className="space-y-2 text-xs text-green-800">
+                            <div className="flex justify-between">
+                              <span>Subtotal Artigos</span>
+                              <span>{subtotal.toFixed(2)} €</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>IVA</span>
+                              <span>{totalTax.toFixed(2)} €</span>
+                            </div>
+                            {discountAmount > 0 && (
+                              <div className="flex justify-between text-green-700">
+                                <span>Desconto</span>
+                                <span>-{discountAmount.toFixed(2)} €</span>
+                              </div>
+                            )}
+                            {adjustmentAmount !== 0 && (
+                              <div className="flex justify-between text-green-700">
+                                <span>Ajuste</span>
+                                <span>{adjustmentAmount > 0 ? '+' : ''}{adjustmentAmount.toFixed(2)} €</span>
+                              </div>
+                            )}
+
+                            <div className="pt-2 mt-2 border-t border-green-200">
+                              <div className="flex justify-between items-center text-base font-bold text-green-950">
+                                <span>Total Previsto</span>
+                                <span>{finalPrice.toFixed(2)} €</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
                   {/* Schedule Section */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg text-foreground">Agendamento</h3>
@@ -610,39 +771,6 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                               {...field}
                             />
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Price Section */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg text-foreground">Precificação (Opcional)</h3>
-
-                    <FormField
-                      control={form.control}
-                      name="final_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Preço Definido</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="Ex: 2.000,00"
-                              value={field.value?.toString() || ''}
-                              onChange={(e) => {
-                                const parsed = parseCurrencyInput(e.target.value);
-                                field.onChange(parsed > 0 ? parsed : undefined);
-                              }}
-                            />
-                          </FormControl>
-                          <FormDescription className="text-muted-foreground">
-                            Se definir o preço agora, o serviço aparecerá automaticamente em 'Em Débito' após a criação.
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

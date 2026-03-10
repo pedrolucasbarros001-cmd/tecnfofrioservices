@@ -245,6 +245,38 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
 
       if (serviceError) throw serviceError;
 
+      // Sync service_parts: Delete non-requested parts and insert current items
+      await supabase
+        .from('service_parts')
+        .delete()
+        .eq('service_id', service.id)
+        .eq('is_requested', false);
+
+      if (validItems.length > 0) {
+        const partsToInsert = validItems.map(item => ({
+          service_id: service.id,
+          part_name: item.description,
+          part_code: item.reference || '',
+          quantity: item.quantity,
+          cost: item.unit_price,
+          iva_rate: item.tax_rate,
+          is_requested: false,
+          arrived: true,
+          registered_by: user?.id,
+          registered_location: 'oficina' // Edits via this modal are administrative
+        }));
+
+        const { error: partsError } = await supabase
+          .from('service_parts')
+          .insert(partsToInsert);
+
+        if (partsError) {
+          console.error('Error syncing service parts:', partsError);
+          // We don't throw here to avoid blocking the main service save, 
+          // but we log it.
+        }
+      }
+
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,

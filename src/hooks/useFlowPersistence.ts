@@ -377,9 +377,10 @@ export function useFlowPersistence<T extends Record<string, unknown>>(
         lastPersistedStepRef.current = currentStep;
         lastPersistedPayloadRef.current = serializedPayload;
       } catch (error) {
-        console.error('Error persisting flow state to DB:', error);
+        // Log error but don't crash, will try again on next change
+        console.error('Silent auto-save failed:', error);
       }
-    }, 450);
+    }, 1000); // 1s debounce to prevent DB spam
   }, [persistStepToDb, sanitizeFormData]);
 
   // Flush immediately (no debounce) — call when modal closes

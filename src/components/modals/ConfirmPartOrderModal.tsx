@@ -56,6 +56,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
   const [partReference, setPartReference] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletedRequestedPartIds, setDeletedRequestedPartIds] = useState<string[]>([]);
   const [newParts, setNewParts] = useState<NewPartEntry[]>([]);
 
   const updateService = useUpdateService();
@@ -88,6 +89,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
       setPartReference('');
       setNotes('');
       setNewParts([]);
+      setDeletedRequestedPartIds([]);
     }
   }, [open]);
 
@@ -104,6 +106,10 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
     setNewParts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
   };
 
+  const removeRequestedPart = (id: string) => {
+    setDeletedRequestedPartIds(prev => [...prev, id]);
+  };
+
   const handleSubmit = async () => {
     if (!service) return;
 
@@ -111,15 +117,29 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
 
     setIsSubmitting(true);
     try {
-      // Update all pending parts with the estimated arrival and cost
-      if (pendingParts.length > 0) {
-        const updatePromises = pendingParts.map(part =>
+      // 1. Handle deleted requested parts (unmark them as requested)
+      if (deletedRequestedPartIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('service_parts')
+          .update({
+            is_requested: false,
+            estimated_arrival: null,
+          })
+          .in('id', deletedRequestedPartIds);
+
+        if (deleteError) throw deleteError;
+      }
+
+      // 2. Update remaining pending parts
+      const remainingPendingParts = pendingParts.filter(p => !deletedRequestedPartIds.includes(p.id));
+      if (remainingPendingParts.length > 0) {
+        const updatePromises = remainingPendingParts.map(part =>
           supabase
             .from('service_parts')
             .update({
               estimated_arrival: estimatedArrival,
               cost: part.cost ? parseCurrencyInput(part.cost.toString()) : null,
-              iva_rate: 23, // Default to 23 if not specific
+              iva_rate: 23,
               part_code: part.part_code,
               part_name: part.part_name,
               quantity: part.quantity,
@@ -130,7 +150,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         await Promise.all(updatePromises);
       }
 
-      // Insert new parts added by admin
+      // 3. Insert new parts added by admin
       const validNewParts = newParts.filter(p => p.name.trim());
       if (validNewParts.length > 0) {
         const { error: insertError } = await supabase
@@ -151,27 +171,35 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         if (insertError) throw insertError;
       }
 
-      // Update service status to em_espera_de_peca
-      await updateService.mutateAsync({
-        id: service.id,
-        status: 'em_espera_de_peca',
-        skipToast: true,
-      });
+      // 4. Update service status to em_espera_de_peca if there are any parts left/added
+      const totalPartsToOrder = remainingPendingParts.length + validNewParts.length;
+      if (totalPartsToOrder > 0) {
+        await updateService.mutateAsync({
+          id: service.id,
+          status: 'em_espera_de_peca',
+          skipToast: true,
+        });
 
-      const partNames = [...pendingParts.map(p => p.part_name), ...validNewParts.map(p => p.name)].join(', ');
-      await logPartOrdered(
-        service.code || 'N/A',
-        service.id,
-        partNames,
-        estimatedArrivalFormatted,
-        user?.id
-      );
+        const partNames = [...remainingPendingParts.map(p => p.part_name), ...validNewParts.map(p => p.name)].join(', ');
+        await logPartOrdered(
+          service.code || 'N/A',
+          service.id,
+          partNames,
+          estimatedArrivalFormatted,
+          user?.id
+        );
+
+        toast.success(`Pedido registado! Artigo previsto para ${estimatedArrivalFormatted}.`);
+      } else {
+        // If all parts were deleted and no new ones added, maybe revert to technician state?
+        // For now, just toast and close.
+        toast.info('Nenhum artigo registado.');
+      }
 
       queryClient.invalidateQueries({ queryKey: ['service-parts'] });
       queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
 
-      toast.success(`Pedido registado! Artigo previsto para ${estimatedArrivalFormatted}.`);
       onOpenChange(false);
     } catch (error) {
       console.error('Error confirming part order:', error);
@@ -209,12 +237,21 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             )}
 
             {/* Pending Articles */}
-            {pendingParts.length > 0 && (
+            {pendingParts.filter(p => !deletedRequestedPartIds.includes(p.id)).length > 0 && (
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Artigos Solicitados</Label>
                 <div className="space-y-3">
-                  {pendingParts.map((part) => (
-                    <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group">
+                  {pendingParts.filter(p => !deletedRequestedPartIds.includes(p.id)).map((part) => (
+                    <div key={part.id} className="p-3 bg-muted/30 border rounded-lg relative group/item">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover/item:opacity-100 transition-opacity z-10"
+                        onClick={() => removeRequestedPart(part.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                       <div className="grid grid-cols-12 gap-2">
                         <div className="col-span-2 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
@@ -246,7 +283,6 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                             defaultValue={part.quantity || 1}
                             onChange={(e) => {
                               part.quantity = parseInt(e.target.value) || 1;
-                              // Force re-render of total if needed, but for simplicity we rely on the input's own state
                             }}
                             className="h-8 text-sm text-center px-1"
                           />

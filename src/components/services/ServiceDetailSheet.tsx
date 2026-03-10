@@ -60,6 +60,7 @@ import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceMod
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
+import { CancelPartSelectionModal } from '@/components/modals/CancelPartSelectionModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService, useFullServiceData } from '@/hooks/useServices';
@@ -229,6 +230,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showCancelPartSelectionModal, setShowCancelPartSelectionModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<ServicePayment | null>(null);
@@ -293,7 +295,28 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     .filter((p: any) => !p.is_requested)
     .reduce((sum: number, p: any) => sum + ((p.cost || 0) * (p.quantity || 1)), 0);
 
+  const totalArticlesIVA = serviceParts
+    .filter((p: any) => !p.is_requested)
+    .reduce((sum: number, p: any) => sum + (((p.cost || 0) * (p.quantity || 1)) * ((p.iva_rate || 0) / 100)), 0);
+
   const totalPaidAmount = (servicePayments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0);
+
+  const handleDeletePart = async (partId: string) => {
+    try {
+      const { error } = await supabase
+        .from('service_parts')
+        .delete()
+        .eq('id', partId);
+
+      if (error) throw error;
+
+      toast.success('Pedido de peça cancelado com sucesso');
+      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+    } catch (err) {
+      console.error('Error deleting part:', err);
+      toast.error('Erro ao cancelar pedido de peça');
+    }
+  };
 
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -404,17 +427,41 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         serviceId: service.id,
         actorId: user?.id,
         actionType: 'cancelamento',
-        description: `Serviço ${service.code || ''} desativado/cancelado.`,
+        description: `Serviço ${service.code || ''} cancelado (colocado em standby).`,
         isPublic: true,
       });
 
-      toast.success(`Serviço ${service.code || ''} desativado. Todos os dados foram preservados.`);
+      toast.success(`Serviço ${service.code || ''} cancelado.`);
       setShowCancelDialog(false);
-      setCancelReason('');
       onServiceUpdated?.();
     } catch (error) {
       console.error('Error cancelling service:', error);
-      toast.error('Erro ao desativar o serviço. Tente novamente.');
+      toast.error('Erro ao cancelar o serviço.');
+    }
+  };
+
+  const handleReopenService = async () => {
+    if (!service) return;
+    try {
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'por_fazer',
+        skipToast: true,
+      });
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'inicio_execucao',
+        description: `Serviço ${service.code || ''} reaberto.`,
+        isPublic: true,
+      });
+
+      toast.success(`Serviço ${service.code || ''} reaberto com sucesso.`);
+      onServiceUpdated?.();
+    } catch (error) {
+      console.error('Error reopening service:', error);
+      toast.error('Erro ao reabrir o serviço.');
     }
   };
 
@@ -423,31 +470,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   };
 
   const handleCancelPartOrder = async () => {
-    if (!service) return;
-    try {
-      await updateService.mutateAsync({
-        id: service.id,
-        status: 'para_pedir_peca',
-        skipToast: true,
-      });
-
-      // Also clear estimated_arrival from parts that were waiting
-      const { error } = await supabase
-        .from('service_parts')
-        .update({ estimated_arrival: null })
-        .eq('service_id', service.id)
-        .eq('is_requested', true)
-        .eq('arrived', false);
-
-      if (error) throw error;
-
-      toast.success('Pedido de artigo cancelado. O serviço voltou para "Pedir Peça".');
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
-    } catch (error) {
-      console.error('Error cancelling part order:', error);
-      toast.error('Erro ao cancelar o pedido do artigo.');
-    }
+    setShowCancelPartSelectionModal(true);
   };
 
   return (
@@ -812,9 +835,25 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           <Package className="h-4 w-4 text-orange-600" />
                           <span className="font-medium">{part.part_name}</span>
                         </div>
-                        <Badge className={part.arrived ? "bg-green-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>
-                          {part.arrived ? 'Chegou' : 'Pedida'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className={part.arrived ? "bg-green-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>
+                            {part.arrived ? 'Chegou' : 'Pedida'}
+                          </Badge>
+                          {role === 'owner' && !part.arrived && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                if (window.confirm('Tem a certeza que deseja cancelar este pedido de peça?')) {
+                                  handleDeletePart(part.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -833,6 +872,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       <span className="text-muted-foreground">Subtotal Artigos</span>
                       <span className="font-medium">{(Number(totalArticlesAmount) || 0).toFixed(2)} €</span>
                     </div>
+                    {totalArticlesIVA > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">IVA</span>
+                        <span className="font-medium">{totalArticlesIVA.toFixed(2)} €</span>
+                      </div>
+                    )}
                     {safeNumber(service?.labor_cost) > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Mão de obra</span>
@@ -1045,6 +1090,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
               onCancelPartOrder={(role === 'dono' || role === 'secretaria') ? handleCancelPartOrder : undefined}
               onCancel={(role === 'dono' || role === 'secretaria') && service.status !== 'cancelado' && service.status !== 'finalizado' ? () => setShowCancelDialog(true) : undefined}
+              onReopen={(role === 'dono' || role === 'secretaria') && service.status === 'cancelado' ? handleReopenService : undefined}
             />
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
@@ -1142,6 +1188,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
           if (!open) handleModalSuccess();
         }}
         service={service}
+      />
+
+      <CancelPartSelectionModal
+        open={showCancelPartSelectionModal}
+        onOpenChange={setShowCancelPartSelectionModal}
+        service={service}
+        onSuccess={handleModalSuccess}
       />
 
       <EditServiceDetailsModal

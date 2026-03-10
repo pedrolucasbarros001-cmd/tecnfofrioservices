@@ -32,6 +32,11 @@ const getSignatureDescription = (type: string | null): string => {
   }
 };
 
+const safeNumber = (val: any) => {
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+};
+
 export default function ServicePrintPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
@@ -113,7 +118,7 @@ export default function ServicePrintPage() {
 
   const pricingDetails = useMemo(() => {
     if (!service?.pricing_description) {
-      return { subtotal: service?.labor_cost || 0, iva: service?.parts_cost || 0, hasItemizedPricing: false, items: [] };
+      return { subtotal: service?.parts_cost || 0, iva: 0, hasItemizedPricing: false, items: [] };
     }
 
     try {
@@ -217,7 +222,12 @@ export default function ServicePrintPage() {
   const usedParts = parts.filter(p => !p.is_requested);
   const requestedParts = parts.filter(p => p.is_requested);
   const totalPartsCost = usedParts.reduce((sum, p) => sum + (p.cost || 0) * (p.quantity || 1), 0);
+  const totalPartsIVA = usedParts.reduce((sum, p) => sum + ((p.cost || 0) * (p.quantity || 1) * ((p.iva_rate || 0) / 100)), 0);
   const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  // Use values from service_parts if available, otherwise fallback to pricing_description
+  const displaySubtotal = usedParts.length > 0 ? totalPartsCost : pricingDetails.subtotal;
+  const displayIVA = usedParts.length > 0 ? totalPartsIVA : pricingDetails.iva;
 
   return (
     <div className="print-page">
@@ -461,7 +471,7 @@ export default function ServicePrintPage() {
                   )}
                   <tr className="font-medium">
                     <td colSpan={4} className="py-1 text-right">Subtotal Artigos:</td>
-                    <td className="py-1 text-right">{(pricingDetails.hasItemizedPricing ? pricingDetails.subtotal : totalPartsCost).toFixed(2)} €</td>
+                    <td className="py-1 text-right">{displaySubtotal.toFixed(2)} €</td>
                   </tr>
                 </tbody>
               </table>
@@ -520,16 +530,22 @@ export default function ServicePrintPage() {
             <section className="mb-2">
               <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Resumo Financeiro</h2>
               <div className="grid grid-cols-2 gap-1 text-xs max-w-xs ml-auto">
-                {pricingDetails.subtotal > 0 && (
+                {displaySubtotal > 0 && (
                   <div className="flex justify-between col-span-2">
-                    <span className="text-muted-foreground">Subtotal (s/ IVA):</span>
-                    <span>{pricingDetails.subtotal.toFixed(2)} €</span>
+                    <span className="text-muted-foreground">Subtotal Artigos:</span>
+                    <span>{displaySubtotal.toFixed(2)} €</span>
                   </div>
                 )}
-                {pricingDetails.iva > 0 && (
+                {safeNumber(service?.labor_cost) > 0 && (
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-muted-foreground">Mão de obra:</span>
+                    <span>{safeNumber(service?.labor_cost).toFixed(2)} €</span>
+                  </div>
+                )}
+                {displayIVA > 0 && (
                   <div className="flex justify-between col-span-2">
                     <span className="text-muted-foreground">IVA:</span>
-                    <span>{pricingDetails.iva.toFixed(2)} €</span>
+                    <span>{displayIVA.toFixed(2)} €</span>
                   </div>
                 )}
                 {service.discount && service.discount > 0 && (
