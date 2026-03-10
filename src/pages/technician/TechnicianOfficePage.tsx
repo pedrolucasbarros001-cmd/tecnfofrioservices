@@ -76,9 +76,10 @@ export default function TechnicianOfficePage() {
     refetchOnWindowFocus: true,
   });
 
-  // Handle assuming a service
+  // Handle assuming a service (with double-click guard)
   const handleAssumeService = async (service: Service) => {
-    if (!profile) return;
+    if (!profile || assumingServiceId) return;
+    setAssumingServiceId(service.id);
 
     try {
       // Get technician ID
@@ -108,6 +109,8 @@ export default function TechnicianOfficePage() {
     } catch (error) {
       console.error('Error assuming service:', error);
       toast.error('Erro ao assumir serviço');
+    } finally {
+      setAssumingServiceId(null);
     }
   };
 
