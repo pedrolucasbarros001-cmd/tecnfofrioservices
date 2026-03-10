@@ -57,7 +57,7 @@ export default function TechnicianOfficePage() {
   });
 
   // Query for available services (no technician assigned)
-  const { data: availableServices = [], isLoading: isLoadingAvailable, refetch: refetchAvailable } = useQuery({
+  const { data: availableServices = [], isLoading: isLoadingAvailable } = useQuery({
     queryKey: ['available-workshop-services'],
     queryFn: async () => {
       const { data, error } = await supabase

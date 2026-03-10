@@ -35,7 +35,7 @@ export default function ServicosPage() {
 
   // Use React Query for proper caching and refetch
   const queryClient = useQueryClient();
-  const { data: services = [], isLoading: loading, refetch, error } = useQuery({
+  const { data: services = [], isLoading: loading, error } = useQuery({
     queryKey: ['technician-services', profile?.id],
     queryFn: async () => {
       if (!profile) return [];
