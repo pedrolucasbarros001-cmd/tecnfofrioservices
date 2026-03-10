@@ -124,7 +124,7 @@ export default function OrcamentosPage() {
       if (error) throw error;
       
       toast.success('Orçamento excluído com sucesso!');
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (error) {
       console.error('Error deleting budget:', error);
       toast.error('Erro ao excluir orçamento');
