@@ -369,7 +369,7 @@ export default function OrcamentosPage() {
         open={showConvertModal}
         onOpenChange={setShowConvertModal}
         budget={budgetToConvert}
-        onSuccess={() => refetch()}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
       />
 
       {/* Budget Detail Panel */}
