@@ -60,6 +60,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess }: EditServiceDetailsModalProps) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showRequestPart, setShowRequestPart] = useState(false);
   const [applianceType, setApplianceType] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
