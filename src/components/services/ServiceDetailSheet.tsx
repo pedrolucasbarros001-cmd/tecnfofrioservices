@@ -897,7 +897,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           <Badge className={part.arrived ? "bg-green-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>
                             {part.arrived ? 'Chegou' : 'Pedida'}
                           </Badge>
-                          {role === 'owner' && !part.arrived && (
+                          {role === 'dono' && !part.arrived && (
                             <Button
                               variant="ghost"
                               size="icon"

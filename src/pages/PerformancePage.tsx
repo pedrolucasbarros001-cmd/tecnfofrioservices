@@ -216,6 +216,7 @@ export default function PerformancePage() {
                                   status: service.status as any,
                                   pending_pricing: service.pending_pricing,
                                   final_price: service.final_price ?? 0,
+                                  amount_paid: service.amount_paid ?? 0,
                                   service_location: service.service_location as any,
                                   service_type: service.service_type as any,
                                 }}
