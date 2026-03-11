@@ -453,7 +453,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       // STEP 1: Persist all current form data to the service explicitly (Atomic Save)
       // This ensures that even if status update fails, we didn't lose the diagnostic/products/articles
-      const { error: saveError } = await updateService.mutateAsync({
+      await updateService.mutateAsync({
         id: service.id,
         detected_fault: formData.detectedFault || (service as any).detected_fault,
         brand: formData.productBrand || service.brand,
@@ -462,8 +462,6 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         pnc: formData.productPNC || (service as any).pnc,
         appliance_type: formData.productType || service.appliance_type,
       } as any);
-
-      if (saveError) throw new Error(`Falha ao salvar dados do serviço: ${saveError.message}`);
 
       // STEP 2: Execute Flow-specific Action
       if (signatureType === "pedido_peca") {

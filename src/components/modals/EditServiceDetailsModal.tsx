@@ -12,8 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Package, Plus, Trash2, Wrench, FileText, Check, X, Tag } from 'lucide-react';
+import { Package, Plus, Trash2, Wrench, FileText, Check, X, Tag, ShoppingCart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { AdminPhotoUploadSection } from './AdminPhotoUploadSection';
+import { RequestPartModal } from './RequestPartModal';
 import { cn } from '@/lib/utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,6 +60,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess }: EditServiceDetailsModalProps) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showRequestPart, setShowRequestPart] = useState(false);
   const [applianceType, setApplianceType] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
@@ -301,6 +304,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
   if (!service) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden p-0 bg-gray-50">
         <div className="px-6 pt-6 pb-4 flex-shrink-0 bg-white border-b">
@@ -503,5 +507,14 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
         </div>
       </DialogContent>
     </Dialog>
+
+    {showRequestPart ? (
+      <RequestPartModal
+        service={service}
+        open={showRequestPart}
+        onOpenChange={setShowRequestPart}
+      />
+    ) : null}
+    </>
   );
 }

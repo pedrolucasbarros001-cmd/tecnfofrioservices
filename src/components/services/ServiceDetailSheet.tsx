@@ -344,7 +344,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         // service held before the part request, falling back to current
         // status if we don't know.  This keeps the financial axis
         // untouched and avoids hardcoding 'por_fazer'.
-        const newStatus = service.last_status_before_part_request || service.status;
+        const newStatus = (service.last_status_before_part_request || service.status) as ServiceStatus;
         await updateService.mutateAsync({
           id: service.id,
           status: newStatus,
@@ -897,7 +897,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                           <Badge className={part.arrived ? "bg-green-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>
                             {part.arrived ? 'Chegou' : 'Pedida'}
                           </Badge>
-                          {role === 'owner' && !part.arrived && (
+                          {role === 'dono' && !part.arrived && (
                             <Button
                               variant="ghost"
                               size="icon"

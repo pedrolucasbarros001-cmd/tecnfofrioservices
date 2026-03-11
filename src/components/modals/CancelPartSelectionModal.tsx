@@ -96,7 +96,7 @@ export function CancelPartSelectionModal({ service, open, onOpenChange, onSucces
                 // service's operational status if we have it, otherwise fall
                 // back to the current status.  Hardcoding 'por_fazer' breaks
                 // flows where the tech had already progressed (e.g. na_oficina).
-                const restored = service.last_status_before_part_request || service.status;
+                const restored = (service.last_status_before_part_request || service.status) as import('@/types/database').ServiceStatus;
                 await updateService.mutateAsync({
                     id: service.id,
                     status: restored,
