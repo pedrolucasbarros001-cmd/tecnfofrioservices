@@ -109,7 +109,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       customer_nif: '',
       customer_email: '',
       items: [
-        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'part' },
+        { name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, type: 'part' },
       ],
       discount_value: 0,
       discount_type: 'fixed' as const,
@@ -612,7 +612,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'part' })}
+                      onClick={() => append({ name: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, type: 'part' })}
                       className="w-full"
                     >
                       <Plus className="h-4 w-4 mr-2" />

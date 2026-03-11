@@ -141,7 +141,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
       code: p.part_code,
       qty: p.quantity,
       price: p.cost,
-      tax: p.iva_rate || 23
+      tax: p.iva_rate ?? 0
     }));
 
   // Print content component - rendered via portal

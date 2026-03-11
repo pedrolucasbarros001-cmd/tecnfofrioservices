@@ -108,7 +108,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     articles: [],
     discountValue: "",
     discountType: "euro",
-    taxRate: 23,
+    taxRate: 0,
     articlesLocked: false,
     needsPartOrder: false,
     partsToOrder: [],
@@ -177,7 +177,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       } else {
         setCurrentStep(mode === "continuacao_peca" ? "resumo_continuacao" : "resumo");
       }
-      setFormData(prev => ({ ...prev, articles: [], discountValue: "", discountType: "euro" as const, taxRate: 23, articlesLocked: false, ...savedState.formData }));
+      setFormData(prev => ({ ...prev, articles: [], discountValue: "", discountType: "euro" as const, taxRate: 0, articlesLocked: false, ...savedState.formData }));
       return;
     }
 
@@ -462,7 +462,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             cost: article.unit_price,
             is_requested: false,
             arrived: true,
-            iva_rate: formData.taxRate ?? 23,
+            iva_rate: formData.taxRate ?? 0,
             registered_by: user?.id || null,
             registered_location: "oficina",
           });
@@ -514,7 +514,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       articles: [],
       discountValue: "",
       discountType: "euro",
-      taxRate: 23,
+      taxRate: 0,
       articlesLocked: false,
       needsPartOrder: false,
       partsToOrder: [],

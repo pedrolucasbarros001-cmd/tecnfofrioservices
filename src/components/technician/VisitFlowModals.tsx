@@ -127,7 +127,7 @@ const INITIAL_FORM_DATA: VisitFormData = {
   articles: [],
   discountValue: "",
   discountType: "euro",
-  taxRate: 23,
+  taxRate: 0,
   articlesLocked: false,
   needsPartOrder: false,
   partsToOrder: [],

@@ -65,23 +65,23 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
             details: it.details || '',
             qty: it.qty || 1,
             price: it.price || 0,
-            tax: it.tax ?? 23,
+            tax: it.tax ?? 0,
             type: it.type || 'part',
           })));
         } else {
-          setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
+          setItems([{ description: '', details: '', qty: 1, price: 0, tax: 0, type: 'part' }]);
         }
         setDiscountValue(parsed.discountValue || parsed.discount || 0);
         setDiscountType(parsed.discountType === 'percent' ? 'percent' : 'euro');
       } catch {
-        setItems([{ description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
+        setItems([{ description: '', details: '', qty: 1, price: 0, tax: 0, type: 'part' }]);
         setDiscountValue(0);
         setDiscountType('euro');
       }
     }
   }, [open, budget]);
 
-  const addItem = () => setItems(prev => [...prev, { description: '', details: '', qty: 1, price: 0, tax: 23, type: 'part' }]);
+  const addItem = () => setItems(prev => [...prev, { description: '', details: '', qty: 1, price: 0, tax: 0, type: 'part' }]);
   const removeItem = (index: number) => setItems(prev => prev.filter((_, i) => i !== index));
   const updateItem = (index: number, field: keyof BudgetItem, value: any) => {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));

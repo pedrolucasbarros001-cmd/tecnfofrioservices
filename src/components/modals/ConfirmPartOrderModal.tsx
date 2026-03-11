@@ -85,7 +85,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
     if (open) {
       setSupplier('');
       setCost('');
-      setIvaRate('23');
+      setIvaRate('0');
       setPartReference('');
       setNotes('');
       setNewParts([]);
@@ -139,7 +139,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
             .update({
               estimated_arrival: estimatedArrival,
               cost: part.cost ? parseCurrencyInput(part.cost.toString()) : null,
-              iva_rate: 23,
+              iva_rate: 0,
               part_code: part.part_code,
               part_name: part.part_name,
               quantity: part.quantity,
@@ -165,7 +165,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
               arrived: false,
               estimated_arrival: estimatedArrival,
               cost: (p as any).value ? parseCurrencyInput((p as any).value.toString()) : null,
-              iva_rate: 23,
+              iva_rate: 0,
             }))
           );
         if (insertError) throw insertError;

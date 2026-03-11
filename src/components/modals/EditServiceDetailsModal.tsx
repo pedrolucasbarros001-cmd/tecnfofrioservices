@@ -135,7 +135,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
               description: item.desc || '',
               quantity: item.qty || 1,
               unit_price: item.price || 0,
-              tax_rate: item.tax_rate || item.tax || 23,
+              tax_rate: item.tax_rate ?? item.tax ?? 0,
             }));
           }
           if (parsed.discount) existingDiscount = parsed.discount;
@@ -151,7 +151,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
             description: p.part_name || '',
             quantity: p.quantity || 1,
             unit_price: p.cost || 0,
-            tax_rate: p.iva_rate || 23,
+            tax_rate: p.iva_rate ?? 0,
           }));
         } else {
           const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
@@ -161,7 +161,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
               description: 'Serviço',
               quantity: 1,
               unit_price: existingPrice,
-              tax_rate: 23,
+              tax_rate: 0,
             }];
           }
         }

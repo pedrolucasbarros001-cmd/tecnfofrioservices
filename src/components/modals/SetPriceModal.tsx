@@ -110,7 +110,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               description: item.desc || '',
               quantity: item.qty || 1,
               unit_price: item.price || 0,
-              tax_rate: item.tax_rate || item.tax || 23,
+              tax_rate: item.tax_rate ?? item.tax ?? 0,
             }));
           }
           if (parsed.discount) {
@@ -132,7 +132,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
             description: p.part_name || '',
             quantity: p.quantity || 1,
             unit_price: p.cost || 0,
-            tax_rate: p.iva_rate || 23,
+            tax_rate: p.iva_rate ?? 0,
           }));
         } else {
           const existingPrice = (service.labor_cost || 0) + (service.parts_cost || 0);
@@ -142,7 +142,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
               description: 'Serviço',
               quantity: 1,
               unit_price: existingPrice,
-              tax_rate: 23,
+              tax_rate: 0,
             }];
           }
         }
