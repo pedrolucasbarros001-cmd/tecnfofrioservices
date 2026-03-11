@@ -538,10 +538,6 @@ export default function GeralPage() {
                           {service.is_warranty && (
                             <Badge variant={"subtle-warranty" as any} className="text-xs">Garantia</Badge>
                           )}
-                          {(service.final_price || 0) > 0 &&
-                            (service.amount_paid || 0) < (service.final_price || 0) && (
-                              <Badge variant={"subtle-debit" as any} className="text-xs">Em Débito</Badge>
-                            )}
                         </div>
                       </TableCell>
 

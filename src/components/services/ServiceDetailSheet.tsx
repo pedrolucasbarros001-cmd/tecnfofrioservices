@@ -624,20 +624,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                   </Badge>
                 )}
 
-                {/* A Precificar - gerido pelo ServiceStatusBadge acima */}
-
-                {/* Em Débito - indica débito coexistente */}
-                {(() => {
-                  const hasDebt =
-                    service.status !== 'cancelado' &&
-                    (service.final_price || 0) > 0 &&
-                    (service.amount_paid || 0) < (service.final_price || 0);
-                  return hasDebt ? (
-                    <Badge className="bg-red-500 text-white">
-                      Em Débito
-                    </Badge>
-                  ) : null;
-                })()}
               </div>
 
               {/* Customer Info */}
