@@ -470,12 +470,13 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }
 
       // If price was already set by central (admin/secretary) before execution,
-      // skip the pricing step and go directly to em_debito.
+      // we still mark as concluidos (operational state). Financial debt is derived
+      // in the UI via ServiceStatusBadge/isServiceInDebit, not stored as status.
       const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
 
       const { error: rpcError } = await technicianUpdateService({
         serviceId: service.id,
-        status: hasPricingPreDefined ? 'em_debito' : 'concluidos',
+        status: 'concluidos', // Always operational status; debt is derived from final_price vs amount_paid
         pendingPricing: hasPricingPreDefined ? false : true,
         detectedFault: formData.detectedFault || null,
         workPerformed: finalWorkPerformed,
@@ -492,7 +493,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
       clearState();
       saveStateToDb(null as any);
-      toast.success(hasPricingPreDefined ? `${service.code} concluído! Serviço em débito.` : `${service.code} concluído! Aguarda precificação.`);
+      toast.success(hasPricingPreDefined ? `${service.code} concluído! Verifica débito em portal.` : `${service.code} concluído! Aguarda precificação.`);
       onComplete();
     } catch (error) {
       console.error("Error completing repair:", error);

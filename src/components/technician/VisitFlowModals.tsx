@@ -569,7 +569,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
         await updateService.mutateAsync({
           id: service.id,
-          status: hasPricingPreDefined ? "em_debito" : "concluidos",
+          status: 'concluidos', // Always operational status; debt is derived from final_price vs amount_paid
           pending_pricing: !hasPricingPreDefined,
           work_performed: mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente",
           last_status_before_part_request: null,

@@ -29,7 +29,7 @@ const getImpactWarnings = (fromStatus: ServiceStatus, toStatus: ServiceStatus): 
 
   // If going back to earlier statuses from completed states
   if (['por_fazer', 'em_execucao', 'na_oficina'].includes(toStatus) &&
-    ['concluidos', 'em_debito', 'finalizado'].includes(fromStatus)) {
+    ['concluidos', 'finalizado'].includes(fromStatus)) {
     warnings.push('O serviço será reaberto e poderá requerer novo agendamento.');
     warnings.push('O técnico verá este serviço novamente na sua lista de trabalho.');
   }
@@ -37,7 +37,7 @@ const getImpactWarnings = (fromStatus: ServiceStatus, toStatus: ServiceStatus): 
   // If jumping directly to finalizado
   if (toStatus === 'finalizado') {
     warnings.push('O serviço será marcado como entregue ao cliente.');
-    if (fromStatus !== 'concluidos' && fromStatus !== 'em_debito') {
+    if (fromStatus !== 'concluidos') {
       warnings.push('Etapas intermediárias serão ignoradas (precificação, pagamento, entrega).');
     }
   }
@@ -54,7 +54,7 @@ const getImpactWarnings = (fromStatus: ServiceStatus, toStatus: ServiceStatus): 
   }
 
   // If going to concluidos
-  if (toStatus === 'concluidos' && !['a_precificar', 'em_debito'].includes(fromStatus)) {
+  if (toStatus === 'concluidos' && fromStatus !== 'a_precificar') {
     warnings.push('O serviço será marcado como concluído e pronto para entrega.');
   }
 

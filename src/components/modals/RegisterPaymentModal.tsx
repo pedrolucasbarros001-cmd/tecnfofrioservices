@@ -127,23 +127,20 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       const newAmountPaid = totalPaid + paymentValue;
       const isPaidInFull = newAmountPaid >= (finalPrice - 0.01);
 
-      let newStatus: ServiceStatus | undefined;
-
-      if (isPaidInFull) {
-        const isWorkshop = service.service_location === 'oficina';
-        if (isWorkshop) {
-          newStatus = 'concluidos';
-        } else {
-          newStatus = 'finalizado';
-        }
-      }
-
+      // The payment step should *not* automatically advance the
+      // operational status.  Closing out a debt is a financial change
+      // only; the technician/secretary should explicitly finalize or
+      // complete the service elsewhere if desired.  Previous behaviour
+      // caused invoices to mark services finished before the technician
+      // had actually packed/handed over the appliance.
       await updateService.mutateAsync({
         id: service.id,
         amount_paid: newAmountPaid,
-        ...(newStatus && { status: newStatus }),
         skipToast: true,
       });
+
+      // NOTE: if you want to transition the service after payment, call
+      // a separate handler such as `handleFinalizeServiceAfterPayment()`.
 
       await logPayment(
         service.code || 'N/A',

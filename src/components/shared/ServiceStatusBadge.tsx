@@ -4,8 +4,26 @@ import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types
 import { cn } from '@/lib/utils';
 
 interface ServiceStatusBadgeProps {
-    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type'>;
+    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type' | 'amount_paid'>;
     className?: string;
+}
+
+// helpers exposed for other components that need the same derived logic
+export function computeNeedsPricing(service: Pick<Service, 'status' | 'pending_pricing' | 'final_price'>) {
+    return (
+        !service.status ||
+        service.status !== 'cancelado' &&
+        service.pending_pricing === true &&
+        (service.final_price ?? 0) === 0
+    );
+}
+
+export function computeIsDebt(service: Pick<Service, 'status' | 'final_price' | 'amount_paid'>) {
+    return (
+        service.status !== 'cancelado' &&
+        (service.final_price ?? 0) > 0 &&
+        (service.amount_paid ?? 0) < (service.final_price ?? 0)
+    );
 }
 
 /**
@@ -18,25 +36,23 @@ interface ServiceStatusBadgeProps {
  */
 export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatusBadgeProps>(
     ({ service, className }, ref) => {
-        const isClientSideRepair =
-            service.status === 'concluidos' &&
-            (service.service_location === 'cliente' || (service.service_type as string) === 'visita');
-
-        const statusConfig = {
-            ...(SERVICE_STATUS_CONFIG[service.status as ServiceStatus]
-                ?? { label: service.status, color: 'bg-muted text-muted-foreground' }),
-            ...(isClientSideRepair ? { label: 'Concluído' } : {}),
+        // primary operational badge
+        const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus] || {
+            label: service.status,
+            color: 'bg-muted text-muted-foreground',
         };
 
+        // derive extra flags independently of status
         const needsPricing =
-            service.status !== 'cancelado' && service.pending_pricing === true && (service.final_price ?? 0) === 0;
+            !service.status ||
+            service.status !== 'cancelado' &&
+            service.pending_pricing === true &&
+            (service.final_price ?? 0) === 0;
 
-        const isDebtState =
+        const isDebt =
             service.status !== 'cancelado' &&
             (service.final_price ?? 0) > 0 &&
-            service.status !== 'finalizado' &&
-            service.status !== 'em_debito' &&
-            (service.status === 'em_espera_de_peca' || service.status === 'para_pedir_peca');
+            (service.amount_paid ?? 0) < (service.final_price ?? 0);
 
         return (
             <span ref={ref} className={cn('inline-flex flex-wrap items-center gap-1', className)}>
@@ -48,7 +64,7 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                         Orçamentar
                     </Badge>
                 )}
-                {isDebtState && (
+                {isDebt && (
                     <Badge className="text-xs bg-red-100 text-red-700 border border-red-300">
                         Em Débito
                     </Badge>

@@ -70,6 +70,10 @@ export default function GeralPage() {
   useEffect(() => {
     try {
       const statusParam = searchParams.get('status') as any;
+      // Note: 'em_debito' is a derived filter that is supported for backwards compatibility
+      // when passed as a URL param. The hook will fetch all services and then client-filter
+      // them based on final_price vs amount_paid. The UI displays debt via ServiceStatusBadge.
+      // 'em_debito' should never be written as a status; it remains a read-only derived flag.
       const validStatuses: (ServiceStatus | 'all')[] = [
         'all', 'por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca',
         'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'
@@ -534,8 +538,7 @@ export default function GeralPage() {
                           {service.is_warranty && (
                             <Badge variant={"subtle-warranty" as any} className="text-xs">Garantia</Badge>
                           )}
-                          {service.status !== 'em_debito' &&
-                            (service.final_price || 0) > 0 &&
+                          {(service.final_price || 0) > 0 &&
                             (service.amount_paid || 0) < (service.final_price || 0) && (
                               <Badge variant={"subtle-debit" as any} className="text-xs">Em Débito</Badge>
                             )}

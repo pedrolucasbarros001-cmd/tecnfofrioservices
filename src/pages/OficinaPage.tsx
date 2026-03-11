@@ -32,9 +32,16 @@ export default function OficinaPage() {
   }, [queryClient]);
 
   const filteredServices = useMemo(() => {
-    if (!searchTerm.trim()) return services;
+    // Only show services that are NOT yet concluded (still being repaired)
+    // Once repaired, status becomes 'concluidos' (Oficina Reparados) and
+    // they should disappear from this view
+    const notConcluded = services.filter(s => 
+      !['concluidos', 'finalizado', 'cancelado'].includes(s.status)
+    );
+
+    if (!searchTerm.trim()) return notConcluded;
     const term = searchTerm.toLowerCase();
-    return services.filter(s =>
+    return notConcluded.filter(s =>
       s.code?.toLowerCase().includes(term) ||
       s.customer?.name?.toLowerCase().includes(term) ||
       s.appliance_type?.toLowerCase().includes(term) ||

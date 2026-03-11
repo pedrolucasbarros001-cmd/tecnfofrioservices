@@ -86,7 +86,7 @@ export default function PerfilPage() {
         .from('services')
         .select('*', { count: 'exact', head: true })
         .eq('technician_id', technicianData.id)
-        .in('status', ['concluido', 'em_debito', 'finalizado'])
+        .in('status', ['concluidos', 'finalizado'])
         .gte('updated_at', startOfCurrentMonth);
 
       // Servicos ativos

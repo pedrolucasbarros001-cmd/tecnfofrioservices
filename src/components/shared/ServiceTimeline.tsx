@@ -15,37 +15,37 @@ const getTimelineSteps = (service: Service) => {
 
   if (isDelivery) {
     return [
-      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'in_progress', label: 'Em Curso', icon: Truck, status: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'done', label: 'Entregue', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
+      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'finalizado'] },
+      { id: 'in_progress', label: 'Em Curso', icon: Truck, status: ['em_execucao', 'concluidos', 'finalizado'] },
+      { id: 'done', label: 'Entregue', icon: Check, status: ['concluidos', 'finalizado'] },
       { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
   if (isInstallation) {
     return [
-      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'in_progress', label: 'Instalação', icon: Wrench, status: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'done', label: 'Concluído', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
+      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'concluidos', 'finalizado'] },
+      { id: 'in_progress', label: 'Instalação', icon: Wrench, status: ['em_execucao', 'concluidos', 'finalizado'] },
+      { id: 'done', label: 'Concluído', icon: Check, status: ['concluidos', 'finalizado'] },
       { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
   if (isWorkshop) {
     return [
-      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'workshop', label: 'Oficina', icon: Package, status: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'repair', label: 'Reparação', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'em_debito', 'finalizado'] },
+      { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { id: 'workshop', label: 'Oficina', icon: Package, status: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { id: 'repair', label: 'Reparação', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { id: 'done', label: 'Reparado', icon: Check, status: ['concluidos', 'finalizado'] },
       { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
     ];
   }
 
   // Visit service
   return [
-    { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-    { id: 'visit', label: 'Visita', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-    { id: 'done', label: 'Concluído', icon: Check, status: ['a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
+    { id: 'created', label: 'Criado', icon: Check, status: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+    { id: 'visit', label: 'Visita', icon: Wrench, status: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+    { id: 'done', label: 'Concluído', icon: Check, status: ['a_precificar', 'concluidos', 'finalizado'] },
     { id: 'finished', label: 'Concluído', icon: Check, status: ['finalizado'] },
   ];
 };
@@ -174,9 +174,6 @@ export function NextStepIndicator({ service, className }: NextStepIndicatorProps
           return { label: 'Próximo passo', action: 'Definir entrega' };
         }
         return { label: 'Próximo passo', action: 'Finalizar serviço' };
-      
-      case 'em_debito':
-        return { label: 'Próximo passo', action: 'Registar pagamento' };
       
       case 'finalizado':
         return null;

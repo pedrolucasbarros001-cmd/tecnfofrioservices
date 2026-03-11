@@ -92,13 +92,18 @@ export function CancelPartSelectionModal({ service, open, onOpenChange, onSucces
             // 3. Check if all parts were cancelled
             const remainingPartsCount = orderedParts.length - selectedPartIds.length;
             if (remainingPartsCount === 0) {
-                // Revert service status to 'por_fazer' (Aberto)
+                // When all requested parts are cancelled we should restore the
+                // service's operational status if we have it, otherwise fall
+                // back to the current status.  Hardcoding 'por_fazer' breaks
+                // flows where the tech had already progressed (e.g. na_oficina).
+                const restored = service.last_status_before_part_request || service.status;
                 await updateService.mutateAsync({
                     id: service.id,
-                    status: 'por_fazer',
+                    status: restored,
+                    last_status_before_part_request: null,
                     skipToast: true,
                 });
-                toast.success('Todos os artigos cancelados. O serviço voltou para "Aberto".');
+                toast.success('Todos os artigos cancelados. Estado operacional restaurado.');
             } else {
                 toast.success(`${selectedPartIds.length} artigo(s) cancelado(s) com sucesso.`);
             }

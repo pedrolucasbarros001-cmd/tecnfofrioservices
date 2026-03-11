@@ -93,8 +93,8 @@ function mapStatus(
     if (p.includes("pago") && !p.includes("não") && !p.includes("nao")) {
       return { status: "finalizado", service_location: "cliente", amount_paid_equals_final: true, final_price_zero: false };
     }
-    // "Não Pago" on concluded = em_debito
-    return { status: "em_debito", service_location: "cliente", amount_paid_equals_final: false, final_price_zero: false };
+    // "Não Pago" on concluded: use concluidos and let UI derive debt from financial data
+    return { status: "concluidos", service_location: "cliente", amount_paid_equals_final: false, final_price_zero: false };
   }
   if (e.includes("recusada") || e.includes("cancelada")) {
     return { status: "finalizado", service_location: "cliente", amount_paid_equals_final: false, final_price_zero: true };

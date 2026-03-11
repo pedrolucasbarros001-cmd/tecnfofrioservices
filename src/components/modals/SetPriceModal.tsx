@@ -211,21 +211,11 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     // Determine next status:
     // - a_precificar: oficina que precisa de preço
     // - concluidos + pending_pricing: visita/entrega concluída que aguarda preço
-    // Both go to em_debito after pricing is confirmed (or finalizado if warranty)
-    const needsPricingConfirmation =
-      currentStatus === 'a_precificar' ||
-      (currentStatus === 'concluidos' && service.pending_pricing === true);
-
-    let newStatus: ServiceStatus | undefined;
-
-    if (needsPricingConfirmation) {
-      if (warrantyCoversAll) {
-        newStatus = isClientLocation ? 'finalizado' : 'concluidos';
-      } else {
-        newStatus = 'em_debito';
-      }
-    }
-
+    // The pricing form is purely a financial update. It MUST never
+    // drive the operational "status" axis by itself. Services remain in
+    // their operational state; financial debt is derived in the UI from
+    // final_price vs amount_paid. Any status transition logic should be
+    // in a dedicated handler/server‑side RPC, not embedded in the form.
     await updateService.mutateAsync({
       id: service.id,
       labor_cost: combinedSubtotal,
@@ -234,9 +224,13 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       final_price: finalPrice,
       pricing_description: JSON.stringify(pricingData),
       pending_pricing: false,
-      ...(newStatus && { status: newStatus }),
       skipToast: true,
     });
+
+    // NOTE: if an explicit operational transition is required after
+    // pricing, invoke it separately (e.g. markServiceFinalized RPC).
+    // Doing so keeps the axes orthogonal and prevents collisions.
+
 
     await logPricingSet(
       service.code || 'N/A',

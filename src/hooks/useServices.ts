@@ -41,6 +41,8 @@ export function useServices(options: UseServicesOptions = {}) {
 
       if (status === 'pending_pricing') {
         query = query.eq('pending_pricing', true);
+      } else if (status === 'em_debito') {
+        // special derived filter: handled after fetch
       } else if (status !== 'all') {
         query = query.eq('status', status);
       }
@@ -56,7 +58,13 @@ export function useServices(options: UseServicesOptions = {}) {
       const { data, error } = await query.limit(200);
 
       if (error) throw error;
-      return (data as unknown as Service[]) || [];
+      let services = (data as unknown as Service[]) || [];
+      if (status === 'em_debito') {
+        services = services.filter(s =>
+          (s.final_price ?? 0) > 0 && (s.amount_paid ?? 0) < (s.final_price ?? 0)
+        );
+      }
+      return services;
     },
     // Realtime handles updates — no polling needed
   });
@@ -184,6 +192,8 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
 
       if (status === 'pending_pricing') {
         baseQuery = baseQuery.eq('pending_pricing', true);
+      } else if (status === 'em_debito') {
+        // leave baseQuery unfiltered; we will filter results below
       } else if (status !== 'all') {
         baseQuery = baseQuery.eq('status', status);
       }
@@ -314,8 +324,8 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
 
         if (status === 'pending_pricing') {
           paginatedQuery = paginatedQuery.eq('pending_pricing', true);
-        } else if (status !== 'all') {
-          paginatedQuery = paginatedQuery.eq('status', status);
+        } else if (status === 'em_debito') {
+            // no filter here, we'll post-process below
         }
 
         if (location !== 'all') {
@@ -330,7 +340,15 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         if (error) throw error;
 
         allServices = (data as unknown as Service[]) || [];
-        totalCount = count || 0;
+        // apply derived debt filter after retrieval when requested
+        if (status === 'em_debito') {
+          allServices = allServices.filter(s =>
+            (s.final_price ?? 0) > 0 && (s.amount_paid ?? 0) < (s.final_price ?? 0)
+          );
+          totalCount = allServices.length;
+        } else {
+          totalCount = count || 0;
+        }
       }
 
       return {
@@ -379,7 +397,32 @@ export function useUpdateService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, skipToast, shouldSelect = true, ...updates }: Partial<Service> & { id: string; skipToast?: boolean; shouldSelect?: boolean }) => {
+    mutationFn: async ({ id, skipToast, shouldSelect = true, ...updates }: Partial<Service> & { id: string; skipToast?: boolean; shouldSelect?: boolean }) => {      // guard: financial updates should not carry an unrelated status change
+      // Define which financial fields should NEVER accompany a status
+      // mutation.  `pending_pricing` is intentionally omitted since there
+      // are legitimate business rules where both properties are updated
+      // together (e.g. service completion that marks status=a_precificar
+      // *and* pending_pricing=true).  Other fields like final_price or
+      // amount_paid belong strictly to the financial axis and must not
+      // drag the operational status along with them.
+      const financialKeysPreventingStatus = [
+        'final_price',
+        'labor_cost',
+        'parts_cost',
+        'discount',
+        'pricing_description',
+        'amount_paid',
+      ];
+      if (
+        updates.status &&
+        Object.keys(updates).some(k => financialKeysPreventingStatus.includes(k))
+      ) {
+        console.warn(
+          '[useUpdateService] Dropping status because unrelated financial fields are present',
+          updates
+        );
+        delete (updates as any).status;
+      }
       const query = supabase
         .from('services')
         .update(updates as any)

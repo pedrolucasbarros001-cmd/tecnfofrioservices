@@ -214,17 +214,9 @@ export function StateActionButtons({
         return null;
       }
 
-      case 'em_debito':
-        if ((isDono || isSecretaria) && onRegisterPayment) {
-          return {
-            label: 'Registar Pagamento',
-            icon: CreditCard,
-            onClick: onRegisterPayment,
-            className: primaryButtonClass,
-          };
-        }
-        return null;
-
+      // 'em_debito' is no longer an actual status stored in the database.
+      // actions that were previously shown for it are handled by the
+      // 'concluidos' branch using the `isServiceInDebit` flag above.
       default:
         return null;
     }

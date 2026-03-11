@@ -233,13 +233,15 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
           work_performed: workPerformed || null,
           notes: notes || null,
 
-          // Pricing Updates
+          // Pricing Updates (financial axis only)
           pricing_description: JSON.stringify(pricingData),
           parts_cost: subtotal,
           labor_cost: 0,
           discount: discountAmount,
           final_price: finalValForDB,
-          status: amountPaid < finalValForDB && (service.status === 'finalizado' || service.status === 'em_debito') ? 'em_debito' : service.status
+          // NOTE: we deliberately avoid touching `status` here.  The
+          // service should remain in whatever operational state the
+          // technician left it, even if the admin increases the price.
         })
         .eq('id', service.id);
 

@@ -164,7 +164,13 @@ interface ServiceDetailSheetProps {
   onServiceUpdated?: () => void;
 }
 
-// Helper function to get relevant progress steps based on service type
+// Helper function to get relevant progress steps based on service type.  **operational states only**
+//
+// The UI used to include `'em_debito'` in the arrays below, which encouraged
+// writing that value back to the database.  debt is now a *derived* flag that
+// is shown by `ServiceStatusBadge` and should never be pushed as a status.  We
+// keep the old label around for colouring, but the progress steps themselves
+// are strictly about workflow.
 const getServiceProgressSteps = (service: Service) => {
   const isWorkshop = service.service_location === 'oficina';
   const isDelivery = service.service_type === 'entrega';
@@ -172,37 +178,37 @@ const getServiceProgressSteps = (service: Service) => {
 
   if (isDelivery) {
     return [
-      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Em Curso', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Entregue', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'finalizado'] },
+      { label: 'Em Curso', statuses: ['em_execucao', 'concluidos', 'finalizado'] },
+      { label: 'Entregue', statuses: ['concluidos', 'finalizado'] },
       { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
   if (isInstallation) {
     return [
-      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Instalação', statuses: ['em_execucao', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'concluidos', 'finalizado'] },
+      { label: 'Instalação', statuses: ['em_execucao', 'concluidos', 'finalizado'] },
+      { label: 'Concluído', statuses: ['concluidos', 'finalizado'] },
       { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
   if (isWorkshop) {
     return [
-      { label: 'Criado', statuses: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Oficina', statuses: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Reparação', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-      { label: 'Reparado', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+      { label: 'Criado', statuses: ['por_fazer', 'na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { label: 'Oficina', statuses: ['na_oficina', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { label: 'Reparação', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+      { label: 'Reparado', statuses: ['concluidos', 'finalizado'] },
       { label: 'Concluído', statuses: ['finalizado'] },
     ];
   }
 
   // Visit service (default)
   return [
-    { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-    { label: 'Visita', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'em_debito', 'finalizado'] },
-    { label: 'Concluído', statuses: ['concluidos', 'em_debito', 'finalizado'] },
+    { label: 'Criado', statuses: ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+    { label: 'Visita', statuses: ['em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'a_precificar', 'concluidos', 'finalizado'] },
+    { label: 'Concluído', statuses: ['concluidos', 'finalizado'] },
     { label: 'Concluído', statuses: ['finalizado'] },
   ];
 };
@@ -334,13 +340,18 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       );
 
       if (remainingPendingParts.length === 0) {
-        // Revert service status to 'por_fazer' (Aberto)
+        // No more pending parts; restore whatever operational state the
+        // service held before the part request, falling back to current
+        // status if we don't know.  This keeps the financial axis
+        // untouched and avoids hardcoding 'por_fazer'.
+        const newStatus = service.last_status_before_part_request || service.status;
         await updateService.mutateAsync({
           id: service.id,
-          status: 'por_fazer',
+          status: newStatus,
+          last_status_before_part_request: null,
           skipToast: true,
         });
-        toast.success(`Artigo "${partName}" cancelado. O serviço voltou para "Aberto".`);
+        toast.success(`Artigo "${partName}" cancelado. Estado operacional restaurado.`);
       } else {
         toast.success(`Pedido do artigo "${partName}" cancelado.`);
       }
@@ -413,6 +424,9 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
+  // Operational transition initiated by owner/admin: mark the
+  // service as finished. This touches only the status axis; no
+  // financial field is modified here.
   const handleFinalize = async () => {
     if (!service) return;
     try {
@@ -452,6 +466,10 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const handleCancelService = async () => {
     if (!service) return;
     try {
+      // cancellation is an operational decision, but we also clear the
+      // financial flag `pending_pricing` because a cancelled job should
+      // never appear in the pricing queue. This is a legitimate axis
+      // crossover with explicit business intent, not a side effect.
       await updateService.mutateAsync({
         id: service.id,
         status: 'cancelado',
@@ -609,13 +627,17 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 {/* A Precificar - gerido pelo ServiceStatusBadge acima */}
 
                 {/* Em Débito - indica débito coexistente */}
-                {service.status !== 'em_debito' &&
-                  (service.final_price || 0) > 0 &&
-                  (service.amount_paid || 0) < (service.final_price || 0) && (
+                {(() => {
+                  const hasDebt =
+                    service.status !== 'cancelado' &&
+                    (service.final_price || 0) > 0 &&
+                    (service.amount_paid || 0) < (service.final_price || 0);
+                  return hasDebt ? (
                     <Badge className="bg-red-500 text-white">
                       Em Débito
                     </Badge>
-                  )}
+                  ) : null;
+                })()}
               </div>
 
               {/* Customer Info */}

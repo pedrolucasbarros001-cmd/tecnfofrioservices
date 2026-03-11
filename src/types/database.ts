@@ -14,6 +14,12 @@ export type ServiceStatus =
   | 'em_espera_de_peca'
   | 'a_precificar'
   | 'concluidos'
+  /**
+   * @deprecated financial flag derived from final_price/amount_paid.
+   * Keep for backwards compatibility but avoid writing this value.
+   * Services should remain in their operational state and the UI
+   * determines "em débito" by data, not status.
+   */
   | 'em_debito'
   | 'finalizado'
   | 'cancelado';
