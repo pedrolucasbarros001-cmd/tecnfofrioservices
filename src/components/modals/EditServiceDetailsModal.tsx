@@ -506,5 +506,14 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
         </div>
       </DialogContent>
     </Dialog>
+
+    {showRequestPart ? (
+      <RequestPartModal
+        service={service}
+        open={showRequestPart}
+        onOpenChange={setShowRequestPart}
+      />
+    ) : null}
+    </>
   );
 }
