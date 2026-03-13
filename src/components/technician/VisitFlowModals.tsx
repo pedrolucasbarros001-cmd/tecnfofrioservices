@@ -563,11 +563,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
 
         // Final Status Update (Transaction Phase 2)
-        const hasPricingPreDefined = !!(service.pricing_description && service.pending_pricing === false);
+        // On-site repairs: no physical delivery needed, so skip 'concluidos' (Oficina Reparados)
+        const hasPricingPreDefined = !!((service.final_price || 0) > 0);
+        const isFullyPaid = hasPricingPreDefined && (service.amount_paid || 0) >= (service.final_price || 0);
+        const finalStatus = isFullyPaid ? 'finalizado' : 'a_precificar';
 
         await updateService.mutateAsync({
           id: service.id,
-          status: 'concluidos', // Always operational status; debt is derived from final_price vs amount_paid
+          status: finalStatus,
           pending_pricing: !hasPricingPreDefined,
           work_performed: mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente",
           last_status_before_part_request: null,
