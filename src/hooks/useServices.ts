@@ -325,7 +325,9 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         if (status === 'pending_pricing') {
           paginatedQuery = paginatedQuery.eq('pending_pricing', true);
         } else if (status === 'em_debito') {
-            // no filter here, we'll post-process below
+          // no filter here, we'll post-process below
+        } else if (status !== 'all') {
+          paginatedQuery = paginatedQuery.eq('status', status);
         }
 
         if (location !== 'all') {
