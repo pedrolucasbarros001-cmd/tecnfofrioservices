@@ -1230,6 +1230,138 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           </div>
         );
 
+      case "pedir_peca":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Pedir Artigos Complementares?" step={isReparacao ? "Passo 9" : "Passo 7"} />
+            <div className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex gap-3 mb-2">
+                <Package className="h-5 w-5 text-yellow-600 shrink-0" />
+                <p className="text-xs text-yellow-800">
+                  Se a reparação necessita de mais peças que não tem em stock agora, solicite-as aqui para o escritório.
+                </p>
+              </div>
+
+              <RadioGroup
+                value={formData.needsPartOrder ? "sim" : "nao"}
+                onValueChange={(val) => setFormData(p => ({ ...p, needsPartOrder: val === "sim" }))}
+                className="flex gap-4"
+              >
+                <div className="flex-1">
+                  <RadioGroupItem value="nao" id="visit_needs_no" className="sr-only" />
+                  <Label
+                    htmlFor="visit_needs_no"
+                    className={cn(
+                      "flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                      !formData.needsPartOrder ? "border-green-500 bg-green-50 text-green-900" : "border-muted hover:border-primary/20"
+                    )}
+                  >
+                    <CheckCircle2 className={cn("h-6 w-6 mb-1", !formData.needsPartOrder ? "text-green-600" : "text-muted-foreground")} />
+                    <span className="font-semibold text-sm">Tudo OK</span>
+                    <span className="text-[10px] opacity-70 italic text-center">Não preciso de peças</span>
+                  </Label>
+                </div>
+                <div className="flex-1">
+                  <RadioGroupItem value="sim" id="visit_needs_yes" className="sr-only" />
+                  <Label
+                    htmlFor="visit_needs_yes"
+                    className={cn(
+                      "flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                      formData.needsPartOrder ? "border-yellow-500 bg-yellow-50 text-yellow-900" : "border-muted hover:border-primary/20"
+                    )}
+                  >
+                    <Plus className={cn("h-6 w-6 mb-1", formData.needsPartOrder ? "text-yellow-600" : "text-muted-foreground")} />
+                    <span className="font-semibold text-sm">Pedir Peça</span>
+                    <span className="text-[10px] opacity-70 italic text-center">Preciso encomendar</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {formData.needsPartOrder && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold uppercase text-muted-foreground">Lista de Encomenda</Label>
+                    <Button variant="ghost" size="sm" onClick={() => setFormData(p => ({ ...p, partsToOrder: [...p.partsToOrder, { name: "", reference: "" }] }))} className="h-7 text-[10px]">
+                      <Plus className="h-3 w-3 mr-1" /> Add Peça
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
+                    {formData.partsToOrder.map((part, idx) => (
+                      <div key={idx} className="flex gap-2 items-start bg-muted/30 p-2 rounded-lg relative group">
+                        <div className="flex-1 space-y-2">
+                          <Input
+                            placeholder="Nome da peça..."
+                            className="h-8 text-sm"
+                            value={part.name}
+                            onChange={(e) => {
+                              const newList = [...formData.partsToOrder];
+                              newList[idx] = { ...newList[idx], name: e.target.value };
+                              setFormData(p => ({ ...p, partsToOrder: newList }));
+                            }}
+                          />
+                          <Input
+                            placeholder="Referência (opcional)"
+                            className="h-7 text-[10px]"
+                            value={part.reference}
+                            onChange={(e) => {
+                              const newList = [...formData.partsToOrder];
+                              newList[idx] = { ...newList[idx], reference: e.target.value };
+                              setFormData(p => ({ ...p, partsToOrder: newList }));
+                            }}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive rounded-full absolute -right-2 -top-2 bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setFormData(p => ({ ...p, partsToOrder: p.partsToOrder.filter((_, i) => i !== idx) }))}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    {formData.partsToOrder.length === 0 && (
+                      <Button variant="outline" className="w-full border-dashed h-12 gap-2 text-muted-foreground" onClick={() => setFormData(p => ({ ...p, partsToOrder: [{ name: "", reference: "" }] }))}>
+                        <Plus className="h-4 w-4" /> Clique para adicionar a peça
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
+              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handlePedirPecaConfirm}>
+                Continuar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </DialogFooter>
+          </div>
+        );
+
+      case "confirmacao_peca":
+        return (
+          <div className="space-y-4">
+            <ModalHeader title="Confirmação do Artigo" step="Instalação" />
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col items-center text-center gap-3">
+                <Package className="h-12 w-12 text-blue-500 bg-blue-100 p-2 rounded-full" />
+                <h3 className="font-semibold text-lg">O artigo encomendado foi instalado?</h3>
+                <p className="text-sm text-muted-foreground">Confirme se o artigo que chegou foi instalado com sucesso.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <Button variant="outline" className="h-20 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={handleClose}>
+                  <X className="h-6 w-6 text-red-500" />
+                  <span>Ainda não</span>
+                </Button>
+                <Button className="h-20 flex flex-col gap-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmacaoPeca}>
+                  <CheckCircle2 className="h-6 w-6" />
+                  <span>Sim, instalada</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+
       case "resumo_reparacao":
         return (
           <div className="space-y-4">
