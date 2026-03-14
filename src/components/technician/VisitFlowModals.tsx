@@ -1080,52 +1080,152 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       case "registo_artigos":
         return (
-          <div className="space-y-4 max-h-[80vh] flex flex-col">
+          <div className="space-y-4 max-h-[70vh] flex flex-col">
             <ModalHeader title="Registo de Artigos" step={isReparacao ? "Passo 8" : "Passo 6"} />
             <div className="flex-1 overflow-y-auto space-y-4">
-              {formData.articles.map((article, idx) => (
-                <div key={idx} className="p-3 border rounded-lg bg-muted/20 relative">
-                  <Input placeholder="Descrição" value={article.description} onChange={(e) => updateArticle(idx, "description", e.target.value)} />
-                </div>
-              ))}
-              <Button variant="outline" size="sm" onClick={addArticle} className="w-full border-dashed"><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
-            </div>
-            <DialogFooter className="flex gap-2 pt-4 border-t mt-auto">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}>Anterior</Button>
-              <Button className="flex-1 bg-blue-500" onClick={() => safeSetStep("pedir_peca")}>Continuar</Button>
-            </DialogFooter>
-          </div>
-        );
+              {adminPricing && <AdminPricingReadOnly data={adminPricing} />}
 
-      case "pedir_peca":
-        return (
-          <div className="space-y-4">
-            <ModalHeader title="Precisa Pedir Artigo?" step={isReparacao ? "Passo 9" : "Passo 7"} />
-            <RadioGroup value={formData.needsPartOrder ? "sim" : "nao"} onValueChange={(val) => setFormData(prev => ({ ...prev, needsPartOrder: val === "sim" }))} className="flex gap-4">
-              <label htmlFor="needsPart_nao" className={cn("flex-1 p-3 rounded-lg border-2 text-center cursor-pointer", !formData.needsPartOrder ? "border-green-500 bg-green-50" : "border-muted")}>
-                <RadioGroupItem value="nao" id="needsPart_nao" className="sr-only" />
-                <span className="font-medium">Não</span>
-              </label>
-              <label htmlFor="needsPart_sim" className={cn("flex-1 p-3 rounded-lg border-2 text-center cursor-pointer", formData.needsPartOrder ? "border-yellow-500 bg-yellow-50" : "border-muted")}>
-                <RadioGroupItem value="sim" id="needsPart_sim" className="sr-only" />
-                <span className="font-medium">Sim</span>
-              </label>
-            </RadioGroup>
-            {formData.needsPartOrder && (
               <div className="space-y-2">
-                {formData.partsToOrder.map((part, index) => (
-                  <Input key={index} placeholder="Nome do artigo" value={part.name} onChange={(e) => {
-                    const newList = [...formData.partsToOrder];
-                    newList[index].name = e.target.value;
-                    setFormData(prev => ({ ...prev, partsToOrder: newList }));
-                  }} />
-                ))}
-                <Button variant="ghost" size="sm" onClick={() => setFormData(prev => ({ ...prev, partsToOrder: [...prev.partsToOrder, { name: "", reference: "" }] }))}>+ Adicionar</Button>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Artigos Utilizados</Label>
+                  {!formData.articlesLocked && (
+                    <Button variant="outline" size="sm" onClick={addArticle} className="h-8 gap-1">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {formData.articles.map((article, index) => (
+                    <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
+                      {!formData.articlesLocked && !article.isExisting && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeArticle(index)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <div className="grid grid-cols-12 gap-2 mt-1">
+                        <div className="col-span-3 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                          <Input
+                            placeholder="F01..."
+                            value={article.reference}
+                            disabled={formData.articlesLocked || article.isExisting}
+                            className="h-8 text-sm px-2"
+                            onChange={(e) => updateArticle(index, 'reference', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
+                          <Input
+                            placeholder="Artigo"
+                            value={article.description}
+                            disabled={formData.articlesLocked || article.isExisting}
+                            className="h-8 text-sm"
+                            onChange={(e) => updateArticle(index, 'description', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={article.quantity}
+                            disabled={formData.articlesLocked || article.isExisting}
+                            className="h-8 text-sm text-center px-1"
+                            onChange={(e) => updateArticle(index, 'quantity', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
+                          <Input
+                            placeholder="0"
+                            value={article.unit_price}
+                            disabled={formData.articlesLocked || article.isExisting}
+                            className="h-8 text-sm px-2 text-right"
+                            onChange={(e) => updateArticle(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}>Anterior</Button>
-              <Button className="flex-1 bg-primary" onClick={handlePedirPecaConfirm}>Continuar</Button>
+
+              {!formData.articlesLocked && formData.articles.filter(a => !a.isExisting).length > 0 && (
+                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
+                  {isSubmitting ? "A confirmar..." : "Confirmar Registo"}
+                </Button>
+              )}
+
+              {/* Resumo Financeiro */}
+              <div className="bg-muted p-3 rounded-lg space-y-2 mt-4 text-sm border">
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <span className="font-semibold text-xs text-muted-foreground uppercase">Subtotal Bruto:</span>
+                  <span className="font-bold">{articlesSubtotal.toFixed(2)} €</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-end pt-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground">Desconto</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        placeholder="0"
+                        className="h-8 text-right px-2 flex-1"
+                        value={formData.discountValue}
+                        onChange={(e) => setFormData(p => ({ ...p, discountValue: e.target.value }))}
+                      />
+                      <Select
+                        value={formData.discountType}
+                        onValueChange={(v: any) => setFormData(p => ({ ...p, discountType: v }))}
+                      >
+                        <SelectTrigger className="h-8 w-12 text-[10px] px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="euro">€</SelectItem>
+                          <SelectItem value="percent">%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground">IVA (%)</Label>
+                    <Input
+                      type="number"
+                      className="h-8 text-center px-1"
+                      value={formData.taxRate}
+                      onChange={(e) => setFormData(p => ({ ...p, taxRate: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>Taxa Aplicada:</span>
+                  <span>{formData.taxRate}%</span>
+                </div>
+
+                {articlesSubtotal > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span>Total Artigos:</span>
+                    <span className="text-secondary-foreground">{(articlesSubtotal - discountAmount + taxAmount).toFixed(2)} €</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t font-bold text-lg text-primary">
+                  <span>TOTAL FINAL:</span>
+                  <span>{totalFinal.toFixed(2)} €</span>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2 pt-2 border-t mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
+              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => safeSetStep("pedir_peca")} disabled={!formData.articlesLocked && formData.articles.filter(a => !a.isExisting).length > 0}>Continuar <ArrowRight className="h-4 w-4 ml-1" /></Button>
             </DialogFooter>
           </div>
         );
@@ -1134,18 +1234,62 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         return (
           <div className="space-y-4">
             <ModalHeader title="Resumo Final" step="Final" />
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between font-bold text-lg border-t pt-2">
-                <span>Total Final</span>
-                <span>{totalFinal.toFixed(2)} €</span>
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-card/50 overflow-hidden text-sm">
+                <div className="bg-muted/50 px-3 py-2 border-b flex justify-between items-center">
+                  <span className="font-semibold text-xs text-muted-foreground uppercase">Materiais Registados</span>
+                  <Badge variant="outline" className="text-[10px]">{formData.articles.length} itens</Badge>
+                </div>
+                <div className="p-3 space-y-2">
+                  {formData.articles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic text-center py-2">Nenhum artigo registado.</p>
+                  ) : (
+                    formData.articles.map((a, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs">
+                        <span className="flex-1 truncate pr-2">{a.description}</span>
+                        <span className="text-muted-foreground px-2">x{a.quantity}</span>
+                        <span className="font-medium">{(a.quantity * a.unit_price).toFixed(2)}€</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {adminPricing && (
+                  <div className="p-3 pt-0 space-y-2 border-t mt-2">
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold pt-2">Serviços Administrativos</p>
+                    <div className="flex justify-between items-center text-xs">
+                      <span>Mão de Obra / Deslocação / Outros</span>
+                      <span className="font-medium">{adminPricingTotal.toFixed(2)}€</span>
+                    </div>
+                  </div>
+                )}
+                <div className="bg-blue-50 p-3 border-t flex justify-between items-center">
+                  <span className="font-bold text-blue-900">Total Previsto</span>
+                  <span className="font-bold text-blue-600 text-lg">{totalFinal.toFixed(2)} €</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex gap-3 items-start">
+                <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-blue-900 leading-none">Guardar e Bloquear</p>
+                  <p className="text-xs text-blue-700 leading-snug">
+                    Esta ação irá registar permanentemente os artigos no ficheiro do serviço. Não poderá alterar após guardar.
+                  </p>
+                </div>
               </div>
             </div>
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>Anterior</Button>
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
               {!formData.articlesLocked ? (
-                <Button className="flex-1 bg-green-600" onClick={handleConfirmArticles}>Guardar Artigos</Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> {isSubmitting ? "A guardar..." : "Confirmar Artigos"}
+                </Button>
               ) : (
-                <Button className="flex-1 bg-blue-500" onClick={handleResumoReparacaoConfirm}>Concluir</Button>
+                <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm}>
+                  Concluir <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
               )}
             </DialogFooter>
           </div>
