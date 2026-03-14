@@ -84,7 +84,7 @@ export function FieldPaymentStep({
     const paymentValue = parseCurrencyInput(amount);
 
     const handleConfirmPayment = async () => {
-        if (paymentValue <= 0) {
+        if (paymentValue < 0) {
             toast.error('Insira um valor válido');
             return;
         }
@@ -284,7 +284,7 @@ export function FieldPaymentStep({
                         <Button
                             className="w-full h-12 text-base bg-green-600 hover:bg-green-700 text-white"
                             onClick={handleConfirmPayment}
-                            disabled={isSubmitting || paymentValue <= 0}
+                            disabled={isSubmitting || paymentValue < 0}
                         >
                             {isSubmitting ? 'A registar...' : `Registar €${paymentValue > 0 ? paymentValue.toFixed(2) : '0.00'} e Avançar`}
                         </Button>

@@ -1021,6 +1021,16 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   <Input value={formData.productModel} onChange={(e) => setFormData(prev => ({ ...prev, productModel: e.target.value }))} />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>PNC</Label>
+                  <Input value={formData.productPNC} onChange={(e) => setFormData(prev => ({ ...prev, productPNC: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>N/S</Label>
+                  <Input value={formData.productSerial} onChange={(e) => setFormData(prev => ({ ...prev, productSerial: e.target.value }))} />
+                </div>
+              </div>
             </div>
             <DialogFooter className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={goToPreviousPhotoStep}>Anterior</Button>
