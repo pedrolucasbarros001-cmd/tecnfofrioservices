@@ -3,14 +3,7 @@ import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integration
 import type { Service, ServiceStatus, ServicePart, ServicePhoto, ServiceSignature, ServicePayment } from '@/types/database';
 import { toast } from 'sonner';
 
-// Helper para invalidar TODAS as queries de serviços
-function invalidateAllServiceQueries(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
-}
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 
 interface UseServicesOptions {
   status?: ServiceStatus | 'all' | 'pending_pricing';
