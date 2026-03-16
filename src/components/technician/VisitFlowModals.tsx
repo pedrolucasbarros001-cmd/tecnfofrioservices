@@ -633,10 +633,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         toast.success("Visita concluída com sucesso!");
       }
 
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
-      queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       clearState();
       saveStateToDb(null as any);
