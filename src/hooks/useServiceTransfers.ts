@@ -207,6 +207,7 @@ export function useRejectTransferRequest() {
       if (error) throw error;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Transferência recusada.');
