@@ -68,7 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(nextSession);
         setUser(nextSession.user);
         if (!alreadyHydrated) {
-          void hydrateUser(nextSession.user.id);
+          hydrateUser(nextSession.user.id).catch(err => {
+            console.error('[AuthContext] Background hydration error:', err);
+          });
         }
         return;
       }
@@ -128,26 +130,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[AuthContext] Starting hydration for user:', userId);
     const promise = (async () => {
       try {
-        const [profileRes, roleRpcRes] = await Promise.all([
-          supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
-          supabase.rpc('get_user_role', { _user_id: userId }),
-        ]);
+        let profileData: Profile | null = null;
+        let userRole: AppRole | null = null;
+        let fetchError: any = null;
 
-        if (profileRes.error) {
-          console.error('[AuthContext] Profile fetch error:', profileRes.error);
-        }
-        if (roleRpcRes.error) {
-          console.error('[AuthContext] Role RPC error:', roleRpcRes.error);
+        // Tentar obter perfil com retries curtos
+        for (let i = 0; i < 3; i++) {
+          const profileRes = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+          if (!profileRes.error) {
+            profileData = profileRes.data as Profile | null;
+            break;
+          }
+          if (i < 2) await new Promise(r => setTimeout(r, 800));
         }
 
-        const profileData = profileRes.data as Profile | null;
-        const userRole = (roleRpcRes.data as AppRole | null) ?? null;
+        // Tentar obter role com retries e fallback
+        for (let i = 0; i < 3; i++) {
+          // Attempt 1: RPC
+          const roleRpcRes = await supabase.rpc('get_user_role', { _user_id: userId });
+          if (!roleRpcRes.error && roleRpcRes.data) {
+            userRole = roleRpcRes.data as AppRole;
+            break;
+          }
+          
+          if (roleRpcRes.error) {
+            fetchError = roleRpcRes.error;
+            console.warn('[AuthContext] RPC error fetching role, attempting fallback...', roleRpcRes.error);
+          }
+
+          // Attempt 2: Direct Table Select (Fallback)
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (!roleError && roleData) {
+            userRole = roleData.role;
+            break;
+          }
+
+          if (roleError) {
+            fetchError = roleError;
+            console.warn('[AuthContext] Fallback error fetching role...', roleError);
+          }
+
+          // If no error but data is just null, the user genuinely has no role. No need to retry.
+          if (!roleRpcRes.error && !roleError && !roleRpcRes.data && !roleData) {
+            break;
+          }
+
+          if (i < 2) await new Promise(r => setTimeout(r, 1000));
+        }
 
         console.log('[AuthContext] Hydration result:', {
           hasProfile: !!profileData,
           role: userRole,
-          userId
+          userId,
+          hadErrors: !!fetchError
         });
+
+        // Se o userRole for nulo E houve erros de fetch, lançamos erro para o signIn não assumir "sem permissões"
+        if (!userRole && fetchError) {
+          throw new Error('Falha de ligação ao confirmar permissões. Tente novamente.');
+        }
 
         setProfile(profileData);
         setRole(userRole);
@@ -156,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('[AuthContext] Unexpected hydrateUser error:', error);
         // Do not clear existing profile/role on transient network errors during token refresh
         setLoading(false);
-        return null;
+        throw error; // Let the caller decide how to handle it
       } finally {
         hydrationPromiseRef.current = null;
         setLoading(false);
