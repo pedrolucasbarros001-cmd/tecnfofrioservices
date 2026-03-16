@@ -486,15 +486,7 @@ export function useUpdateService() {
       // We can't easily rollback lists without snapshotting them all, but invalidation will fix it
     },
     onSettled: (data, error, variables) => {
-      // Always refetch after error or success to ensure cache consistency
-      queryClient.invalidateQueries({ queryKey: ['service', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-
-      // Also invalidate technician specific lists
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+      invalidateServiceQueries(queryClient, variables.id);
 
       if (data && !data.skipToast) {
         toast.success('Serviço atualizado!');
