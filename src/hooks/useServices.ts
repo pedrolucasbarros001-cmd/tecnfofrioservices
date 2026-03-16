@@ -508,7 +508,7 @@ export function useDeleteService() {
       if (error) throw error;
     },
     onSuccess: () => {
-      invalidateAllServiceQueries(queryClient);
+      invalidateServiceQueries(queryClient);
       toast.success('Serviço eliminado!');
     },
     onError: (error) => {
