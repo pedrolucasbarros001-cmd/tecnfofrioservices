@@ -377,7 +377,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }
 
       setFormData(prev => ({ ...prev, articlesLocked: true }));
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success("Artigos registados e confirmados!");
     } catch (error) {
       console.error("Error saving articles:", error);
