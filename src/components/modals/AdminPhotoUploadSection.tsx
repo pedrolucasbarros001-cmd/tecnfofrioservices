@@ -8,6 +8,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { uploadServicePhoto } from '@/utils/photoUpload';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PHOTO_TYPE_LABELS, type PhotoType } from '@/types/database';
