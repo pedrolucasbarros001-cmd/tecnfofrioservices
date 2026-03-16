@@ -166,9 +166,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         await Promise.all(logPromises);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
       toast.success(`Artigo chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} - ${formatShiftLabel(scheduledShift)} (${techName}).`);

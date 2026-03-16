@@ -132,7 +132,7 @@ export function RequestPartModal({
         profile?.user_id
       );
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       const count = validParts.length;
       if (count === 1) {

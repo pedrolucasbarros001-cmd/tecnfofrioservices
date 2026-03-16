@@ -108,9 +108,7 @@ export function CancelPartSelectionModal({ service, open, onOpenChange, onSucces
                 toast.success(`${selectedPartIds.length} artigo(s) cancelado(s) com sucesso.`);
             }
 
-            queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-            queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
-            queryClient.invalidateQueries({ queryKey: ['services'] });
+            invalidateServiceQueries(queryClient, service.id);
 
             onSuccess?.();
             onOpenChange(false);
