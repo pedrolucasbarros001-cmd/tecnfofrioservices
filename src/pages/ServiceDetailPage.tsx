@@ -157,7 +157,7 @@ export default function ServiceDetailPage() {
 
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ["service-photos-detail", serviceId] });
+      invalidateServiceQueries(queryClient, serviceId);
       toast.success("Foto eliminada com sucesso");
     } catch (err) {
       console.error("Error deleting photo:", err);
