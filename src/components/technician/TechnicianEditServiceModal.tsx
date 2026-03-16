@@ -219,9 +219,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       }
 
       toast.success('Serviço atualizado!');
-      queryClient.invalidateQueries({ queryKey: ['service-parts-edit', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['activity-logs', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
+      onOpenChange(false);
       onOpenChange(false);
     } catch (err) {
       console.error('Error updating service:', err);
