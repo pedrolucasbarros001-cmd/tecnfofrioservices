@@ -138,8 +138,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           workPerformed: workPerformed || null,
         });
         if (rpcError) throw rpcError;
-        if (detectedFault !== (service.detected_fault || '')) changes.push('Diagnóstico atualizado');
-        if (workPerformed !== (service.work_performed || '')) changes.push('Trabalho realizado atualizado');
+        if (detectedFault !== (service.detected_fault || '')) changes.push(`Diagnóstico: "${service.detected_fault || '(vazio)'}" → "${detectedFault}"`);
+        if (workPerformed !== (service.work_performed || '')) changes.push(`Trabalho realizado: "${service.work_performed || '(vazio)'}" → "${workPerformed}"`);
       }
 
       // Update equipment fields directly
