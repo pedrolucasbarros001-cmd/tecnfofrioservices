@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { PhotoGalleryModal } from "@/components/shared/PhotoGalleryModal";
 import { CustomerLink } from "@/components/shared/CustomerLink";
 import { useQueryClient } from "@tanstack/react-query";
+import { invalidateServiceQueries } from "@/lib/queryInvalidation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
