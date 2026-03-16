@@ -126,7 +126,7 @@ export function TechnicianServiceSheet({
           if (photoError) throw photoError;
         }
         if (capturedPhotos.length > 0) noteText += ` (${capturedPhotos.length} foto${capturedPhotos.length > 1 ? 's' : ''} anexada${capturedPhotos.length > 1 ? 's' : ''})`;
-        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+        invalidateServiceQueries(queryClient, service.id);
       }
 
       // Log activity
