@@ -16,6 +16,7 @@ import {
   Pencil,
   Ban,
   Mail,
+  Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,6 +50,7 @@ interface StateActionButtonsProps {
   onReopen?: () => void;
   onCancelPartOrder?: () => void;
   onNotifyPartWait?: () => void;
+  onAttachDocument?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -82,6 +84,7 @@ export function StateActionButtons({
   onReopen,
   onCancelPartOrder,
   onNotifyPartWait,
+  onAttachDocument,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -250,6 +253,14 @@ export function StateActionButtons({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="bg-popover">
+          {/* Anexar Documento - Everyone can attach documents */}
+          {onAttachDocument && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAttachDocument(); }}>
+              <Paperclip className="h-4 w-4 mr-2" />
+              Anexar Documento
+            </DropdownMenuItem>
+          )}
+
           {onViewDetails && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
               <Eye className="h-4 w-4 mr-2" />

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
-import type { Service, ServiceStatus, ServicePart, ServicePhoto, ServiceSignature, ServicePayment } from '@/types/database';
+import type { Service, ServiceStatus, ServicePart, ServicePhoto, ServiceSignature, ServicePayment, ServiceDocument } from '@/types/database';
 import { toast } from 'sonner';
 
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -78,7 +78,8 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
           parts:service_parts(*),
           photos:service_photos(*),
           signatures:service_signatures(*),
-          payments:service_payments(*)
+          payments:service_payments(*),
+          documents:service_documents(*)
         `)
         .eq('id', serviceId)
         .single();
@@ -113,12 +114,14 @@ export function useFullServiceData(serviceId: string | undefined, enabled: boole
           return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
         }),
         payments: safeSort(result.payments, 'payment_date'),
+        documents: safeSort(result.documents, 'created_at'),
         logs: [], // Loaded separately to reduce query weight
       } as Service & {
         parts: ServicePart[],
         photos: ServicePhoto[],
         signatures: ServiceSignature[],
         payments: (ServicePayment & { receiver?: { full_name: string | null } })[],
+        documents: ServiceDocument[],
         logs: any[]
       };
     },
@@ -140,7 +143,8 @@ export function prefetchFullServiceData(queryClient: QueryClient, serviceId: str
           parts:service_parts(*),
           photos:service_photos(*),
           signatures:service_signatures(*),
-          payments:service_payments(*)
+          payments:service_payments(*),
+          documents:service_documents(*)
         `)
         .eq('id', serviceId)
         .single();

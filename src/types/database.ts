@@ -178,6 +178,17 @@ export interface ServicePart {
   created_at: string;
 }
 
+export interface ServiceDocument {
+  id: string;
+  service_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 export interface ServicePhoto {
   id: string;
   service_id: string;

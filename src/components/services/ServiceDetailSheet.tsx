@@ -62,6 +62,7 @@ import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { CancelPartSelectionModal } from '@/components/modals/CancelPartSelectionModal';
+import { UploadDocumentModal } from './UploadDocumentModal';
 import { StateActionButtons } from './StateActionButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateService, useDeleteService, useFullServiceData } from '@/hooks/useServices';
@@ -238,6 +239,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showCancelPartSelectionModal, setShowCancelPartSelectionModal] = useState(false);
+  const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<ServicePayment | null>(null);
@@ -1189,6 +1191,88 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 </Section>
               )}
 
+              {/* Documents */}
+              {(service as any).documents && (service as any).documents.length > 0 && (
+                <Section
+                  title="Documentos Anexados"
+                  bgColor="bg-gray-50"
+                  borderColor="border-l-gray-400"
+                >
+                  <div className="space-y-3">
+                    {(service as any).documents.map((doc: any) => {
+                      // Usar o URL real para o download
+                      // Assumimos que o bucket e publico ou o cliente ja retornou a url assinada/publica.
+                      // Como configuramos o bucket como publico na DB, a url gerada atraves do path resolvera o ficheiro
+                      const publicUrl = supabase.storage.from('service_documents').getPublicUrl(doc.file_url).data.publicUrl;
+                      
+                      return (
+                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <FileText className="h-6 w-6 text-primary flex-shrink-0" />
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="text-sm font-medium truncate" title={doc.file_name}>
+                                {doc.file_name}
+                              </span>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                <span>{(doc.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                                <span>•</span>
+                                <span>{safeFormat(doc.created_at, "dd/MM/yyyy", { locale: pt })}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => window.open(publicUrl, '_blank')}
+                            >
+                              Baixar
+                            </Button>
+                            
+                            {/* So quem enviou ou Admins podem apagar */}
+                            {(role === 'dono' || role === 'secretaria' || user?.id === doc.uploaded_by) && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-destructive"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Tem a certeza que deseja eliminar este documento?')) {
+                                    try {
+                                      const { error: storageError } = await supabase.storage
+                                        .from('service_documents')
+                                        .remove([doc.file_url]);
+                                        
+                                      if (storageError) throw storageError;
+                                      
+                                      const { error: dbError } = await supabase
+                                        .from('service_documents')
+                                        .delete()
+                                        .eq('id', doc.id);
+                                        
+                                      if (dbError) throw dbError;
+                                      
+                                      toast.success('Documento eliminado.');
+                                      invalidateServiceQueries(queryClient, service.id);
+                                    } catch (err: any) {
+                                      toast.error('Erro ao eliminar documento.');
+                                      console.error(err);
+                                    }
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
               {/* Notes */}
               {service.notes && (
                 <Section
@@ -1223,6 +1307,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onNotifyPartWait={(role === 'dono' || role === 'secretaria') ? handleSendPartNotice : undefined}
               onCancel={(role === 'dono' || role === 'secretaria') && service.status !== 'cancelado' && service.status !== 'finalizado' ? () => setShowCancelDialog(true) : undefined}
               onReopen={(role === 'dono' || role === 'secretaria') && service.status === 'cancelado' ? handleReopenService : undefined}
+              onAttachDocument={() => setShowUploadDocumentModal(true)}
             />
             <p className="text-xs text-muted-foreground text-center mt-3">
               O aparelho só pode permanecer na oficina por até 30 dias após a conclusão do serviço.
@@ -1232,6 +1317,12 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       </Sheet>
 
       {/* All Modals */}
+      <UploadDocumentModal 
+        isOpen={showUploadDocumentModal}
+        onClose={() => setShowUploadDocumentModal(false)}
+        serviceId={service.id}
+      />
+      
       <AssignTechnicianModal
         open={showAssignModal}
         onOpenChange={(open) => {
