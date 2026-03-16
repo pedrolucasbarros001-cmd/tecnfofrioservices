@@ -17,6 +17,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { technicianUpdateService } from '@/utils/technicianRpc';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
