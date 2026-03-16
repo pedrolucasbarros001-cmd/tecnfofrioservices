@@ -351,7 +351,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setShowCamera(false);
       toast.success(images.length > 1 ? `${images.length} fotos guardadas!` : "Foto guardada!");
     } catch (error) {
