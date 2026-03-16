@@ -70,8 +70,7 @@ export function AdminPhotoUploadSection({ serviceId }: AdminPhotoUploadSectionPr
       toast.error('Erro ao eliminar foto');
       throw error;
     }
-    queryClient.invalidateQueries({ queryKey: ['service-photos-admin', serviceId] });
-    queryClient.invalidateQueries({ queryKey: ['full-service-data', serviceId] });
+    invalidateServiceQueries(queryClient, serviceId);
     toast.success('Foto eliminada');
   };
 
