@@ -51,8 +51,7 @@ export function AdminPhotoUploadSection({ serviceId }: AdminPhotoUploadSectionPr
           `Foto adicionada pelo administrador (${PHOTO_TYPE_LABELS[photoType as PhotoType] || photoType})`
         );
       }
-      queryClient.invalidateQueries({ queryKey: ['service-photos-admin', serviceId] });
-      queryClient.invalidateQueries({ queryKey: ['full-service-data', serviceId] });
+      invalidateServiceQueries(queryClient, serviceId);
       toast.success(`${images.length} foto(s) adicionada(s) com sucesso`);
     } catch (error) {
       console.error('Error uploading photo:', error);
