@@ -123,7 +123,7 @@ export default function SecretaryPrecificarPage() {
         service={selectedService}
         open={showDetailSheet}
         onOpenChange={setShowDetailSheet}
-        onServiceUpdated={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
+        onServiceUpdated={() => invalidateServiceQueries(queryClient)}
       />
 
       <SetPriceModal
