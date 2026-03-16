@@ -373,8 +373,8 @@ export function useCreateService() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      invalidateAllServiceQueries(queryClient);
+    onSuccess: (data) => {
+      invalidateServiceQueries(queryClient, data?.id);
       toast.success('Serviço criado com sucesso!');
     },
     onError: (error: Error) => {
