@@ -44,7 +44,7 @@ export function PhotoCaptureStep({
         description: title,
       });
       
-      queryClient.invalidateQueries({ queryKey: ['service-photos', serviceId] });
+      invalidateServiceQueries(queryClient, serviceId);
       
       if (multiple) {
         onPhotosChange([...photos, imageData]);

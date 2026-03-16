@@ -1460,8 +1460,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     skipToast: true,
                   });
 
-                  queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-                  queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
+                  invalidateServiceQueries(queryClient, service.id);
                   setPaymentToDelete(null);
                   const newTotalPaid = (service?.amount_paid || 0) - (paymentToDelete?.amount || 0);
                   toast.success(`Pagamento de ${safeNumber(paymentToDelete?.amount).toFixed(2)} € eliminado. Novo total pago: ${safeNumber(newTotalPaid).toFixed(2)} €`);

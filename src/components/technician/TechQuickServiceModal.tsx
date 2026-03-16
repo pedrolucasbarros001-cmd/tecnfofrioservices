@@ -127,10 +127,8 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
       const result = Array.isArray(data) ? data[0] : data;
       toast.success(`Serviço ${result?.service_code || ''} criado!`);
 
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      invalidateServiceQueries(queryClient);
+      invalidateCustomerQueries(queryClient);
 
       form.reset();
       setExistingCustomer(null);

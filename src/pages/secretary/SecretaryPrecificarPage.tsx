@@ -131,7 +131,7 @@ export default function SecretaryPrecificarPage() {
         open={showSetPriceModal}
         onOpenChange={(open) => {
           setShowSetPriceModal(open);
-          if (!open) queryClient.invalidateQueries({ queryKey: ['services'] });
+          if (!open) invalidateServiceQueries(queryClient);
         }}
       />
     </div>

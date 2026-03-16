@@ -150,8 +150,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         profile?.full_name || undefined
       );
 
-      queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-      queryClient.invalidateQueries({ queryKey: ['service-payments-history'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (newBalance > 0) {
         toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);

@@ -122,7 +122,7 @@ export function FieldPaymentStep({
                 profile?.full_name || undefined
             );
 
-            queryClient.invalidateQueries({ queryKey: ['service-payments'] });
+            invalidateServiceQueries(queryClient, serviceId);
 
             toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado`);
 

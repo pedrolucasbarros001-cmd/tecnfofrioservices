@@ -141,7 +141,7 @@ export function TechnicianServiceSheet({
       toast.success('Registo adicionado!');
       setNewNote('');
       setCapturedPhotos([]);
-      queryClient.invalidateQueries({ queryKey: ['activity-logs', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (err) {
       console.error('Error adding record:', err);
       toast.error('Erro ao adicionar registo');

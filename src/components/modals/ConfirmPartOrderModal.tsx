@@ -197,9 +197,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         toast.info('Nenhum artigo registado.');
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       onOpenChange(false);
     } catch (error) {
