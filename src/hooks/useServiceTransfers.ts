@@ -176,9 +176,8 @@ export function useAcceptTransferRequest() {
       return request;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Transferência aceite! O serviço foi movido para si.');
     },
