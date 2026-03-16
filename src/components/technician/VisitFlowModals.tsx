@@ -302,8 +302,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       });
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
         safeSetStep(derivedResumeStep);
