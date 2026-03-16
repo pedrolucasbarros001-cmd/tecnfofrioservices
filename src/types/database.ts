@@ -153,6 +153,9 @@ export interface Service {
   pnc: string | null;
   flow_step: string | null;
   flow_data: any | null;
+  last_payment_reminder_sent_at: string | null;
+  last_part_notice_sent_at: string | null;
+  last_visit_report_sent_at: string | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;

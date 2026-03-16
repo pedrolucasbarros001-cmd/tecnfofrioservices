@@ -255,46 +255,27 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     
     setIsSendingReminder(true);
     try {
+      const { error } = await supabase
+        .from('services')
+        .update({ last_payment_reminder_sent_at: new Date().toISOString() })
+        .eq('id', service.id);
+
+      if (error) throw error;
+      
       const debtAmount = (safeNumber(service?.final_price) - safeNumber((fullData?.payments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0))).toFixed(2);
-      
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-          <h2 style="color: #0b4a99; border-bottom: 2px solid #0b4a99; padding-bottom: 10px;">Aviso de Pagamento Pendente</h2>
-          <p>Caro(a) <strong>${service.customer.name}</strong>,</p>
-          <p>Verificamos que existe um valor pendente referente à reparação do seu equipamento (Serviço #${service.code}).</p>
-          
-          <div style="margin: 30px 0; padding: 20px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; text-align: center;">
-            <p style="margin: 0; font-size: 16px; color: #856404;">Valor em Débito:</p>
-            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #d39e00;">${debtAmount} €</p>
-          </div>
-          
-          <p>Agradecemos a liquidação do valor com a maior brevidade possível para concluir o processo de faturação.</p>
-          <p>Em caso de dúvida ou se já efetuou o pagamento, por favor ignore esta mensagem ou contacte-nos.</p>
-          
-          <p style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">Com os melhores cumprimentos,<br>A Equipa Tecnofrio Services</p>
-        </div>
-      `;
-      
-      await supabase.functions.invoke('send-email-notification', {
-        body: {
-          to: service.customer.email,
-          subject: `Lembrete de Pagamento - Serviço ${service.code}`,
-          html: emailHtml
-        }
-      });
       
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
         actionType: 'nota_adicionada',
-        description: `Lembrete de pagamento (${debtAmount}€) enviado por email para ${service.customer.email}`,
+        description: `Lembrete de pagamento (${debtAmount}€) agendado e pedido para envio ao email ${service.customer.email}`,
         isPublic: true,
       });
 
-      toast.success('Lembrete de pagamento enviado com sucesso!');
+      toast.success('Lembrete de pagamento pedido com sucesso!');
     } catch (error) {
-      console.error('Erro ao enviar lembrete:', error);
-      toast.error('Ocorreu um erro ao enviar o lembrete.');
+      console.error('Erro ao pedir lembrete:', error);
+      toast.error('Ocorreu um erro ao pedir o lembrete.');
     } finally {
       setIsSendingReminder(false);
     }
@@ -308,46 +289,25 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     
     setIsSendingPartNotice(true);
     try {
-      const pendingParts = (fullData?.parts || []).filter((p: any) => p.is_requested && !p.arrived);
-      const partsListHtml = pendingParts.map((p: any) => `<li>${p.part_name}</li>`).join('');
-      
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-          <h2 style="color: #e67e22; border-bottom: 2px solid #e67e22; padding-bottom: 10px;">Aviso: A Aguardar Material</h2>
-          <p>Caro(a) <strong>${service.customer.name}</strong>,</p>
-          <p>Informamos que a reparação do seu equipamento encontra-se de momento a <strong>aguardar a receção do seguinte material</strong> pelos nossos fornecedores:</p>
-          
-          <ul style="margin: 20px 0; padding-left: 20px; color: #555;">
-            ${partsListHtml || '<li>Material de reparação</li>'}
-          </ul>
-          
-          <p>Estaremos a monitorizar a encomenda e entraremos em contacto consigo para agendar a intervenção assim que o material dê entrada nas nossas instalações.</p>
-          <p>Agradecemos a sua compreensão e paciência.</p>
-          
-          <p style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">Com os melhores cumprimentos,<br>A Equipa Tecnofrio Services</p>
-        </div>
-      `;
-      
-      await supabase.functions.invoke('send-email-notification', {
-        body: {
-          to: service.customer.email,
-          subject: `Aviso de Material - Serviço ${service.code}`,
-          html: emailHtml
-        }
-      });
+      const { error } = await supabase
+        .from('services')
+        .update({ last_part_notice_sent_at: new Date().toISOString() })
+        .eq('id', service.id);
+
+      if (error) throw error;
       
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
         actionType: 'nota_adicionada',
-        description: `Aviso "Aguardar Peça" enviado por email para ${service.customer.email}`,
+        description: `Aviso "Aguardar Peça" agendado para envio ao email ${service.customer.email}`,
         isPublic: true,
       });
 
-      toast.success('Aviso de espera de peça enviado com sucesso!');
+      toast.success('Aviso de espera de peça pedido com sucesso!');
     } catch (error) {
-      console.error('Erro ao enviar aviso:', error);
-      toast.error('Ocorreu um erro ao enviar o aviso.');
+      console.error('Erro ao pedir aviso:', error);
+      toast.error('Ocorreu um erro ao pedir o aviso.');
     } finally {
       setIsSendingPartNotice(false);
     }
