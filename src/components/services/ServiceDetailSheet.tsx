@@ -466,8 +466,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         toast.success(`Pedido do artigo "${partName}" cancelado.`);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['full-service-data', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (err) {
       console.error('Error cancelling part:', err);
       toast.error('Erro ao cancelar pedido de peça');
