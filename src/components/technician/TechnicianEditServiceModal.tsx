@@ -125,10 +125,10 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
       // Update service fields
       const updates: Record<string, any> = {};
-      if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: ${brand}`); }
-      if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: ${model}`); }
-      if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: ${serialNumber}`); }
-      if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: ${applianceType}`); }
+      if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: "${service.brand || '(vazio)'}" → "${brand}"`); }
+      if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: "${service.model || '(vazio)'}" → "${model}"`); }
+      if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: "${service.serial_number || '(vazio)'}" → "${serialNumber}"`); }
+      if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: "${service.appliance_type || '(vazio)'}" → "${applianceType}"`); }
 
       // Use technician_update_service RPC for status-safe fields
       if (detectedFault !== (service.detected_fault || '') || workPerformed !== (service.work_performed || '')) {
