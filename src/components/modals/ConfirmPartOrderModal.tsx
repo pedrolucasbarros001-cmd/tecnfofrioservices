@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import {
   Select,
   SelectContent,
