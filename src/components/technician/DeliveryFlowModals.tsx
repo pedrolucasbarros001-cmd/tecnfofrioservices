@@ -180,7 +180,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       await ensureValidSession();
       const { uploadServicePhoto } = await import('@/utils/photoUpload');
       const publicUrl = await uploadServicePhoto(service.id, imageData, 'entrega', 'Foto da entrega');
-      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setFormData(prev => ({ ...prev, photoFile: publicUrl }));
       setShowCamera(false);
       toast.success('Foto guardada!');
