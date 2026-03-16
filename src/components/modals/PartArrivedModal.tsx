@@ -30,6 +30,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatShiftLabel } from '@/utils/dateUtils';

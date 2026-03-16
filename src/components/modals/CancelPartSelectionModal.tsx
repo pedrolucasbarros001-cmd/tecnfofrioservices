@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';

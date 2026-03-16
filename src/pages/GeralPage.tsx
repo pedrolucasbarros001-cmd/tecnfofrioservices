@@ -40,6 +40,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 
 export default function GeralPage() {

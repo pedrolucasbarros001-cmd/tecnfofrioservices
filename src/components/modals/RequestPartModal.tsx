@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { useAuth } from '@/contexts/AuthContext';
 import { notifyPartRequested } from '@/utils/notificationUtils';
 import { logPartRequest } from '@/utils/activityLogUtils';
