@@ -147,8 +147,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       });
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo') {
         safeSetStep(derivedResumeStep);
