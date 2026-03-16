@@ -487,8 +487,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
-      queryClient.invalidateQueries({ queryKey: ["service-full", service.id] });
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       clearState();
       saveStateToDb(null as any);
       toast.success(hasPricingPreDefined ? `${service.code} concluído! Verifica débito em portal.` : `${service.code} concluído! Aguarda precificação.`);

@@ -231,7 +231,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         user?.id
       );
 
-      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       // Clear persisted state on completion (localStorage + DB)
       clearState();

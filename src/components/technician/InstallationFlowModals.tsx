@@ -196,7 +196,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       const { uploadServicePhoto } = await import('@/utils/photoUpload');
       const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, description);
 
-      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (cameraMode === 'antes') {
         setFormData(prev => ({ ...prev, photoAntes: publicUrl }));

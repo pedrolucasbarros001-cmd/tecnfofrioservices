@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
+import { invalidateServiceQueries } from "@/lib/queryInvalidation";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logWorkshopPickup, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
