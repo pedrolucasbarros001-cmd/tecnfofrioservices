@@ -300,7 +300,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       clearState();
       saveStateToDb(null as any);
 
-      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setShowSignature(false);
       toast.success(needsPricing ? 'Instalação concluída! Aguarda precificação.' : 'Instalação concluída com sucesso!');
       onComplete();
