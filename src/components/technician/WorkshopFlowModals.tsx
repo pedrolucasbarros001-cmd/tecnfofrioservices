@@ -292,9 +292,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => { });
 
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
