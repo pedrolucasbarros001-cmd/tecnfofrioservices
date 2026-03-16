@@ -45,7 +45,7 @@ const emptyPart = (isRequested = false): NewPart => ({
 });
 
 export function TechnicianEditServiceModal({ service, open, onOpenChange }: TechnicianEditServiceModalProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
