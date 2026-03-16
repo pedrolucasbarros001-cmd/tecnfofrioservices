@@ -30,6 +30,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatShiftLabel } from '@/utils/dateUtils';
@@ -166,9 +167,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         await Promise.all(logPromises);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
       toast.success(`Artigo chegou! ${service.code} agendado para ${format(scheduledDate, 'dd/MM', { locale: pt })} - ${formatShiftLabel(scheduledShift)} (${techName}).`);

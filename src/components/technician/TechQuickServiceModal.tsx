@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
+import { invalidateCustomerQueries } from '@/lib/queryInvalidation';
 import { Loader2, Shield, AlertTriangle, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -125,10 +127,8 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
       const result = Array.isArray(data) ? data[0] : data;
       toast.success(`Serviço ${result?.service_code || ''} criado!`);
 
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      invalidateServiceQueries(queryClient);
+      invalidateCustomerQueries(queryClient);
 
       form.reset();
       setExistingCustomer(null);

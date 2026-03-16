@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { Wrench, Play, UserPlus, Package, AlertCircle, ArrowRightLeft, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -103,9 +104,7 @@ export default function TechnicianOfficePage() {
       if (rpcError) throw rpcError;
 
       toast.success('Serviço assumido com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (error) {
       console.error('Error assuming service:', error);
       toast.error('Erro ao assumir serviço');
@@ -124,8 +123,7 @@ export default function TechnicianOfficePage() {
     setFlowOpen(false);
     setSelectedService(null);
     setFlowMode("normal");
-    queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-    queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+    invalidateServiceQueries(queryClient);
   };
 
   const handleFlowClose = () => {

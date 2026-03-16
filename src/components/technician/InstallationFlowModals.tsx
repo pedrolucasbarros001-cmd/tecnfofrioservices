@@ -31,6 +31,7 @@ import { humanizeError } from '@/utils/errorMessages';
 import { buildFullAddress } from '@/utils/addressUtils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { UsedPartsModal, PartEntry } from '@/components/modals/UsedPartsModal';
@@ -160,8 +161,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       });
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo') {
         safeSetStep(derivedResumeStep);
@@ -197,7 +197,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       const { uploadServicePhoto } = await import('@/utils/photoUpload');
       const publicUrl = await uploadServicePhoto(service.id, imageData, photoType, description);
 
-      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (cameraMode === 'antes') {
         setFormData(prev => ({ ...prev, photoAntes: publicUrl }));
@@ -244,7 +244,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
       setFormData(prev => ({ ...prev, usedMaterials: materials }));
       setShowMaterialsModal(false);
-      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success('Materiais registados!');
 
       // Advance to next step
@@ -300,7 +300,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
       clearState();
       saveStateToDb(null as any);
 
-      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setShowSignature(false);
       toast.success(needsPricing ? 'Instalação concluída! Aguarda precificação.' : 'Instalação concluída com sucesso!');
       onComplete();

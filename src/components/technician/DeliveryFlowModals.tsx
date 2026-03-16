@@ -27,6 +27,7 @@ import { humanizeError } from '@/utils/errorMessages';
 import { buildFullAddress } from '@/utils/addressUtils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
@@ -147,8 +148,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       });
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo') {
         safeSetStep(derivedResumeStep);
@@ -181,7 +181,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
       await ensureValidSession();
       const { uploadServicePhoto } = await import('@/utils/photoUpload');
       const publicUrl = await uploadServicePhoto(service.id, imageData, 'entrega', 'Foto da entrega');
-      queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setFormData(prev => ({ ...prev, photoFile: publicUrl }));
       setShowCamera(false);
       toast.success('Foto guardada!');
@@ -232,7 +232,7 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
         user?.id
       );
 
-      queryClient.invalidateQueries({ queryKey: ['service-signatures', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       // Clear persisted state on completion (localStorage + DB)
       clearState();

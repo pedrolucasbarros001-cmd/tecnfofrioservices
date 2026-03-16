@@ -33,6 +33,7 @@ import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useServiceFinancialData } from '@/hooks/useServiceFinancialData';
 import { ServicePartsHistory } from '@/components/shared/ServicePartsHistory';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import type { Service, PaymentMethod, ServiceStatus } from '@/types/database';
@@ -150,8 +151,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
         profile?.full_name || undefined
       );
 
-      queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-      queryClient.invalidateQueries({ queryKey: ['service-payments-history'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (newBalance > 0) {
         toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado. Em falta: €${newBalance.toFixed(2)}`);

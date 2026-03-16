@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { invalidateServiceQueries } from "@/lib/queryInvalidation";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logServiceStart, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
@@ -292,9 +293,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       logServiceStart(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id).catch(() => { });
 
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-office-services"] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success(`Em execução! ${service.code} está a ser reparado.`);
 
       if (derivedResumeStep && derivedResumeStep !== 'resumo' && derivedResumeStep !== 'resumo_continuacao') {
@@ -379,7 +378,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       }
 
       setFormData(prev => ({ ...prev, articlesLocked: true }));
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success("Artigos registados e confirmados!");
     } catch (error) {
       console.error("Error saving articles:", error);
@@ -424,7 +423,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success("Pedidos de peças registados com sucesso");
       clearState();
       saveStateToDb(null as any);
@@ -489,8 +488,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
 
-      queryClient.invalidateQueries({ queryKey: ["service-full", service.id] });
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       clearState();
       saveStateToDb(null as any);
       toast.success(hasPricingPreDefined ? `${service.code} concluído! Verifica débito em portal.` : `${service.code} concluído! Aguarda precificação.`);
@@ -1278,7 +1276,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               }
             }
 
-            queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
+            invalidateServiceQueries(queryClient, service.id);
             setShowCamera(false);
             toast.success(images.length > 1 ? `${images.length} fotos guardadas!` : "Foto guardada!");
           } catch (error) {

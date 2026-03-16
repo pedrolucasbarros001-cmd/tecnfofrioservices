@@ -3,14 +3,7 @@ import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integration
 import type { Service, ServiceStatus, ServicePart, ServicePhoto, ServiceSignature, ServicePayment } from '@/types/database';
 import { toast } from 'sonner';
 
-// Helper para invalidar TODAS as queries de serviços
-function invalidateAllServiceQueries(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
-}
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 
 interface UseServicesOptions {
   status?: ServiceStatus | 'all' | 'pending_pricing';
@@ -380,8 +373,8 @@ export function useCreateService() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      invalidateAllServiceQueries(queryClient);
+    onSuccess: (data) => {
+      invalidateServiceQueries(queryClient, data?.id);
       toast.success('Serviço criado com sucesso!');
     },
     onError: (error: Error) => {
@@ -493,15 +486,7 @@ export function useUpdateService() {
       // We can't easily rollback lists without snapshotting them all, but invalidation will fix it
     },
     onSettled: (data, error, variables) => {
-      // Always refetch after error or success to ensure cache consistency
-      queryClient.invalidateQueries({ queryKey: ['service', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-
-      // Also invalidate technician specific lists
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-      queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+      invalidateServiceQueries(queryClient, variables.id);
 
       if (data && !data.skipToast) {
         toast.success('Serviço atualizado!');
@@ -523,7 +508,7 @@ export function useDeleteService() {
       if (error) throw error;
     },
     onSuccess: () => {
-      invalidateAllServiceQueries(queryClient);
+      invalidateServiceQueries(queryClient);
       toast.success('Serviço eliminado!');
     },
     onError: (error) => {

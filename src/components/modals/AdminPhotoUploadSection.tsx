@@ -8,6 +8,7 @@ import { CameraCapture } from '@/components/shared/CameraCapture';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { uploadServicePhoto } from '@/utils/photoUpload';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PHOTO_TYPE_LABELS, type PhotoType } from '@/types/database';
@@ -50,8 +51,7 @@ export function AdminPhotoUploadSection({ serviceId }: AdminPhotoUploadSectionPr
           `Foto adicionada pelo administrador (${PHOTO_TYPE_LABELS[photoType as PhotoType] || photoType})`
         );
       }
-      queryClient.invalidateQueries({ queryKey: ['service-photos-admin', serviceId] });
-      queryClient.invalidateQueries({ queryKey: ['full-service-data', serviceId] });
+      invalidateServiceQueries(queryClient, serviceId);
       toast.success(`${images.length} foto(s) adicionada(s) com sucesso`);
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -70,8 +70,7 @@ export function AdminPhotoUploadSection({ serviceId }: AdminPhotoUploadSectionPr
       toast.error('Erro ao eliminar foto');
       throw error;
     }
-    queryClient.invalidateQueries({ queryKey: ['service-photos-admin', serviceId] });
-    queryClient.invalidateQueries({ queryKey: ['full-service-data', serviceId] });
+    invalidateServiceQueries(queryClient, serviceId);
     toast.success('Foto eliminada');
   };
 

@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { logPayment } from '@/utils/activityLogUtils';
 import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import type { Service, PaymentMethod } from '@/types/database';
 
@@ -122,7 +123,7 @@ export function FieldPaymentStep({
                 profile?.full_name || undefined
             );
 
-            queryClient.invalidateQueries({ queryKey: ['service-payments'] });
+            invalidateServiceQueries(queryClient, service.id);
 
             toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado`);
 

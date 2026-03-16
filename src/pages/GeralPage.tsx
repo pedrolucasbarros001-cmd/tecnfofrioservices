@@ -40,6 +40,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 
 export default function GeralPage() {
@@ -309,8 +310,7 @@ export default function GeralPage() {
       if (error) throw error;
 
       toast.success('Pedido de artigo cancelado. O serviço voltou para "Pedir Peça".');
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['all-pending-parts'] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (error) {
       console.error('Error cancelling part order:', error);
       toast.error('Erro ao cancelar o pedido do artigo.');

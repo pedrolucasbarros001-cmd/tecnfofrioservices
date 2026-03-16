@@ -17,6 +17,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { technicianUpdateService } from '@/utils/technicianRpc';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -219,9 +220,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       }
 
       toast.success('Serviço atualizado!');
-      queryClient.invalidateQueries({ queryKey: ['service-parts-edit', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['activity-logs', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
+      onOpenChange(false);
       onOpenChange(false);
     } catch (err) {
       console.error('Error updating service:', err);

@@ -17,6 +17,7 @@ import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceM
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import type { Service } from '@/types/database';
 
 type FlowType = 'visit' | 'installation' | 'delivery' | null;
@@ -124,7 +125,7 @@ export default function ServicosPage() {
     setSelectedService(null);
     setActiveFlow(null);
     setFlowMode("normal");
-    queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+    invalidateServiceQueries(queryClient);
   };
 
   // Get button config based on service type

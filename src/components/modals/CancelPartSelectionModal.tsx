@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -108,9 +109,7 @@ export function CancelPartSelectionModal({ service, open, onOpenChange, onSucces
                 toast.success(`${selectedPartIds.length} artigo(s) cancelado(s) com sucesso.`);
             }
 
-            queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-            queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
-            queryClient.invalidateQueries({ queryKey: ['services'] });
+            invalidateServiceQueries(queryClient, service.id);
 
             onSuccess?.();
             onOpenChange(false);

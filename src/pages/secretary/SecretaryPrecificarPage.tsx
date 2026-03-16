@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -122,7 +123,7 @@ export default function SecretaryPrecificarPage() {
         service={selectedService}
         open={showDetailSheet}
         onOpenChange={setShowDetailSheet}
-        onServiceUpdated={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
+        onServiceUpdated={() => invalidateServiceQueries(queryClient)}
       />
 
       <SetPriceModal
@@ -130,7 +131,7 @@ export default function SecretaryPrecificarPage() {
         open={showSetPriceModal}
         onOpenChange={(open) => {
           setShowSetPriceModal(open);
-          if (!open) queryClient.invalidateQueries({ queryKey: ['services'] });
+          if (!open) invalidateServiceQueries(queryClient);
         }}
       />
     </div>

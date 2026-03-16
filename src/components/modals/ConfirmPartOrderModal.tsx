@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useUpdateService } from '@/hooks/useServices';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import {
   Select,
   SelectContent,
@@ -196,9 +197,7 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
         toast.info('Nenhum artigo registado.');
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       onOpenChange(false);
     } catch (error) {

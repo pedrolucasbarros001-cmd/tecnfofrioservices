@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import {
   MapPin,
   Phone,
@@ -466,8 +467,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         toast.success(`Pedido do artigo "${partName}" cancelado.`);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
-      queryClient.invalidateQueries({ queryKey: ['full-service-data', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (err) {
       console.error('Error cancelling part:', err);
       toast.error('Erro ao cancelar pedido de peça');
@@ -485,9 +485,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       if (error) throw error;
 
       if (service?.id) {
-        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
-        queryClient.invalidateQueries({ queryKey: ['service-full', service.id] });
-        queryClient.invalidateQueries({ queryKey: ['service-consult', service.id] });
+        invalidateServiceQueries(queryClient, service.id);
       }
       toast.success('Foto eliminada com sucesso');
     } catch (error) {
@@ -1463,8 +1461,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     skipToast: true,
                   });
 
-                  queryClient.invalidateQueries({ queryKey: ['service-payments'] });
-                  queryClient.invalidateQueries({ queryKey: ['full-service-data'] });
+                  invalidateServiceQueries(queryClient, service.id);
                   setPaymentToDelete(null);
                   const newTotalPaid = (service?.amount_paid || 0) - (paymentToDelete?.amount || 0);
                   toast.success(`Pagamento de ${safeNumber(paymentToDelete?.amount).toFixed(2)} € eliminado. Novo total pago: ${safeNumber(newTotalPaid).toFixed(2)} €`);

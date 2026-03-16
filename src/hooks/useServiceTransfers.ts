@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -122,6 +123,7 @@ export function useCreateTransferRequest() {
       return data;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Pedido de transferência enviado!');
@@ -174,9 +176,8 @@ export function useAcceptTransferRequest() {
       return request;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Transferência aceite! O serviço foi movido para si.');
     },
@@ -206,6 +207,7 @@ export function useRejectTransferRequest() {
       if (error) throw error;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Transferência recusada.');

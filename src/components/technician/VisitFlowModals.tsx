@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
+import { invalidateServiceQueries } from "@/lib/queryInvalidation";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logWorkshopPickup, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";
@@ -302,8 +303,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       });
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+      invalidateServiceQueries(queryClient, service.id);
 
       if (derivedResumeStep && derivedResumeStep !== "resumo" && derivedResumeStep !== "resumo_continuacao") {
         safeSetStep(derivedResumeStep);
@@ -352,7 +352,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["service-photos", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       setShowCamera(false);
       toast.success(images.length > 1 ? `${images.length} fotos guardadas!` : "Foto guardada!");
     } catch (error) {
@@ -438,7 +438,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       }
 
       setFormData(prev => ({ ...prev, articlesLocked: true }));
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success("Artigos registados e confirmados!");
     } catch (error) {
       console.error("Error saving articles:", error);
@@ -634,10 +634,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         toast.success("Visita concluída com sucesso!");
       }
 
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      queryClient.invalidateQueries({ queryKey: ["technician-services"] });
-      queryClient.invalidateQueries({ queryKey: ["service-signatures", service.id] });
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
 
       clearState();
       saveStateToDb(null as any);

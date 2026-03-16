@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { Camera, Send, User, MessageSquare, X, Pencil } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -125,7 +126,7 @@ export function TechnicianServiceSheet({
           if (photoError) throw photoError;
         }
         if (capturedPhotos.length > 0) noteText += ` (${capturedPhotos.length} foto${capturedPhotos.length > 1 ? 's' : ''} anexada${capturedPhotos.length > 1 ? 's' : ''})`;
-        queryClient.invalidateQueries({ queryKey: ['service-photos', service.id] });
+        invalidateServiceQueries(queryClient, service.id);
       }
 
       // Log activity
@@ -140,7 +141,7 @@ export function TechnicianServiceSheet({
       toast.success('Registo adicionado!');
       setNewNote('');
       setCapturedPhotos([]);
-      queryClient.invalidateQueries({ queryKey: ['activity-logs', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
     } catch (err) {
       console.error('Error adding record:', err);
       toast.error('Erro ao adicionar registo');
