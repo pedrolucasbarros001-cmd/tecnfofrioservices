@@ -45,7 +45,7 @@ const emptyPart = (isRequested = false): NewPart => ({
 });
 
 export function TechnicianEditServiceModal({ service, open, onOpenChange }: TechnicianEditServiceModalProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -125,10 +125,10 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
       // Update service fields
       const updates: Record<string, any> = {};
-      if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: ${brand}`); }
-      if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: ${model}`); }
-      if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: ${serialNumber}`); }
-      if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: ${applianceType}`); }
+      if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: "${service.brand || '(vazio)'}" → "${brand}"`); }
+      if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: "${service.model || '(vazio)'}" → "${model}"`); }
+      if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: "${service.serial_number || '(vazio)'}" → "${serialNumber}"`); }
+      if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: "${service.appliance_type || '(vazio)'}" → "${applianceType}"`); }
 
       // Use technician_update_service RPC for status-safe fields
       if (detectedFault !== (service.detected_fault || '') || workPerformed !== (service.work_performed || '')) {
@@ -138,8 +138,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           workPerformed: workPerformed || null,
         });
         if (rpcError) throw rpcError;
-        if (detectedFault !== (service.detected_fault || '')) changes.push('Diagnóstico atualizado');
-        if (workPerformed !== (service.work_performed || '')) changes.push('Trabalho realizado atualizado');
+        if (detectedFault !== (service.detected_fault || '')) changes.push(`Diagnóstico: "${service.detected_fault || '(vazio)'}" → "${detectedFault}"`);
+        if (workPerformed !== (service.work_performed || '')) changes.push(`Trabalho realizado: "${service.work_performed || '(vazio)'}" → "${workPerformed}"`);
       }
 
       // Update equipment fields directly
@@ -152,7 +152,14 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       }
 
       // Delete parts (marking) - actual deletion via admin or if owner
+      const removedPartNames: string[] = [];
       if (partsToDelete.length > 0) {
+        // Collect names before deleting
+        for (const partId of partsToDelete) {
+          const found = existingParts.find(p => p.id === partId);
+          if (found) removedPartNames.push(found.part_name);
+        }
+
         const { error: delError } = await supabase
           .from('service_parts')
           .delete()
@@ -160,16 +167,18 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
         if (delError) {
           console.warn('Technician marked parts for deletion but likely lacked RLS permissions:', delError);
-          changes.push(`${partsToDelete.length} artigo(s) marcados para remoção (aguarda admin)`);
+          changes.push(`Marcado p/ remoção: ${removedPartNames.join(', ')}`);
         } else {
-          changes.push(`${partsToDelete.length} artigo(s) removido(s)`);
+          changes.push(`Removido: ${removedPartNames.join(', ')}`);
         }
       }
 
       // Insert new parts
+      const addedPartNames: string[] = [];
       if (newParts.length > 0) {
         const validParts = newParts.filter(p => p.part_name.trim());
         if (validParts.length > 0) {
+          addedPartNames.push(...validParts.map(p => p.part_name.trim()));
           const { error: insertError } = await supabase.from('service_parts').insert(
             validParts.map(p => ({
               service_id: service.id,
@@ -181,18 +190,31 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             }))
           );
           if (insertError) throw insertError;
-          changes.push(`${validParts.length} artigo(s) adicionado(s)`);
+          changes.push(`Adicionado: ${addedPartNames.join(', ')}`);
         }
       }
 
-      // Log activity
+      // Log activity with full audit trail
       if (changes.length > 0) {
+        const actorName = profile?.full_name || 'Desconhecido';
         await logActivity({
           serviceId: service.id,
           actorId: user?.id,
           actionType: 'servico_editado',
-          description: `Serviço editado: ${changes.join('; ')}`,
+          description: `Técnico ${actorName} editou ${service.code}: ${changes.join('; ')}`,
           isPublic: true,
+          metadata: {
+            previous: {
+              brand: service.brand,
+              model: service.model,
+              serial_number: service.serial_number,
+              appliance_type: service.appliance_type,
+              detected_fault: service.detected_fault,
+              work_performed: service.work_performed,
+            },
+            partsRemoved: removedPartNames,
+            partsAdded: addedPartNames,
+          },
         });
       }
 
