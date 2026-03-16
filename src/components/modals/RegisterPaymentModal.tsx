@@ -33,6 +33,7 @@ import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { useServiceFinancialData } from '@/hooks/useServiceFinancialData';
 import { ServicePartsHistory } from '@/components/shared/ServicePartsHistory';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import type { Service, PaymentMethod, ServiceStatus } from '@/types/database';
