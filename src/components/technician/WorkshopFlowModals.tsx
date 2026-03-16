@@ -422,7 +422,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       });
       if (rpcError) throw rpcError;
 
-      queryClient.invalidateQueries({ queryKey: ["service-parts", service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success("Pedidos de peças registados com sucesso");
       clearState();
       saveStateToDb(null as any);
