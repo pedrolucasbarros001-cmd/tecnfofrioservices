@@ -123,6 +123,7 @@ export function useCreateTransferRequest() {
       return data;
     },
     onSuccess: () => {
+      invalidateServiceQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['pending-transfer-requests'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Pedido de transferência enviado!');
