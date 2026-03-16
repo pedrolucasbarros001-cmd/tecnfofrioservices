@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { invalidateServiceQueries } from "@/lib/queryInvalidation";
 import { useUpdateService } from "@/hooks/useServices";
 import { useAuth } from "@/contexts/AuthContext";
 import { logServiceStart, logPartRequest, logServiceCompletion } from "@/utils/activityLogUtils";

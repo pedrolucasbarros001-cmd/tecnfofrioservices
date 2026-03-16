@@ -27,6 +27,7 @@ import { humanizeError } from '@/utils/errorMessages';
 import { buildFullAddress } from '@/utils/addressUtils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { FieldPaymentStep } from '@/components/technician/FieldPaymentStep';
