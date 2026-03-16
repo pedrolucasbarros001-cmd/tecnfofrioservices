@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { Camera, Send, User, MessageSquare, X, Pencil } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
