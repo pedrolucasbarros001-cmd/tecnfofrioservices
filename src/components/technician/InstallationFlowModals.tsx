@@ -244,7 +244,7 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
 
       setFormData(prev => ({ ...prev, usedMaterials: materials }));
       setShowMaterialsModal(false);
-      queryClient.invalidateQueries({ queryKey: ['service-parts', service.id] });
+      invalidateServiceQueries(queryClient, service.id);
       toast.success('Materiais registados!');
 
       // Advance to next step
