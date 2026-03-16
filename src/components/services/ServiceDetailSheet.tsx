@@ -241,6 +241,116 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<ServicePayment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [isSendingPartNotice, setIsSendingPartNotice] = useState(false);
+
+  // Email Functions
+  const handleSendPaymentReminder = async () => {
+    if (!service?.customer?.email) {
+      toast.error('O cliente não tem email registado.');
+      return;
+    }
+    
+    setIsSendingReminder(true);
+    try {
+      const debtAmount = (safeNumber(service?.final_price) - safeNumber((fullData?.payments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0))).toFixed(2);
+      
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="color: #0b4a99; border-bottom: 2px solid #0b4a99; padding-bottom: 10px;">Aviso de Pagamento Pendente</h2>
+          <p>Caro(a) <strong>${service.customer.name}</strong>,</p>
+          <p>Verificamos que existe um valor pendente referente à reparação do seu equipamento (Serviço #${service.code}).</p>
+          
+          <div style="margin: 30px 0; padding: 20px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; text-align: center;">
+            <p style="margin: 0; font-size: 16px; color: #856404;">Valor em Débito:</p>
+            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #d39e00;">${debtAmount} €</p>
+          </div>
+          
+          <p>Agradecemos a liquidação do valor com a maior brevidade possível para concluir o processo de faturação.</p>
+          <p>Em caso de dúvida ou se já efetuou o pagamento, por favor ignore esta mensagem ou contacte-nos.</p>
+          
+          <p style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">Com os melhores cumprimentos,<br>A Equipa Tecnofrio Services</p>
+        </div>
+      `;
+      
+      await supabase.functions.invoke('send-email-notification', {
+        body: {
+          to: service.customer.email,
+          subject: `Lembrete de Pagamento - Serviço ${service.code}`,
+          html: emailHtml
+        }
+      });
+      
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'nota_adicionada',
+        description: `Lembrete de pagamento (${debtAmount}€) enviado por email para ${service.customer.email}`,
+        isPublic: true,
+      });
+
+      toast.success('Lembrete de pagamento enviado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao enviar lembrete:', error);
+      toast.error('Ocorreu um erro ao enviar o lembrete.');
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
+
+  const handleSendPartNotice = async () => {
+    if (!service?.customer?.email) {
+      toast.error('O cliente não tem email registado.');
+      return;
+    }
+    
+    setIsSendingPartNotice(true);
+    try {
+      const pendingParts = (fullData?.parts || []).filter((p: any) => p.is_requested && !p.arrived);
+      const partsListHtml = pendingParts.map((p: any) => `<li>${p.part_name}</li>`).join('');
+      
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="color: #e67e22; border-bottom: 2px solid #e67e22; padding-bottom: 10px;">Aviso: A Aguardar Material</h2>
+          <p>Caro(a) <strong>${service.customer.name}</strong>,</p>
+          <p>Informamos que a reparação do seu equipamento encontra-se de momento a <strong>aguardar a receção do seguinte material</strong> pelos nossos fornecedores:</p>
+          
+          <ul style="margin: 20px 0; padding-left: 20px; color: #555;">
+            ${partsListHtml || '<li>Material de reparação</li>'}
+          </ul>
+          
+          <p>Estaremos a monitorizar a encomenda e entraremos em contacto consigo para agendar a intervenção assim que o material dê entrada nas nossas instalações.</p>
+          <p>Agradecemos a sua compreensão e paciência.</p>
+          
+          <p style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">Com os melhores cumprimentos,<br>A Equipa Tecnofrio Services</p>
+        </div>
+      `;
+      
+      await supabase.functions.invoke('send-email-notification', {
+        body: {
+          to: service.customer.email,
+          subject: `Aviso de Material - Serviço ${service.code}`,
+          html: emailHtml
+        }
+      });
+      
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'nota_adicionada',
+        description: `Aviso "Aguardar Peça" enviado por email para ${service.customer.email}`,
+        isPublic: true,
+      });
+
+      toast.success('Aviso de espera de peça enviado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao enviar aviso:', error);
+      toast.error('Ocorreu um erro ao enviar o aviso.');
+    } finally {
+      setIsSendingPartNotice(false);
+    }
+  };
 
   // Consolidate status, parts, payments, photos, signatures into one request (logs loaded separately)
   const { data: fullData, isLoading: isLoadingFull } = useFullServiceData(service?.id, open);
@@ -948,9 +1058,28 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                       <span>{(safeNumber(service?.final_price) - safeNumber(totalPaidAmount)).toFixed(2)} €</span>
                     </div>
                     {safeNumber(service?.final_price) > 0 && safeNumber(totalPaidAmount) < safeNumber(service?.final_price) && (
-                      <div className="flex justify-between text-sm font-medium p-2 rounded bg-destructive/10 text-destructive">
-                        <span>🔴 Em Débito</span>
-                        <span>{(safeNumber(service?.final_price) - safeNumber(totalPaidAmount)).toFixed(2)} €</span>
+                      <div className="flex flex-col gap-2 mt-2">
+                        <div className="flex justify-between text-sm font-medium p-2 rounded bg-destructive/10 text-destructive">
+                          <span>🔴 Em Débito</span>
+                          <span>{(safeNumber(service?.final_price) - safeNumber(totalPaidAmount)).toFixed(2)} €</span>
+                        </div>
+                        {(role === 'dono' || role === 'secretaria') && service.customer?.email && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full border-destructive text-destructive hover:bg-destructive hover:text-white transition-colors"
+                            onClick={handleSendPaymentReminder}
+                            disabled={isSendingReminder}
+                          >
+                            <Mail className="h-4 w-4 mr-2" />
+                            {isSendingReminder ? 'A enviar lembrete...' : 'Enviar Lembrete de Pagamento'}
+                          </Button>
+                        )}
+                        {(role === 'dono' || role === 'secretaria') && !service.customer?.email && (
+                          <div className="text-[10px] text-center text-muted-foreground uppercase">
+                            Para enviar lembrete, edite a ficha e adicione um email.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1133,6 +1262,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
               onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
               onCancelPartOrder={(role === 'dono' || role === 'secretaria') ? handleCancelPartOrder : undefined}
+              onNotifyPartWait={(role === 'dono' || role === 'secretaria') ? handleSendPartNotice : undefined}
               onCancel={(role === 'dono' || role === 'secretaria') && service.status !== 'cancelado' && service.status !== 'finalizado' ? () => setShowCancelDialog(true) : undefined}
               onReopen={(role === 'dono' || role === 'secretaria') && service.status === 'cancelado' ? handleReopenService : undefined}
             />

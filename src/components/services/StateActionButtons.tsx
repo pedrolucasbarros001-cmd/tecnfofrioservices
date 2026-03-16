@@ -15,6 +15,7 @@ import {
   CalendarClock,
   Pencil,
   Ban,
+  Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,6 +48,7 @@ interface StateActionButtonsProps {
   onCancel?: () => void;
   onReopen?: () => void;
   onCancelPartOrder?: () => void;
+  onNotifyPartWait?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -79,6 +81,7 @@ export function StateActionButtons({
   onCancel,
   onReopen,
   onCancelPartOrder,
+  onNotifyPartWait,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -259,6 +262,14 @@ export function StateActionButtons({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCancelPartOrder(); }} className="text-amber-600">
               <Package className="h-4 w-4 mr-2" />
               Cancelar Pedido de Artigo
+            </DropdownMenuItem>
+          )}
+
+          {/* Notify part wait */}
+          {service?.status === 'em_espera_de_peca' && (isDono || isSecretaria) && onNotifyPartWait && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNotifyPartWait(); }} className="text-orange-600">
+              <Mail className="h-4 w-4 mr-2" />
+              Notificar Atraso da Peça
             </DropdownMenuItem>
           )}
 

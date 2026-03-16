@@ -114,6 +114,7 @@ interface VisitFormData {
   productPNC: string;
   productType: string;
   partInstalled: boolean;
+  sendEmailReport: boolean;
   [key: string]: unknown;
 }
 
@@ -137,6 +138,7 @@ const INITIAL_FORM_DATA: VisitFormData = {
   productPNC: "",
   productType: "",
   partInstalled: false,
+  sendEmailReport: false,
 };
 
 export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "normal" }: VisitFlowModalsProps) {
@@ -580,6 +582,55 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         if (!existingSig) {
           await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
+
+        // --- EMAIL LOGIC ---
+        if (formData.sendEmailReport && service.customer?.email) {
+          try {
+            const emailHtml = `
+              <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+                <h2 style="color: #0b4a99; border-bottom: 2px solid #0b4a99; padding-bottom: 10px;">Relatório de Intervenção Técnica</h2>
+                <p>Caro(a) <strong>${service.customer.name}</strong>,</p>
+                <p>Abaixo encontra o resumo da intervenção técnica realizada.</p>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                  <tr><td style="padding: 8px; border-bottom: 1px solid #ddd; width: 40%;"><strong>Equipamento:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${formData.productType || service.appliance_type || 'N/A'}</td></tr>
+                  <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Marca/Modelo:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${formData.productBrand || service.brand || 'N/A'} / ${formData.productModel || service.model || 'N/A'}</td></tr>
+                  <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Avaria Reportada:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${service.fault_description || 'N/A'}</td></tr>
+                  <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Diagnóstico/Avaria:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${formData.detectedFault || service.detected_fault || 'N/A'}</td></tr>
+                  <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Trabalho Realizado:</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${mode === "continuacao_peca" ? "Artigo instalado e serviço concluído" : "Reparado no local do cliente"}</td></tr>
+                </table>
+                
+                <h4 style="margin-top: 30px; margin-bottom: 10px;">Artigos Aplicados:</h4>
+                <ul style="padding-left: 20px;">
+                  ${formData.articles.map((a: any) => `<li style="margin-bottom: 5px;">${a.quantity}x ${a.description} - ${(a.quantity * a.unit_price).toFixed(2)}€</li>`).join('') || '<li>Nenhum artigo aplicado.</li>'}
+                </ul>
+                
+                <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; text-align: right;">
+                  <span style="font-size: 14px; color: #555;">Total Previsto:</span>
+                  <span style="font-size: 20px; font-weight: bold; color: #0b4a99; margin-left: 10px;">${totalFinal.toFixed(2)} €</span>
+                </div>
+                
+                <p style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">Obrigado por preferir a Tecnofrio Services.</p>
+              </div>
+            `;
+            
+            await supabase.functions.invoke('send-email-notification', {
+              body: {
+                to: service.customer.email,
+                subject: `Relatório de Intervenção - ${service.code}`,
+                html: emailHtml
+              }
+            });
+            console.log("Relatório enviado por email");
+          } catch (e) {
+            console.error("Erro ao enviar email:", e);
+            toast.error("Serviço guardado, mas o envio do email falhou.");
+          }
+        } else if (formData.sendEmailReport && !service.customer?.email) {
+          toast.warning("Serviço concluído. O cliente não tem email registado.");
+        }
+        // --- END EMAIL LOGIC ---
+
         toast.success("Visita concluída com sucesso!");
       }
 
@@ -1358,6 +1409,22 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                 <h3 className="font-semibold text-lg">O artigo encomendado foi instalado?</h3>
                 <p className="text-sm text-muted-foreground">Confirme se o artigo que chegou foi instalado com sucesso.</p>
               </div>
+
+              <label className="flex items-center gap-3 p-3 mt-4 bg-muted/30 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex h-5 items-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    checked={formData.sendEmailReport}
+                    onChange={(e) => setFormData(p => ({ ...p, sendEmailReport: e.target.checked }))}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Enviar relatório da intervenção por email</span>
+                  <span className="text-xs text-muted-foreground">O cliente receberá um resumo automático do serviço.</span>
+                </div>
+              </label>
+
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <Button variant="outline" className="h-20 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={handleClose}>
                   <X className="h-6 w-6 text-red-500" />
@@ -1419,6 +1486,23 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                   </p>
                 </div>
               </div>
+
+              {formData.articlesLocked && (
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex h-5 items-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                      checked={formData.sendEmailReport}
+                      onChange={(e) => setFormData(p => ({ ...p, sendEmailReport: e.target.checked }))}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">Enviar relatório da intervenção por email</span>
+                    <span className="text-xs text-muted-foreground">O cliente receberá um resumo em PDF/Email.</span>
+                  </div>
+                </label>
+              )}
             </div>
             <DialogFooter className="flex gap-2 mt-4">
               <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>
