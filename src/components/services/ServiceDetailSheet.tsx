@@ -311,7 +311,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       // Update timestamp for record keeping
       await supabase
         .from('services')
-        .update({ last_part_notice_sent_at: new Date().toISOString() })
+        .update({ last_part_notice_sent_at: new Date().toISOString() } as any)
         .eq('id', service.id);
       
       await logActivity({
