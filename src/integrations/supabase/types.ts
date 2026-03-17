@@ -363,6 +363,61 @@ export type Database = {
         }
         Relationships: []
       }
+      service_documents: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          service_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id?: string
+          service_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          service_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_documents_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_documents_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_documents_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_parts: {
         Row: {
           arrived: boolean | null
@@ -704,7 +759,10 @@ export type Database = {
           is_urgent: boolean | null
           is_warranty: boolean | null
           labor_cost: number | null
+          last_part_notice_sent_at: string | null
+          last_payment_reminder_sent_at: string | null
           last_status_before_part_request: string | null
+          last_visit_report_sent_at: string | null
           model: string | null
           notes: string | null
           parts_cost: number | null
@@ -752,7 +810,10 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           labor_cost?: number | null
+          last_part_notice_sent_at?: string | null
+          last_payment_reminder_sent_at?: string | null
           last_status_before_part_request?: string | null
+          last_visit_report_sent_at?: string | null
           model?: string | null
           notes?: string | null
           parts_cost?: number | null
@@ -800,7 +861,10 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           labor_cost?: number | null
+          last_part_notice_sent_at?: string | null
+          last_payment_reminder_sent_at?: string | null
           last_status_before_part_request?: string | null
+          last_visit_report_sent_at?: string | null
           model?: string | null
           notes?: string | null
           parts_cost?: number | null

@@ -188,8 +188,8 @@ export default function ServicosPage() {
                 </Badge>
                 <StateActionButtons
                   service={service}
-                  onViewDetails={(e) => {
-                    e.stopPropagation();
+                  onAssignTechnician={() => {}}
+                  onViewDetails={() => {
                     // If we had a detail sheet here...
                   }}
                   onAttachDocument={() => {

@@ -64,7 +64,7 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
 
       // 2. Insert record into service_documents table
       const { error: dbError } = await supabase
-        .from('service_documents')
+        .from('service_documents' as any)
         .insert({
           service_id: serviceId,
           file_name: selectedFile.name,

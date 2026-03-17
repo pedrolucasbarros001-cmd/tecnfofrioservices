@@ -269,7 +269,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       // Update timestamp for record keeping
       await supabase
         .from('services')
-        .update({ last_payment_reminder_sent_at: new Date().toISOString() })
+        .update({ last_payment_reminder_sent_at: new Date().toISOString() } as any)
         .eq('id', service.id);
       
       const debtAmount = (safeNumber(service?.final_price) - safeNumber((fullData?.payments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0))).toFixed(2);
@@ -311,7 +311,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       // Update timestamp for record keeping
       await supabase
         .from('services')
-        .update({ last_part_notice_sent_at: new Date().toISOString() })
+        .update({ last_part_notice_sent_at: new Date().toISOString() } as any)
         .eq('id', service.id);
       
       await logActivity({
@@ -1257,13 +1257,13 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                   if (confirm('Tem a certeza que deseja eliminar este documento?')) {
                                     try {
                                       const { error: storageError } = await supabase.storage
-                                        .from('service_documents')
+                                        .from('service_documents' as any)
                                         .remove([doc.file_url]);
                                         
                                       if (storageError) throw storageError;
                                       
                                       const { error: dbError } = await supabase
-                                        .from('service_documents')
+                                        .from('service_documents' as any)
                                         .delete()
                                         .eq('id', doc.id);
                                         

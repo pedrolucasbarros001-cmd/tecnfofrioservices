@@ -96,6 +96,7 @@ import type { Customer, Service, ServiceStatus } from '@/types/database';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
+import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 
 interface CustomerDetailSheetProps {
   open: boolean;

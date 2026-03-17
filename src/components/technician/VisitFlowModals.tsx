@@ -598,7 +598,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             // Update timestamp for record keeping
             await supabase
               .from('services')
-              .update({ last_visit_report_sent_at: new Date().toISOString() })
+              .update({ last_visit_report_sent_at: new Date().toISOString() } as any)
               .eq('id', service.id);
             
             console.log("Relatório enviado com sucesso.");
