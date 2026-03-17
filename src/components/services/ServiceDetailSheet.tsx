@@ -1263,7 +1263,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                       if (storageError) throw storageError;
                                       
                                       const { error: dbError } = await supabase
-                                        .from('service_documents')
+                                        .from('service_documents' as any)
                                         .delete()
                                         .eq('id', doc.id);
                                         

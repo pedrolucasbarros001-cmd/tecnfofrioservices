@@ -142,13 +142,13 @@ export default function OficinaPage() {
                     <div className="flex flex-col gap-1 items-end">
                       <StateActionButtons
                         service={service}
-                        onAssignTechnician={(e) => handleAssignClick(e, service)}
+                        onAssignTechnician={() => handleAssignClick(undefined, service)}
                         onViewDetails={() => handleServiceClick(service)}
                         onAttachDocument={() => {
                           setCurrentService(service);
                           setShowUploadModal(true);
                         }}
-                        viewContext="oficina"
+                        viewContext="na_oficina"
                       />
                       {service.is_urgent && (
                         <Badge variant="destructive" className="animate-pulse flex items-center gap-1">

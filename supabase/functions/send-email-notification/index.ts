@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!RESEND_API_KEY) throw new Error("RESEND_KAY not set");
+    if (!RESEND_API_KEY) throw new Error("RESEND_KAY secret not set");
 
     const body = await req.json();
     const { service_id, action_type, custom_message } = body;
