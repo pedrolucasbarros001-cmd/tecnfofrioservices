@@ -1257,7 +1257,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                   if (confirm('Tem a certeza que deseja eliminar este documento?')) {
                                     try {
                                       const { error: storageError } = await supabase.storage
-                                        .from('service_documents')
+                                        .from('service_documents' as any)
                                         .remove([doc.file_url]);
                                         
                                       if (storageError) throw storageError;
