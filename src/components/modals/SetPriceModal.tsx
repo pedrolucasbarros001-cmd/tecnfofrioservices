@@ -181,7 +181,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
   const finalPrice = warrantyCoversAll ? 0 : Math.max(0, combinedTotal - discountAmount + adjustmentAmount);
 
-  const canSubmit = validAdditionalItems.length > 0;
+  const canSubmit = watchItems.length > 0;
 
   const handleSubmit = async (values: FormValues) => {
     if (!service) return;
@@ -209,13 +209,15 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     const currentStatus = service.status as ServiceStatus;
 
     // Determine next status:
-    // - a_precificar: oficina que precisa de preço
-    // - concluidos + pending_pricing: visita/entrega concluída que aguarda preço
-    // The pricing form is purely a financial update. It MUST never
-    // drive the operational "status" axis by itself. Services remain in
-    // their operational state; financial debt is derived in the UI from
-    // final_price vs amount_paid. Any status transition logic should be
-    // in a dedicated handler/server‑side RPC, not embedded in the form.
+    // If it's a visit (`a_precificar`), we transition it to `finalizado` automatically.
+    // If it's workshop concluded (`concluidos`), it stays in `concluidos` but now without the `pending_pricing` flag.
+    const nextStatus = currentStatus === 'a_precificar' ? 'finalizado' : currentStatus;
+
+    // Determine next location:
+    const nextLocation = currentStatus === 'a_precificar' ? 'entregue' : service.service_location;
+
+    // Determine finalized date if transitioning to finalizado
+    const pickupDate = nextStatus === 'finalizado' ? new Date().toISOString() : service.pickup_date;
     await updateService.mutateAsync({
       id: service.id,
       labor_cost: combinedSubtotal,
@@ -224,6 +226,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       final_price: finalPrice,
       pricing_description: JSON.stringify(pricingData),
       pending_pricing: false,
+      status: nextStatus as any,
+      service_location: nextLocation as any,
+      pickup_date: pickupDate,
       skipToast: true,
     });
 

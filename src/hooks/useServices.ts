@@ -414,7 +414,8 @@ export function useUpdateService() {
       ];
       if (
         updates.status &&
-        Object.keys(updates).some(k => financialKeysPreventingStatus.includes(k))
+        Object.keys(updates).some(k => financialKeysPreventingStatus.includes(k)) &&
+        updates.pending_pricing !== false
       ) {
         console.warn(
           '[useUpdateService] Dropping status because unrelated financial fields are present',
