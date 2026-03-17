@@ -63,8 +63,8 @@ export default function OficinaPage() {
     setShowDetailSheet(true);
   };
 
-  const handleAssignClick = (e: React.MouseEvent, service: Service) => {
-    e.stopPropagation();
+  const handleAssignClick = (e: React.MouseEvent | undefined, service: Service) => {
+    e?.stopPropagation();
     setServiceToAssign(service);
     setShowAssignModal(true);
   };
