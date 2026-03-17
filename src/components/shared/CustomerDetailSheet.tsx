@@ -94,7 +94,8 @@ import { useCreateService } from '@/hooks/useServices';
 import { useUpdateCustomer } from '@/hooks/useCustomers';
 import type { Customer, Service, ServiceStatus } from '@/types/database';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
-import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 
 interface CustomerDetailSheetProps {
   open: boolean;
@@ -126,6 +127,8 @@ export function CustomerDetailSheet({
   const [showCreateServiceModal, setShowCreateServiceModal] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showServiceDetail, setShowServiceDetail] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
   const updateCustomer = useUpdateCustomer();
 
   const form = useForm<CustomerFormValues>({
@@ -475,9 +478,24 @@ export function CustomerDetailSheet({
                                     {service.final_price?.toFixed(2) || '0,00'} €
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusConfig?.color)}>
-                                      {statusConfig?.label}
-                                    </Badge>
+                                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusConfig?.color)}>
+                                        {statusConfig?.label}
+                                      </Badge>
+                                      <StateActionButtons
+                                        service={service}
+                                        onAssignTechnician={() => {
+                                          setSelectedService(service);
+                                          setShowServiceDetail(true);
+                                        }}
+                                        onViewDetails={() => handleViewService(service)}
+                                        onAttachDocument={() => {
+                                          setCurrentServiceId(service.id);
+                                          setShowUploadModal(true);
+                                        }}
+                                        viewContext="all"
+                                      />
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -508,6 +526,12 @@ export function CustomerDetailSheet({
         open={showServiceDetail}
         onOpenChange={setShowServiceDetail}
         onServiceUpdated={handleServiceUpdated}
+      />
+
+      <UploadDocumentModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        serviceId={currentServiceId || ''}
       />
     </>
   );

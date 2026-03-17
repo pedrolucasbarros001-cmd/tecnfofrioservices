@@ -32,6 +32,7 @@ import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceMod
 import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { usePaginatedServices, useUpdateService, useDeleteService, prefetchFullServiceData } from '@/hooks/useServices';
@@ -121,6 +122,7 @@ export default function GeralPage() {
   const [showPartArrivedModal, setShowPartArrivedModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -588,6 +590,10 @@ export default function GeralPage() {
                           onCancelPartOrder={() => handleCancelPartOrder(service)}
                           onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined}
                           onReopen={service.status === 'cancelado' ? () => handleReopenService(service) : undefined}
+                          onAttachDocument={() => {
+                            setCurrentService(service);
+                            setShowUploadDocumentModal(true);
+                          }}
                           viewContext={selectedStatus}
                         />
                       </TableCell>
@@ -698,6 +704,15 @@ export default function GeralPage() {
 
         {/* Detail Sheet */}
         <ServiceDetailSheet service={selectedService} open={showDetailSheet} onOpenChange={setShowDetailSheet} />
+
+        {/* Upload Document Modal */}
+        {currentService && (
+          <UploadDocumentModal 
+            isOpen={showUploadDocumentModal} 
+            onClose={() => setShowUploadDocumentModal(false)} 
+            serviceId={currentService.id} 
+          />
+        )}
       </div>
     </ErrorBoundary>
   );

@@ -257,12 +257,20 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     
     setIsSendingReminder(true);
     try {
-      const { error } = await supabase
+      const { error: emailError } = await supabase.functions.invoke('send-email-notification', {
+        body: { 
+          service_id: service.id, 
+          action_type: 'payment_reminder' 
+        }
+      });
+
+      if (emailError) throw emailError;
+
+      // Update timestamp for record keeping
+      await supabase
         .from('services')
         .update({ last_payment_reminder_sent_at: new Date().toISOString() })
         .eq('id', service.id);
-
-      if (error) throw error;
       
       const debtAmount = (safeNumber(service?.final_price) - safeNumber((fullData?.payments || []).reduce((sum: number, p: any) => sum + (Number(p?.amount) || 0), 0))).toFixed(2);
       
@@ -270,14 +278,14 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
         serviceId: service.id,
         actorId: user?.id,
         actionType: 'nota_adicionada',
-        description: `Lembrete de pagamento (${debtAmount}€) agendado e pedido para envio ao email ${service.customer.email}`,
+        description: `Lembrete de pagamento (${debtAmount}€) enviado com sucesso para ${service.customer.email}`,
         isPublic: true,
       });
 
-      toast.success('Lembrete de pagamento pedido com sucesso!');
+      toast.success('Lembrete de pagamento enviado com sucesso!');
     } catch (error) {
-      console.error('Erro ao pedir lembrete:', error);
-      toast.error('Ocorreu um erro ao pedir o lembrete.');
+      console.error('Erro ao enviar lembrete:', error);
+      toast.error('Falhou o envio do lembrete de pagamento.');
     } finally {
       setIsSendingReminder(false);
     }
@@ -291,25 +299,33 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     
     setIsSendingPartNotice(true);
     try {
-      const { error } = await supabase
+      const { error: emailError } = await supabase.functions.invoke('send-email-notification', {
+        body: { 
+          service_id: service.id, 
+          action_type: 'part_notice' 
+        }
+      });
+
+      if (emailError) throw emailError;
+
+      // Update timestamp for record keeping
+      await supabase
         .from('services')
         .update({ last_part_notice_sent_at: new Date().toISOString() })
         .eq('id', service.id);
-
-      if (error) throw error;
       
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
         actionType: 'nota_adicionada',
-        description: `Aviso "Aguardar Peça" agendado para envio ao email ${service.customer.email}`,
+        description: `Aviso "Aguardar Peça" enviado para ${service.customer.email}`,
         isPublic: true,
       });
 
-      toast.success('Aviso de espera de peça pedido com sucesso!');
+      toast.success('Aviso de espera de peça enviado com sucesso!');
     } catch (error) {
-      console.error('Erro ao pedir aviso:', error);
-      toast.error('Ocorreu um erro ao pedir o aviso.');
+      console.error('Erro ao enviar aviso:', error);
+      toast.error('Falhou o envio do aviso de espera de peça.');
     } finally {
       setIsSendingPartNotice(false);
     }

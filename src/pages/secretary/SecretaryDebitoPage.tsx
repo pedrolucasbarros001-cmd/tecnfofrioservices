@@ -14,6 +14,8 @@ import {
 import { RegisterPaymentModal } from '@/components/modals/RegisterPaymentModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { useServices } from '@/hooks/useServices';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import type { Service } from '@/types/database';
@@ -24,6 +26,7 @@ export default function SecretaryDebitoPage() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
 
@@ -136,22 +139,29 @@ export default function SecretaryDebitoPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleContactClient(service)}
-                          >
-                            <Phone className="h-4 w-4 mr-1" />
-                            Contactar
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleRegisterPayment(service)}
-                          >
-                            <DollarSign className="h-4 w-4 mr-1" />
-                            Registrar
-                          </Button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <StateActionButtons
+                            service={service}
+                            onAssignTechnician={() => {
+                              setCurrentService(service);
+                              // Note: We don't have a showAssignModal in this page yet, 
+                              // but we can add it or just rely on the detail sheet.
+                              // For now, let's just make it do nothing or open details.
+                              setSelectedService(service);
+                              setShowDetailSheet(true);
+                            }}
+                            onViewDetails={() => {
+                              setSelectedService(service);
+                              setShowDetailSheet(true);
+                            }}
+                            onRegisterPayment={() => handleRegisterPayment(service)}
+                            onContactClient={() => handleContactClient(service)}
+                            onAttachDocument={() => {
+                              setCurrentService(service);
+                              setShowUploadModal(true);
+                            }}
+                            viewContext="em_debito"
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -180,6 +190,12 @@ export default function SecretaryDebitoPage() {
         service={selectedService}
         open={showDetailSheet}
         onOpenChange={setShowDetailSheet}
+      />
+
+      <UploadDocumentModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        serviceId={currentService?.id || ''}
       />
     </div>
   );

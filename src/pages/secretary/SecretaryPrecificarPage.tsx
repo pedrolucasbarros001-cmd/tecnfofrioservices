@@ -13,6 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { SetPriceModal } from '@/components/modals/SetPriceModal';
 import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { CustomerLink } from '@/components/shared/CustomerLink';
@@ -26,6 +28,7 @@ export default function SecretaryPrecificarPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showSetPriceModal, setShowSetPriceModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [priceService, setPriceService] = useState<Service | null>(null);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
@@ -103,13 +106,28 @@ export default function SecretaryPrecificarPage() {
                         : "Data indisponível"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        onClick={(e) => handleSetPrice(service, e)}
-                      >
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        Orçamentar
-                      </Button>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <StateActionButtons
+                          service={service}
+                          onAssignTechnician={() => {
+                            setSelectedService(service);
+                            setShowDetailSheet(true);
+                          }}
+                          onViewDetails={() => {
+                            setSelectedService(service);
+                            setShowDetailSheet(true);
+                          }}
+                          onSetPrice={() => {
+                            setPriceService(service);
+                            setShowSetPriceModal(true);
+                          }}
+                          onAttachDocument={() => {
+                            setSelectedService(service);
+                            setShowUploadModal(true);
+                          }}
+                          viewContext="a_precificar"
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -133,6 +151,12 @@ export default function SecretaryPrecificarPage() {
           setShowSetPriceModal(open);
           if (!open) invalidateServiceQueries(queryClient);
         }}
+      />
+
+      <UploadDocumentModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        serviceId={selectedService?.id || ''}
       />
     </div>
   );

@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { AssignTechnicianModal } from '@/components/modals/AssignTechnicianModal';
 import { SendTaskModal } from '@/components/modals/SendTaskModal';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
@@ -21,7 +23,9 @@ export default function OficinaPage() {
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
+  const [currentService, setCurrentService] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const queryClient = useQueryClient();
@@ -136,6 +140,16 @@ export default function OficinaPage() {
                       <ServiceStatusBadge service={service} className="mt-1" />
                     </div>
                     <div className="flex flex-col gap-1 items-end">
+                      <StateActionButtons
+                        service={service}
+                        onAssignTechnician={(e) => handleAssignClick(e, service)}
+                        onViewDetails={() => handleServiceClick(service)}
+                        onAttachDocument={() => {
+                          setCurrentService(service);
+                          setShowUploadModal(true);
+                        }}
+                        viewContext="oficina"
+                      />
                       {service.is_urgent && (
                         <Badge variant="destructive" className="animate-pulse flex items-center gap-1">
                           <AlertCircle className="h-3 w-3" />
@@ -231,6 +245,12 @@ export default function OficinaPage() {
         service={selectedService}
         open={showDetailSheet}
         onOpenChange={setShowDetailSheet}
+      />
+
+      <UploadDocumentModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        serviceId={currentService?.id || ''}
       />
 
       <AssignTechnicianModal

@@ -14,6 +14,8 @@ import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
 import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
 import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceModal';
+import { StateActionButtons } from '@/components/services/StateActionButtons';
+import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,6 +35,8 @@ export default function ServicosPage() {
   const [activeFlow, setActiveFlow] = useState<FlowType>(null);
   const [flowMode, setFlowMode] = useState<"normal" | "continuacao_peca">("normal");
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [serviceToUpload, setServiceToUpload] = useState<Service | null>(null);
 
   // Use React Query for proper caching and refetch
   const queryClient = useQueryClient();
@@ -178,9 +182,23 @@ export default function ServicosPage() {
               <span className="font-mono font-bold text-sm text-foreground">
                 {service.code}
               </span>
-              <Badge variant="secondary" className={cn('text-xs shrink-0', serviceConfig.badgeColor)}>
-                {serviceConfig.badgeLabel}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className={cn('text-xs shrink-0', serviceConfig.badgeColor)}>
+                  {serviceConfig.badgeLabel}
+                </Badge>
+                <StateActionButtons
+                  service={service}
+                  onViewDetails={(e) => {
+                    e.stopPropagation();
+                    // If we had a detail sheet here...
+                  }}
+                  onAttachDocument={() => {
+                    setServiceToUpload(service);
+                    setShowUploadModal(true);
+                  }}
+                  viewContext="all"
+                />
+              </div>
             </div>
 
             {/* Client Name + Phone */}
@@ -358,6 +376,12 @@ export default function ServicosPage() {
       </Button>
 
       <TechQuickServiceModal open={quickCreateOpen} onOpenChange={setQuickCreateOpen} />
+
+      <UploadDocumentModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        serviceId={serviceToUpload?.id || ''}
+      />
     </div>
   );
 }

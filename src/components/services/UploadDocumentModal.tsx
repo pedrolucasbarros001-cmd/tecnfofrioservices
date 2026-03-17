@@ -104,9 +104,9 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Anexar Documento</DialogTitle>
+          <DialogTitle>Anexar Documento / Ficheiro</DialogTitle>
           <DialogDescription>
-            Faça upload de PDF, Word, Excel, ou imagens referentes ao serviço. (Máx: 10MB)
+            Faça upload de qualquer ficheiro relevante para este serviço (PDF, Imagens, Word, Excel, etc). Máximo: 10MB.
           </DialogDescription>
         </DialogHeader>
 
@@ -120,15 +120,15 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
                   <p className="mb-2 text-sm text-muted-foreground">
-                    <span className="font-semibold">Clique para anexar</span> ou arraste o ficheiro
+                    <span className="font-semibold text-primary">Clique para selecionar</span> ou arraste o ficheiro aqui
                   </p>
+                  <p className="text-xs text-muted-foreground">Todos os formatos são aceites até 10MB</p>
                 </div>
                 <Input 
                   id="dropzone-file" 
                   type="file" 
                   className="hidden" 
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                 />
               </Label>
             </div>

@@ -583,18 +583,29 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
         }
 
-        // --- EMAIL LOGIC ---
+        // --- EMAIL LOGIC (DIRECT CALL) ---
         if (formData.sendEmailReport && service.customer?.email) {
           try {
+            const { error: emailError } = await supabase.functions.invoke('send-email-notification', {
+              body: { 
+                service_id: service.id, 
+                action_type: 'visit_report' 
+              }
+            });
+
+            if (emailError) throw emailError;
+
+            // Update timestamp for record keeping
             await supabase
               .from('services')
               .update({ last_visit_report_sent_at: new Date().toISOString() })
               .eq('id', service.id);
             
-            console.log("Pedido de relatório agendado (webhook).");
+            console.log("Relatório enviado com sucesso.");
+            toast.success("Relatório enviado por email ao cliente.");
           } catch (e) {
-            console.error("Erro ao pedir envio de email:", e);
-            toast.error("Serviço guardado, mas o agendamento do email falhou.");
+            console.error("Erro ao enviar email:", e);
+            toast.error("Serviço guardado, mas falhou o envio do relatório por email.");
           }
         } else if (formData.sendEmailReport && !service.customer?.email) {
           toast.warning("Serviço concluído. O cliente não tem email registado.");
