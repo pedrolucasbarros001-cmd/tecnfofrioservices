@@ -1192,6 +1192,8 @@ export type Database = {
         Args: { _detected_fault?: string; _service_id: string }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       start_workshop_service: {
         Args: { _service_id: string }
         Returns: undefined
