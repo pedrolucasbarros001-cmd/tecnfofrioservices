@@ -1,23 +1,34 @@
 import { QueryClient } from "@tanstack/react-query";
 
+type InvalidationScope = 'all' | 'detail' | 'list';
+
 /**
  * Centralized cache invalidation after any service-related mutation.
  * Call this after create/update/delete on services, parts, photos, signatures, payments.
- * This ensures ALL views (admin, secretary, technician, workshop, paginated) refresh immediately.
  *
- * @param serviceId - optional: also invalidates service-specific queries (full data, parts, photos, etc.)
+ * @param serviceId - optional: also invalidates service-specific queries
+ * @param scope - 'all' (default, backwards-compatible), 'detail' (only service-specific), 'list' (only lists)
  */
-export function invalidateServiceQueries(queryClient: QueryClient, serviceId?: string) {
-  // All service list queries
-  queryClient.invalidateQueries({ queryKey: ['services'] });
-  queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-services'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
-  queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
-  queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
+export function invalidateServiceQueries(
+  queryClient: QueryClient,
+  serviceId?: string,
+  scope: InvalidationScope = 'all'
+) {
+  const invalidateLists = scope === 'all' || scope === 'list';
+  const invalidateDetail = scope === 'all' || scope === 'detail';
 
-  // Service-specific queries (detail views)
-  if (serviceId) {
+  if (invalidateLists) {
+    queryClient.invalidateQueries({ queryKey: ['services'] });
+    queryClient.invalidateQueries({ queryKey: ['services-paginated'] });
+    queryClient.invalidateQueries({ queryKey: ['technician-services'] });
+    queryClient.invalidateQueries({ queryKey: ['technician-office-services'] });
+    queryClient.invalidateQueries({ queryKey: ['available-workshop-services'] });
+    queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
+    queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
+    queryClient.invalidateQueries({ queryKey: ['all-pending-parts'] });
+  }
+
+  if (serviceId && invalidateDetail) {
     queryClient.invalidateQueries({ queryKey: ['service', serviceId] });
     queryClient.invalidateQueries({ queryKey: ['service-full', serviceId] });
     queryClient.invalidateQueries({ queryKey: ['service-parts', serviceId] });
@@ -28,10 +39,6 @@ export function invalidateServiceQueries(queryClient: QueryClient, serviceId?: s
     queryClient.invalidateQueries({ queryKey: ['activity-logs', serviceId] });
     queryClient.invalidateQueries({ queryKey: ['service-financial', serviceId] });
   }
-
-  // Related entities
-  queryClient.invalidateQueries({ queryKey: ['pending-parts'] });
-  queryClient.invalidateQueries({ queryKey: ['all-pending-parts'] });
 }
 
 /**

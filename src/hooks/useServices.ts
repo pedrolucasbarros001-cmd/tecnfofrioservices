@@ -63,111 +63,72 @@ export function useServices(options: UseServicesOptions = {}) {
   });
 }
 
+// Shared fetch logic — used by both useFullServiceData and prefetchFullServiceData
+async function fetchFullServiceById(serviceId: string) {
+  const { data, error } = await supabase
+    .from('services')
+    .select(`
+      *,
+      customer:customers(*),
+      technician:technicians!services_technician_id_fkey(*, profile:profiles(*)),
+      parts:service_parts(*),
+      photos:service_photos(*),
+      signatures:service_signatures(*),
+      payments:service_payments(*),
+      documents:service_documents(*)
+    `)
+    .eq('id', serviceId)
+    .single();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const result = data as any;
+
+  const safeDate = (d: any) => {
+    if (!d) return 0;
+    const t = new Date(d).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const safeSort = (arr: any[], dateKey: string) =>
+    Array.isArray(arr)
+      ? [...arr].sort((a, b) => safeDate(b[dateKey]) - safeDate(a[dateKey]))
+      : [];
+
+  return {
+    ...result,
+    parts: result.parts || [],
+    photos: safeSort(result.photos, 'uploaded_at'),
+    signatures: (result.signatures || []).sort((a: any, b: any) =>
+      safeDate(a.signed_at) - safeDate(b.signed_at)
+    ),
+    payments: safeSort(result.payments, 'payment_date'),
+    documents: safeSort(result.documents, 'created_at'),
+    logs: [],
+  } as Service & {
+    parts: ServicePart[];
+    photos: ServicePhoto[];
+    signatures: ServiceSignature[];
+    payments: (ServicePayment & { receiver?: { full_name: string | null } })[];
+    documents: ServiceDocument[];
+    logs: any[];
+  };
+}
+
 export function useFullServiceData(serviceId: string | undefined, enabled: boolean = true) {
   return useQuery({
     queryKey: ['service-full', serviceId],
-    queryFn: async () => {
-      if (!serviceId) return null;
-
-      const { data, error } = await supabase
-        .from('services')
-        .select(`
-          *,
-          customer:customers(*),
-          technician:technicians!services_technician_id_fkey(*, profile:profiles(*)),
-          parts:service_parts(*),
-          photos:service_photos(*),
-          signatures:service_signatures(*),
-          payments:service_payments(*),
-          documents:service_documents(*)
-        `)
-        .eq('id', serviceId)
-        .single();
-
-      if (error) throw error;
-      if (!data) return null;
-
-      // Ensure arrays are initialized even if empty
-      const result = data as any;
-
-      const safeSort = (arr: any[], dateKey: string) => {
-        if (!arr || !Array.isArray(arr)) return [];
-        return [...arr].sort((a, b) => {
-          const valA = a[dateKey];
-          const valB = b[dateKey];
-          const timeA = valA ? new Date(valA).getTime() : 0;
-          const timeB = valB ? new Date(valB).getTime() : 0;
-          if (isNaN(timeA) && isNaN(timeB)) return 0;
-          if (isNaN(timeA)) return 1;
-          if (isNaN(timeB)) return -1;
-          return timeB - timeA; // Descending
-        });
-      };
-
-      return {
-        ...result,
-        parts: result.parts || [],
-        photos: safeSort(result.photos, 'uploaded_at'),
-        signatures: (result.signatures || []).sort((a: any, b: any) => {
-          const tA = a.signed_at ? new Date(a.signed_at).getTime() : 0;
-          const tB = b.signed_at ? new Date(b.signed_at).getTime() : 0;
-          return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
-        }),
-        payments: safeSort(result.payments, 'payment_date'),
-        documents: safeSort(result.documents, 'created_at'),
-        logs: [], // Loaded separately to reduce query weight
-      } as Service & {
-        parts: ServicePart[],
-        photos: ServicePhoto[],
-        signatures: ServiceSignature[],
-        payments: (ServicePayment & { receiver?: { full_name: string | null } })[],
-        documents: ServiceDocument[],
-        logs: any[]
-      };
-    },
+    queryFn: () => fetchFullServiceById(serviceId!),
     enabled: !!serviceId && enabled,
-    staleTime: 1000 * 30, // Keep for 30s as it's a "heavy" but critical query
+    staleTime: 1000 * 30,
   });
 }
 
 export function prefetchFullServiceData(queryClient: QueryClient, serviceId: string) {
   return queryClient.prefetchQuery({
     queryKey: ['service-full', serviceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select(`
-          *,
-          customer:customers(*),
-          technician:technicians!services_technician_id_fkey(*, profile:profiles(*)),
-          parts:service_parts(*),
-          photos:service_photos(*),
-          signatures:service_signatures(*),
-          payments:service_payments(*),
-          documents:service_documents(*)
-        `)
-        .eq('id', serviceId)
-        .single();
-
-      if (error) throw error;
-      if (!data) return null;
-
-      const result = data as any;
-      const safeDate = (d: any) => {
-        if (!d) return 0;
-        const t = new Date(d).getTime();
-        return isNaN(t) ? 0 : t;
-      };
-
-      return {
-        ...result,
-        parts: result.parts || [],
-        photos: (result.photos || []).sort((a: any, b: any) => safeDate(b.uploaded_at) - safeDate(a.uploaded_at)),
-        signatures: (result.signatures || []).sort((a: any, b: any) => safeDate(a.signed_at) - safeDate(b.signed_at)),
-        payments: (result.payments || []).sort((a: any, b: any) => safeDate(b.payment_date) - safeDate(a.payment_date)),
-        logs: [],
-      };
-    },
+    queryFn: () => fetchFullServiceById(serviceId),
     staleTime: 1000 * 30,
   });
 }
@@ -440,16 +401,16 @@ export function useUpdateService() {
     },
     onMutate: async (newService) => {
       // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['service', newService.id] });
+      await queryClient.cancelQueries({ queryKey: ['service-full', newService.id] });
       await queryClient.cancelQueries({ queryKey: ['services'] });
       await queryClient.cancelQueries({ queryKey: ['services-paginated'] });
 
       // Snapshot the previous value
-      const previousService = queryClient.getQueryData(['service', newService.id]);
+      const previousService = queryClient.getQueryData(['service-full', newService.id]);
 
       // Optimistically update to the new value
       if (previousService) {
-        queryClient.setQueryData(['service', newService.id], (old: any) => ({
+        queryClient.setQueryData(['service-full', newService.id], (old: any) => ({
           ...old,
           ...newService,
         }));
@@ -486,7 +447,7 @@ export function useUpdateService() {
 
       // Rollback to the previous value if we have it
       if (context?.previousService) {
-        queryClient.setQueryData(['service', newService.id], context.previousService);
+        queryClient.setQueryData(['service-full', newService.id], context.previousService);
       }
       // We can't easily rollback lists without snapshotting them all, but invalidation will fix it
     },

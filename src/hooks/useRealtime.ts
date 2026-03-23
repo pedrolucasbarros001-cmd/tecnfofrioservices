@@ -2,7 +2,7 @@ import { useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const THROTTLE_MS = 3_000; // 20 invalidations/min max per subscription
+const DEBOUNCE_MS = 800; // debounce instead of throttle — ensures last event is always processed
 
 export function useRealtime(
   table: string,
@@ -12,8 +12,8 @@ export function useRealtime(
   const queryClient = useQueryClient();
   const queryKeysRef = useRef(queryKeys);
   queryKeysRef.current = queryKeys;
-  const lastInvalidationRef = useRef<number>(0);
-  const instanceId = useId(); // unique per component instance — prevents channel collisions
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const instanceId = useId();
 
   useEffect(() => {
     const channelName = `rt:${table}:${event}:${instanceId}`;
@@ -21,26 +21,28 @@ export function useRealtime(
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event, schema: 'public', table }, () => {
-        // Skip when tab is hidden — no wasted disk IO
         if (document.visibilityState === 'hidden') return;
 
-        const now = Date.now();
-        if (now - lastInvalidationRef.current < THROTTLE_MS) return;
+        // Debounce: cancel previous timer and reschedule
+        if (timerRef.current) clearTimeout(timerRef.current);
 
-        // Only invalidate if at least one query is not already stale
-        const hasNonStale = queryKeysRef.current.some(key => {
-          const state = queryClient.getQueryState(key);
-          return state && !state.isInvalidated;
-        });
-        if (!hasNonStale) return;
+        timerRef.current = setTimeout(() => {
+          const hasNonStale = queryKeysRef.current.some(key => {
+            const state = queryClient.getQueryState(key);
+            return state && !state.isInvalidated;
+          });
+          if (!hasNonStale) return;
 
-        lastInvalidationRef.current = now;
-        queryKeysRef.current.forEach(key => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
+          queryKeysRef.current.forEach(key => {
+            queryClient.invalidateQueries({ queryKey: key });
+          });
+        }, DEBOUNCE_MS);
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      supabase.removeChannel(channel);
+    };
   }, [table, event, queryClient, instanceId]);
 }
