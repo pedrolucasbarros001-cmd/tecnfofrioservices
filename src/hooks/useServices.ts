@@ -447,7 +447,7 @@ export function useUpdateService() {
 
       // Rollback to the previous value if we have it
       if (context?.previousService) {
-        queryClient.setQueryData(['service', newService.id], context.previousService);
+        queryClient.setQueryData(['service-full', newService.id], context.previousService);
       }
       // We can't easily rollback lists without snapshotting them all, but invalidation will fix it
     },
