@@ -991,6 +991,30 @@ function CreateServiceFromCustomerModal({
                     )}
                   />
 
+                  {/* Pricing Section for instalacao/entrega */}
+                  {hasPricing && (
+                    <div className="space-y-4">
+                      <Separator />
+                      <h3 className="font-semibold text-lg text-foreground">Artigos / Preço</h3>
+                      <PriceLineItems
+                        form={form}
+                        fieldName="items"
+                      />
+                      <div className="flex justify-end">
+                        <PricingSummary
+                          subtotal={pricingSubtotal}
+                          totalTax={pricingTax}
+                          discountValue={discountValue}
+                          discountType={discountType}
+                          adjustment={adjustment}
+                          onDiscountValueChange={setDiscountValue}
+                          onDiscountTypeChange={setDiscountType}
+                          onAdjustmentChange={setAdjustment}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Smart Address Toggle */}
                   {form.watch('service_location') === 'cliente' && (
                     <div className="space-y-3">
