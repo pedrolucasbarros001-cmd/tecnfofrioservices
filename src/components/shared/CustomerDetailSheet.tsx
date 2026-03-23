@@ -97,6 +97,9 @@ import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/components/pricing/PriceLineItems';
+import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CustomerDetailSheetProps {
   open: boolean;
@@ -566,6 +569,14 @@ const serviceFormSchema = z.object({
   service_postal_code: z.string().optional(),
   service_city: z.string().optional(),
   notes: z.string().optional(),
+  // Pricing items for instalacao/entrega
+  items: z.array(z.object({
+    reference: z.string().optional(),
+    description: z.string(),
+    quantity: z.number().min(0),
+    unit_price: z.number().min(0),
+    tax_rate: z.number(),
+  })).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -580,6 +591,12 @@ function CreateServiceFromCustomerModal({
   const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
   const { data: technicians = [] } = useTechnicians();
   const createService = useCreateService();
+  const { user } = useAuth();
+
+  // Pricing state for instalacao/entrega
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [adjustment, setAdjustment] = useState<string>('');
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
@@ -593,11 +610,21 @@ function CreateServiceFromCustomerModal({
       service_address: '',
       service_postal_code: '',
       service_city: '',
+      items: [{ ...DEFAULT_LINE_ITEM }],
     },
   });
 
   const isWarranty = form.watch('is_warranty');
   const serviceType = form.watch('service_type');
+  const hasPricing = serviceType === 'instalacao' || serviceType === 'entrega';
+
+  // Pricing calculations
+  const watchItems = form.watch('items') || [];
+  const validItems = (watchItems as LineItem[]).filter(item => item.description && item.description.trim() !== '');
+  const { subtotal: pricingSubtotal, totalTax: pricingTax, total: pricingBaseTotal } = calculateTotals(validItems);
+  const discountAmount = calculateDiscount(pricingSubtotal, discountValue, discountType);
+  const adjustmentAmount = parseFloat((adjustment || '').replace(',', '.')) || 0;
+  const finalPrice = Math.max(0, pricingBaseTotal - discountAmount + adjustmentAmount);
 
   const handleSubmit = async (values: ServiceFormValues) => {
     try {
@@ -609,7 +636,35 @@ function CreateServiceFromCustomerModal({
         ? (values.technician_id ? 'na_oficina' : 'por_fazer')
         : 'por_fazer';
 
-      await createService.mutateAsync({
+      const isPricingType = values.service_type === 'instalacao' || values.service_type === 'entrega';
+
+      // Build pricing data for instalacao/entrega
+      let pricingFields: Record<string, any> = {};
+      if (isPricingType && validItems.length > 0) {
+        const pricingData = {
+          items: validItems.map(item => ({
+            ref: item.reference,
+            desc: item.description,
+            qty: item.quantity,
+            price: item.unit_price,
+            tax_rate: item.tax_rate,
+          })),
+          discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
+          adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+        };
+        pricingFields = {
+          pricing_description: JSON.stringify(pricingData),
+          parts_cost: pricingSubtotal,
+          labor_cost: 0,
+          discount: discountAmount,
+          final_price: finalPrice,
+          pending_pricing: finalPrice === 0,
+          is_installation: values.service_type === 'instalacao',
+          is_sale: values.service_type === 'entrega',
+        };
+      }
+
+      const newService = await createService.mutateAsync({
         customer_id: customer.id,
         appliance_type: values.appliance_type,
         brand: values.brand,
@@ -634,9 +689,28 @@ function CreateServiceFromCustomerModal({
         contact_name: customer.name,
         contact_phone: customer.phone || null,
         contact_email: customer.email || null,
-        pending_pricing: values.is_warranty ? false : undefined,
-        final_price: values.is_warranty ? 0 : undefined,
+        pending_pricing: values.is_warranty ? false : (isPricingType ? pricingFields.pending_pricing : undefined),
+        final_price: values.is_warranty ? 0 : (isPricingType ? finalPrice : undefined),
+        ...pricingFields,
       });
+
+      // Insert items into service_parts for pricing types
+      if (isPricingType && newService?.id && validItems.length > 0) {
+        const partsToInsert = validItems.map(item => ({
+          service_id: newService.id,
+          part_name: item.description,
+          part_code: item.reference || '',
+          quantity: item.quantity,
+          cost: item.unit_price,
+          iva_rate: item.tax_rate,
+          is_requested: false,
+          arrived: true,
+          registered_by: user?.id,
+          registered_location: 'visita'
+        }));
+
+        await supabase.from('service_parts').insert(partsToInsert);
+      }
 
       // Upload workshop photos if any
       if (workshopPhotos.length > 0 && values.service_location === 'oficina') {
@@ -690,11 +764,17 @@ function CreateServiceFromCustomerModal({
     form.reset();
     setStep('type');
     setWorkshopPhotos([]);
+    setDiscountValue('');
+    setDiscountType('euro');
+    setAdjustment('');
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
+      <DialogContent className={cn(
+        "max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col",
+        hasPricing && step === 'form' ? "sm:max-w-4xl" : "sm:max-w-[600px]"
+      )}>
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
             {step === 'type'
@@ -910,6 +990,30 @@ function CreateServiceFromCustomerModal({
                       </FormItem>
                     )}
                   />
+
+                  {/* Pricing Section for instalacao/entrega */}
+                  {hasPricing && (
+                    <div className="space-y-4">
+                      <Separator />
+                      <h3 className="font-semibold text-lg text-foreground">Artigos / Preço</h3>
+                      <PriceLineItems
+                        form={form}
+                        fieldName="items"
+                      />
+                      <div className="flex justify-end">
+                        <PricingSummary
+                          subtotal={pricingSubtotal}
+                          totalTax={pricingTax}
+                          discountValue={discountValue}
+                          discountType={discountType}
+                          adjustment={adjustment}
+                          onDiscountValueChange={setDiscountValue}
+                          onDiscountTypeChange={setDiscountType}
+                          onAdjustmentChange={setAdjustment}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Smart Address Toggle */}
                   {form.watch('service_location') === 'cliente' && (
