@@ -410,7 +410,7 @@ export function useUpdateService() {
 
       // Optimistically update to the new value
       if (previousService) {
-        queryClient.setQueryData(['service', newService.id], (old: any) => ({
+        queryClient.setQueryData(['service-full', newService.id], (old: any) => ({
           ...old,
           ...newService,
         }));
