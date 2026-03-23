@@ -591,6 +591,12 @@ function CreateServiceFromCustomerModal({
   const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
   const { data: technicians = [] } = useTechnicians();
   const createService = useCreateService();
+  const { user } = useAuth();
+
+  // Pricing state for instalacao/entrega
+  const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [adjustment, setAdjustment] = useState<string>('');
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
@@ -604,11 +610,21 @@ function CreateServiceFromCustomerModal({
       service_address: '',
       service_postal_code: '',
       service_city: '',
+      items: [{ ...DEFAULT_LINE_ITEM }],
     },
   });
 
   const isWarranty = form.watch('is_warranty');
   const serviceType = form.watch('service_type');
+  const hasPricing = serviceType === 'instalacao' || serviceType === 'entrega';
+
+  // Pricing calculations
+  const watchItems = form.watch('items') || [];
+  const validItems = (watchItems as LineItem[]).filter(item => item.description && item.description.trim() !== '');
+  const { subtotal: pricingSubtotal, totalTax: pricingTax, total: pricingBaseTotal } = calculateTotals(validItems);
+  const discountAmount = calculateDiscount(pricingSubtotal, discountValue, discountType);
+  const adjustmentAmount = parseFloat((adjustment || '').replace(',', '.')) || 0;
+  const finalPrice = Math.max(0, pricingBaseTotal - discountAmount + adjustmentAmount);
 
   const handleSubmit = async (values: ServiceFormValues) => {
     try {
