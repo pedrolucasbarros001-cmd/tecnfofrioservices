@@ -406,7 +406,7 @@ export function useUpdateService() {
       await queryClient.cancelQueries({ queryKey: ['services-paginated'] });
 
       // Snapshot the previous value
-      const previousService = queryClient.getQueryData(['service', newService.id]);
+      const previousService = queryClient.getQueryData(['service-full', newService.id]);
 
       // Optimistically update to the new value
       if (previousService) {
