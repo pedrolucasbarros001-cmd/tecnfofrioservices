@@ -566,6 +566,14 @@ const serviceFormSchema = z.object({
   service_postal_code: z.string().optional(),
   service_city: z.string().optional(),
   notes: z.string().optional(),
+  // Pricing items for instalacao/entrega
+  items: z.array(z.object({
+    reference: z.string().optional(),
+    description: z.string(),
+    quantity: z.number().min(0),
+    unit_price: z.number().min(0),
+    tax_rate: z.number(),
+  })).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
