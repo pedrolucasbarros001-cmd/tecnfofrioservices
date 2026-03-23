@@ -764,11 +764,17 @@ function CreateServiceFromCustomerModal({
     form.reset();
     setStep('type');
     setWorkshopPhotos([]);
+    setDiscountValue('');
+    setDiscountType('euro');
+    setAdjustment('');
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col">
+      <DialogContent className={cn(
+        "max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex [&>form]:flex-col",
+        hasPricing && step === 'form' ? "sm:max-w-4xl" : "sm:max-w-[600px]"
+      )}>
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-xl">
             {step === 'type'
