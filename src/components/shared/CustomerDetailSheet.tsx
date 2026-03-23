@@ -636,7 +636,35 @@ function CreateServiceFromCustomerModal({
         ? (values.technician_id ? 'na_oficina' : 'por_fazer')
         : 'por_fazer';
 
-      await createService.mutateAsync({
+      const isPricingType = values.service_type === 'instalacao' || values.service_type === 'entrega';
+
+      // Build pricing data for instalacao/entrega
+      let pricingFields: Record<string, any> = {};
+      if (isPricingType && validItems.length > 0) {
+        const pricingData = {
+          items: validItems.map(item => ({
+            ref: item.reference,
+            desc: item.description,
+            qty: item.quantity,
+            price: item.unit_price,
+            tax_rate: item.tax_rate,
+          })),
+          discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
+          adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+        };
+        pricingFields = {
+          pricing_description: JSON.stringify(pricingData),
+          parts_cost: pricingSubtotal,
+          labor_cost: 0,
+          discount: discountAmount,
+          final_price: finalPrice,
+          pending_pricing: finalPrice === 0,
+          is_installation: values.service_type === 'instalacao',
+          is_sale: values.service_type === 'entrega',
+        };
+      }
+
+      const newService = await createService.mutateAsync({
         customer_id: customer.id,
         appliance_type: values.appliance_type,
         brand: values.brand,
@@ -661,9 +689,28 @@ function CreateServiceFromCustomerModal({
         contact_name: customer.name,
         contact_phone: customer.phone || null,
         contact_email: customer.email || null,
-        pending_pricing: values.is_warranty ? false : undefined,
-        final_price: values.is_warranty ? 0 : undefined,
+        pending_pricing: values.is_warranty ? false : (isPricingType ? pricingFields.pending_pricing : undefined),
+        final_price: values.is_warranty ? 0 : (isPricingType ? finalPrice : undefined),
+        ...pricingFields,
       });
+
+      // Insert items into service_parts for pricing types
+      if (isPricingType && newService?.id && validItems.length > 0) {
+        const partsToInsert = validItems.map(item => ({
+          service_id: newService.id,
+          part_name: item.description,
+          part_code: item.reference || '',
+          quantity: item.quantity,
+          cost: item.unit_price,
+          iva_rate: item.tax_rate,
+          is_requested: false,
+          arrived: true,
+          registered_by: user?.id,
+          registered_location: 'visita'
+        }));
+
+        await supabase.from('service_parts').insert(partsToInsert);
+      }
 
       // Upload workshop photos if any
       if (workshopPhotos.length > 0 && values.service_location === 'oficina') {
