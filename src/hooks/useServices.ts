@@ -401,7 +401,7 @@ export function useUpdateService() {
     },
     onMutate: async (newService) => {
       // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['service', newService.id] });
+      await queryClient.cancelQueries({ queryKey: ['service-full', newService.id] });
       await queryClient.cancelQueries({ queryKey: ['services'] });
       await queryClient.cancelQueries({ queryKey: ['services-paginated'] });
 
