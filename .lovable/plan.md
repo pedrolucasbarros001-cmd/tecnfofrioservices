@@ -1,39 +1,32 @@
 
 
-## Plano de Otimização de Performance — 5 Passos
+## Corrigir Envio de Emails — Edge Function
 
-### Passo 1 — Índices SQL para pesquisa rápida
-Criar migração com:
-- Extensão `pg_trgm` para pesquisa por texto parcial
-- Índice GIN trigram nos campos de pesquisa dos serviços (code, appliance_type, brand, model, serial_number, fault_description)
-- Índice parcial em `pending_pricing WHERE true`
-- Índice GIN trigram separado no campo `code`
+### Problema
+Os logs da edge function mostram o erro:
+```
+Could not embed because more than one relationship was found for 'services' and 'technicians'
+```
 
-### Passo 2 — Corrigir optimistic update rollback
-Em `src/hooks/useServices.ts`, na função `useUpdateService`:
-- `onMutate`: trocar `['service', id]` por `['service-full', id]` no cancel, snapshot e setQueryData (linhas 443, 448, 452) — é o query key que o sistema realmente usa
-- `onError`: mesma correção no rollback (linha 489)
+A tabela `services` tem mais do que uma FK para `technicians`, e a query na edge function não especifica qual usar. O código da app já resolve isto com `technicians!services_technician_id_fkey`, mas a edge function usa apenas `tech:technicians(*)`.
 
-### Passo 3 — Throttle → Debounce no Realtime
-Reescrever `src/hooks/useRealtime.ts`:
-- Substituir throttle de 3s (que ignora eventos) por debounce de 800ms (que reagenda)
-- Usar `setTimeout`/`clearTimeout` em vez de timestamp comparison
-- Limpar timer no cleanup do useEffect
+### Correção
 
-### Passo 4 — Extrair queryFn partilhado
-Em `src/hooks/useServices.ts`:
-- Criar função `fetchFullServiceById(serviceId)` com a lógica de query + sorting que está duplicada em `useFullServiceData` e `prefetchFullServiceData`
-- Simplificar ambas as funções para chamar esta função partilhada
+**Ficheiro**: `supabase/functions/send-email-notification/index.ts`
 
-### Passo 5 — Invalidação seletiva
-Em `src/lib/queryInvalidation.ts`:
-- Adicionar parâmetro opcional `scope: 'all' | 'detail' | 'list'` (default `'all'` = comportamento idêntico ao actual)
-- Mover `pending-parts` e `all-pending-parts` para o bloco de listas
-- Permitir futuras chamadas com scope específico sem mudar nada agora
+**Linha 69** — Alterar a query de:
+```typescript
+.select('*, customer:customers(*), tech:technicians(*, profile:profiles(*))')
+```
+Para:
+```typescript
+.select('*, customer:customers(*), tech:technicians!services_technician_id_fkey(*, profile:profiles(*))')
+```
+
+Isto é a única alteração necessária. Após o deploy automático, todos os 4 tipos de email (relatório, pagamento, peças, mensagem personalizada) passarão a funcionar.
 
 ### Secção Técnica
-- **Ficheiros alterados**: `src/hooks/useServices.ts`, `src/hooks/useRealtime.ts`, `src/lib/queryInvalidation.ts`
-- **Migração SQL**: 1 migração com 4 statements (CREATE EXTENSION + 3 CREATE INDEX)
-- **Retrocompatibilidade**: todos os passos são retrocompatíveis — sem scope explícito, o comportamento é idêntico ao actual
-- **Risco**: zero para o passo 1 (só índices). Passos 2-5 são refactors seguros sem mudança de comportamento externo
+- A causa raiz é a ambiguidade de FK entre `services` e `technicians` — o PostgREST exige o hint `!services_technician_id_fkey` quando há múltiplas relações
+- Não há alterações nos templates, apenas na query de dados
+- A edge function será redeployada automaticamente após a edição
 
