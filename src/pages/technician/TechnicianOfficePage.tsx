@@ -42,12 +42,13 @@ export default function TechnicianOfficePage() {
 
       if (techError || !tech) return [];
 
-      // Fetch workshop services assigned to this technician
+      // Fetch workshop services assigned to this technician (exclude delivery services — those go to ServicosPage)
       const { data, error } = await supabase
         .from('services')
         .select('*, customer:customers(*)')
         .eq('technician_id', tech.id)
         .eq('service_location', 'oficina')
+        .neq('service_type', 'entrega')
         .in('status', ['por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca'])
         .order('created_at', { ascending: false });
 
