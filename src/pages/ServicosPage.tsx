@@ -61,19 +61,43 @@ export default function ServicosPage() {
         return [];
       }
 
-      // Fetch services assigned to this technician:
-      // - Non-oficina services (visits, installations)
-      // - OR delivery services (service_type='entrega'), even if service_location is 'oficina'
-      const { data, error } = await supabase
+      // Query 1: regular services assigned to this technician (field visits, installations, entrega, etc.)
+      const { data: regularServices, error: regularError } = await supabase
         .from('services')
         .select('*, customer:customers(*)')
         .eq('technician_id', technicianData.id)
-        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca'])
+        // Include services that are NOT in the workshop OR are specifically marked as 'entrega'
         .or('service_location.neq.oficina,service_type.eq.entrega')
+        // Include 'concluidos' status for repaired items assigned for delivery
+        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'])
         .order('scheduled_date', { ascending: true });
 
-      if (error) throw error;
-      return (data as Service[]) || [];
+      if (regularError) throw regularError;
+
+      // Query 2: workshop services where THIS technician is assigned for delivery
+      // These stay at status 'concluidos' and service_location 'oficina', but need to appear
+      // in the technician's agenda on their delivery date (delivery_date field).
+      const { data: deliveryServices, error: deliveryError } = await supabase
+        .from('services')
+        .select('*, customer:customers(*)')
+        .eq('delivery_technician_id', technicianData.id)
+        .eq('delivery_method', 'technician_delivery')
+        .eq('status', 'concluidos')
+        .order('delivery_date', { ascending: true });
+
+      if (deliveryError) throw deliveryError;
+
+      // For delivery services, map delivery_date → scheduled_date so the date navigation works
+      const mappedDeliveryServices = (deliveryServices || []).map(s => ({
+        ...s,
+        // Use delivery_date as the date for the day-navigation filter
+        scheduled_date: s.delivery_date ?? s.scheduled_date,
+        // Mark as delivery type so the correct flow modal opens
+        service_type: 'entrega' as const,
+      }));
+
+      const combined = [...(regularServices || []), ...mappedDeliveryServices];
+      return combined as Service[];
     },
     enabled: !!profile,
     // Realtime handles updates — no polling needed
