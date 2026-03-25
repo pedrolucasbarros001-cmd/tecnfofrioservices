@@ -960,6 +960,30 @@ export type Database = {
           },
         ]
       }
+      user_passwords: {
+        Row: {
+          id: string
+          password_plain: string
+          set_by: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          password_plain: string
+          set_by?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          password_plain?: string
+          set_by?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
