@@ -68,8 +68,9 @@ export default function ServicosPage() {
         .eq('technician_id', technicianData.id)
         // Include services that are NOT in the workshop OR are specifically marked as 'entrega'
         .or('service_location.neq.oficina,service_type.eq.entrega')
-        // Include 'concluidos' status for repaired items assigned for delivery
-        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos'])
+        // Include 'concluidos' status for repaired items assigned for delivery, 
+        // and 'na_oficina' for items assigned in the workshop.
+        .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos', 'na_oficina', 'a_precificar'])
         .order('scheduled_date', { ascending: true });
 
       if (regularError) throw regularError;
