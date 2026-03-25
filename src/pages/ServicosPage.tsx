@@ -61,13 +61,15 @@ export default function ServicosPage() {
         return [];
       }
 
-      // Fetch all services assigned to this technician (active ones, NOT in oficina for this view)
+      // Fetch services assigned to this technician:
+      // - Non-oficina services (visits, installations)
+      // - OR delivery services (service_type='entrega'), even if service_location is 'oficina'
       const { data, error } = await supabase
         .from('services')
         .select('*, customer:customers(*)')
         .eq('technician_id', technicianData.id)
-        .neq('service_location', 'oficina') // Workshop services go to the Oficina page
         .in('status', ['por_fazer', 'em_execucao', 'para_pedir_peca', 'em_espera_de_peca'])
+        .or('service_location.neq.oficina,service_type.eq.entrega')
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
