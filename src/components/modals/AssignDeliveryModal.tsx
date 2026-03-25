@@ -52,11 +52,11 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
         delivery_technician_id: technicianId,
         delivery_date: deliveryDate,
         scheduled_shift: deliveryTime,
-        // NOTE: do NOT change status or service_type here. The service is
-        // already in "concluidos" (Oficina Reparados) and will stay there
-        // until delivery is complete. Changing status to 'por_fazer' would
-        // incorrectly suggest the repair isn't done.  Just assign the
-        // delivery technician and dates.
+        // Transition the service so it appears in the technician's task list
+        status: 'por_fazer',
+        service_type: 'entrega',
+        technician_id: technicianId,
+        scheduled_date: deliveryDate,
         skipToast: true,
       });
 

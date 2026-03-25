@@ -212,6 +212,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Store password for admin visibility
+    await supabaseAdmin
+      .from('user_passwords')
+      .upsert({
+        user_id: newUser.id,
+        password_plain: password,
+        set_by: claimsData.user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
     // Return success
     return new Response(
       JSON.stringify({
