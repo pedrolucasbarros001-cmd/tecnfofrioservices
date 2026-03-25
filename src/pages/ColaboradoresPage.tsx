@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, Pencil, Power, Search, Trash2, Loader2 } from 'lucide-react';
+import { Users, Plus, Pencil, Power, Search, Trash2, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,7 @@ interface UserWithRole {
   phone: string | null;
   role: AppRole | null;
   is_active: boolean;
+  password_plain: string | null;
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -92,27 +93,32 @@ export default function ColaboradoresPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const { user: currentUser } = useAuth();
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['collaborators'],
     queryFn: async () => {
       // Get all data in parallel for faster loading
-      const [profilesRes, rolesRes, techniciansRes] = await Promise.all([
+      const [profilesRes, rolesRes, techniciansRes, passwordsRes] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: true }),
         supabase.from('user_roles').select('*'),
         supabase.from('technicians').select('profile_id, active'),
+        supabase.from('user_passwords' as any).select('user_id, password_plain'),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
       if (techniciansRes.error) throw techniciansRes.error;
 
+      const passwords = (passwordsRes.data as any[]) || [];
+
       // Combine data
       const usersWithRoles: UserWithRole[] = profilesRes.data.map((profile) => {
         const userRole = rolesRes.data.find((r) => r.user_id === profile.user_id);
         const technician = techniciansRes.data.find((t) => t.profile_id === profile.id);
         const role = userRole?.role || null;
+        const pw = passwords.find((p: any) => p.user_id === profile.user_id);
 
         // is_active only matters for technicians — non-technicians are always active
         const is_active = role === 'tecnico' && technician
@@ -127,6 +133,7 @@ export default function ColaboradoresPage() {
           phone: profile.phone,
           role,
           is_active,
+          password_plain: pw?.password_plain || null,
         };
       });
 
@@ -256,6 +263,7 @@ export default function ColaboradoresPage() {
                   <TableHead>Utilizador</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Telefone</TableHead>
+                  <TableHead>Palavra-passe</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
                   {filteredUsers.some(u => u.role === 'tecnico') && (
                     <TableHead>Estado</TableHead>
@@ -285,8 +293,31 @@ export default function ColaboradoresPage() {
                       <TableCell className="text-muted-foreground">
                         {user.email || '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.phone || '-'}
+                      <TableCell>
+                        {user.password_plain ? (
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm">
+                              {visiblePasswords[user.user_id] ? user.password_plain : '••••••••'}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setVisiblePasswords(prev => ({
+                                ...prev,
+                                [user.user_id]: !prev[user.user_id],
+                              }))}
+                            >
+                              {visiblePasswords[user.user_id] ? (
+                                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {roleConfig ? (

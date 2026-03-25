@@ -101,6 +101,16 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Store password for admin visibility
+    await supabaseAdmin
+      .from('user_passwords')
+      .upsert({
+        user_id: user_id,
+        password_plain: new_password,
+        set_by: claimsData.user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
     return new Response(
       JSON.stringify({ success: true, message: 'Palavra-passe redefinida com sucesso' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
