@@ -83,6 +83,17 @@ export function AssignTechnicianModal({
     },
   });
 
+  // Reset form when service or open state changes to avoid stale data
+  useEffect(() => {
+    if (open && service) {
+      form.reset({
+        technician_id: service.technician_id || '',
+        scheduled_date: service.scheduled_date ? new Date(service.scheduled_date) : undefined,
+        scheduled_shift: service.scheduled_shift || '',
+      });
+    }
+  }, [open, service, form]);
+
   const handleSubmit = async (values: FormValues) => {
     if (!service) return;
 
