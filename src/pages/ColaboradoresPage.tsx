@@ -263,6 +263,7 @@ export default function ColaboradoresPage() {
                   <TableHead>Utilizador</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Telefone</TableHead>
+                  <TableHead>Palavra-passe</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
                   {filteredUsers.some(u => u.role === 'tecnico') && (
                     <TableHead>Estado</TableHead>
@@ -292,8 +293,31 @@ export default function ColaboradoresPage() {
                       <TableCell className="text-muted-foreground">
                         {user.email || '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.phone || '-'}
+                      <TableCell>
+                        {user.password_plain ? (
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm">
+                              {visiblePasswords[user.user_id] ? user.password_plain : '••••••••'}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setVisiblePasswords(prev => ({
+                                ...prev,
+                                [user.user_id]: !prev[user.user_id],
+                              }))}
+                            >
+                              {visiblePasswords[user.user_id] ? (
+                                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {roleConfig ? (
