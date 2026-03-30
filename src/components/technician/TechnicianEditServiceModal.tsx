@@ -493,9 +493,21 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
             value={part.quantity}
             onChange={e => onUpdate('quantity', parseInt(e.target.value) || 1)}
             className="text-xs h-8 px-1 text-center"
+            placeholder="Qtd"
           />
         </div>
-        <div className="col-span-3">
+        <div className="col-span-1">
+          <Input
+            type="number"
+            min={0}
+            step={0.01}
+            value={part.cost || ''}
+            onChange={e => onUpdate('cost', parseFloat(e.target.value) || 0)}
+            className="text-xs h-8 px-1"
+            placeholder="Preço €"
+          />
+        </div>
+        <div className="col-span-2">
           <Input
             placeholder="Observações..."
             value={part.notes}
