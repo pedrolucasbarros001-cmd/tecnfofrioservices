@@ -42,6 +42,7 @@ const emptyPart = (isRequested = false): NewPart => ({
   part_name: '',
   part_code: '',
   quantity: 1,
+  cost: 0,
   is_requested: isRequested,
   notes: ''
 });
