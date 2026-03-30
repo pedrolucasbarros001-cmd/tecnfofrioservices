@@ -44,7 +44,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
 import { notifyServiceAssigned } from '@/utils/notificationUtils';
 import { logTechnicianAssignment } from '@/utils/activityLogUtils';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Service, ServiceStatus } from '@/types/database';

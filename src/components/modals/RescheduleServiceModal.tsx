@@ -35,7 +35,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface RescheduleServiceModalProps {
