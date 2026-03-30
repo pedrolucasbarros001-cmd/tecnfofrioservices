@@ -188,6 +188,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
               part_name: p.part_name.trim(),
               part_code: p.part_code.trim() || null,
               quantity: p.quantity || 1,
+              cost: p.cost || 0,
               is_requested: p.is_requested || false,
               notes: p.notes?.trim() || null,
             }))
