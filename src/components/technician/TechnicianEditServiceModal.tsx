@@ -33,6 +33,7 @@ interface NewPart extends Partial<ServicePart> {
   part_name: string;
   part_code: string;
   quantity: number;
+  cost: number;
   is_requested: boolean;
   notes?: string;
 }
