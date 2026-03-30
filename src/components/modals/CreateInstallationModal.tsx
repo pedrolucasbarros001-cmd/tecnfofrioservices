@@ -259,7 +259,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         serial_number: values.serial_number,
         service_location: 'cliente',
         technician_id: values.technician_id || null,
-        scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
+        scheduled_date: values.scheduled_date ? toLocalDateString(values.scheduled_date) : undefined,
         scheduled_shift: values.scheduled_shift,
         pnc: values.pnc,
         notes: values.notes,

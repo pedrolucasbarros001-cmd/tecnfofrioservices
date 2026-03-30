@@ -101,7 +101,7 @@ export function RescheduleServiceModal({
     try {
       const updateData: Record<string, unknown> = {
         id: service.id,
-        scheduled_date: values.scheduled_date.toISOString().split('T')[0],
+        scheduled_date: toLocalDateString(values.scheduled_date),
         scheduled_shift: values.scheduled_shift || null,
       };
 

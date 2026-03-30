@@ -140,7 +140,7 @@ export function AssignTechnicianModal({
               service.id,
               service.code || 'N/A',
               profileData.user_id,
-              values.scheduled_date.toISOString().split('T')[0],
+              toLocalDateString(values.scheduled_date),
               values.scheduled_shift
             );
 

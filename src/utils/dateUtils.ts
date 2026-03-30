@@ -65,6 +65,16 @@ export function getBusinessDaysRemaining(targetDate: Date): number {
  * Regular time strings (e.g. "14:30") are returned as-is.
  * Returns 'Sem turno' for null/undefined/empty values.
  */
+/**
+ * Formats a Date to 'YYYY-MM-DD' using LOCAL timezone (avoids UTC day-shift).
+ */
+export function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function formatShiftLabel(shift: string | null | undefined): string {
   if (!shift) return 'Sem turno';
   const s = shift.toLowerCase();

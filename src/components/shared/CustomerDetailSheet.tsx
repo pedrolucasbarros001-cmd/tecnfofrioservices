@@ -678,7 +678,7 @@ function CreateServiceFromCustomerModal({
         is_urgent: values.is_urgent,
         service_location: values.service_location,
         technician_id: values.technician_id || null,
-        scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
+        scheduled_date: values.scheduled_date ? toLocalDateString(values.scheduled_date) : undefined,
         scheduled_shift: values.scheduled_shift,
         notes: values.notes,
         service_type: values.service_type,
