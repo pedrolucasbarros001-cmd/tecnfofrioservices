@@ -7,6 +7,7 @@ import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
+import { toLocalDateString } from '@/utils/dateUtils';
 import {
   Dialog,
   DialogContent,
