@@ -306,6 +306,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                           <th className="p-2 font-medium">Ref</th>
                           <th className="p-2 font-medium">Descrição</th>
                           <th className="p-2 font-medium text-center">Qtd</th>
+                          <th className="p-2 font-medium text-right">Preço</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -314,6 +315,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                             <td className="p-2 text-xs font-mono">{item.ref || '-'}</td>
                             <td className="p-2 font-medium">{item.desc}</td>
                             <td className="p-2 text-center text-xs">{item.qty || 1}</td>
+                            <td className="p-2 text-right text-xs">{item.price.toFixed(2)} €</td>
                           </tr>
                         ))}
                       </tbody>
