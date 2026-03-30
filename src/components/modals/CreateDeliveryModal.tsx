@@ -7,6 +7,7 @@ import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, UserPlus, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
+import { toLocalDateString } from '@/utils/dateUtils';
 import {
   Dialog,
   DialogContent,
@@ -259,7 +260,7 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         serial_number: values.serial_number,
         service_location: 'cliente',
         technician_id: values.technician_id || null,
-        scheduled_date: values.scheduled_date?.toISOString().split('T')[0],
+        scheduled_date: values.scheduled_date ? toLocalDateString(values.scheduled_date) : undefined,
         scheduled_shift: values.scheduled_shift as any,
         pnc: values.pnc,
         notes: values.notes,

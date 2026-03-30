@@ -44,7 +44,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useUpdateService } from '@/hooks/useServices';
 import { notifyServiceAssigned } from '@/utils/notificationUtils';
 import { logTechnicianAssignment } from '@/utils/activityLogUtils';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Service, ServiceStatus } from '@/types/database';
@@ -118,7 +118,7 @@ export function AssignTechnicianModal({
       await updateService.mutateAsync({
         id: service.id,
         technician_id: values.technician_id,
-        scheduled_date: values.scheduled_date.toISOString().split('T')[0],
+        scheduled_date: toLocalDateString(values.scheduled_date),
         scheduled_shift: (values.scheduled_shift as any) || null,
         ...(newStatus && { status: newStatus }),
         skipToast: true, // We'll show contextual message below
@@ -140,7 +140,7 @@ export function AssignTechnicianModal({
               service.id,
               service.code || 'N/A',
               profileData.user_id,
-              values.scheduled_date.toISOString().split('T')[0],
+              toLocalDateString(values.scheduled_date),
               values.scheduled_shift
             );
 

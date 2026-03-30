@@ -33,6 +33,7 @@ interface NewPart extends Partial<ServicePart> {
   part_name: string;
   part_code: string;
   quantity: number;
+  cost: number;
   is_requested: boolean;
   notes?: string;
 }
@@ -41,6 +42,7 @@ const emptyPart = (isRequested = false): NewPart => ({
   part_name: '',
   part_code: '',
   quantity: 1,
+  cost: 0,
   is_requested: isRequested,
   notes: ''
 });
@@ -186,6 +188,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
               part_name: p.part_name.trim(),
               part_code: p.part_code.trim() || null,
               quantity: p.quantity || 1,
+              cost: p.cost || 0,
               is_requested: p.is_requested || false,
               notes: p.notes?.trim() || null,
             }))
@@ -304,6 +307,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                           <th className="p-2 font-medium">Ref</th>
                           <th className="p-2 font-medium">Descrição</th>
                           <th className="p-2 font-medium text-center">Qtd</th>
+                          <th className="p-2 font-medium text-right">Preço</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -312,6 +316,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                             <td className="p-2 text-xs font-mono">{item.ref || '-'}</td>
                             <td className="p-2 font-medium">{item.desc}</td>
                             <td className="p-2 text-center text-xs">{item.qty || 1}</td>
+                            <td className="p-2 text-right text-xs">{item.price.toFixed(2)} €</td>
                           </tr>
                         ))}
                       </tbody>
@@ -489,9 +494,21 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
             value={part.quantity}
             onChange={e => onUpdate('quantity', parseInt(e.target.value) || 1)}
             className="text-xs h-8 px-1 text-center"
+            placeholder="Qtd"
           />
         </div>
-        <div className="col-span-3">
+        <div className="col-span-1">
+          <Input
+            type="number"
+            min={0}
+            step={0.01}
+            value={part.cost || ''}
+            onChange={e => onUpdate('cost', parseFloat(e.target.value) || 0)}
+            className="text-xs h-8 px-1"
+            placeholder="Preço €"
+          />
+        </div>
+        <div className="col-span-2">
           <Input
             placeholder="Observações..."
             value={part.notes}

@@ -35,7 +35,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface RescheduleServiceModalProps {
@@ -101,7 +101,7 @@ export function RescheduleServiceModal({
     try {
       const updateData: Record<string, unknown> = {
         id: service.id,
-        scheduled_date: values.scheduled_date.toISOString().split('T')[0],
+        scheduled_date: toLocalDateString(values.scheduled_date),
         scheduled_shift: values.scheduled_shift || null,
       };
 
