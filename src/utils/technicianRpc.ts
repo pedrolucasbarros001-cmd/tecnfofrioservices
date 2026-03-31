@@ -16,11 +16,13 @@ export interface TechnicianUpdateServiceInput {
  * technician_update_service, enviando SEMPRE os 8 parâmetros.
  */
 export async function technicianUpdateService(input: TechnicianUpdateServiceInput) {
+  // undefined → null (don't touch field), '' → '' (clear field), 'text' → 'text' (overwrite)
+  const mapText = (v: string | null | undefined) => v === undefined ? null : v;
   return (supabase.rpc as any)('technician_update_service', {
     _service_id: input.serviceId,
     _status: input.status ?? null,
-    _detected_fault: input.detectedFault ?? null,
-    _work_performed: input.workPerformed ?? null,
+    _detected_fault: mapText(input.detectedFault),
+    _work_performed: mapText(input.workPerformed),
     _pending_pricing: input.pendingPricing ?? null,
     _last_status_before_part_request: input.lastStatusBeforePartRequest ?? null,
     _flow_step: input.flowStep ?? null,

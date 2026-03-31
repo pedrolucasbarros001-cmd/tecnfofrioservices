@@ -575,14 +575,16 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         const isFullyPaid = hasPricingPreDefined && (service.amount_paid || 0) >= (service.final_price || 0);
         const finalStatus = isFullyPaid ? 'finalizado' : 'a_precificar';
 
-        await updateService.mutateAsync({
-          id: service.id,
+        const defaultWork = mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente";
+        const { error: rpcError } = await technicianUpdateService({
+          serviceId: service.id,
           status: finalStatus,
-          pending_pricing: !hasPricingPreDefined,
-          work_performed: mode === "continuacao_peca" ? "Artigo instalada e serviço concluído" : "Reparado no local do cliente",
-          last_status_before_part_request: null,
-          skipToast: true,
+          pendingPricing: !hasPricingPreDefined,
+          workPerformed: formData.workPerformed?.trim() || defaultWork,
+          detectedFault: formData.detectedFault?.trim() || null,
+          lastStatusBeforePartRequest: null,
         });
+        if (rpcError) throw rpcError;
 
         if (!existingSig) {
           await logServiceCompletion(service.code || "N/A", service.id, profile?.full_name || "Técnico", user?.id);
