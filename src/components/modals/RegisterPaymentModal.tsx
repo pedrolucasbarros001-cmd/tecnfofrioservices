@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { toLocalDateString } from '@/utils/dateUtils';
 import { ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
 import {
   Dialog,
@@ -61,7 +62,7 @@ const METHOD_LABELS: Record<string, string> = {
 export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPaymentModalProps) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dinheiro');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(toLocalDateString(new Date()));
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -80,7 +81,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     if (service && open) {
       setAmount(finalPrice > 0 && remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
       setPaymentMethod('dinheiro');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentDate(toLocalDateString(new Date()));
       setDescription('');
       setDetailsOpen(false);
     }
@@ -171,7 +172,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const resetForm = () => {
     setAmount('');
     setPaymentMethod('dinheiro');
-    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentDate(toLocalDateString(new Date()));
     setDescription('');
     setDetailsOpen(false);
   };

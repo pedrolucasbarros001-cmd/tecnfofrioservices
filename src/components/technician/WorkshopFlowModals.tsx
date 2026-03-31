@@ -363,7 +363,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description.trim());
 
       for (const article of newArticles) {
-        await supabase.from("service_parts").insert({
+        const { error: insertErr } = await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: article.description,
           part_code: article.reference || null,
@@ -375,6 +375,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           registered_by: user?.id || null,
           registered_location: "oficina",
         });
+        if (insertErr) throw insertErr;
       }
 
       setFormData(prev => ({ ...prev, articlesLocked: true }));
@@ -401,7 +402,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       for (const part of formData.partsToOrder) {
         if (!part.name.trim()) continue;
 
-        await supabase.from("service_parts").insert({
+        const { error: partInsertErr } = await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: part.name.trim(),
           part_code: part.reference.trim() || null,
@@ -410,6 +411,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           arrived: false,
           cost: part.cost ? parseFloat(part.cost.replace(',', '.')) : 0,
         });
+        if (partInsertErr) throw partInsertErr;
 
         await logPartRequest(service.code || "N/A", service.id, part.name.trim(), profile?.full_name || "Técnico", user?.id);
       }
@@ -453,7 +455,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       const newArticles = (formData.articles as ArticleEntry[]).filter((a: ArticleEntry) => !a.isExisting && a.description?.trim());
       if (newArticles.length > 0 && !formData.articlesLocked) {
         for (const article of newArticles) {
-          await supabase.from("service_parts").insert({
+          const { error: insertErr } = await supabase.from("service_parts").insert({
             service_id: service.id,
             part_name: article.description,
             part_code: article.reference || null,
@@ -465,6 +467,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
             registered_by: user?.id || null,
             registered_location: "oficina",
           });
+          if (insertErr) throw insertErr;
         }
       }
 

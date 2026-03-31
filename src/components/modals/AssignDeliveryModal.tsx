@@ -20,7 +20,7 @@ import {
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import type { Service } from '@/types/database';
@@ -139,7 +139,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
                     type="date"
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={toLocalDateString(new Date())}
                   />
                 </div>
 

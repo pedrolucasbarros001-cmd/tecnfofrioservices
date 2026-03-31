@@ -120,6 +120,9 @@ export function AssignTechnicianModal({
         technician_id: values.technician_id,
         scheduled_date: toLocalDateString(values.scheduled_date),
         scheduled_shift: (values.scheduled_shift as any) || null,
+        // Clear stale flow state when (re)assigning to prevent ghost steps for the new technician
+        flow_step: null,
+        flow_data: null,
         ...(newStatus && { status: newStatus }),
         skipToast: true, // We'll show contextual message below
       });

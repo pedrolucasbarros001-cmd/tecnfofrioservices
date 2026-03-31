@@ -175,6 +175,8 @@ export interface ServicePart {
   arrived: boolean;
   supplier: string | null;
   notes: string | null;
+  registered_by: string | null;
+  registered_location: string | null;
   created_at: string;
 }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toLocalDateString } from '@/utils/dateUtils';
 import { DollarSign, Check, X } from 'lucide-react';
 import {
     Dialog,
@@ -99,7 +100,7 @@ export function FieldPaymentStep({
                     service_id: service.id,
                     amount: paymentValue,
                     payment_method: paymentMethod,
-                    payment_date: new Date().toISOString().split('T')[0],
+                    payment_date: toLocalDateString(new Date()),
                     description: description || `Pagamento registado pelo técnico no terreno`,
                     received_by: user?.id || null,
                 });
