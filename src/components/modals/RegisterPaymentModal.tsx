@@ -61,7 +61,7 @@ const METHOD_LABELS: Record<string, string> = {
 export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPaymentModalProps) {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dinheiro');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(toLocalDateString(new Date()));
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
