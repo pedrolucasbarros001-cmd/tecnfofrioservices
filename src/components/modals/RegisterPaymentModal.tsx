@@ -81,7 +81,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     if (service && open) {
       setAmount(finalPrice > 0 && remainingBalance > 0 ? remainingBalance.toFixed(2) : '');
       setPaymentMethod('dinheiro');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentDate(toLocalDateString(new Date()));
       setDescription('');
       setDetailsOpen(false);
     }
