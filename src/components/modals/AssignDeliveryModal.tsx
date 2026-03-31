@@ -139,7 +139,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
                     type="date"
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={toLocalDateString(new Date())}
                   />
                 </div>
 
