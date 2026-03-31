@@ -404,30 +404,36 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                 </p>
               </div>
 
-              {existingParts.filter(p => p.is_requested).map(part => (
-                <div
-                  key={part.id}
-                  className={cn(
-                    "flex items-center gap-2 p-2 rounded-md border text-sm transition-opacity",
-                    partsToDelete.includes(part.id) ? 'opacity-40 line-through bg-destructive/5' : 'bg-amber-50/20 border-amber-100'
-                  )}
-                >
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-amber-900">{part.part_name}</span>
-                    {part.part_code && <span className="text-muted-foreground ml-1 text-xs">({part.part_code})</span>}
-                    <span className="text-muted-foreground ml-2 font-mono text-xs">x{part.quantity || 1}</span>
-                    {part.arrived && <Badge className="ml-2 bg-green-500 text-[9px] h-4">Chegou</Badge>}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                    onClick={() => handleToggleDeletePart(part.id)}
+              {existingParts.filter(p => p.is_requested).map(part => {
+                const canDelete = part.registered_by === user?.id;
+                return (
+                  <div
+                    key={part.id}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-md border text-sm transition-opacity",
+                      partsToDelete.includes(part.id) ? 'opacity-40 line-through bg-destructive/5' : 'bg-amber-50/20 border-amber-100'
+                    )}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-amber-900">{part.part_name}</span>
+                      {part.part_code && <span className="text-muted-foreground ml-1 text-xs">({part.part_code})</span>}
+                      <span className="text-muted-foreground ml-2 font-mono text-xs">x{part.quantity || 1}</span>
+                      {part.arrived && <Badge className="ml-2 bg-green-500 text-[9px] h-4">Chegou</Badge>}
+                      {part.cost ? <span className="text-muted-foreground ml-2 text-xs">{Number(part.cost).toFixed(2)} €</span> : null}
+                    </div>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                        onClick={() => handleToggleDeletePart(part.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
 
               {newParts.filter(p => p.is_requested).map((part, i) => (
                 <PartFormRow

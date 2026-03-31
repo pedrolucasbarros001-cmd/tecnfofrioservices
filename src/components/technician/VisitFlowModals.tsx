@@ -491,7 +491,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         // Insert parts to order if any
         for (const part of formData.partsToOrder) {
           if (!part.name.trim()) continue;
-          await supabase.from("service_parts").insert({
+          const { error: partInsertErr } = await supabase.from("service_parts").insert({
             service_id: service.id,
             part_name: part.name.trim(),
             part_code: part.reference.trim() || null,
@@ -500,6 +500,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             arrived: false,
             cost: 0,
           });
+          if (partInsertErr) throw partInsertErr;
         }
 
         // Update service status (Transaction Phase 2)
