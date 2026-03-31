@@ -580,8 +580,8 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           serviceId: service.id,
           status: finalStatus,
           pendingPricing: !hasPricingPreDefined,
-          workPerformed: formData.workPerformed?.trim() || defaultWork,
-          detectedFault: formData.detectedFault?.trim() || null,
+          workPerformed: (typeof formData.workPerformed === 'string' ? formData.workPerformed.trim() : '') || defaultWork,
+          detectedFault: (typeof formData.detectedFault === 'string' ? formData.detectedFault.trim() : '') || null,
           lastStatusBeforePartRequest: null,
         });
         if (rpcError) throw rpcError;
