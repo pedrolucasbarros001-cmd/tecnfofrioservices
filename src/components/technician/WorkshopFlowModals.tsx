@@ -402,7 +402,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       for (const part of formData.partsToOrder) {
         if (!part.name.trim()) continue;
 
-        await supabase.from("service_parts").insert({
+        const { error: partInsertErr } = await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: part.name.trim(),
           part_code: part.reference.trim() || null,
@@ -411,6 +411,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           arrived: false,
           cost: part.cost ? parseFloat(part.cost.replace(',', '.')) : 0,
         });
+        if (partInsertErr) throw partInsertErr;
 
         await logPartRequest(service.code || "N/A", service.id, part.name.trim(), profile?.full_name || "Técnico", user?.id);
       }
