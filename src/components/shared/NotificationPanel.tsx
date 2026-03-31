@@ -116,7 +116,25 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
     if (!notification.is_read) {
       markAsReadMutation.mutate(notification.id);
     }
-    // Future: Navigate to service if service_id exists
+
+    // Navigate to relevant page based on notification type and service_id
+    if (notification.service_id) {
+      onOpenChange(false); // Close the panel first
+
+      const type = notification.notification_type;
+
+      // Technicians go to their office page (service opens via sheet)
+      if (role === 'tecnico') {
+        if (type === 'transferencia_solicitada') {
+          navigate('/technician/office');
+        } else {
+          navigate(`/service-detail/${notification.service_id}`);
+        }
+      } else {
+        // Owners/secretaries → service detail page
+        navigate(`/service-detail/${notification.service_id}`);
+      }
+    }
   };
 
   return (
