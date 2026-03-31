@@ -174,7 +174,9 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
     saveState(currentStep, formData);
     saveStateToDb(currentStep, formData);
 
+    isTransitioning.current = true;
     setCurrentStep(step);
+    setTimeout(() => { isTransitioning.current = false; }, 350);
   };
 
   const handleStepDialogOpenChange = (open: boolean) => {
