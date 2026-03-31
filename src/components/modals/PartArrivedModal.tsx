@@ -146,7 +146,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
         id: service.id,
         status: previousStatus as any,
         technician_id: technicianId,
-        scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
+        scheduled_date: toLocalDateString(scheduledDate),
         scheduled_shift: (scheduledShift as any) || null,
         notes: notes ? `${service.notes || ''}\n[Artigo chegou] ${notes}`.trim() : service.notes,
         // Keep last_status_before_part_request so UI shows "Continuar" button

@@ -169,8 +169,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           .in('id', partsToDelete);
 
         if (delError) {
-          console.warn('Technician marked parts for deletion but likely lacked RLS permissions:', delError);
-          changes.push(`Marcado p/ remoção: ${removedPartNames.join(', ')}`);
+          console.warn('Failed to delete parts (RLS restriction):', delError);
+          toast.error('Sem permissão para remover alguns artigos. Apenas o criador ou administrador pode removê-los.');
         } else {
           changes.push(`Removido: ${removedPartNames.join(', ')}`);
         }
