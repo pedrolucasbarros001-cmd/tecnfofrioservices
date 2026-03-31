@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { toLocalDateString } from '@/utils/dateUtils';
 import { ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
 import {
   Dialog,
