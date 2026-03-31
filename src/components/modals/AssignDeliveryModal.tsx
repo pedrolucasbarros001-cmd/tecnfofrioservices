@@ -20,7 +20,7 @@ import {
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import type { Service } from '@/types/database';
