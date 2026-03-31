@@ -15,6 +15,7 @@ import {
   CheckCheck,
   X,
   ArrowRightLeft,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sheet,
