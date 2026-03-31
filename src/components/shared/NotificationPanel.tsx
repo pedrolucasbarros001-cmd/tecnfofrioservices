@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -14,6 +15,7 @@ import {
   CheckCheck,
   X,
   ArrowRightLeft,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sheet,
@@ -49,7 +51,8 @@ const NOTIFICATION_ICONS: Record<string, { icon: typeof Bell; color: string }> =
 };
 
 export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: notifications = [], isLoading } = useQuery({
@@ -114,7 +117,25 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
     if (!notification.is_read) {
       markAsReadMutation.mutate(notification.id);
     }
-    // Future: Navigate to service if service_id exists
+
+    // Navigate to relevant page based on notification type and service_id
+    if (notification.service_id) {
+      onOpenChange(false); // Close the panel first
+
+      const type = notification.notification_type;
+
+      // Technicians go to their office page (service opens via sheet)
+      if (role === 'tecnico') {
+        if (type === 'transferencia_solicitada') {
+          navigate('/technician/office');
+        } else {
+          navigate(`/service-detail/${notification.service_id}`);
+        }
+      } else {
+        // Owners/secretaries → service detail page
+        navigate(`/service-detail/${notification.service_id}`);
+      }
+    }
   };
 
   return (
@@ -201,12 +222,19 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
                             {notification.message}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                            locale: pt,
-                          })}
-                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(notification.created_at), {
+                              addSuffix: true,
+                              locale: pt,
+                            })}
+                          </p>
+                          {notification.service_id && (
+                            <span className="text-xs text-primary flex items-center gap-1">
+                              Ver serviço <ExternalLink className="h-3 w-3" />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
