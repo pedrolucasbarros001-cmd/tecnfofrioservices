@@ -172,7 +172,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const resetForm = () => {
     setAmount('');
     setPaymentMethod('dinheiro');
-    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentDate(toLocalDateString(new Date()));
     setDescription('');
     setDetailsOpen(false);
   };
