@@ -33,7 +33,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { logPartArrival } from '@/utils/activityLogUtils';
 import type { Service, ServicePart, ScheduledShift } from '@/types/database';
