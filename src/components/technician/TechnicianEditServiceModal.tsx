@@ -133,17 +133,16 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: "${service.serial_number || '(vazio)'}" → "${serialNumber}"`); }
       if (applianceType !== (service.appliance_type || '')) { updates.appliance_type = applianceType; changes.push(`Tipo: "${service.appliance_type || '(vazio)'}" → "${applianceType}"`); }
 
-      // Use technician_update_service RPC for status-safe fields
-      if (detectedFault !== (service.detected_fault || '') || workPerformed !== (service.work_performed || '')) {
-        const { error: rpcError } = await technicianUpdateService({
-          serviceId: service.id,
-          detectedFault: detectedFault || null,
-          workPerformed: workPerformed || null,
-        });
-        if (rpcError) throw rpcError;
-        if (detectedFault !== (service.detected_fault || '')) changes.push(`Diagnóstico: "${service.detected_fault || '(vazio)'}" → "${detectedFault}"`);
-        if (workPerformed !== (service.work_performed || '')) changes.push(`Trabalho realizado: "${service.work_performed || '(vazio)'}" → "${workPerformed}"`);
-      }
+      // Always send diagnosis/work via RPC — let the DB decide if there's a real change
+      const { error: rpcError } = await technicianUpdateService({
+        serviceId: service.id,
+        detectedFault: detectedFault,
+        workPerformed: workPerformed,
+      });
+      if (rpcError) throw rpcError;
+      if (detectedFault !== (service.detected_fault || '')) changes.push(`Diagnóstico: "${service.detected_fault || '(vazio)'}" → "${detectedFault}"`);
+      if (workPerformed !== (service.work_performed || '')) changes.push(`Trabalho realizado: "${service.work_performed || '(vazio)'}" → "${workPerformed}"`);
+
 
       // Update equipment fields directly
       if (Object.keys(updates).length > 0) {

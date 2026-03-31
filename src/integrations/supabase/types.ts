@@ -1242,31 +1242,19 @@ export type Database = {
           service_id: string
         }[]
       }
-      technician_update_service:
-        | {
-            Args: {
-              _detected_fault?: string
-              _last_status_before_part_request?: string
-              _pending_pricing?: boolean
-              _service_id: string
-              _status?: string
-              _work_performed?: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              _detected_fault?: string
-              _flow_data?: Json
-              _flow_step?: string
-              _last_status_before_part_request?: string
-              _pending_pricing?: boolean
-              _service_id: string
-              _status?: string
-              _work_performed?: string
-            }
-            Returns: undefined
-          }
+      technician_update_service: {
+        Args: {
+          _detected_fault?: string
+          _flow_data?: Json
+          _flow_step?: string
+          _last_status_before_part_request?: string
+          _pending_pricing?: boolean
+          _service_id: string
+          _status?: string
+          _work_performed?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "dono" | "secretaria" | "tecnico" | "monitor"
