@@ -222,12 +222,19 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
                             {notification.message}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                            locale: pt,
-                          })}
-                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(notification.created_at), {
+                              addSuffix: true,
+                              locale: pt,
+                            })}
+                          </p>
+                          {notification.service_id && (
+                            <span className="text-xs text-primary flex items-center gap-1">
+                              Ver serviço <ExternalLink className="h-3 w-3" />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
