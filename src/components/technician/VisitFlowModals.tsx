@@ -179,6 +179,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
   const handleStepDialogOpenChange = (open: boolean) => {
     if (open) return;
+    if (isTransitioning.current) return;
     handleClose();
   };
 
