@@ -50,7 +50,8 @@ const NOTIFICATION_ICONS: Record<string, { icon: typeof Bell; color: string }> =
 };
 
 export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: notifications = [], isLoading } = useQuery({
