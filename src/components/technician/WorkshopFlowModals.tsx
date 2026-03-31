@@ -363,7 +363,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description.trim());
 
       for (const article of newArticles) {
-        await supabase.from("service_parts").insert({
+        const { error: insertErr } = await supabase.from("service_parts").insert({
           service_id: service.id,
           part_name: article.description,
           part_code: article.reference || null,
@@ -375,6 +375,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
           registered_by: user?.id || null,
           registered_location: "oficina",
         });
+        if (insertErr) throw insertErr;
       }
 
       setFormData(prev => ({ ...prev, articlesLocked: true }));
