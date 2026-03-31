@@ -204,6 +204,13 @@ export function TechnicianServiceSheet({
               </div>
             )}
 
+            {service.detected_fault && (
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Diagnóstico Técnico</div>
+                <div className="text-sm border-l-2 border-amber-400 pl-3 py-1 bg-amber-50/50 rounded-r-md">{service.detected_fault}</div>
+              </div>
+            )}
+
             {service.work_performed && (
               <div className="space-y-1">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Trabalho Realizado</div>

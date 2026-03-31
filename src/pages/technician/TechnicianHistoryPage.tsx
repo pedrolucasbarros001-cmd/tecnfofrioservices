@@ -168,6 +168,24 @@ export default function TechnicianHistoryPage() {
                                             {service.created_at ? format(parseISO(service.created_at), "dd/MM/yyyy", { locale: pt }) : '-'}
                                         </div>
                                     </div>
+
+                                    {/* Observações do técnico */}
+                                    {(service.detected_fault || service.work_performed) && (
+                                        <div className="space-y-1 text-sm">
+                                            {service.detected_fault && (
+                                                <div className="text-muted-foreground truncate">
+                                                    <span className="font-medium text-foreground">Diagnóstico:</span>{' '}
+                                                    {service.detected_fault}
+                                                </div>
+                                            )}
+                                            {service.work_performed && (
+                                                <div className="text-muted-foreground truncate">
+                                                    <span className="font-medium text-foreground">Trabalho:</span>{' '}
+                                                    {service.work_performed}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
