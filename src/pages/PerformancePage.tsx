@@ -209,7 +209,7 @@ export default function PerformancePage() {
                             <div className="text-right">
                               {service.scheduled_date && (
                                 <p className="text-xs text-muted-foreground">
-                                  {parseLocalDate(service.scheduled_date).toLocaleDateString('pt-PT')}
+                                  {formatLocalDate(service.scheduled_date, 'dd/MM/yyyy')}
                                 </p>
                               )}
                               <ServiceStatusBadge
