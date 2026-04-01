@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, isSameDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { formatShiftLabel, isSameLocalDateString } from '@/utils/dateUtils';
 import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
