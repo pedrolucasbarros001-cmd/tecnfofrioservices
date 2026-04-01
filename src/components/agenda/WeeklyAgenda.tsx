@@ -72,8 +72,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
     return services.filter(service => {
       if (!service || !service.scheduled_date) return false;
       try {
-        const serviceDate = parseISO(service.scheduled_date);
-        return isSameDay(serviceDate, date);
+        return isSameLocalDateString(service.scheduled_date, date);
       } catch (e) {
         return false;
       }

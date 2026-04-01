@@ -39,14 +39,18 @@ export function PartArrivalIndicator({
     );
   }
 
-  const arrival = new Date(estimatedArrival);
+  // Parse as local date (pure YYYY-MM-DD) to avoid UTC day shift
+  let arrival: Date;
+  try {
+    arrival = parseLocalDate(estimatedArrival);
+  } catch {
+    return null;
+  }
 
   // Validate date before proceeding - prevents crash on invalid dates
   if (isNaN(arrival.getTime())) {
     return null;
   }
-
-  arrival.setHours(0, 0, 0, 0);
 
   const businessDaysRemaining = getBusinessDaysRemaining(arrival);
 

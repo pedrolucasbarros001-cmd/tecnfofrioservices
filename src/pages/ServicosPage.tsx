@@ -118,7 +118,7 @@ export default function ServicosPage() {
       // Show services scheduled for today OR unfinished services from past
       // But mainly filtered by scheduled date as per original logic
       if (!service.scheduled_date) return false;
-      return isSameDay(parseISO(service.scheduled_date), currentDate);
+      return isSameLocalDateString(service.scheduled_date, currentDate);
     });
   }, [services, currentDate]);
 

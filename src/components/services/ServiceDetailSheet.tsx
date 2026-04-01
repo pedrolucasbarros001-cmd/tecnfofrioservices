@@ -827,7 +827,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
                       {service.scheduled_date
-                        ? safeFormat(service.scheduled_date, "d 'de' MMMM", { locale: pt })
+                        ? (() => { try { return format(parseLocalDate(service.scheduled_date), "d 'de' MMMM", { locale: pt }); } catch { return '-'; } })()
                         : 'Não agendado'}
                     </span>
                   </div>

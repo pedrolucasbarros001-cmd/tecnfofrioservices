@@ -59,7 +59,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
       });
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
-      const dateStr = format(new Date(deliveryDate), "dd/MM", { locale: pt });
+      const dateStr = formatLocalDate(deliveryDate, "dd/MM");
       const shiftStr = formatShiftLabel(deliveryTime);
 
       toast.success(`Entrega agendada: ${techName} (${dateStr}, ${shiftStr})`);
