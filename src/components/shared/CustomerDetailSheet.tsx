@@ -477,7 +477,7 @@ export function CustomerDetailSheet({
                                     {service.fault_description}
                                   </TableCell>
                                   <TableCell className="text-sm">
-                                    {service.scheduled_date ? format(new Date(service.scheduled_date), 'dd/MM/yyyy') : '-'}
+                                    {service.scheduled_date ? format(parseLocalDate(service.scheduled_date), 'dd/MM/yyyy') : '-'}
                                   </TableCell>
                                   <TableCell className="font-medium">
                                     {service.final_price?.toFixed(2) || '0,00'} €

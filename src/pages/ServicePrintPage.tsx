@@ -355,7 +355,7 @@ export default function ServicePrintPage() {
               <span className="text-muted-foreground">Data Agendada:</span>{' '}
               <span className="font-medium">
                 {service.scheduled_date
-                  ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                  ? format(parseLocalDate(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
             </div>
