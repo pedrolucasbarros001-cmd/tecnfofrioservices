@@ -27,12 +27,6 @@ export function useRealtime(
         if (timerRef.current) clearTimeout(timerRef.current);
 
         timerRef.current = setTimeout(() => {
-          const hasNonStale = queryKeysRef.current.some(key => {
-            const state = queryClient.getQueryState(key);
-            return state && !state.isInvalidated;
-          });
-          if (!hasNonStale) return;
-
           queryKeysRef.current.forEach(key => {
             queryClient.invalidateQueries({ queryKey: key });
           });

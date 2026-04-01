@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { format, addDays, subDays, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, subDays, isSameDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, isSameLocalDateString } from '@/utils/dateUtils';
 import { VisitFlowModals } from '@/components/technician/VisitFlowModals';
 import { InstallationFlowModals } from '@/components/technician/InstallationFlowModals';
 import { DeliveryFlowModals } from '@/components/technician/DeliveryFlowModals';
@@ -118,7 +118,7 @@ export default function ServicosPage() {
       // Show services scheduled for today OR unfinished services from past
       // But mainly filtered by scheduled date as per original logic
       if (!service.scheduled_date) return false;
-      return isSameDay(parseISO(service.scheduled_date), currentDate);
+      return isSameLocalDateString(service.scheduled_date, currentDate);
     });
   }, [services, currentDate]);
 

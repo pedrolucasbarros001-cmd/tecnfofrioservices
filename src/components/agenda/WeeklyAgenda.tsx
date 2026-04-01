@@ -8,7 +8,6 @@ import {
   subWeeks,
   eachDayOfInterval,
   isSameDay,
-  parseISO,
   startOfMonth,
   endOfMonth,
   addMonths,
@@ -19,7 +18,7 @@ import { pt } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, isSameLocalDateString } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 import { AgendaDrawer } from './AgendaDrawer';
 
@@ -73,8 +72,7 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
     return services.filter(service => {
       if (!service || !service.scheduled_date) return false;
       try {
-        const serviceDate = parseISO(service.scheduled_date);
-        return isSameDay(serviceDate, date);
+        return isSameLocalDateString(service.scheduled_date, date);
       } catch (e) {
         return false;
       }

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Package, Wrench, Truck } from 'lucide-react';
-import { parseLocalDate } from '@/utils/dateUtils';
+import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -209,7 +209,7 @@ export default function PerformancePage() {
                             <div className="text-right">
                               {service.scheduled_date && (
                                 <p className="text-xs text-muted-foreground">
-                                  {parseLocalDate(service.scheduled_date).toLocaleDateString('pt-PT')}
+                                  {formatLocalDate(service.scheduled_date, 'dd/MM/yyyy')}
                                 </p>
                               )}
                               <ServiceStatusBadge

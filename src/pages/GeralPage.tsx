@@ -132,8 +132,9 @@ export default function GeralPage() {
 
   // Sem Realtime — atualiza ao abrir página, refetchOnWindowFocus, ou após ações manuais
 
-  // Realtime updates for secretary navigation
-  useRealtime('services');
+  // Realtime updates for secretary navigation — cover all queries on this page
+  useRealtime('services', [['services'], ['services-paginated'], ['agenda-services']]);
+  useRealtime('service_parts', [['all-pending-parts']]);
 
   const {
     data: result,

@@ -1,6 +1,7 @@
 /**
  * Date utilities for business day calculations and shift formatting
  */
+import { format } from 'date-fns';
 
 /**
  * Adds business days to a date (excludes Saturdays and Sundays)
@@ -83,6 +84,25 @@ export function toLocalDateString(date: Date): string {
 export function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
+}
+
+/**
+ * Compares a YYYY-MM-DD string with a Date object using LOCAL day only.
+ * Replaces isSameDay(parseISO(dateStr), date) which is vulnerable to UTC shift.
+ */
+export function isSameLocalDateString(dateStr: string, date: Date): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+/**
+ * Formats a YYYY-MM-DD string using date-fns format, treating it as local date.
+ * Use this instead of format(new Date(dateStr), ...) for pure-date fields like
+ * scheduled_date, delivery_date, estimated_arrival.
+ */
+export function formatLocalDate(dateStr: string, formatStr: string, options?: any): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return format(new Date(y, m - 1, d), formatStr, options);
 }
 
 export function formatShiftLabel(shift: string | null | undefined): string {

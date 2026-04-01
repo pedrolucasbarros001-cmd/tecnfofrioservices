@@ -85,9 +85,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { humanizeError } from '@/utils/errorMessages';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, parseLocalDate } from '@/utils/dateUtils';
 
 // Helper: safe date formatting to prevent crashes on "Invalid Date"
+// For pure-date fields (scheduled_date, delivery_date, estimated_arrival)
+// use safeFormatDate instead to avoid UTC day shift.
 const safeFormat = (date: any, formatStr: string, options?: any) => {
   if (!date) return '-';
   try {
@@ -825,7 +827,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
                       {service.scheduled_date
-                        ? safeFormat(service.scheduled_date, "d 'de' MMMM", { locale: pt })
+                        ? (() => { try { return format(parseLocalDate(service.scheduled_date), "d 'de' MMMM", { locale: pt }); } catch { return '-'; } })()
                         : 'Não agendado'}
                     </span>
                   </div>

@@ -20,9 +20,7 @@ import {
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
-import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { formatShiftLabel, toLocalDateString, formatLocalDate } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface AssignDeliveryModalProps {
@@ -61,7 +59,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
       });
 
       const techName = technicians.find(t => t.id === technicianId)?.profile?.full_name || 'Técnico';
-      const dateStr = format(new Date(deliveryDate), "dd/MM", { locale: pt });
+      const dateStr = formatLocalDate(deliveryDate, "dd/MM");
       const shiftStr = formatShiftLabel(deliveryTime);
 
       toast.success(`Entrega agendada: ${techName} (${dateStr}, ${shiftStr})`);
