@@ -79,7 +79,7 @@ export function AssignTechnicianModal({
     resolver: zodResolver(formSchema),
     defaultValues: {
       technician_id: service?.technician_id || '',
-      scheduled_date: service?.scheduled_date ? new Date(service.scheduled_date) : undefined,
+      scheduled_date: service?.scheduled_date ? parseLocalDate(service.scheduled_date) : undefined,
       scheduled_shift: service?.scheduled_shift || '',
     },
   });
