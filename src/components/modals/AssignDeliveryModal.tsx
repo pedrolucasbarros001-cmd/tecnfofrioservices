@@ -20,9 +20,7 @@ import {
 import { useUpdateService } from '@/hooks/useServices';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { toast } from 'sonner';
-import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { formatShiftLabel, toLocalDateString, formatLocalDate } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface AssignDeliveryModalProps {
