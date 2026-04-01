@@ -8,6 +8,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
+import { parseLocalDate } from '@/utils/dateUtils';
 import {
   Dialog,
   DialogContent,
