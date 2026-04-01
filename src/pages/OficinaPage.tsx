@@ -31,6 +31,7 @@ export default function OficinaPage() {
 
   const queryClient = useQueryClient();
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
+  useRealtime('services');
 
   const handlePrefetch = useCallback((serviceId: string) => {
     prefetchFullServiceData(queryClient, serviceId);

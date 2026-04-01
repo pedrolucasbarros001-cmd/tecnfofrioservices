@@ -30,6 +30,7 @@ export default function SecretaryDebitoPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
+  useRealtime('services');
 
   // Filter services with pending payment
   const debitServices = allServices.filter((service) => {

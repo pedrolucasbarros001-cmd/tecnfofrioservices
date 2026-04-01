@@ -33,6 +33,7 @@ export default function SecretaryPrecificarPage() {
   const [priceService, setPriceService] = useState<Service | null>(null);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
+  useRealtime('services');
 
   // Filter services with pending_pricing = true
   const precificarServices = allServices.filter((s) => s.pending_pricing === true);

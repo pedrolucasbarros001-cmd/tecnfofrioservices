@@ -28,6 +28,7 @@ export default function SecretaryConcluidosPage() {
   const [showContactModal, setShowContactModal] = useState(false);
 
   const { data: services = [], isLoading } = useServices({ status: 'concluidos' });
+  useRealtime('services');
   const updateService = useUpdateService();
 
   // Filter only services in workshop (status concluidos)
