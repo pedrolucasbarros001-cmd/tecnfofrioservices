@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useRealtime } from '@/hooks/useRealtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { Wrench, Send, UserPlus, Clock, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
