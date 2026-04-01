@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRealtime } from '@/hooks/useRealtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { DollarSign } from 'lucide-react';
