@@ -101,7 +101,6 @@ export function isSameLocalDateString(dateStr: string, date: Date): boolean {
  * scheduled_date, delivery_date, estimated_arrival.
  */
 export function formatLocalDate(dateStr: string, formatStr: string, options?: any): string {
-  const { format } = require('date-fns');
   const [y, m, d] = dateStr.split('-').map(Number);
   return format(new Date(y, m - 1, d), formatStr, options);
 }
