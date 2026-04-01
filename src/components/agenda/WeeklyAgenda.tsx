@@ -18,7 +18,7 @@ import { pt } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, isSameLocalDateString } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 import { AgendaDrawer } from './AgendaDrawer';
 
