@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { getBusinessDaysRemaining } from '@/utils/dateUtils';
+import { getBusinessDaysRemaining, parseLocalDate } from '@/utils/dateUtils';
 
 interface PartArrivalIndicatorProps {
   estimatedArrival: string | null;
