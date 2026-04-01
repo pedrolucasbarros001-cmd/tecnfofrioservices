@@ -249,7 +249,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               <span style={{ color: '#666' }}>Data Agendada:</span>{' '}
               <span style={{ fontWeight: '500' }}>
                 {service.scheduled_date
-                  ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                  ? format(parseLocalDate(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
             </div>
