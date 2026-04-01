@@ -150,7 +150,7 @@ export function RescheduleServiceModal({
                   <CalendarIcon className="h-4 w-4" />
                   <span>
                     {service.scheduled_date
-                      ? format(new Date(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
+                      ? format(parseLocalDate(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
                       : 'Sem data'}
                     {service.scheduled_shift && (
                       <> • {formatShiftLabel(service.scheduled_shift)}</>

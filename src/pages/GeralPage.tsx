@@ -132,6 +132,9 @@ export default function GeralPage() {
 
   // Sem Realtime — atualiza ao abrir página, refetchOnWindowFocus, ou após ações manuais
 
+  // Realtime updates for secretary navigation
+  useRealtime('services');
+
   const {
     data: result,
     isLoading
