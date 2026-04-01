@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 import { AlertTriangle, Download, PenTool, Loader2, Printer } from 'lucide-react';
 import { printServiceSheet } from '@/utils/printUtils';
 import {
