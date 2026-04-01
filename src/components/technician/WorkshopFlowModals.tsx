@@ -344,7 +344,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const previousArticlesSubtotal = previousArticles.reduce((sum, a) => sum + (a.quantity * a.unit_price), 0);
   const adminPricingTotals = adminPricing ? calculateAdminPricingTotals(adminPricing) : null;
   const adminPricingTotal = adminPricingTotals?.total || 0;
-  const combinedSubtotal = articlesSubtotal + previousArticlesSubtotal;
+  const combinedSubtotal = articlesSubtotal;
 
   const discountAmount = (() => {
     const val = parseFloat(formData.discountValue) || 0;
