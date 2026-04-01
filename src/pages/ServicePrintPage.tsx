@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 import { AlertTriangle, Download, PenTool, Loader2, Printer, ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -354,7 +355,7 @@ export default function ServicePrintPage() {
               <span className="text-muted-foreground">Data Agendada:</span>{' '}
               <span className="font-medium">
                 {service.scheduled_date
-                  ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                  ? format(parseLocalDate(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
             </div>

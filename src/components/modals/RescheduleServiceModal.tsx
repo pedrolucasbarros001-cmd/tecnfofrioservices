@@ -35,7 +35,7 @@ import { useUpdateService } from '@/hooks/useServices';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
-import { formatShiftLabel, toLocalDateString } from '@/utils/dateUtils';
+import { formatShiftLabel, toLocalDateString, parseLocalDate } from '@/utils/dateUtils';
 import type { Service } from '@/types/database';
 
 interface RescheduleServiceModalProps {
@@ -83,7 +83,7 @@ export function RescheduleServiceModal({
         change_technician: false,
         technician_id: service.technician_id || '',
         scheduled_date: service.scheduled_date
-          ? new Date(service.scheduled_date)
+          ? parseLocalDate(service.scheduled_date)
           : undefined,
         scheduled_shift: service.scheduled_shift || '',
       });
@@ -150,7 +150,7 @@ export function RescheduleServiceModal({
                   <CalendarIcon className="h-4 w-4" />
                   <span>
                     {service.scheduled_date
-                      ? format(new Date(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
+                      ? format(parseLocalDate(service.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: pt })
                       : 'Sem data'}
                     {service.scheduled_shift && (
                       <> • {formatShiftLabel(service.scheduled_shift)}</>

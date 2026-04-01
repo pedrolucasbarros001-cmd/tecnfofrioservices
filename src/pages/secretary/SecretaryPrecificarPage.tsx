@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRealtime } from '@/hooks/useRealtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { DollarSign } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function SecretaryPrecificarPage() {
   const [priceService, setPriceService] = useState<Service | null>(null);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
+  useRealtime('services');
 
   // Filter services with pending_pricing = true
   const precificarServices = allServices.filter((s) => s.pending_pricing === true);

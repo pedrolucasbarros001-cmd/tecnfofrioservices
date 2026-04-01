@@ -5,7 +5,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBoundaryFallbackContent } from '@/components/ErrorBoundaryFallbackContent';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { formatShiftLabel } from '@/utils/dateUtils';
+import { formatShiftLabel, parseLocalDate } from '@/utils/dateUtils';
+import { useRealtime } from '@/hooks/useRealtime';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,6 +131,9 @@ export default function GeralPage() {
   const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
 
   // Sem Realtime — atualiza ao abrir página, refetchOnWindowFocus, ou após ações manuais
+
+  // Realtime updates for secretary navigation
+  useRealtime('services');
 
   const {
     data: result,
@@ -559,8 +563,8 @@ export default function GeralPage() {
                       <TableCell>
                         {service.scheduled_date ? <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />                            {(service.scheduled_date && !isNaN(new Date(service.scheduled_date).getTime()))
-                              ? format(new Date(service.scheduled_date), 'dd/MM/yy', { locale: pt })
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />                            {(service.scheduled_date && !isNaN(parseLocalDate(service.scheduled_date).getTime()))
+                              ? format(parseLocalDate(service.scheduled_date), 'dd/MM/yy', { locale: pt })
                               : '-'}
                           </div>
                           {service.scheduled_shift && <Badge variant={"outline" as any} className="text-xs">

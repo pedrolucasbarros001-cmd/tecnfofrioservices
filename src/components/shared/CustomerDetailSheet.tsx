@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { toLocalDateString } from '@/utils/dateUtils';
+import { toLocalDateString, parseLocalDate } from '@/utils/dateUtils';
 import { pt } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -477,7 +477,7 @@ export function CustomerDetailSheet({
                                     {service.fault_description}
                                   </TableCell>
                                   <TableCell className="text-sm">
-                                    {service.scheduled_date ? format(new Date(service.scheduled_date), 'dd/MM/yyyy') : '-'}
+                                    {service.scheduled_date ? format(parseLocalDate(service.scheduled_date), 'dd/MM/yyyy') : '-'}
                                   </TableCell>
                                   <TableCell className="font-medium">
                                     {service.final_price?.toFixed(2) || '0,00'} €

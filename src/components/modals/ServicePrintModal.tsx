@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateUtils';
 import { AlertTriangle, Download, PenTool, Loader2, Printer } from 'lucide-react';
 import { printServiceSheet } from '@/utils/printUtils';
 import {
@@ -248,7 +249,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               <span style={{ color: '#666' }}>Data Agendada:</span>{' '}
               <span style={{ fontWeight: '500' }}>
                 {service.scheduled_date
-                  ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                  ? format(parseLocalDate(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                   : 'Não agendado'}
               </span>
             </div>
@@ -627,7 +628,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 <span className="text-muted-foreground">Data Agendada:</span>{' '}
                 <span className="font-medium">
                   {service.scheduled_date
-                    ? format(new Date(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
+                    ? format(parseLocalDate(service.scheduled_date), "dd/MM/yyyy", { locale: pt })
                     : 'Não agendado'}
                 </span>
               </div>

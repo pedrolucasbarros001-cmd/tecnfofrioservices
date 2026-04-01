@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRealtime } from '@/hooks/useRealtime';
 import type { Service } from '@/types/database';
 import { CheckCircle2, Truck, Phone, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
@@ -27,6 +28,7 @@ export default function SecretaryConcluidosPage() {
   const [showContactModal, setShowContactModal] = useState(false);
 
   const { data: services = [], isLoading } = useServices({ status: 'concluidos' });
+  useRealtime('services');
   const updateService = useUpdateService();
 
   // Filter only services in workshop (status concluidos)

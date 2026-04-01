@@ -75,6 +75,16 @@ export function toLocalDateString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Parses a 'YYYY-MM-DD' string as a LOCAL date (not UTC).
+ * Fixes the bug where `new Date("2026-04-01")` is interpreted as UTC midnight,
+ * which shows as the previous day in timezones like Portugal (UTC+0/+1).
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export function formatShiftLabel(shift: string | null | undefined): string {
   if (!shift) return 'Sem turno';
   const s = shift.toLowerCase();

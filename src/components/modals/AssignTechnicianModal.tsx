@@ -8,6 +8,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
+import { parseLocalDate } from '@/utils/dateUtils';
 import {
   Dialog,
   DialogContent,
@@ -78,7 +79,7 @@ export function AssignTechnicianModal({
     resolver: zodResolver(formSchema),
     defaultValues: {
       technician_id: service?.technician_id || '',
-      scheduled_date: service?.scheduled_date ? new Date(service.scheduled_date) : undefined,
+      scheduled_date: service?.scheduled_date ? parseLocalDate(service.scheduled_date) : undefined,
       scheduled_shift: service?.scheduled_shift || '',
     },
   });
@@ -88,7 +89,7 @@ export function AssignTechnicianModal({
     if (open && service) {
       form.reset({
         technician_id: service.technician_id || '',
-        scheduled_date: service.scheduled_date ? new Date(service.scheduled_date) : undefined,
+        scheduled_date: service.scheduled_date ? parseLocalDate(service.scheduled_date) : undefined,
         scheduled_shift: service.scheduled_shift || '',
       });
     }

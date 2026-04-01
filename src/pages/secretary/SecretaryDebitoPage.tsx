@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRealtime } from '@/hooks/useRealtime';
 import { DollarSign, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export default function SecretaryDebitoPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   const { data: allServices = [], isLoading } = useServices({ status: 'all' });
+  useRealtime('services');
 
   // Filter services with pending payment
   const debitServices = allServices.filter((service) => {
