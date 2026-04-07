@@ -36,7 +36,7 @@ export default function SecretaryPrecificarPage() {
   useRealtime('services');
 
   // Filter services with pending_pricing = true
-  const precificarServices = allServices.filter((s) => s.pending_pricing === true);
+  const precificarServices = allServices.filter((s) => s.pending_pricing === true && (s.final_price ?? 0) === 0);
 
   const handleRowClick = (service: Service) => {
     setSelectedService(service);
