@@ -18,13 +18,9 @@ export default function ServiceTagPage() {
   const tagRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Session bridge for new tab authentication
   const { isSettling: sessionSettling } = usePrintSessionBridge();
-
-  // Auth state from context
   const { isAuthenticated, loading: authLoading } = useAuth();
 
-  // Fetch service data with customer
   const {
     data: service,
     isLoading,
@@ -75,10 +71,10 @@ export default function ServiceTagPage() {
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: [62, 90],
+        format: [29, 90],
       });
-      const canvasHeight = (canvas.height / canvas.width) * 62;
-      pdf.addImage(imgData, "PNG", 0, 0, 62, canvasHeight);
+      const canvasHeight = (canvas.height / canvas.width) * 29;
+      pdf.addImage(imgData, "PNG", 0, 0, 29, canvasHeight);
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
@@ -120,10 +116,9 @@ export default function ServiceTagPage() {
 
   const details = [
     { label: "Cliente", value: service.customer?.name },
-    { label: "Telefone", value: service.customer?.phone },
-    { label: "Equipamento", value: service.appliance_type },
-    { label: "Modelo/PNC", value: `${service.model || ''}${service.pnc ? ` / ${service.pnc}` : ''}` },
-    { label: "Descrição", value: service.detected_fault || service.fault_description },
+    { label: "Tel", value: service.customer?.phone },
+    { label: "Equip", value: service.appliance_type },
+    { label: "Desc", value: service.detected_fault || service.fault_description },
   ].filter(d => !!d.value);
 
   return (
@@ -131,7 +126,7 @@ export default function ServiceTagPage() {
       <style>{`
         @media print {
           @page {
-            size: 62mm 90mm;
+            size: 29mm 90mm;
             margin: 0;
           }
           .no-print {
@@ -154,7 +149,7 @@ export default function ServiceTagPage() {
           min-height: calc(100vh - 73px);
         }
         .print-tag-container {
-          width: 62mm;
+          width: 29mm;
           height: 90mm;
           background: white;
           box-sizing: border-box;
@@ -190,30 +185,30 @@ export default function ServiceTagPage() {
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
           {/* Top blue bar */}
-          <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+          <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
           {/* Logo */}
-          <div style={{ padding: '2mm 4mm 1mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <div style={{ padding: '1.5mm 2mm 1mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
             <img
               src={tecnofrioLogoFull}
               alt="TECNOFRIO"
-              style={{ height: '7mm', maxWidth: '100%', objectFit: 'contain' }}
+              style={{ height: '5mm', maxWidth: '100%', objectFit: 'contain' }}
             />
           </div>
 
           {/* QR Code */}
           <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0' }}>
-            <QRCodeSVG value={qrUrl} size={110} level="M" includeMargin={false} />
+            <QRCodeSVG value={qrUrl} size={70} level="M" includeMargin={false} />
           </div>
 
           {/* Service Code */}
-          <div style={{ textAlign: 'center', padding: '1mm 4mm' }}>
+          <div style={{ textAlign: 'center', padding: '1mm 2mm 0.5mm' }}>
             <p style={{
-              fontSize: '13px',
+              fontSize: '9px',
               fontFamily: 'monospace',
               fontWeight: 'bold',
               color: '#2B4F84',
-              letterSpacing: '1px',
+              letterSpacing: '0.5px',
               margin: 0,
             }}>
               {service.code}
@@ -221,21 +216,17 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 'calc(100% - 6mm)', height: '0.2mm', backgroundColor: '#e5e7eb', margin: '1mm 3mm' }} />
+          <div style={{ width: 'calc(100% - 4mm)', height: '0.2mm', backgroundColor: '#e5e7eb', margin: '0.5mm 2mm' }} />
 
           {/* Details */}
-          <div style={{ padding: '1mm 4mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
+          <div style={{ padding: '0.5mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
             {details.map(({ label, value }) => (
-              <div key={label} style={{ display: 'flex', gap: '3px', marginBottom: '0.5mm', lineHeight: '1.2' }}>
-                <span style={{ fontSize: '7.5px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, minWidth: '50px' }}>{label}:</span>
+              <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.2' }}>
+                <span style={{ fontSize: '5.5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
                 <span style={{
-                  fontSize: '7.5px',
+                  fontSize: '5.5px',
                   color: '#000000',
                   wordBreak: 'break-all',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
                 }} title={value || ''}>
                   {value}
                 </span>
@@ -244,7 +235,7 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Bottom blue bar */}
-          <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+          <div style={{ width: '100%', height: '2.5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
         </div>
       </div>
     </div>

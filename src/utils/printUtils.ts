@@ -8,7 +8,7 @@ type PrintType = 'sheet' | 'tag';
 // Page configurations for each print type
 const PAGE_CONFIGS: Record<PrintType, string> = {
   sheet: '@page { size: A4 portrait; margin: 0; }',
-  tag: '@page { size: 62mm 90mm; margin: 0; }', // 62mm x 90mm portrait label (Brother QL-700)
+  tag: '@page { size: 29mm 90mm; margin: 0; }', // 29mm x 90mm portrait label (Brother QL-700 DK-11201)
 };
 
 let injectedStyleElement: HTMLStyleElement | null = null;
