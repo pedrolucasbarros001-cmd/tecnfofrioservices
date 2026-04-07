@@ -114,7 +114,8 @@ export default function DashboardPage() {
 
         // --- Financial overlays (independent of operational status) ---
         // "Orçamentar" = pending_pricing=true (needs pricing)
-        if (service.pending_pricing) {
+        // "Orçamentar" = pending_pricing=true AND no price set yet
+        if (service.pending_pricing && finalPrice === 0) {
           counts.a_precificar++;
         }
 

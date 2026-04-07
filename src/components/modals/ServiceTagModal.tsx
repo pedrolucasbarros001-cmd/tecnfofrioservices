@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Download, Loader2, Printer } from 'lucide-react';
-import { printServiceTag } from '@/utils/printUtils';
 import {
   Dialog,
   DialogContent,
@@ -42,9 +41,9 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           element.style.position = 'relative';
         },
       });
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 90] });
-      const canvasHeight = (canvas.height / canvas.width) * 62;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 62, canvasHeight);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [29, 90] });
+      const canvasHeight = (canvas.height / canvas.width) * 29;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 29, canvasHeight);
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error('Erro ao gerar PDF da etiqueta:', err);
@@ -53,7 +52,6 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
     }
   };
 
-  // Generate a full URL for QR code that works for any authenticated collaborator
   const qrData = `${window.location.origin}/service/${service.id}`;
 
   return (
@@ -64,13 +62,14 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>
 
-          {/* Tag content - portrait 62mm layout */}
+          {/* Tag content - portrait 29mm x 90mm layout */}
           <div className="flex justify-center py-2">
             <div
               ref={tagRef}
               className="print-tag"
               style={{
-                width: '62mm',
+                width: '29mm',
+                height: '90mm',
                 background: '#ffffff',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 overflow: 'hidden',
@@ -80,35 +79,35 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               }}
             >
               {/* Top accent bar */}
-              <div style={{ width: '100%', height: '5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+              <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
               {/* Logo */}
-              <div style={{ padding: '3mm 4mm 2mm', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ padding: '1.5mm 2mm 1mm', display: 'flex', justifyContent: 'center' }}>
                 <img
                   src={tecnofrioLogoFull}
                   alt="TECNOFRIO"
-                  style={{ height: '8mm', objectFit: 'contain' }}
+                  style={{ height: '5mm', objectFit: 'contain' }}
                 />
               </div>
 
               {/* QR Code */}
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0 2mm' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0' }}>
                 <QRCodeSVG
                   value={qrData}
-                  size={120}
+                  size={70}
                   level="M"
                   includeMargin={false}
                 />
               </div>
 
               {/* Service Code */}
-              <div style={{ textAlign: 'center', padding: '2mm 4mm 1mm' }}>
+              <div style={{ textAlign: 'center', padding: '1mm 2mm 0.5mm' }}>
                 <p style={{
-                  fontSize: '14px',
+                  fontSize: '9px',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
                   color: '#2B4F84',
-                  letterSpacing: '1px',
+                  letterSpacing: '0.5px',
                   margin: 0,
                 }}>
                   {service.code}
@@ -116,25 +115,25 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               </div>
 
               {/* Divider */}
-              <div style={{ width: 'calc(100% - 8mm)', height: '0.5px', backgroundColor: '#e5e7eb', margin: '1mm 4mm' }} />
+              <div style={{ width: 'calc(100% - 4mm)', height: '0.3px', backgroundColor: '#e5e7eb', margin: '0.5mm 2mm' }} />
 
               {/* Service Details */}
-              <div style={{ padding: '1mm 4mm 2mm', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ padding: '0.5mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
                 {[
                   { label: 'Cliente', value: service.customer?.name },
-                  { label: 'Telefone', value: service.customer?.phone },
-                  { label: 'Equipamento', value: service.appliance_type },
-                  { label: 'Descrição', value: service.detected_fault || service.fault_description },
+                  { label: 'Tel', value: service.customer?.phone },
+                  { label: 'Equip', value: service.appliance_type },
+                  { label: 'Desc', value: service.detected_fault || service.fault_description },
                 ].map(({ label, value }) => value ? (
-                  <div key={label} style={{ display: 'flex', gap: '4px', marginBottom: '1mm', lineHeight: '1.3' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#4b5563', flexShrink: 0, width: '60px' }}>{label}:</span>
-                    <span style={{ fontSize: '9px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+                  <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.2' }}>
+                    <span style={{ fontSize: '5.5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
+                    <span style={{ fontSize: '5.5px', color: '#000000' }}>{value}</span>
                   </div>
                 ) : null)}
               </div>
 
               {/* Bottom accent bar */}
-              <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', marginTop: 'auto', flexShrink: 0 }} />
+              <div style={{ width: '100%', height: '2.5mm', backgroundColor: '#2B4F84', marginTop: 'auto', flexShrink: 0 }} />
             </div>
           </div>
 
