@@ -93,7 +93,7 @@ export function FieldPaymentStep({
 
         setIsSubmitting(true);
         try {
-            // Insert payment record
+            // Insert payment record (pending validation)
             const { error: paymentError } = await supabase
                 .from('service_payments')
                 .insert({
@@ -103,17 +103,10 @@ export function FieldPaymentStep({
                     payment_date: toLocalDateString(new Date()),
                     description: description || `Pagamento registado pelo técnico no terreno`,
                     received_by: user?.id || null,
+                    is_pending_validation: true,
                 });
 
             if (paymentError) throw paymentError;
-
-            // Update amount_paid on the service
-            const newAmountPaid = amountPaid + paymentValue;
-            await updateService.mutateAsync({
-                id: service.id,
-                amount_paid: newAmountPaid,
-                skipToast: true,
-            });
 
             // Log activity
             await logPayment(
@@ -126,7 +119,7 @@ export function FieldPaymentStep({
 
             invalidateServiceQueries(queryClient, service.id);
 
-            toast.success(`Pagamento de €${paymentValue.toFixed(2)} registado`);
+            toast.success(`Pagamento de €${paymentValue.toFixed(2)} reportado — aguarda validação do responsável.`);
 
             // Reset and advance
             resetForm();

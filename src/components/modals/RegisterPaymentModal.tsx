@@ -72,7 +72,7 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const { user, profile } = useAuth();
 
   // Fetch service history data
-  const { groupedParts, historySubtotal, payments, totalPaid, nameMap } = useServiceFinancialData(service?.id, open);
+  const { groupedParts, historySubtotal, payments, pendingPayments, totalPaid, nameMap } = useServiceFinancialData(service?.id, open);
 
   const finalPrice = service?.final_price || 0;
   const remainingBalance = finalPrice > 0 ? finalPrice - totalPaid : 0;
@@ -169,6 +169,38 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
     }
   };
 
+  const handleValidatePayment = async (payment: any) => {
+    if (!service || !user) return;
+
+    try {
+      // 1. Update the payment record
+      const { error: paymentError } = await supabase
+        .from('service_payments')
+        .update({
+          validated_at: new Date().toISOString(),
+          validated_by: user.id,
+          is_pending_validation: false,
+        })
+        .eq('id', payment.id);
+
+      if (paymentError) throw paymentError;
+
+      // 2. Update service amount_paid
+      const newAmountPaid = totalPaid + payment.amount;
+      await updateService.mutateAsync({
+        id: service.id,
+        amount_paid: newAmountPaid,
+        skipToast: true,
+      });
+
+      toast.success(`Pagamento de €${payment.amount.toFixed(2)} validado e registado no saldo.`);
+      invalidateServiceQueries(queryClient, service.id);
+    } catch (error) {
+      console.error('Error validating payment:', error);
+      toast.error(humanizeError(error));
+    }
+  };
+
   const resetForm = () => {
     setAmount('');
     setPaymentMethod('dinheiro');
@@ -223,6 +255,42 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
                   )}
                 </CollapsibleContent>
               </Collapsible>
+            )}
+
+            {/* Pending Payments Validation */}
+            {pendingPayments && pendingPayments.length > 0 && (
+              <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <h4 className="text-sm font-bold text-amber-700 flex items-center gap-1.5">
+                  ⚠️ Pagamentos Reportados pelo Técnico (aguardam validação)
+                </h4>
+                <div className="space-y-2">
+                  {pendingPayments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-white/50 border border-amber-100 rounded">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <span>{p.payment_date ? format(new Date(p.payment_date), 'dd/MM', { locale: pt }) : '—'}</span>
+                          <span>•</span>
+                          <span>{METHOD_LABELS[p.payment_method || ''] || p.payment_method}</span>
+                        </div>
+                        {p.received_by && nameMap[p.received_by] && (
+                          <span className="text-[10px] text-muted-foreground">Reportado por: {nameMap[p.received_by]}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-amber-600">€{p.amount.toFixed(2)}</span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white border-none text-xs"
+                          onClick={() => handleValidatePayment(p)}
+                        >
+                          Validar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Previous Payments */}

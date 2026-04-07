@@ -21,6 +21,9 @@ export interface ServicePayment {
   description: string | null;
   received_by: string | null;
   created_at: string;
+  is_pending_validation: boolean | null;
+  validated_at: string | null;
+  validated_by: string | null;
 }
 
 export interface GroupedParts {
@@ -50,14 +53,14 @@ export function useServiceFinancialData(serviceId: string | undefined, enabled: 
     enabled: enabled && !!serviceId,
   });
 
-  // Fetch service_payments
+  // Fetch all service_payments for this service
   const paymentsQuery = useQuery({
     queryKey: ['service-payments-history', serviceId],
     queryFn: async () => {
       if (!serviceId) return [];
       const { data, error } = await supabase
         .from('service_payments')
-        .select('id, amount, payment_method, payment_date, description, received_by, created_at')
+        .select('id, amount, payment_method, payment_date, description, received_by, created_at, is_pending_validation, validated_at, validated_by')
         .eq('service_id', serviceId)
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -65,6 +68,11 @@ export function useServiceFinancialData(serviceId: string | undefined, enabled: 
     },
     enabled: enabled && !!serviceId,
   });
+
+  // Split into validated and pending
+  const allPayments = paymentsQuery.data || [];
+  const pendingPayments = allPayments.filter(p => p.is_pending_validation === true && !p.validated_at);
+  const validatedPayments = allPayments.filter(p => !(p.is_pending_validation === true && !p.validated_at));
 
   // Collect unique user IDs from parts and payments
   const userIds = new Set<string>();
@@ -115,13 +123,14 @@ export function useServiceFinancialData(serviceId: string | undefined, enabled: 
     }
   }
 
-  // Calculate totals
+  // Calculate totals (pending payments do NOT count toward the balance yet)
   const historySubtotal = groupedParts.reduce((sum, g) => sum + g.subtotal, 0);
-  const totalPaid = (paymentsQuery.data || []).reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = validatedPayments.reduce((sum, p) => sum + p.amount, 0);
 
   return {
     parts: partsQuery.data || [],
-    payments: paymentsQuery.data || [],
+    payments: validatedPayments,
+    pendingPayments,
     groupedParts,
     nameMap,
     historySubtotal,
