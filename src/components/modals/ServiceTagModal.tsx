@@ -82,32 +82,32 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
               {/* Logo */}
-              <div style={{ padding: '1.5mm 2mm 1mm', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ padding: '1mm 1mm 0.5mm', display: 'flex', justifyContent: 'center' }}>
                 <img
                   src={tecnofrioLogoFull}
                   alt="TECNOFRIO"
-                  style={{ height: '5mm', objectFit: 'contain' }}
+                  style={{ height: '4mm', objectFit: 'contain' }}
                 />
               </div>
 
               {/* QR Code */}
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5mm 1mm' }}>
                 <QRCodeSVG
                   value={qrData}
-                  size={70}
-                  level="M"
+                  size={50}
+                  level="L"
                   includeMargin={false}
                 />
               </div>
 
               {/* Service Code */}
-              <div style={{ textAlign: 'center', padding: '1mm 2mm 0.5mm' }}>
+              <div style={{ textAlign: 'center', padding: '0.5mm 1mm 0.5mm' }}>
                 <p style={{
-                  fontSize: '9px',
+                  fontSize: '7px',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
                   color: '#2B4F84',
-                  letterSpacing: '0.5px',
+                  letterSpacing: '0.3px',
                   margin: 0,
                 }}>
                   {service.code}
@@ -115,19 +115,19 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               </div>
 
               {/* Divider */}
-              <div style={{ width: 'calc(100% - 4mm)', height: '0.3px', backgroundColor: '#e5e7eb', margin: '0.5mm 2mm' }} />
+              <div style={{ width: 'calc(100% - 2mm)', height: '0.3px', backgroundColor: '#cccccc', margin: '0.3mm 1mm' }} />
 
               {/* Service Details */}
-              <div style={{ padding: '0.5mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '0.5mm 1mm 0.5mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
                 {[
                   { label: 'Cliente', value: service.customer?.name },
                   { label: 'Tel', value: service.customer?.phone },
                   { label: 'Equip', value: service.appliance_type },
                   { label: 'Desc', value: service.detected_fault || service.fault_description },
                 ].map(({ label, value }) => value ? (
-                  <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.2' }}>
-                    <span style={{ fontSize: '5.5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
-                    <span style={{ fontSize: '5.5px', color: '#000000' }}>{value}</span>
+                  <div key={label} style={{ marginBottom: '0.3mm', lineHeight: '1.15' }}>
+                    <span style={{ fontSize: '5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
+                    <span style={{ fontSize: '5px', color: '#000000', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{value}</span>
                   </div>
                 ) : null)}
               </div>

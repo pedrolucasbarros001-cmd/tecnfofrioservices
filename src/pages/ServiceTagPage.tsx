@@ -188,27 +188,27 @@ export default function ServiceTagPage() {
           <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
           {/* Logo */}
-          <div style={{ padding: '1.5mm 2mm 1mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <div style={{ padding: '1mm 1mm 0.5mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
             <img
               src={tecnofrioLogoFull}
               alt="TECNOFRIO"
-              style={{ height: '5mm', maxWidth: '100%', objectFit: 'contain' }}
+              style={{ height: '4mm', maxWidth: '100%', objectFit: 'contain' }}
             />
           </div>
 
           {/* QR Code */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 0' }}>
-            <QRCodeSVG value={qrUrl} size={70} level="M" includeMargin={false} />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5mm 1mm' }}>
+            <QRCodeSVG value={qrUrl} size={50} level="L" includeMargin={false} />
           </div>
 
           {/* Service Code */}
-          <div style={{ textAlign: 'center', padding: '1mm 2mm 0.5mm' }}>
+          <div style={{ textAlign: 'center', padding: '0.5mm 1mm 0.5mm' }}>
             <p style={{
-              fontSize: '9px',
+              fontSize: '7px',
               fontFamily: 'monospace',
               fontWeight: 'bold',
               color: '#2B4F84',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.3px',
               margin: 0,
             }}>
               {service.code}
@@ -216,17 +216,18 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 'calc(100% - 4mm)', height: '0.2mm', backgroundColor: '#e5e7eb', margin: '0.5mm 2mm' }} />
+          <div style={{ width: 'calc(100% - 2mm)', height: '0.2mm', backgroundColor: '#cccccc', margin: '0.3mm 1mm' }} />
 
           {/* Details */}
-          <div style={{ padding: '0.5mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
+          <div style={{ padding: '0.5mm 1mm 0.5mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
             {details.map(({ label, value }) => (
-              <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.2' }}>
-                <span style={{ fontSize: '5.5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
+              <div key={label} style={{ marginBottom: '0.3mm', lineHeight: '1.15' }}>
+                <span style={{ fontSize: '5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
                 <span style={{
-                  fontSize: '5.5px',
+                  fontSize: '5px',
                   color: '#000000',
-                  wordBreak: 'break-all',
+                  overflowWrap: 'break-word',
+                  wordBreak: 'break-word',
                 }} title={value || ''}>
                   {value}
                 </span>
