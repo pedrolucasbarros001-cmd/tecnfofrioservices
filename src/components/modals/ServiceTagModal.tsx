@@ -41,9 +41,9 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
           element.style.position = 'relative';
         },
       });
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [29, 90] });
-      const canvasHeight = (canvas.height / canvas.width) * 29;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 29, canvasHeight);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [62, 100] });
+      const canvasHeight = (canvas.height / canvas.width) * 62;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 62, canvasHeight);
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error('Erro ao gerar PDF da etiqueta:', err);
@@ -62,14 +62,14 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
             <DialogTitle>Etiqueta de Serviço - {service.code}</DialogTitle>
           </DialogHeader>
 
-          {/* Tag content - portrait 29mm x 90mm layout */}
+          {/* Tag content - portrait 62mm x 100mm layout */}
           <div className="flex justify-center py-2">
             <div
               ref={tagRef}
               className="print-tag"
               style={{
-                width: '29mm',
-                height: '90mm',
+                width: '62mm',
+                height: '100mm',
                 background: '#ffffff',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 overflow: 'hidden',
@@ -79,35 +79,35 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               }}
             >
               {/* Top accent bar */}
-              <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+              <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
               {/* Logo */}
-              <div style={{ padding: '1mm 1mm 0.5mm', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ padding: '2mm 2mm 1mm', display: 'flex', justifyContent: 'center' }}>
                 <img
                   src={tecnofrioLogoFull}
                   alt="TECNOFRIO"
-                  style={{ height: '4mm', objectFit: 'contain' }}
+                  style={{ height: '8mm', objectFit: 'contain' }}
                 />
               </div>
 
               {/* QR Code */}
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5mm 1mm' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 2mm' }}>
                 <QRCodeSVG
                   value={qrData}
-                  size={50}
+                  size={110}
                   level="L"
                   includeMargin={false}
                 />
               </div>
 
               {/* Service Code */}
-              <div style={{ textAlign: 'center', padding: '0.5mm 1mm 0.5mm' }}>
+              <div style={{ textAlign: 'center', padding: '1mm 2mm 1mm' }}>
                 <p style={{
-                  fontSize: '7px',
+                  fontSize: '11px',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
                   color: '#2B4F84',
-                  letterSpacing: '0.3px',
+                  letterSpacing: '0.5px',
                   margin: 0,
                 }}>
                   {service.code}
@@ -115,25 +115,25 @@ export function ServiceTagModal({ service, open, onOpenChange }: ServiceTagModal
               </div>
 
               {/* Divider */}
-              <div style={{ width: 'calc(100% - 2mm)', height: '0.3px', backgroundColor: '#cccccc', margin: '0.3mm 1mm' }} />
+              <div style={{ width: 'calc(100% - 4mm)', height: '0.3px', backgroundColor: '#cccccc', margin: '0.5mm 2mm' }} />
 
               {/* Service Details */}
-              <div style={{ padding: '0.5mm 1mm 0.5mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '1mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
                 {[
                   { label: 'Cliente', value: service.customer?.name },
                   { label: 'Tel', value: service.customer?.phone },
                   { label: 'Equip', value: service.appliance_type },
                   { label: 'Desc', value: service.detected_fault || service.fault_description },
                 ].map(({ label, value }) => value ? (
-                  <div key={label} style={{ marginBottom: '0.3mm', lineHeight: '1.15' }}>
-                    <span style={{ fontSize: '5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
-                    <span style={{ fontSize: '5px', color: '#000000', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{value}</span>
+                  <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.3' }}>
+                    <span style={{ fontSize: '8px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
+                    <span style={{ fontSize: '8px', color: '#000000', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{value}</span>
                   </div>
                 ) : null)}
               </div>
 
               {/* Bottom accent bar */}
-              <div style={{ width: '100%', height: '2.5mm', backgroundColor: '#2B4F84', marginTop: 'auto', flexShrink: 0 }} />
+              <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', marginTop: 'auto', flexShrink: 0 }} />
             </div>
           </div>
 

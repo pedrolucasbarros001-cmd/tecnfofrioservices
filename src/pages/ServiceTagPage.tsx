@@ -71,10 +71,10 @@ export default function ServiceTagPage() {
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: [29, 90],
+        format: [62, 100],
       });
-      const canvasHeight = (canvas.height / canvas.width) * 29;
-      pdf.addImage(imgData, "PNG", 0, 0, 29, canvasHeight);
+      const canvasHeight = (canvas.height / canvas.width) * 62;
+      pdf.addImage(imgData, "PNG", 0, 0, 62, canvasHeight);
       pdf.save(`Etiqueta-${service.code}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
@@ -126,7 +126,7 @@ export default function ServiceTagPage() {
       <style>{`
         @media print {
           @page {
-            size: 29mm 90mm;
+            size: 62mm 100mm;
             margin: 0;
           }
           .no-print {
@@ -149,8 +149,8 @@ export default function ServiceTagPage() {
           min-height: calc(100vh - 73px);
         }
         .print-tag-container {
-          width: 29mm;
-          height: 90mm;
+          width: 62mm;
+          height: 100mm;
           background: white;
           box-sizing: border-box;
           display: flex;
@@ -185,30 +185,30 @@ export default function ServiceTagPage() {
       <div className="tag-preview-wrapper">
         <div ref={tagRef} className="print-tag-container preview-border">
           {/* Top blue bar */}
-          <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+          <div style={{ width: '100%', height: '4mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
 
           {/* Logo */}
-          <div style={{ padding: '1mm 1mm 0.5mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <div style={{ padding: '2mm 2mm 1mm', display: 'flex', justifyContent: 'center', width: '100%' }}>
             <img
               src={tecnofrioLogoFull}
               alt="TECNOFRIO"
-              style={{ height: '4mm', maxWidth: '100%', objectFit: 'contain' }}
+              style={{ height: '8mm', maxWidth: '100%', objectFit: 'contain' }}
             />
           </div>
 
           {/* QR Code */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5mm 1mm' }}>
-            <QRCodeSVG value={qrUrl} size={50} level="L" includeMargin={false} />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1mm 2mm' }}>
+            <QRCodeSVG value={qrUrl} size={110} level="L" includeMargin={false} />
           </div>
 
           {/* Service Code */}
-          <div style={{ textAlign: 'center', padding: '0.5mm 1mm 0.5mm' }}>
+          <div style={{ textAlign: 'center', padding: '1mm 2mm 1mm' }}>
             <p style={{
-              fontSize: '7px',
+              fontSize: '11px',
               fontFamily: 'monospace',
               fontWeight: 'bold',
               color: '#2B4F84',
-              letterSpacing: '0.3px',
+              letterSpacing: '0.5px',
               margin: 0,
             }}>
               {service.code}
@@ -216,15 +216,15 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 'calc(100% - 2mm)', height: '0.2mm', backgroundColor: '#cccccc', margin: '0.3mm 1mm' }} />
+          <div style={{ width: 'calc(100% - 4mm)', height: '0.2mm', backgroundColor: '#cccccc', margin: '0.5mm 2mm' }} />
 
           {/* Details */}
-          <div style={{ padding: '0.5mm 1mm 0.5mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
+          <div style={{ padding: '1mm 2mm 1mm', width: '100%', boxSizing: 'border-box', flex: 1, overflow: 'hidden' }}>
             {details.map(({ label, value }) => (
-              <div key={label} style={{ marginBottom: '0.3mm', lineHeight: '1.15' }}>
-                <span style={{ fontSize: '5px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
+              <div key={label} style={{ marginBottom: '0.5mm', lineHeight: '1.3' }}>
+                <span style={{ fontSize: '8px', fontWeight: 'bold', color: '#4b5563' }}>{label}: </span>
                 <span style={{
-                  fontSize: '5px',
+                  fontSize: '8px',
                   color: '#000000',
                   overflowWrap: 'break-word',
                   wordBreak: 'break-word',
@@ -236,7 +236,7 @@ export default function ServiceTagPage() {
           </div>
 
           {/* Bottom blue bar */}
-          <div style={{ width: '100%', height: '2.5mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
+          <div style={{ width: '100%', height: '3mm', backgroundColor: '#2B4F84', flexShrink: 0 }} />
         </div>
       </div>
     </div>
