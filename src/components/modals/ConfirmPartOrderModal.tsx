@@ -114,6 +114,14 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
   const handleSubmit = async () => {
     if (!service) return;
 
+    if (service.status !== 'para_pedir_peca') {
+      toast.error(
+        `Não é possível registar o pedido: ${service.code} não está no estado correcto. Recarrega a página e tenta de novo.`
+      );
+      onOpenChange(false);
+      return;
+    }
+
     const estimatedArrival = format(estimatedArrivalDate, 'yyyy-MM-dd');
 
     setIsSubmitting(true);

@@ -81,6 +81,12 @@ export function RequestPartModal({
   const handleSubmit = async () => {
     if (!service || !hasValidParts) return;
 
+    const ALLOWED_FOR_PART_REQUEST = ['em_execucao', 'na_oficina'];
+    if (!ALLOWED_FOR_PART_REQUEST.includes(service.status)) {
+      toast.error(`Não é possível solicitar peças: o serviço está em estado incompatível ("${service.status}"). Recarrega a página.`);
+      return;
+    }
+
     const validParts = parts.filter(p => p.partName.trim());
 
     if (requireSignature && !clientApproved) {
@@ -88,8 +94,17 @@ export function RequestPartModal({
       return;
     }
 
+    const currentStatus = service.status;
     setIsSubmitting(true);
     try {
+      // 1. Update the service status first
+      await updateService.mutateAsync({
+        id: service.id,
+        status: 'para_pedir_peca',
+        last_status_before_part_request: currentStatus,
+        skipToast: true,
+      });
+
       const inserts = validParts.map(p => ({
         service_id: service.id,
         part_name: p.partName.trim(),
@@ -102,19 +117,25 @@ export function RequestPartModal({
         notes: p.notes.trim() || null,
       }));
 
+      // 2. Insert the parts; if this fails, revert the status
       const { error: partError } = await supabase
         .from('service_parts')
         .insert(inserts);
 
-      if (partError) throw partError;
-
-      const currentStatus = service.status;
-      await updateService.mutateAsync({
-        id: service.id,
-        status: 'para_pedir_peca',
-        last_status_before_part_request: currentStatus,
-        skipToast: true,
-      });
+      if (partError) {
+        // Revert status back to original
+        try {
+          await updateService.mutateAsync({
+            id: service.id,
+            status: currentStatus,
+            last_status_before_part_request: null,
+            skipToast: true,
+          });
+        } catch (revertError) {
+          console.error('Failed to revert service status after insert error:', revertError);
+        }
+        throw partError;
+      }
 
       const technicianName = profile?.full_name || 'Técnico';
       const partNames = validParts.map(p => p.partName.trim()).join(', ');
