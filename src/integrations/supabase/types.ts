@@ -500,30 +500,39 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_pending_validation: boolean
           payment_date: string | null
           payment_method: string | null
           received_by: string | null
           service_id: string
+          validated_at: string | null
+          validated_by: string | null
         }
         Insert: {
           amount: number
           created_at?: string
           description?: string | null
           id?: string
+          is_pending_validation?: boolean
           payment_date?: string | null
           payment_method?: string | null
           received_by?: string | null
           service_id: string
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
           description?: string | null
           id?: string
+          is_pending_validation?: boolean
           payment_date?: string | null
           payment_method?: string | null
           received_by?: string | null
           service_id?: string
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Relationships: [
           {
