@@ -875,7 +875,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           onClick={() => removeArticle(index)}
                         >
                           <X className="h-3 w-3" />
