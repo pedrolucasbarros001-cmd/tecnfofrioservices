@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ChevronDown, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Search, ChevronDown, MapPin, Calendar, AlertCircle, Paperclip } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBoundaryFallbackContent } from '@/components/ErrorBoundaryFallbackContent';
 import { format } from 'date-fns';
