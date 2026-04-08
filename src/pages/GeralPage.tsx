@@ -34,6 +34,7 @@ import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsM
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
+import { ServiceDocumentsModal } from '@/components/modals/ServiceDocumentsModal';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { usePaginatedServices, useUpdateService, useDeleteService, prefetchFullServiceData } from '@/hooks/useServices';
@@ -124,6 +125,7 @@ export default function GeralPage() {
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
