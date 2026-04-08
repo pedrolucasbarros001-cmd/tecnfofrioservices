@@ -274,7 +274,7 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-
+          {onViewDetails && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
               <Eye className="h-4 w-4 mr-2" />
               Ver Detalhes
