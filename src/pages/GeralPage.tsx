@@ -751,6 +751,16 @@ export default function GeralPage() {
             serviceId={currentService.id} 
           />
         )}
+
+        {/* Documents Viewer Modal */}
+        {currentService && (
+          <ServiceDocumentsModal
+            open={showDocumentsModal}
+            onOpenChange={setShowDocumentsModal}
+            serviceId={currentService.id}
+            serviceCode={currentService.code}
+          />
+        )}
       </div>
     </ErrorBoundary>
   );
