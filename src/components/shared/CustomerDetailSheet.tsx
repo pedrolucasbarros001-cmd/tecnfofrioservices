@@ -204,6 +204,23 @@ export function CustomerDetailSheet({
     enabled: !!customer?.id && open,
   });
 
+  // Fetch all documents across this customer's services
+  const serviceIds = services.map(s => s.id);
+  const { data: customerDocuments = [] } = useQuery({
+    queryKey: ['customer-documents', customer?.id, serviceIds.join(',')],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('service_documents')
+        .select('*, service:services!service_documents_service_id_fkey(code)')
+        .in('service_id', serviceIds)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: serviceIds.length > 0 && open,
+  });
+
   if (!customer) return null;
 
   const handleViewService = (service: Service) => {
@@ -268,6 +285,18 @@ export function CustomerDetailSheet({
                   <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
                     {services.length}
                   </Badge>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="anexos"
+                  className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
+                >
+                  <Paperclip className="h-4 w-4" />
+                  Anexos
+                  {customerDocuments.length > 0 && (
+                    <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
+                      {customerDocuments.length}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -507,6 +536,56 @@ export function CustomerDetailSheet({
                             })}
                           </TableBody>
                         </Table>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* Anexos Content */}
+                  <TabsContent value="anexos" className="mt-0">
+                    <h3 className="text-lg font-semibold mb-4">Documentos Anexados</h3>
+                    {customerDocuments.length === 0 ? (
+                      <div className="py-12 text-center text-muted-foreground">
+                        <Paperclip className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>Nenhum documento anexado aos serviços deste cliente.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {customerDocuments.map((doc: any) => {
+                          const publicUrl = supabase.storage
+                            .from('service_documents')
+                            .getPublicUrl(doc.file_url).data.publicUrl;
+                          return (
+                            <div
+                              key={doc.id}
+                              className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                                <div className="overflow-hidden">
+                                  <p className="text-sm font-medium truncate">{doc.file_name}</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{(doc.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                                    <span>•</span>
+                                    <span>{doc.service?.code || '-'}</span>
+                                    <span>•</span>
+                                    <span>
+                                      {doc.created_at
+                                        ? format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: pt })
+                                        : '-'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(publicUrl, '_blank')}
+                              >
+                                Baixar
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
