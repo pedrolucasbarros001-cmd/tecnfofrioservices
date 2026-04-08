@@ -204,6 +204,23 @@ export function CustomerDetailSheet({
     enabled: !!customer?.id && open,
   });
 
+  // Fetch all documents across this customer's services
+  const serviceIds = services.map(s => s.id);
+  const { data: customerDocuments = [] } = useQuery({
+    queryKey: ['customer-documents', customer?.id, serviceIds.join(',')],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('service_documents')
+        .select('*, service:services!service_documents_service_id_fkey(code)')
+        .in('service_id', serviceIds)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: serviceIds.length > 0 && open,
+  });
+
   if (!customer) return null;
 
   const handleViewService = (service: Service) => {
