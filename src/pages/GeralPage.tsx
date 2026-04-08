@@ -532,7 +532,7 @@ export default function GeralPage() {
                         <div className="flex items-center gap-1.5">
                           {service.code}
                           {documentCountsMap[service.id] > 0 && (
-                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" title={`${documentCountsMap[service.id]} anexo(s)`} />
+                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
                         </div>
                       </TableCell>
