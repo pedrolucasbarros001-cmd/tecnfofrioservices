@@ -266,7 +266,15 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {onViewDetails && (
+          {/* Ver Anexos - Only shown when documents exist */}
+          {hasDocuments && onViewDocuments && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDocuments(); }}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Ver Anexos
+            </DropdownMenuItem>
+          )}
+
+
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
               <Eye className="h-4 w-4 mr-2" />
               Ver Detalhes
