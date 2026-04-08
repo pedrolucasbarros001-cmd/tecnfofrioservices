@@ -51,6 +51,8 @@ interface StateActionButtonsProps {
   onCancelPartOrder?: () => void;
   onNotifyPartWait?: () => void;
   onAttachDocument?: () => void;
+  onViewDocuments?: () => void;
+  hasDocuments?: boolean;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -85,6 +87,8 @@ export function StateActionButtons({
   onCancelPartOrder,
   onNotifyPartWait,
   onAttachDocument,
+  onViewDocuments,
+  hasDocuments,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
