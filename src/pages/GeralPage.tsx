@@ -627,6 +627,11 @@ export default function GeralPage() {
                             setCurrentService(service);
                             setShowUploadDocumentModal(true);
                           }}
+                          hasDocuments={!!documentCountsMap[service.id]}
+                          onViewDocuments={() => {
+                            setCurrentService(service);
+                            setShowDocumentsModal(true);
+                          }}
                           viewContext={selectedStatus}
                         />
                       </TableCell>
