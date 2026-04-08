@@ -205,7 +205,27 @@ export default function GeralPage() {
     },
   });
 
-  const updateService = useUpdateService();
+  // Fetch document counts per service for the attachment indicator
+  const serviceIds = services.map(s => s.id).filter(Boolean);
+  const { data: documentCountsMap = {} } = useQuery({
+    queryKey: ['service-document-counts', serviceIds.join(',')],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from('service_documents')
+        .select('service_id')
+        .in('service_id', serviceIds);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((d: any) => {
+        map[d.service_id] = (map[d.service_id] || 0) + 1;
+      });
+      return map;
+    },
+    enabled: serviceIds.length > 0,
+    staleTime: 1000 * 60,
+  });
+
   const deleteService = useDeleteService();
   const filteredServices = services;
 
