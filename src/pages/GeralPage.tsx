@@ -226,6 +226,7 @@ export default function GeralPage() {
     staleTime: 1000 * 60,
   });
 
+  const updateService = useUpdateService();
   const deleteService = useDeleteService();
   const filteredServices = services;
 
