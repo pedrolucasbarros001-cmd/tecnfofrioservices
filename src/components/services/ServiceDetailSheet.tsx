@@ -474,6 +474,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
+  const handleConfirmOwner = async () => {
+    if (!service?.id) return;
+    try {
+      const { error } = await supabase
+        .from('services')
+        .update({ owner_confirmed: true, owner_confirmed_at: new Date().toISOString() })
+        .eq('id', service.id);
+      if (error) throw error;
+      invalidateServiceQueries(queryClient, service.id);
+      toast.success('Pagamento confirmado com sucesso');
+    } catch (err) {
+      console.error('Error confirming owner payment:', err);
+      toast.error('Erro ao confirmar pagamento');
+    }
+  };
+
   // Use fullData (which has fresh customer join) when available, fallback to prop
   const displayService = fullData || service;
 
@@ -1318,6 +1334,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               onConfirmPartOrder={role === 'dono' ? handleConfirmPartOrder : undefined}
               onMarkPartArrived={role === 'dono' ? handleMarkPartArrived : undefined}
               onForceState={role === 'dono' ? () => setShowForceStateModal(true) : undefined}
+              onConfirmOwner={role === 'dono' ? handleConfirmOwner : undefined}
               onContactClient={role === 'secretaria' ? () => setShowContactModal(true) : undefined}
               onDelete={role === 'dono' ? () => setShowDeleteDialog(true) : undefined}
               onReschedule={(role === 'dono' || role === 'secretaria') ? () => setShowRescheduleModal(true) : undefined}
