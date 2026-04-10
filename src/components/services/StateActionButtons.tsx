@@ -386,8 +386,8 @@ export function StateActionButtons({
           {isDono && (
             <>
               <DropdownMenuSeparator />
-              {/* Confirm Owner Payment - only for concluidos, fully paid */}
-              {service?.status === 'concluidos' && isServicePriced && !isServiceInDebit && onConfirmOwner && (
+              {/* Confirm Owner Payment - only for finalizado (visually "Concluídos"), fully paid */}
+              {service?.status === 'finalizado' && isServicePriced && !isServiceInDebit && onConfirmOwner && (
                 !service?.owner_confirmed ? (
                   <DropdownMenuItem
                     onClick={(e) => { e.stopPropagation(); onConfirmOwner(); }}
