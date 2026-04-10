@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { Service } from '@/types/database';
-import { CheckCircle2, Truck, Phone, Clock } from 'lucide-react';
+import { CheckCircle2, Truck, Phone, Clock, BadgeCheck, MoreHorizontal } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { differenceInDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DeliveryManagementModal } from '@/components/modals/DeliveryManagementModal';
 import { AssignDeliveryModal } from '@/components/modals/AssignDeliveryModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
@@ -25,6 +34,10 @@ export default function SecretaryConcluidosPage() {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showAssignDeliveryModal, setShowAssignDeliveryModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+
+  const { role } = useAuth();
+  const isDono = role === 'dono';
+  const queryClient = useQueryClient();
 
   const { data: services = [], isLoading } = useServices({ status: 'concluidos' });
   const updateService = useUpdateService();
@@ -61,6 +74,24 @@ export default function SecretaryConcluidosPage() {
   const handleContactClient = (service: Service) => {
     setCurrentService(service);
     setShowContactModal(true);
+  };
+
+  const handleConfirmOwner = async (service: Service) => {
+    try {
+      const { error } = await supabase
+        .from('services')
+        .update({
+          owner_confirmed: true,
+          owner_confirmed_at: new Date().toISOString(),
+        })
+        .eq('id', service.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      toast.success(`Pagamento do serviço ${service.code} confirmado.`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao confirmar pagamento.');
+    }
   };
 
   const getDaysInWorkshop = (service: Service) => {
@@ -105,6 +136,7 @@ export default function SecretaryConcluidosPage() {
                   <TableHead>Aparelho</TableHead>
                   <TableHead>Tempo na Oficina</TableHead>
                   <TableHead>Método</TableHead>
+                  <TableHead>Confirmação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -146,6 +178,22 @@ export default function SecretaryConcluidosPage() {
                           <Badge variant="secondary">Não definido</Badge>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {service.final_price > 0 && service.amount_paid >= service.final_price ? (
+                          service.owner_confirmed ? (
+                            <Badge className="bg-green-600 text-white flex items-center gap-1 w-fit">
+                              <BadgeCheck className="h-3 w-3" />
+                              Confirmado
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-400 text-amber-900 w-fit">
+                              Pendente Confirmação
+                            </Badge>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           {service.delivery_method === 'client_pickup' ? (
@@ -173,6 +221,31 @@ export default function SecretaryConcluidosPage() {
                           >
                             <Phone className="h-4 w-4" />
                           </Button>
+                          {isDono && service.final_price > 0 && service.amount_paid >= service.final_price && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-popover">
+                                {!service.owner_confirmed ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleConfirmOwner(service)}
+                                    className="text-green-700 font-medium"
+                                  >
+                                    <BadgeCheck className="h-4 w-4 mr-2" />
+                                    Confirmar Pagamento Recebido
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem disabled>
+                                    <BadgeCheck className="h-4 w-4 mr-2 text-green-600" />
+                                    Pagamento Confirmado ✓
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

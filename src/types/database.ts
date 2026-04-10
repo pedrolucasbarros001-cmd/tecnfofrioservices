@@ -153,6 +153,8 @@ export interface Service {
   pnc: string | null;
   flow_step: string | null;
   flow_data: any | null;
+  owner_confirmed: boolean;
+  owner_confirmed_at: string | null;
   last_payment_reminder_sent_at: string | null;
   last_part_notice_sent_at: string | null;
   last_visit_report_sent_at: string | null;

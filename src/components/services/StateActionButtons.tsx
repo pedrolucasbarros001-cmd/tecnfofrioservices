@@ -18,6 +18,7 @@ import {
   Mail,
   Paperclip,
   FolderOpen,
+  BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +55,7 @@ interface StateActionButtonsProps {
   onAttachDocument?: () => void;
   onViewDocuments?: () => void;
   hasDocuments?: boolean;
+  onConfirmOwner?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -90,6 +92,7 @@ export function StateActionButtons({
   onAttachDocument,
   onViewDocuments,
   hasDocuments,
+  onConfirmOwner,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -383,6 +386,23 @@ export function StateActionButtons({
           {isDono && (
             <>
               <DropdownMenuSeparator />
+              {/* Confirm Owner Payment - only for concluidos, fully paid */}
+              {service?.status === 'concluidos' && isServicePriced && !isServiceInDebit && onConfirmOwner && (
+                !service?.owner_confirmed ? (
+                  <DropdownMenuItem
+                    onClick={(e) => { e.stopPropagation(); onConfirmOwner(); }}
+                    className="text-green-700 font-medium"
+                  >
+                    <BadgeCheck className="h-4 w-4 mr-2" />
+                    Confirmar Pagamento Recebido
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem disabled>
+                    <BadgeCheck className="h-4 w-4 mr-2 text-green-600" />
+                    Pagamento Confirmado ✓
+                  </DropdownMenuItem>
+                )
+              )}
               {onForceState && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onForceState(); }} className="text-amber-600">
                   <AlertTriangle className="h-4 w-4 mr-2" />

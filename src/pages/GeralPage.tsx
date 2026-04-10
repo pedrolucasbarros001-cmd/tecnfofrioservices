@@ -303,6 +303,24 @@ export default function GeralPage() {
       console.error('Error finalizing service:', error);
     }
   };
+
+  const handleConfirmOwner = async (service: Service) => {
+    try {
+      const { error } = await supabase
+        .from('services')
+        .update({
+          owner_confirmed: true,
+          owner_confirmed_at: new Date().toISOString(),
+        })
+        .eq('id', service.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      toast.success(`Pagamento do serviço ${service.code} confirmado.`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao confirmar pagamento.');
+    }
+  };
   const handleConfirmPartOrder = (service: Service) => {
     setCurrentService(service);
     setShowConfirmPartOrderModal(true);
@@ -608,6 +626,7 @@ export default function GeralPage() {
                           onRequestPart={() => handleRequestPart(service)}
                           onManageDelivery={() => handleManageDelivery(service)}
                           onFinalize={() => handleFinalize(service)}
+                          onConfirmOwner={() => handleConfirmOwner(service)}
                           onConfirmPartOrder={() => handleConfirmPartOrder(service)}
                           onMarkPartArrived={() => handleMarkPartArrived(service)}
                           onForceState={() => handleForceState(service)}

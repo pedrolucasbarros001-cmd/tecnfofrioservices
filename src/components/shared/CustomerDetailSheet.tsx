@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toLocalDateString, parseLocalDate } from '@/utils/dateUtils';
 import { pt } from 'date-fns/locale';
@@ -30,6 +30,7 @@ import {
   ClipboardList,
   Paperclip,
   Users,
+  Trash2,
 } from 'lucide-react';
 import {
   Sheet,
@@ -134,6 +135,8 @@ export function CustomerDetailSheet({
   const [showServiceDetail, setShowServiceDetail] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const updateCustomer = useUpdateCustomer();
 
   const form = useForm<CustomerFormValues>({
@@ -203,6 +206,30 @@ export function CustomerDetailSheet({
     },
     enabled: !!customer?.id && open,
   });
+
+  const handleDeleteDocument = async (doc: any) => {
+    setDeletingDocId(doc.id);
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('service_documents')
+        .remove([doc.file_url]);
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('service_documents')
+        .delete()
+        .eq('id', doc.id);
+      if (dbError) throw dbError;
+
+      queryClient.invalidateQueries({ queryKey: ['customer-documents', customer?.id] });
+      toast.success('Documento eliminado.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao eliminar documento.');
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
 
   // Fetch all documents across this customer's services
   const serviceIds = services.map(s => s.id);
@@ -576,6 +603,7 @@ export function CustomerDetailSheet({
                                   </div>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -583,6 +611,16 @@ export function CustomerDetailSheet({
                               >
                                 Baixar
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteDocument(doc)}
+                                disabled={deletingDocId === doc.id}
+                                className="text-destructive hover:text-destructive px-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                              </div>
                             </div>
                           );
                         })}
