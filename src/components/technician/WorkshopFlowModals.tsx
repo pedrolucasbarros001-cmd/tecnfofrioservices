@@ -355,6 +355,29 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
   const taxAmount = (combinedSubtotal - discountAmount) * (formData.taxRate / 100);
   const totalFinal = combinedSubtotal - discountAmount + taxAmount + adminPricingTotal;
 
+  const separateArticlesByOwner = () => {
+    const ownArticles: (ArticleEntry & { allIndex: number })[] = [];
+    const othersArticles: (ArticleEntry & { allIndex: number; ownerName: string })[] = [];
+
+    formData.articles.forEach((article, index) => {
+      if (article.isExisting) {
+        const prevArticle = previousArticles[index];
+        if (prevArticle && prevArticle.registeredByName) {
+          const isOwn = prevArticle.registeredByName === profile?.full_name;
+          if (isOwn) {
+            ownArticles.push({ ...article, allIndex: index });
+          } else {
+            othersArticles.push({ ...article, allIndex: index, ownerName: prevArticle.registeredByName });
+          }
+        }
+      } else {
+        ownArticles.push({ ...article, allIndex: index });
+      }
+    });
+
+    return { ownArticles, othersArticles };
+  };
+
   const handleConfirmArticles = async () => {
     setIsSubmitting(true);
     try {
@@ -867,66 +890,149 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  {formData.articles.map((article, index) => (
-                    <div key={index} className="p-3 border rounded-lg bg-muted/20 relative group">
-                      {!formData.articlesLocked && !article.isExisting && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeArticle(index)}
-                        >
-                          <X className="h-3 w-3" />
+                {/* Split articles by ownership */}
+                {(() => {
+                  const { ownArticles, othersArticles } = separateArticlesByOwner();
+                  return (
+                    <div className="space-y-4">
+                      {/* Own articles section */}
+                      {ownArticles.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">✏️ Meus Artigos (Editáveis)</Label>
+                            {!formData.articlesLocked && (
+                              <Button variant="outline" size="sm" onClick={addArticle} className="h-8 gap-1">
+                                <Plus className="h-4 w-4" /> Add
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {ownArticles.map((article) => (
+                              <div key={article.allIndex} className="p-3 border rounded-lg bg-blue-50/30 relative group">
+                                {!formData.articlesLocked && !article.isExisting && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => removeArticle(article.allIndex)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                <div className="grid grid-cols-12 gap-2 mt-1">
+                                  <div className="col-span-3 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                                    <Input
+                                      placeholder="F01..."
+                                      value={article.reference}
+                                      disabled={formData.articlesLocked || article.isExisting}
+                                      className="h-8 text-sm px-2"
+                                      onChange={(e) => updateArticle(article.allIndex, 'reference', e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="col-span-5 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
+                                    <Input
+                                      placeholder="Artigo"
+                                      value={article.description}
+                                      disabled={formData.articlesLocked || article.isExisting}
+                                      className="h-8 text-sm"
+                                      onChange={(e) => updateArticle(article.allIndex, 'description', e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={article.quantity}
+                                      disabled={formData.articlesLocked || article.isExisting}
+                                      className="h-8 text-sm text-center px-1"
+                                      onChange={(e) => updateArticle(article.allIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
+                                    <Input
+                                      placeholder="0"
+                                      value={article.unit_price}
+                                      disabled={formData.articlesLocked || article.isExisting}
+                                      className="h-8 text-sm px-2 text-right"
+                                      onChange={(e) => updateArticle(article.allIndex, 'unit_price', parseFloat(e.target.value) || 0)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Others' articles section */}
+                      {othersArticles.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">👥 Artigos de Outros Utilizadores (Apenas Leitura)</Label>
+                          <div className="space-y-3">
+                            {othersArticles.map((article) => (
+                              <div key={article.allIndex} className="p-3 border rounded-lg bg-slate-50 opacity-75 relative group">
+                                <div className="grid grid-cols-12 gap-2 mt-1">
+                                  <div className="col-span-3 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                                    <Input
+                                      placeholder="F01..."
+                                      value={article.reference}
+                                      disabled={true}
+                                      className="h-8 text-sm px-2"
+                                    />
+                                  </div>
+                                  <div className="col-span-5 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
+                                    <Input
+                                      placeholder="Artigo"
+                                      value={article.description}
+                                      disabled={true}
+                                      className="h-8 text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={article.quantity}
+                                      disabled={true}
+                                      className="h-8 text-sm text-center px-1"
+                                    />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
+                                    <Input
+                                      placeholder="0"
+                                      value={article.unit_price}
+                                      disabled={true}
+                                      className="h-8 text-sm px-2 text-right"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground mt-2 text-right italic">
+                                  Por: {article.ownerName} — Apenas leitura
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show "Add" button only for own articles if not locked and no others yet */}
+                      {!formData.articlesLocked && ownArticles.length === 0 && othersArticles.length === 0 && (
+                        <Button variant="outline" className="w-full h-10" onClick={addArticle}>
+                          <Plus className="h-4 w-4 mr-2" /> Adicionar Novo Artigo
                         </Button>
                       )}
-                      <div className="grid grid-cols-12 gap-2 mt-1">
-                        <div className="col-span-3 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
-                          <Input
-                            placeholder="F01..."
-                            value={article.reference}
-                            disabled={formData.articlesLocked || article.isExisting}
-                            className="h-8 text-sm px-2"
-                            onChange={(e) => updateArticle(index, 'reference', e.target.value)}
-                          />
-                        </div>
-                        <div className="col-span-5 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
-                          <Input
-                            placeholder="Artigo"
-                            value={article.description}
-                            disabled={formData.articlesLocked || article.isExisting}
-                            className="h-8 text-sm"
-                            onChange={(e) => updateArticle(index, 'description', e.target.value)}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={article.quantity}
-                            disabled={formData.articlesLocked || article.isExisting}
-                            className="h-8 text-sm text-center px-1"
-                            onChange={(e) => updateArticle(index, 'quantity', parseInt(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
-                          <Input
-                            placeholder="0"
-                            value={article.unit_price}
-                            disabled={formData.articlesLocked || article.isExisting}
-                            className="h-8 text-sm px-2 text-right"
-                            onChange={(e) => updateArticle(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                      </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </div>
 
               {!formData.articlesLocked && formData.articles.filter(a => !a.isExisting).length > 0 && (
