@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUpdateService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +58,7 @@ interface PricingData {
   }>;
   discount?: { type: 'euro' | 'percent'; value: number };
   adjustment?: number;
+  observations?: string; // Observações/notas adicionais
   historySubtotal?: number;
 }
 
@@ -70,6 +72,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
   const [discountValue, setDiscountValue] = useState('');
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [adjustment, setAdjustment] = useState('');
+  const [observations, setObservations] = useState('');
   const [warrantyCoversAll, setWarrantyCoversAll] = useState(false);
 
   const updateService = useUpdateService();
@@ -100,6 +103,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       let existingItems: LineItem[] = [];
       let existingDiscount: { type: 'euro' | 'percent'; value: number } | null = null;
       let existingAdjustment = 0;
+      let existingObservations = '';
 
       if (service.pricing_description) {
         try {
@@ -118,6 +122,9 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
           }
           if (parsed.adjustment !== undefined) {
             existingAdjustment = parsed.adjustment;
+          }
+          if (parsed.observations) {
+            existingObservations = parsed.observations;
           }
         } catch {
           // fallback
@@ -166,6 +173,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       }
 
       setAdjustment(existingAdjustment ? existingAdjustment.toString() : '');
+      setObservations(existingObservations);
       setWarrantyCoversAll(isWarrantyService);
     }
   }, [service, open, historyLoading, hasInitialized, form, groupedParts, isWarrantyService]);
@@ -203,6 +211,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
       })),
       discount: discountValue ? { type: discountType, value: parseFloat(discountValue.replace(',', '.')) || 0 } : undefined,
       adjustment: adjustmentAmount !== 0 ? adjustmentAmount : undefined,
+      observations: observations.trim() || undefined,
     };
 
     const isClientLocation = service.service_location === 'cliente' || service.service_location === 'entregue';
@@ -260,6 +269,7 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
     setDiscountValue('');
     setDiscountType('euro');
     setAdjustment('');
+    setObservations('');
     setWarrantyCoversAll(false);
   };
 
@@ -330,6 +340,27 @@ export function SetPriceModal({ service, open, onOpenChange }: SetPriceModalProp
                     fieldName="items"
                     disabled={warrantyCoversAll}
                   />
+                </div>
+
+                {/* Observations Field */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    <Label htmlFor="observations" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Observações
+                    </Label>
+                  </div>
+                  <Textarea
+                    id="observations"
+                    placeholder="Adicione notas, detalhes adicionais ou informações importantes sobre o orçamento e serviço..."
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
+                    disabled={warrantyCoversAll}
+                    className="min-h-[80px] text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Estas observações serão salvas no histórico do orçamento e visíveis para referência futura.
+                  </p>
                 </div>
 
                 {/* Pricing Summary */}
