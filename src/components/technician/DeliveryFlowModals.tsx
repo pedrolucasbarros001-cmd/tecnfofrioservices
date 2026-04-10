@@ -6,7 +6,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Package,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardList
 } from 'lucide-react';
 import {
   Dialog,
@@ -333,6 +334,14 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
                 {[service.appliance_type, service.brand, service.model].filter(Boolean).join(' ') || 'N/A'}
               </p>
             </div>
+            {service.notes && (
+              <div className="pt-2 border-t mt-2">
+                <p className="text-muted-foreground text-xs flex items-center gap-1">
+                  <ClipboardList className="h-3 w-3" /> Notas Adicionais
+                </p>
+                <p className="font-medium text-amber-700 whitespace-pre-wrap">{service.notes}</p>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex gap-2 mt-4">

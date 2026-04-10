@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Truck } from 'lucide-react';
+import { Truck, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
   const [technicianId, setTechnicianId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
+  const [notes, setNotes] = useState('');
 
   const { data: technicians = [] } = useTechnicians();
   const updateService = useUpdateService();
@@ -55,6 +57,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
         service_type: 'entrega',
         technician_id: technicianId,
         scheduled_date: deliveryDate,
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
         skipToast: true,
       });
 
@@ -75,6 +78,7 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
     setTechnicianId('');
     setDeliveryDate('');
     setDeliveryTime('');
+    setNotes('');
   };
 
   const handleClose = () => {
@@ -154,6 +158,19 @@ export function AssignDeliveryModal({ service, open, onOpenChange }: AssignDeliv
                   </Select>
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                Observações para o técnico
+              </Label>
+              <Textarea
+                placeholder="Instruções especiais, local de entrega, código de acesso..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="resize-none min-h-[80px]"
+              />
             </div>
           </div>
         </div>

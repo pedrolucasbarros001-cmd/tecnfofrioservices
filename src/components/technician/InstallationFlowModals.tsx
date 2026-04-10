@@ -8,7 +8,8 @@ import {
   ImageIcon,
   Package,
   FileText,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardList
 } from 'lucide-react';
 import {
   Dialog,
@@ -419,6 +420,14 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
               <div>
                 <p className="text-muted-foreground text-xs">Observações</p>
                 <p className="font-medium">{service.fault_description}</p>
+              </div>
+            )}
+            {service.notes && (
+              <div className="pt-2 border-t mt-2">
+                <p className="text-muted-foreground text-xs flex items-center gap-1">
+                  <ClipboardList className="h-3 w-3" /> Notas Adicionais
+                </p>
+                <p className="font-medium text-amber-700 whitespace-pre-wrap">{service.notes}</p>
               </div>
             )}
           </div>

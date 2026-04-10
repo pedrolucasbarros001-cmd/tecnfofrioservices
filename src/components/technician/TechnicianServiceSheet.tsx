@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
-import { Camera, Send, User, MessageSquare, X, Pencil } from 'lucide-react';
+import { Camera, Send, User, MessageSquare, X, Pencil, Package, ClipboardList } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,6 +77,22 @@ export function TechnicianServiceSheet({
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
       return data as ServicePhoto[];
+    },
+    enabled: !!service?.id && open,
+  });
+
+  // Fetch service parts (articles registered / ordered)
+  const { data: serviceParts = [] } = useQuery({
+    queryKey: ['service-parts', service?.id],
+    queryFn: async () => {
+      if (!service?.id) return [];
+      const { data, error } = await supabase
+        .from('service_parts')
+        .select('*')
+        .eq('service_id', service.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!service?.id && open,
   });
@@ -215,6 +231,50 @@ export function TechnicianServiceSheet({
               <div className="space-y-1">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Trabalho Realizado</div>
                 <div className="text-sm border-l-2 border-primary/50 pl-3 py-1">{service.work_performed}</div>
+              </div>
+            )}
+
+            {service.notes && (
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <ClipboardList className="h-3 w-3" /> Observações
+                </div>
+                <div className="text-sm border-l-2 border-amber-400 pl-3 py-1 bg-amber-50/50 rounded-r-md whitespace-pre-wrap">{service.notes}</div>
+              </div>
+            )}
+
+            {/* Artigos / Peças registados */}
+            {serviceParts.length > 0 && (
+              <div className="space-y-2">
+                <Separator />
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Package className="h-3 w-3" /> Artigos Registados ({serviceParts.length})
+                </div>
+                <div className="space-y-1.5">
+                  {serviceParts.map((part: any) => (
+                    <div key={part.id} className="bg-muted/40 rounded-md px-3 py-2 text-sm flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{part.name || part.description || 'Artigo'}</p>
+                        {part.reference && (
+                          <p className="text-xs text-muted-foreground">Ref: {part.reference}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground">Qtd: {part.quantity || 1}</p>
+                        {part.status && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            part.status === 'instalado' ? 'bg-green-100 text-green-700' :
+                            part.status === 'encomendado' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {part.status === 'instalado' ? 'Instalado' :
+                             part.status === 'encomendado' ? 'Encomendado' : part.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
