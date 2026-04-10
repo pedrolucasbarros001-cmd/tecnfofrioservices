@@ -17,6 +17,7 @@ import {
   Ban,
   Mail,
   Paperclip,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,6 +52,8 @@ interface StateActionButtonsProps {
   onCancelPartOrder?: () => void;
   onNotifyPartWait?: () => void;
   onAttachDocument?: () => void;
+  onViewDocuments?: () => void;
+  hasDocuments?: boolean;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -85,6 +88,8 @@ export function StateActionButtons({
   onCancelPartOrder,
   onNotifyPartWait,
   onAttachDocument,
+  onViewDocuments,
+  hasDocuments,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -258,6 +263,14 @@ export function StateActionButtons({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAttachDocument(); }}>
               <Paperclip className="h-4 w-4 mr-2" />
               Anexar Documento
+            </DropdownMenuItem>
+          )}
+
+          {/* Ver Anexos - Only shown when documents exist */}
+          {hasDocuments && onViewDocuments && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDocuments(); }}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Ver Anexos
             </DropdownMenuItem>
           )}
 

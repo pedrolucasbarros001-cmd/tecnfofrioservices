@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ChevronDown, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Search, ChevronDown, MapPin, Calendar, AlertCircle, Paperclip } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBoundaryFallbackContent } from '@/components/ErrorBoundaryFallbackContent';
 import { format } from 'date-fns';
@@ -34,6 +34,7 @@ import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsM
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
+import { ServiceDocumentsModal } from '@/components/modals/ServiceDocumentsModal';
 import { PartArrivalIndicator } from '@/components/shared/PartArrivalIndicator';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { usePaginatedServices, useUpdateService, useDeleteService, prefetchFullServiceData } from '@/hooks/useServices';
@@ -124,6 +125,7 @@ export default function GeralPage() {
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -201,6 +203,27 @@ export default function GeralPage() {
         return {};
       }
     },
+  });
+
+  // Fetch document counts per service for the attachment indicator
+  const serviceIds = services.map(s => s.id).filter(Boolean);
+  const { data: documentCountsMap = {} } = useQuery({
+    queryKey: ['service-document-counts', serviceIds.join(',')],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from('service_documents')
+        .select('service_id')
+        .in('service_id', serviceIds);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((d: any) => {
+        map[d.service_id] = (map[d.service_id] || 0) + 1;
+      });
+      return map;
+    },
+    enabled: serviceIds.length > 0,
+    staleTime: 1000 * 60,
   });
 
   const updateService = useUpdateService();
@@ -506,7 +529,12 @@ export default function GeralPage() {
 
                       {/* Código */}
                       <TableCell className="font-mono font-semibold text-primary">
-                        {service.code}
+                        <div className="flex items-center gap-1.5">
+                          {service.code}
+                          {documentCountsMap[service.id] > 0 && (
+                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Cliente */}
@@ -598,6 +626,11 @@ export default function GeralPage() {
                           onAttachDocument={() => {
                             setCurrentService(service);
                             setShowUploadDocumentModal(true);
+                          }}
+                          hasDocuments={!!documentCountsMap[service.id]}
+                          onViewDocuments={() => {
+                            setCurrentService(service);
+                            setShowDocumentsModal(true);
                           }}
                           viewContext={selectedStatus}
                         />
@@ -716,6 +749,16 @@ export default function GeralPage() {
             isOpen={showUploadDocumentModal} 
             onClose={() => setShowUploadDocumentModal(false)} 
             serviceId={currentService.id} 
+          />
+        )}
+
+        {/* Documents Viewer Modal */}
+        {currentService && (
+          <ServiceDocumentsModal
+            open={showDocumentsModal}
+            onOpenChange={setShowDocumentsModal}
+            serviceId={currentService.id}
+            serviceCode={currentService.code}
           />
         )}
       </div>
