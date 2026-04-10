@@ -535,11 +535,11 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
           />
         </div>
         <div className="col-span-2">
-          <Input
+          <Textarea
             placeholder="Observações..."
             value={part.notes}
             onChange={e => onUpdate('notes', e.target.value)}
-            className="text-xs h-8"
+            className="text-xs min-h-[52px] resize-y"
           />
         </div>
       </div>

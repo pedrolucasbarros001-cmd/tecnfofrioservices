@@ -410,7 +410,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
   const addArticle = () => {
     setFormData(prev => ({
       ...prev,
-      articles: [...(prev.articles as ArticleEntry[]), { reference: "", description: "", quantity: 1, unit_price: 0 }],
+      articles: [...(prev.articles as ArticleEntry[]), { reference: "", description: "", quantity: 1, unit_price: 0, notes: "" }],
     }));
   };
 
@@ -484,6 +484,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
           iva_rate: formData.taxRate as number,
           registered_by: user?.id || null,
           registered_location: "visita",
+          notes: article.notes?.trim() || null,
         });
         if (insertErr) throw insertErr;
       }
@@ -1197,14 +1198,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                       {/* Own articles section */}
                       {ownArticles.length > 0 && (
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium">✏️ Meus Artigos (Editáveis)</Label>
-                            {!formData.articlesLocked && (
-                              <Button variant="outline" size="sm" onClick={addArticle} className="h-8 gap-1">
-                                <Plus className="h-4 w-4" /> Add
-                              </Button>
-                            )}
-                          </div>
+                          <Label className="text-sm font-medium">✏️ Meus Artigos (Editáveis)</Label>
                           <div className="space-y-3">
                             {ownArticles.map((article) => (
                               <div key={article.allIndex} className="p-3 border rounded-lg bg-blue-50/30 relative group">
@@ -1262,6 +1256,17 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                                     />
                                   </div>
                                 </div>
+                                {(!formData.articlesLocked && !article.isExisting) && (
+                                  <div className="mt-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Observações</Label>
+                                    <textarea
+                                      placeholder="Observações opcionais sobre este artigo..."
+                                      value={article.notes || ""}
+                                      className="w-full min-h-[52px] resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                      onChange={(e) => updateArticle(article.allIndex, 'notes', e.target.value)}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1323,10 +1328,10 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                         </div>
                       )}
 
-                      {/* Show "Add" button only for own articles if not locked and no others yet */}
-                      {!formData.articlesLocked && ownArticles.length === 0 && othersArticles.length === 0 && (
+                      {/* Single Add button always visible when not locked */}
+                      {!formData.articlesLocked && (
                         <Button variant="outline" className="w-full h-10" onClick={addArticle}>
-                          <Plus className="h-4 w-4 mr-2" /> Adicionar Novo Artigo
+                          <Plus className="h-4 w-4 mr-2" /> Adicionar Artigo
                         </Button>
                       )}
                     </div>
@@ -1402,7 +1407,13 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
             </div>
             <DialogFooter className="flex gap-2 pt-2 border-t mt-4">
               <Button variant="outline" className="flex-1" onClick={() => safeSetStep("decisao")}><ArrowLeft className="h-4 w-4 mr-1" /> Anterior</Button>
-              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => safeSetStep("pedir_peca")} disabled={!formData.articlesLocked && formData.articles.filter(a => !a.isExisting).length > 0}>Continuar <ArrowRight className="h-4 w-4 ml-1" /></Button>
+              <Button className="flex-1 bg-blue-500 hover:bg-blue-600" disabled={isSubmitting} onClick={async () => {
+                const pending = formData.articles.filter(a => !a.isExisting && (a as ArticleEntry).description?.trim());
+                if (pending.length > 0 && !formData.articlesLocked) {
+                  await handleConfirmArticles();
+                }
+                safeSetStep("pedir_peca");
+              }}>Continuar <ArrowRight className="h-4 w-4 ml-1" /></Button>
             </DialogFooter>
           </div>
         );
@@ -1615,6 +1626,17 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                                       onChange={(e) => updateArticle(article.allIndex, 'unit_price', parseFloat(e.target.value) || 0)} />
                                   </div>
                                 </div>
+                                {(!formData.articlesLocked && !article.isExisting) && (
+                                  <div className="mt-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Observações</Label>
+                                    <textarea
+                                      placeholder="Observações opcionais sobre este artigo..."
+                                      value={article.notes || ""}
+                                      className="w-full min-h-[52px] resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                      onChange={(e) => updateArticle(article.allIndex, 'notes', e.target.value)}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1652,7 +1674,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                           </div>
                         </div>
                       )}
-                      {!formData.articlesLocked && ownArticles.length === 0 && othersArticles.length === 0 && (
+                      {!formData.articlesLocked && (
                         <Button variant="outline" className="w-full h-10" onClick={addArticle}>
                           <Plus className="h-4 w-4 mr-2" /> Adicionar Artigo
                         </Button>

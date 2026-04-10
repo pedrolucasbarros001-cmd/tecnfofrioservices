@@ -60,6 +60,7 @@ export interface ArticleEntry {
   description: string;
   quantity: number;
   unit_price: number;
+  notes?: string;
   isExisting?: boolean;
 }
 
