@@ -543,16 +543,16 @@ export default function ServicePrintPage() {
                     <span>{safeNumber(service?.labor_cost).toFixed(2)} €</span>
                   </div>
                 )}
-                {displayIVA > 0 && (
-                  <div className="flex justify-between col-span-2">
-                    <span className="text-muted-foreground">IVA:</span>
-                    <span>{displayIVA.toFixed(2)} €</span>
-                  </div>
-                )}
                 {service.discount && service.discount > 0 && (
                   <div className="flex justify-between col-span-2 text-green-600">
                     <span>Desconto:</span>
                     <span>-{service.discount.toFixed(2)} €</span>
+                  </div>
+                )}
+                {displayIVA > 0 && (
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-muted-foreground">IVA:</span>
+                    <span>{displayIVA.toFixed(2)} €</span>
                   </div>
                 )}
                 <div className="flex justify-between col-span-2 font-bold text-sm border-t pt-1">

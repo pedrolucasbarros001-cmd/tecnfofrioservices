@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { FileText, Download, ExternalLink, X } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, Download, ExternalLink, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -26,6 +28,9 @@ export function ServiceDocumentsModal({
   serviceId,
   serviceCode,
 }: ServiceDocumentsModalProps) {
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['service-documents', serviceId],
     queryFn: async () => {
@@ -45,6 +50,30 @@ export function ServiceDocumentsModal({
       .from('service_documents')
       .getPublicUrl(doc.file_url).data.publicUrl;
     window.open(publicUrl, '_blank');
+  };
+
+  const handleDeleteDocument = async (doc: any) => {
+    setDeletingId(doc.id);
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('service_documents')
+        .remove([doc.file_url]);
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('service_documents')
+        .delete()
+        .eq('id', doc.id);
+      if (dbError) throw dbError;
+
+      queryClient.invalidateQueries({ queryKey: ['service-documents', serviceId] });
+      toast.success('Documento eliminado.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao eliminar documento.');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -88,13 +117,24 @@ export function ServiceDocumentsModal({
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownload(doc)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownload(doc)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteDocument(doc)}
+                      disabled={deletingId === doc.id}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

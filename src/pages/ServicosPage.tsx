@@ -17,6 +17,7 @@ import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceM
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
+import { useRealtime } from '@/hooks/useRealtime';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -26,6 +27,7 @@ type FlowType = 'visit' | 'installation' | 'delivery' | null;
 
 export default function ServicosPage() {
   const { profile } = useAuth();
+  useRealtime('services', [['services'], ['services-paginated']]);
 
   // Current date state for daily navigation
   const [currentDate, setCurrentDate] = useState(() => new Date());

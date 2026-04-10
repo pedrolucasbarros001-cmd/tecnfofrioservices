@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Check, UserPlus, User } from 'lucide-react';
+import { Plus, Trash2, Check, UserPlus, User, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateCustomer } from '@/hooks/useCustomers';
 import { toast } from 'sonner';
@@ -70,6 +71,7 @@ const formSchema = z.object({
   items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
   discount_value: z.number().optional().default(0),
   discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
+  notes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -113,6 +115,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
       ],
       discount_value: 0,
       discount_type: 'fixed' as const,
+      notes: '',
     },
   });
 
@@ -234,6 +237,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         estimated_total: total,
         status: 'pendente',
         pricing_description: JSON.stringify(pricingData),
+        notes: values.notes || null,
       });
 
       if (error) throw error;
@@ -685,6 +689,29 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
                         </span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Observações */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2 text-sm font-medium">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                      Observações
+                    </Label>
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              placeholder="Notas adicionais sobre o orçamento..."
+                              className="resize-none min-h-[80px]"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
               </ScrollArea>
