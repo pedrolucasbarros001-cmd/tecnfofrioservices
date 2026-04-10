@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Wrench, ShoppingCart, Package } from 'lucide-react';
+import { Plus, Trash2, Wrench, ShoppingCart, Package, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +51,8 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isFinalized = service.status === 'finalizado';
 
   // Equipment fields
   const [brand, setBrand] = useState('');
@@ -244,6 +246,13 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
           <DialogTitle>Editar Serviço {service.code}</DialogTitle>
         </DialogHeader>
 
+        {isFinalized && (
+          <div className="mx-6 mb-2 flex items-center gap-2 p-3 rounded-lg border border-orange-200 bg-orange-50 text-orange-800 text-sm">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>Serviço finalizado — edição bloqueada. Apenas visualização.</span>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto min-h-0 px-6 space-y-6">
           {/* Equipment */}
           <section className="space-y-3">
@@ -251,21 +260,21 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Marca</Label>
-                <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Marca" />
+                <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Marca" disabled={isFinalized} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Modelo</Label>
-                <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Modelo" />
+                <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Modelo" disabled={isFinalized} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Nº de Série</Label>
-                <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Nº de Série" />
+                <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Nº de Série" disabled={isFinalized} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Tipo de Aparelho</Label>
-                <Input value={applianceType} onChange={e => setApplianceType(e.target.value)} placeholder="Ex: Frigorífico" />
+                <Input value={applianceType} onChange={e => setApplianceType(e.target.value)} placeholder="Ex: Frigorífico" disabled={isFinalized} />
               </div>
             </div>
           </section>
@@ -277,11 +286,11 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Diagnóstico e Trabalho</h3>
             <div className="space-y-1">
               <Label className="text-xs">Avaria Detectada</Label>
-              <Textarea value={detectedFault} onChange={e => setDetectedFault(e.target.value)} placeholder="Descreva a avaria detectada..." className="min-h-[60px]" />
+              <Textarea value={detectedFault} onChange={e => setDetectedFault(e.target.value)} placeholder="Descreva a avaria detectada..." className="min-h-[60px]" disabled={isFinalized} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Trabalho Realizado</Label>
-              <Textarea value={workPerformed} onChange={e => setWorkPerformed(e.target.value)} placeholder="Descreva o trabalho realizado..." className="min-h-[60px]" />
+              <Textarea value={workPerformed} onChange={e => setWorkPerformed(e.target.value)} placeholder="Descreva o trabalho realizado..." className="min-h-[60px]" disabled={isFinalized} />
             </div>
           </section>
 
@@ -339,9 +348,11 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                 <h3 className="text-xs font-bold text-green-600 uppercase tracking-widest flex items-center gap-2">
                   <Wrench className="h-4 w-4" /> Artigos Utilizados
                 </h3>
-                <Button variant="outline" size="sm" onClick={() => handleAddNewPart(false)} className="gap-1 text-[10px] h-7 border-green-200 text-green-700 hover:bg-green-50">
-                  <Plus className="h-3 w-3" /> Adicionar
-                </Button>
+                {!isFinalized && (
+                  <Button variant="outline" size="sm" onClick={() => handleAddNewPart(false)} className="gap-1 text-[10px] h-7 border-green-200 text-green-700 hover:bg-green-50">
+                    <Plus className="h-3 w-3" /> Adicionar
+                  </Button>
+                )}
               </div>
 
               {existingParts.filter(p => !p.is_requested).map(part => {
@@ -360,7 +371,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                       <span className="text-muted-foreground ml-2 font-mono text-xs">x{part.quantity || 1}</span>
                       {part.cost ? <span className="text-muted-foreground ml-2 text-xs">{Number(part.cost).toFixed(2)} €</span> : null}
                     </div>
-                    {canDelete && (
+                    {canDelete && !isFinalized && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -392,9 +403,11 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                 <h3 className="text-xs font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4" /> Solicitar Artigo
                 </h3>
-                <Button variant="outline" size="sm" onClick={() => handleAddNewPart(true)} className="gap-1 text-[10px] h-7 border-amber-200 text-amber-700 hover:bg-amber-50">
-                  <Plus className="h-3 w-3" /> Pedir Artigo
-                </Button>
+                {!isFinalized && (
+                  <Button variant="outline" size="sm" onClick={() => handleAddNewPart(true)} className="gap-1 text-[10px] h-7 border-amber-200 text-amber-700 hover:bg-amber-50">
+                    <Plus className="h-3 w-3" /> Pedir Artigo
+                  </Button>
+                )}
               </div>
 
               <div className="bg-amber-50/30 border border-amber-100/50 rounded-lg p-3 mb-2">
@@ -420,7 +433,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
                       {part.arrived && <Badge className="ml-2 bg-green-500 text-[9px] h-4">Chegou</Badge>}
                       {part.cost ? <span className="text-muted-foreground ml-2 text-xs">{Number(part.cost).toFixed(2)} €</span> : null}
                     </div>
-                    {canDelete && (
+                    {canDelete && !isFinalized && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -453,11 +466,13 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
 
         <DialogFooter className="px-6 py-4 border-t shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancelar
+            {isFinalized ? 'Fechar' : 'Cancelar'}
           </Button>
-          <Button onClick={handleSave} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
-            {isSubmitting ? 'A guardar...' : 'Guardar Alterações'}
-          </Button>
+          {!isFinalized && (
+            <Button onClick={handleSave} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {isSubmitting ? 'A guardar...' : 'Guardar Alterações'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

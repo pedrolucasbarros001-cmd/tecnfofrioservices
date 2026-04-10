@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
-import { Camera, Send, User, MessageSquare, X, Pencil, Package, ClipboardList } from 'lucide-react';
+import { Camera, Send, User, MessageSquare, X, Pencil, Package, ClipboardList, Lock } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -185,16 +185,23 @@ export function TechnicianServiceSheet({
 
         <ScrollArea className="flex-1">
           <div className="space-y-6 p-4">
-            {/* Edit button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={() => setEditModalOpen(true)}
-            >
-              <Pencil className="h-4 w-4" />
-              Editar Serviço
-            </Button>
+            {/* Edit button - locked when finalizado */}
+            {service.status !== 'finalizado' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setEditModalOpen(true)}
+              >
+                <Pencil className="h-4 w-4" />
+                Editar Serviço
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-2 p-2 rounded-lg border bg-muted/40 text-muted-foreground text-sm">
+                <Lock className="h-4 w-4" />
+                Serviço finalizado — edição bloqueada
+              </div>
+            )}
 
             {(service.customer || service.contact_name) && (
               <div className="space-y-1">

@@ -1187,14 +1187,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               {adminPricing && <AdminPricingReadOnly data={adminPricing} />}
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Artigos Utilizados</Label>
-                  {!formData.articlesLocked && (
-                    <Button variant="outline" size="sm" onClick={addArticle} className="h-8 gap-1">
-                      <Plus className="h-4 w-4" /> Add
-                    </Button>
-                  )}
-                </div>
+                <Label className="text-sm font-medium">Artigos Utilizados</Label>
 
                 {/* Split articles by ownership */}
                 {(() => {
@@ -1564,37 +1557,120 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
 
       case "resumo_reparacao":
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] flex flex-col">
             <ModalHeader title="Resumo Final" step="Final" />
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-card/50 overflow-hidden text-sm">
-                <div className="bg-muted/50 px-3 py-2 border-b flex justify-between items-center">
-                  <span className="font-semibold text-xs text-muted-foreground uppercase">Materiais Registados</span>
-                  <Badge variant="outline" className="text-[10px]">{formData.articles.length} itens</Badge>
-                </div>
-                <div className="p-3 space-y-2">
-                  {formData.articles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic text-center py-2">Nenhum artigo registado.</p>
-                  ) : (
-                    formData.articles.map((a, i) => (
-                      <div key={i} className="flex justify-between items-center text-xs">
-                        <span className="flex-1 truncate pr-2">{a.description}</span>
-                        <span className="text-muted-foreground px-2">x{a.quantity}</span>
-                        <span className="font-medium">{(a.quantity * a.unit_price).toFixed(2)}€</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {adminPricing && (
-                  <div className="p-3 pt-0 space-y-2 border-t mt-2">
-                    <p className="text-[10px] uppercase text-muted-foreground font-semibold pt-2">Serviços Administrativos</p>
-                    <div className="flex justify-between items-center text-xs">
-                      <span>Mão de Obra / Deslocação / Outros</span>
-                      <span className="font-medium">{adminPricingTotal.toFixed(2)}€</span>
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {adminPricing && <AdminPricingReadOnly data={adminPricing} />}
+
+              {/* Artigos — próprios editáveis + outros só leitura */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Materiais Registados</Label>
+                {(() => {
+                  const { ownArticles, othersArticles } = separateArticlesByOwner();
+                  return (
+                    <div className="space-y-4">
+                      {ownArticles.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">✏️ Meus Artigos (Editáveis)</Label>
+                            {!formData.articlesLocked && (
+                              <Button variant="outline" size="sm" onClick={addArticle} className="h-8 gap-1">
+                                <Plus className="h-4 w-4" /> Adicionar
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {ownArticles.map((article) => (
+                              <div key={article.allIndex} className="p-3 border rounded-lg bg-blue-50/30 relative group">
+                                {!formData.articlesLocked && !article.isExisting && (
+                                  <Button type="button" variant="ghost" size="icon"
+                                    className="h-6 w-6 absolute -right-2 -top-2 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => removeArticle(article.allIndex)}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                <div className="grid grid-cols-12 gap-2 mt-1">
+                                  <div className="col-span-3 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                                    <Input placeholder="F01..." value={article.reference}
+                                      disabled={formData.articlesLocked || article.isExisting} className="h-8 text-sm px-2"
+                                      onChange={(e) => updateArticle(article.allIndex, 'reference', e.target.value)} />
+                                  </div>
+                                  <div className="col-span-5 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
+                                    <Input placeholder="Artigo" value={article.description}
+                                      disabled={formData.articlesLocked || article.isExisting} className="h-8 text-sm"
+                                      onChange={(e) => updateArticle(article.allIndex, 'description', e.target.value)} />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                                    <Input type="number" min="1" value={article.quantity}
+                                      disabled={formData.articlesLocked || article.isExisting} className="h-8 text-sm text-center px-1"
+                                      onChange={(e) => updateArticle(article.allIndex, 'quantity', parseInt(e.target.value) || 1)} />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
+                                    <Input placeholder="0" value={article.unit_price}
+                                      disabled={formData.articlesLocked || article.isExisting} className="h-8 text-sm px-2 text-right"
+                                      onChange={(e) => updateArticle(article.allIndex, 'unit_price', parseFloat(e.target.value) || 0)} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {othersArticles.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">👥 Artigos de Outros (Apenas Leitura)</Label>
+                          <div className="space-y-3">
+                            {othersArticles.map((article) => (
+                              <div key={article.allIndex} className="p-3 border rounded-lg bg-slate-50 opacity-75">
+                                <div className="grid grid-cols-12 gap-2">
+                                  <div className="col-span-3 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
+                                    <Input value={article.reference} disabled className="h-8 text-sm px-2" />
+                                  </div>
+                                  <div className="col-span-5 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
+                                    <Input value={article.description} disabled className="h-8 text-sm" />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-center block">Qtd</Label>
+                                    <Input type="number" value={article.quantity} disabled className="h-8 text-sm text-center px-1" />
+                                  </div>
+                                  <div className="col-span-2 space-y-1">
+                                    <Label className="text-[10px] uppercase text-muted-foreground text-right block">Valor</Label>
+                                    <Input value={article.unit_price} disabled className="h-8 text-sm px-2 text-right" />
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground mt-2 text-right italic">
+                                  Por: {article.ownerName} — Apenas leitura
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!formData.articlesLocked && ownArticles.length === 0 && othersArticles.length === 0 && (
+                        <Button variant="outline" className="w-full h-10" onClick={addArticle}>
+                          <Plus className="h-4 w-4 mr-2" /> Adicionar Artigo
+                        </Button>
+                      )}
                     </div>
+                  );
+                })()}
+              </div>
+
+              {/* Totais */}
+              <div className="bg-muted p-3 rounded-lg space-y-1 text-sm border">
+                {adminPricing && (
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span>Serviços Administrativos</span>
+                    <span>{adminPricingTotal.toFixed(2)} €</span>
                   </div>
                 )}
-                <div className="bg-blue-50 p-3 border-t flex justify-between items-center">
+                <div className="bg-blue-50 rounded p-2 mt-1 flex justify-between items-center">
                   <span className="font-bold text-blue-900">Total Previsto</span>
                   <span className="font-bold text-blue-600 text-lg">{totalFinal.toFixed(2)} €</span>
                 </div>
