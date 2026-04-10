@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useRealtime } from '@/hooks/useRealtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { Wrench, Send, UserPlus, Clock, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
@@ -31,7 +30,6 @@ export default function OficinaPage() {
 
   const queryClient = useQueryClient();
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
-  useRealtime('services');
 
   const handlePrefetch = useCallback((serviceId: string) => {
     prefetchFullServiceData(queryClient, serviceId);

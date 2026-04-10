@@ -17,7 +17,7 @@ import { TechQuickServiceModal } from '@/components/technician/TechQuickServiceM
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
-import { useRealtime } from '@/hooks/useRealtime';
+import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -27,7 +27,6 @@ type FlowType = 'visit' | 'installation' | 'delivery' | null;
 
 export default function ServicosPage() {
   const { profile } = useAuth();
-  useRealtime('services', [['services'], ['services-paginated']]);
 
   // Current date state for daily navigation
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -39,6 +38,8 @@ export default function ServicosPage() {
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [serviceToUpload, setServiceToUpload] = useState<Service | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
+  const [detailService, setDetailService] = useState<Service | null>(null);
 
   // Use React Query for proper caching and refetch
   const queryClient = useQueryClient();
@@ -219,7 +220,8 @@ export default function ServicosPage() {
                   service={service}
                   onAssignTechnician={() => {}}
                   onViewDetails={() => {
-                    // If we had a detail sheet here...
+                    setDetailService(service);
+                    setShowDetailSheet(true);
                   }}
                   onAttachDocument={() => {
                     setServiceToUpload(service);
@@ -410,6 +412,12 @@ export default function ServicosPage() {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         serviceId={serviceToUpload?.id || ''}
+      />
+
+      <ServiceDetailSheet
+        service={detailService}
+        open={showDetailSheet}
+        onOpenChange={setShowDetailSheet}
       />
     </div>
   );

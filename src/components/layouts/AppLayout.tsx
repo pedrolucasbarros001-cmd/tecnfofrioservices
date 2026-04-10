@@ -14,12 +14,25 @@ import { useDemo } from '@/contexts/DemoContext';
 import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { useRealtime } from '@/hooks/useRealtime';
 
 export function AppLayout() {
   const { role, user } = useAuth();
   const { isOpen: isOnboardingOpen } = useOnboarding();
   const { isActive: isDemoActive } = useDemo();
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // ─── Realtime centralizado ───────────────────────────────────────────────
+  // Um único conjunto de canais cobre todo o sistema. Debounce de 800ms já
+  // está no hook; tabs em background são ignoradas automaticamente.
+  useRealtime('services', [
+    ['services'],
+    ['services-paginated'],
+    ['agenda-services'],
+  ]);
+  useRealtime('service_parts', [['all-pending-parts']]);
+  useRealtime('budgets', [['budgets']]);
+  useRealtime('notifications', [['unread-notifications', user?.id ?? ''], ['notifications']]);
 
   // Sanitize UI when returning from idle/tab switch
   useEffect(() => {
@@ -60,7 +73,6 @@ export function AppLayout() {
       return count || 0;
     },
     enabled: !!user?.id,
-    refetchInterval: 120000, // Refetch every 2 minutes
   });
 
   const getSidebar = () => {

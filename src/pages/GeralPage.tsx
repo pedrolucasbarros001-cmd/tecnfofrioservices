@@ -6,7 +6,6 @@ import { ErrorBoundaryFallbackContent } from '@/components/ErrorBoundaryFallback
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { formatShiftLabel, parseLocalDate } from '@/utils/dateUtils';
-import { useRealtime } from '@/hooks/useRealtime';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -133,10 +132,6 @@ export default function GeralPage() {
   const effectiveStatus = selectedStatus === 'a_precificar' ? 'pending_pricing' : selectedStatus;
 
   // Sem Realtime — atualiza ao abrir página, refetchOnWindowFocus, ou após ações manuais
-
-  // Realtime updates for secretary navigation — cover all queries on this page
-  useRealtime('services', [['services'], ['services-paginated'], ['agenda-services']]);
-  useRealtime('service_parts', [['all-pending-parts']]);
 
   const {
     data: result,

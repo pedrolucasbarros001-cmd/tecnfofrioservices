@@ -80,6 +80,7 @@ export default function BudgetPrintPage() {
         items: [] as BudgetItem[],
         subtotal: budget?.estimated_labor || 0,
         iva: budget?.estimated_parts || 0,
+        discount: 0,
         total: budget?.estimated_total || 0
       };
     }
@@ -97,11 +98,14 @@ export default function BudgetPrintPage() {
           return sum + ((item.qty * item.price) * (item.tax / 100));
         }, 0);
 
+        const discount = typeof parsed.discount === 'number' ? parsed.discount : 0;
+
         return {
           items,
           subtotal,
           iva,
-          total: subtotal + iva
+          discount,
+          total: subtotal - discount + iva
         };
       }
     } catch {
@@ -112,6 +116,7 @@ export default function BudgetPrintPage() {
       items: [] as BudgetItem[],
       subtotal: budget.estimated_labor || 0,
       iva: budget.estimated_parts || 0,
+      discount: 0,
       total: budget.estimated_total || 0
     };
   }, [budget]);
@@ -400,6 +405,12 @@ export default function BudgetPrintPage() {
               <span className="text-muted-foreground">Subtotal:</span>
               <span>{formatCurrency(pricingDetails.subtotal)}</span>
             </div>
+            {pricingDetails.discount > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Desconto:</span>
+                <span>-{formatCurrency(pricingDetails.discount)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">IVA:</span>
               <span>{formatCurrency(pricingDetails.iva)}</span>

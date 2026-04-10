@@ -44,7 +44,6 @@ import { EditBudgetDetailsModal } from '@/components/modals/EditBudgetDetailsMod
 import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useRealtime } from '@/hooks/useRealtime';
 
 const STATUS_CONFIG = {
   pendente: { label: 'Pendente', color: 'bg-yellow-500 text-black' },
@@ -55,7 +54,6 @@ const STATUS_CONFIG = {
 
 export default function OrcamentosPage() {
   const queryClient = useQueryClient();
-  useRealtime('budgets', [['budgets']]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);

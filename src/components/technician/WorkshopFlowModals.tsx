@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X, Trash2 } from "lucide-react";
+import { Camera, Package, CheckCircle2, ArrowLeft, ArrowRight, FileText, Wrench, Plus, X, Trash2, ClipboardList } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -666,6 +666,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                 <p className="text-muted-foreground text-xs">Avaria Reportada</p>
                 <p className="font-medium">{service.fault_description || "Sem descrição"}</p>
               </div>
+              {service.notes && (
+                <div className="pt-2 border-t mt-2">
+                  <p className="text-muted-foreground text-xs flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3" /> Observações
+                  </p>
+                  <p className="font-medium text-amber-700 whitespace-pre-wrap">{service.notes}</p>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="flex gap-2 mt-4">

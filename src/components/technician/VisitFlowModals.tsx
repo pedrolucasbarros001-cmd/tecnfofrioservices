@@ -924,6 +924,14 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
                 <p className="text-muted-foreground text-xs">Avaria Reportada</p>
                 <p className="font-medium">{service.fault_description || "Sem descrição"}</p>
               </div>
+              {service.notes && (
+                <div className="pt-2 border-t mt-2">
+                  <p className="text-muted-foreground text-xs flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3" /> Observações
+                  </p>
+                  <p className="font-medium text-amber-700 whitespace-pre-wrap">{service.notes}</p>
+                </div>
+              )}
               {mode === "continuacao_peca" && service.detected_fault && (
                 <div className="pt-2 border-t mt-2">
                   <p className="text-muted-foreground text-xs">Diagnóstico Anterior</p>
