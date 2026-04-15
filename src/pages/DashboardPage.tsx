@@ -86,7 +86,7 @@ export default function DashboardPage() {
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'finalizado'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').neq('status', 'finalizado').neq('status', 'concluidos'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').eq('status', 'concluidos'),
-        supabase.from('services').select('amount_paid, final_price').gt('final_price', 0),
+        supabase.from('services').select('*').gt('final_price', 0),
         supabase.from('budgets').select('*', { count: 'exact', head: true }),
       ]);
 
