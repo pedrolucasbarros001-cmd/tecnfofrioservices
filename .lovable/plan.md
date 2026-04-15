@@ -1,25 +1,49 @@
 
 
-## Plano: Corrigir build errors + Garantir que cancelamento remove serviço da visão do técnico
+## Plano: Badge "Pagamento Pendente" + Pesquisa por nome no TechQuickServiceModal
 
-### Diagnóstico
+Duas funcionalidades independentes.
 
-1. **Build errors**: Os 3 erros são sobre `owner_confirmed` não existir no tipo de update gerado pelo Supabase (`src/integrations/supabase/types.ts`). As colunas `owner_confirmed` e `owner_confirmed_at` existem na BD mas o ficheiro de tipos auto-gerado está desatualizado. Como não podemos editar esse ficheiro diretamente, a solução é fazer cast `as any` nos objectos de update.
+---
 
-2. **Cancelamento vs visão do técnico**: A query do técnico em `ServicosPage.tsx` (linha 76) já filtra por `.in('status', ['por_fazer', 'em_execucao', ...])` — `cancelado` **não está incluído**, logo o serviço já desaparece automaticamente quando cancelado. O mesmo acontece na `TechnicianOfficePage`. Não é necessária nenhuma alteração de lógica.
+### 1. Badge amarelo "Pagamento Pendente" para serviços pagos mas não confirmados pelo dono
 
-### Alterações
+**Lógica**: Quando `amount_paid >= final_price` (sem débito), `final_price > 0`, e `owner_confirmed = false` → mostrar badge amarelo "Pgto. Pendente" (pagamento registado mas dono ainda não confirmou no menu de 3 pontos).
 
-**1. `src/components/services/ServiceDetailSheet.tsx` (linha ~482)**
-- Adicionar cast `as any` ao objecto `.update({ owner_confirmed: true, ... } as any)`
+**Alterações:**
 
-**2. `src/pages/GeralPage.tsx` (linha ~312)**
-- Mesmo cast `as any` no `.update()`
+**`src/components/shared/ServiceStatusBadge.tsx`**
+- Adicionar `owner_confirmed` ao Pick do service na interface
+- Adicionar lógica: se `final_price > 0 && amount_paid >= final_price && !owner_confirmed && status !== 'cancelado'` → badge amarelo "Pgto. Pendente"
+- Exportar helper `computePendingConfirmation` para uso externo
 
-**3. `src/pages/secretary/SecretaryConcluidosPage.tsx` (linha ~84)**
-- Mesmo cast `as any` no `.update()`
+**`src/pages/GeralPage.tsx`** / **`src/pages/secretary/SecretaryConcluidosPage.tsx`**
+- Garantir que `owner_confirmed` é incluído no select dos serviços (já está via `*`)
+- Passar o campo ao `ServiceStatusBadge`
 
-### Resultado
-- Build compila sem erros
-- Cancelamento já funciona correctamente — serviço cancelado não aparece para nenhum técnico
+**`src/components/services/ServiceDetailSheet.tsx`**
+- Passar `owner_confirmed` ao badge
+
+---
+
+### 2. Pesquisa por nome no TechQuickServiceModal (além de telefone)
+
+Actualmente o modal só pesquisa clientes por telefone. O técnico deve poder escrever o nome e ver sugestões.
+
+**Alterações:**
+
+**`src/components/technician/TechQuickServiceModal.tsx`**
+- Adicionar state `nameSuggestions: Customer[]` e `lookingUpName: boolean`
+- Adicionar `useEffect` debounced no campo `customer_name` (min 3 chars) que faz `.ilike('name', '%term%').limit(5)`
+- Quando há resultados, mostrar lista dropdown abaixo do campo nome com os clientes encontrados
+- Ao clicar num cliente sugerido: preencher telefone, morada, nome
+- Se não houver dados (cliente sem telefone), continuar normalmente — o RPC `technician_create_service` já cria cliente só com nome
+
+---
+
+### Ficheiros alterados
+- `src/components/shared/ServiceStatusBadge.tsx`
+- `src/components/technician/TechQuickServiceModal.tsx`
+- `src/pages/GeralPage.tsx` (minor — garantir prop)
+- `src/components/services/ServiceDetailSheet.tsx` (minor — garantir prop)
 
