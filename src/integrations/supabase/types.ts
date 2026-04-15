@@ -774,6 +774,8 @@ export type Database = {
           last_visit_report_sent_at: string | null
           model: string | null
           notes: string | null
+          owner_confirmed: boolean
+          owner_confirmed_at: string | null
           parts_cost: number | null
           pending_pricing: boolean | null
           pickup_date: string | null
@@ -825,6 +827,8 @@ export type Database = {
           last_visit_report_sent_at?: string | null
           model?: string | null
           notes?: string | null
+          owner_confirmed?: boolean
+          owner_confirmed_at?: string | null
           parts_cost?: number | null
           pending_pricing?: boolean | null
           pickup_date?: string | null
@@ -876,6 +880,8 @@ export type Database = {
           last_visit_report_sent_at?: string | null
           model?: string | null
           notes?: string | null
+          owner_confirmed?: boolean
+          owner_confirmed_at?: string | null
           parts_cost?: number | null
           pending_pricing?: boolean | null
           pickup_date?: string | null
