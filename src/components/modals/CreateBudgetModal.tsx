@@ -87,9 +87,10 @@ interface CreateBudgetModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  sourceService?: Service & { fault_description?: string; customer?: Customer | null; };
 }
 
-export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudgetModalProps) {
+export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService }: CreateBudgetModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [discountValue, setDiscountValue] = useState('');
@@ -127,6 +128,38 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
   const watchItems = form.watch('items');
   const customerPhone = form.watch('customer_phone');
   const customerNif = form.watch('customer_nif');
+
+  // Prepopulate from sourceService if provided
+  useEffect(() => {
+    if (open && sourceService) {
+      if (sourceService.customer) {
+        setSelectedCustomer(sourceService.customer);
+        form.setValue('customer_name', sourceService.customer.name);
+        form.setValue('customer_phone', sourceService.customer.phone || '');
+        form.setValue('customer_nif', sourceService.customer.nif || '');
+        form.setValue('customer_email', sourceService.customer.email || '');
+      }
+      form.setValue('notes', `Orçamento (Ref: ${sourceService.code})`);
+
+      const fetchParts = async () => {
+        const { data } = await supabase.from('service_parts').select('*').eq('service_id', sourceService.id);
+        if (data && data.length > 0) {
+          form.setValue('items', data.map(p => ({
+            name: p.part_name,
+            description: p.part_code || '',
+            quantity: p.quantity || 1,
+            unit_price: p.cost || 0,
+            tax_rate: p.iva_rate || 23,
+            type: 'part'
+          })));
+        } else {
+          form.setValue('items', [{ name: 'Diagnóstico / Mão de Obra', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'labor' }]);
+        }
+      };
+      
+      fetchParts();
+    }
+  }, [open, sourceService, form]);
 
   // Auto-detect customer by phone or NIF
   useEffect(() => {
@@ -238,9 +271,19 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess }: CreateBudge
         status: 'pendente',
         pricing_description: JSON.stringify(pricingData),
         notes: values.notes || null,
+        source_service_id: sourceService?.id || null,
+        appliance_type: sourceService?.appliance_type || null,
+        brand: sourceService?.brand || null,
+        model: sourceService?.model || null,
+        fault_description: sourceService?.fault_description || null,
       });
 
       if (error) throw error;
+
+      if (sourceService?.id) {
+         // Lock the service
+         await supabase.from('services').update({ awaiting_budget_approval: true }).eq('id', sourceService.id);
+      }
 
       toast.success('Orçamento criado com sucesso!');
       handleClose();

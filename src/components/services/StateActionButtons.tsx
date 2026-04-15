@@ -19,6 +19,7 @@ import {
   Paperclip,
   FolderOpen,
   BadgeCheck,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +57,7 @@ interface StateActionButtonsProps {
   onViewDocuments?: () => void;
   hasDocuments?: boolean;
   onConfirmOwner?: () => void;
+  onCreateBudgetFromAdmin?: () => void;
   /** When set, restricts the main button to only the action that matches
    * this filter context. Use the active filter/card status from the parent page. */
   viewContext?: ServiceStatus | 'all';
@@ -93,6 +95,7 @@ export function StateActionButtons({
   onViewDocuments,
   hasDocuments,
   onConfirmOwner,
+  onCreateBudgetFromAdmin,
   viewContext,
 }: StateActionButtonsProps) {
   const { role } = useAuth();
@@ -335,6 +338,14 @@ export function StateActionButtons({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSetPrice(); }}>
               <DollarSign className="h-4 w-4 mr-2" />
               Orçamentar
+            </DropdownMenuItem>
+          )}
+
+          {/* Gerar Orçamento Oficial via Admin - Dono or Secretaria */}
+          {((service?.status === 'a_precificar' || service?.status === 'por_fazer' || service?.status === 'em_execucao' || service?.status === 'na_oficina') && !service?.awaiting_budget_approval) && (isDono || isSecretaria) && onCreateBudgetFromAdmin && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateBudgetFromAdmin(); }}>
+               <FileText className="h-4 w-4 mr-2" />
+               Gerar Orçamento Oficial
             </DropdownMenuItem>
           )}
 

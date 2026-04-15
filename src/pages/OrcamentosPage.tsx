@@ -134,7 +134,31 @@ export default function OrcamentosPage() {
     }
   };
 
-  const handleOpenConvertModal = (budget: any) => {
+  const handleOpenConvertModal = async (budget: any) => {
+    if (budget.source_service_id) {
+       try {
+         const { error } = await supabase.from('services').update({
+           awaiting_budget_approval: false,
+           final_price: budget.estimated_total,
+           pricing_description: budget.pricing_description,
+           pending_pricing: false,
+           status: 'concluidos' // Assume it was done, or it will be determined by normal flow
+         }).eq('id', budget.source_service_id);
+
+         if (error) throw error;
+
+         await supabase.from('budgets').update({ status: 'convertido', converted_service_id: budget.source_service_id }).eq('id', budget.id);
+
+         toast.success('Orçamento vinculado: O serviço original foi desbloqueado com sucesso!');
+         queryClient.invalidateQueries({ queryKey: ['budgets'] });
+         queryClient.invalidateQueries({ queryKey: ['services'] });
+       } catch (err) {
+         console.error('Error unlocking service:', err);
+         toast.error('Erro ao repor serviço original.');
+       }
+       return;
+    }
+
     setBudgetToConvert(budget);
     setShowConvertModal(true);
   };
@@ -250,7 +274,14 @@ export default function OrcamentosPage() {
                       onClick={() => handleRowClick(budget)}
                     >
                       <TableCell className="font-mono font-semibold text-primary">
-                        {budget.code}
+                        <div className="flex flex-col gap-1 items-start">
+                          <span>{budget.code}</span>
+                          {budget.source_service_id && (
+                            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 uppercase">
+                              Serviço Em Espera
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">
                         {budget.customer?.name || 'Sem cliente'}

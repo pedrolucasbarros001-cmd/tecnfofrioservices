@@ -528,6 +528,83 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     }
   };
 
+  const handleCreateBudgetFromService = async () => {
+    setIsSubmitting(true);
+    try {
+      await ensureValidSession();
+      
+      const newArticles = (formData.articles as ArticleEntry[]).filter(a => !a.isExisting && a.description.trim());
+      for (const article of newArticles) {
+        const { error: insertErr } = await supabase.from("service_parts").insert({
+          service_id: service.id,
+          part_name: article.description,
+          part_code: article.reference || null,
+          quantity: article.quantity,
+          cost: article.unit_price,
+          is_requested: false,
+          arrived: true,
+          iva_rate: formData.taxRate as number,
+          registered_by: user?.id || null,
+          registered_location: "oficina",
+        });
+        if (insertErr) throw insertErr;
+      }
+      
+      for (const part of formData.partsToOrder) {
+        if (!part.name.trim()) continue;
+        const { error: partInsertErr } = await supabase.from("service_parts").insert({
+          service_id: service.id,
+          part_name: part.name.trim(),
+          part_code: part.reference.trim() || null,
+          quantity: 1,
+          is_requested: true,
+          arrived: false,
+          cost: part.cost ? parseFloat(part.cost.replace(',', '.')) : 0,
+        });
+        if (partInsertErr) throw partInsertErr;
+      }
+      
+      const budgetCode = `ORC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const { error: budgetErr } = await supabase.from('budgets').insert({
+        code: budgetCode,
+        customer_id: service.customer_id,
+        appliance_type: formData.productType || service.appliance_type,
+        brand: formData.productBrand || service.brand,
+        model: formData.productModel || service.model,
+        fault_description: formData.detectedFault || (service as any).detected_fault,
+        estimated_labor: adminPricingTotal,
+        estimated_parts: combinedSubtotal,
+        estimated_total: totalFinal,
+        status: 'pendente',
+        source_service_id: service.id,
+      });
+      if (budgetErr) throw budgetErr;
+
+      await technicianUpdateService({
+        serviceId: service.id,
+        status: "a_precificar",
+        detectedFault: formData.detectedFault || null,
+        workPerformed: formData.workPerformed || null,
+      });
+
+      await supabase.from('services').update({ awaiting_budget_approval: true }).eq('id', service.id);
+
+      toast.success("Enviado para Orçamento Oficial no painel!");
+      
+      invalidateServiceQueries(queryClient, service.id);
+      clearState();
+      saveStateToDb(null as any);
+      onComplete();
+      
+    } catch (error) {
+      console.error("Error creating budget:", error);
+      toast.error(humanizeError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleClose = () => {
     if (isOpen && currentStep !== "resumo" && currentStep !== "resumo_continuacao") {
       flushStateToDb(currentStep, formData);
@@ -930,7 +1007,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                                   </Button>
                                 )}
                                 <div className="grid grid-cols-12 gap-2 mt-1">
-                                  <div className="col-span-3 space-y-1">
+                                  <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                                     <Input
                                       placeholder="F01..."
@@ -940,7 +1017,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                                       onChange={(e) => updateArticle(article.allIndex, 'reference', e.target.value)}
                                     />
                                   </div>
-                                  <div className="col-span-5 space-y-1">
+                                  <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
                                     <Input
                                       placeholder="Artigo"
@@ -986,7 +1063,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                             {othersArticles.map((article) => (
                               <div key={article.allIndex} className="p-3 border rounded-lg bg-slate-50 opacity-75 relative group">
                                 <div className="grid grid-cols-12 gap-2 mt-1">
-                                  <div className="col-span-3 space-y-1">
+                                  <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Ref.</Label>
                                     <Input
                                       placeholder="F01..."
@@ -995,7 +1072,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                                       className="h-8 text-sm px-2"
                                     />
                                   </div>
-                                  <div className="col-span-5 space-y-1">
+                                  <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
                                     <Input
                                       placeholder="Artigo"
@@ -1174,9 +1251,14 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   <CheckCircle2 className="h-4 w-4 mr-1" /> {isSubmitting ? "A guardar..." : "Confirmar Artigos"}
                 </Button>
               ) : (
-                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pedir_peca")}>
-                  Continuar <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+                <div className="flex-1 flex gap-2">
+                  <Button variant="secondary" className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" onClick={handleCreateBudgetFromService} disabled={isSubmitting}>
+                    <FileText className="h-4 w-4 mr-1" /> Orçamento Oficial
+                  </Button>
+                  <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pedir_peca")} disabled={isSubmitting}>
+                    Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               )}
             </DialogFooter>
           </>

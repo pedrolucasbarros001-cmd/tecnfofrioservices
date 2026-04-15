@@ -158,6 +158,7 @@ export interface Service {
   last_payment_reminder_sent_at: string | null;
   last_part_notice_sent_at: string | null;
   last_visit_report_sent_at: string | null;
+  awaiting_budget_approval: boolean | null;
   created_at: string;
   updated_at: string;
   customer?: Customer;
@@ -236,6 +237,7 @@ export interface Budget {
   estimated_total: number;
   status: BudgetStatus;
   converted_service_id: string | null;
+  source_service_id: string | null;
   valid_until: string | null;
   notes: string | null;
   created_at: string;

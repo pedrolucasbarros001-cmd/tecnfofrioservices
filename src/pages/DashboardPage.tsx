@@ -86,9 +86,15 @@ export default function DashboardPage() {
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'finalizado'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').neq('status', 'finalizado').neq('status', 'concluidos'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').eq('status', 'concluidos'),
-        supabase.from('services').select('*', { count: 'exact', head: true }).gt('final_price', 0).eq('is_warranty', false).filter('amount_paid', 'lt', 'final_price'),
+        supabase.from('services').select('amount_paid, final_price').gt('final_price', 0),
         supabase.from('budgets').select('*', { count: 'exact', head: true }),
       ]);
+
+      const emDebitoCount = (emDebitoRes.data || []).filter(s => {
+        const finalPrice = s.final_price || 0;
+        const amountPaid = s.amount_paid || 0;
+        return finalPrice > 0 && amountPaid < finalPrice;
+      }).length;
 
       return {
         por_fazer: porFazerRes.count ?? 0,
@@ -99,7 +105,7 @@ export default function DashboardPage() {
         finalizado: finalizadoRes.count ?? 0,
         na_oficina: naOficinaRes.count ?? 0,
         concluidos: concluidosRes.count ?? 0,
-        em_debito: emDebitoRes.count ?? 0,
+        em_debito: emDebitoCount,
         orcamentos: budgetsRes.count ?? 0,
       };
     },

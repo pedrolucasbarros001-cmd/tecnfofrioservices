@@ -104,8 +104,8 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px]">Ref.</TableHead>
-              <TableHead className="min-w-[180px]">Descrição</TableHead>
+              <TableHead className="w-[160px]">Ref.</TableHead>
+              <TableHead className="min-w-[150px]">Descrição</TableHead>
               <TableHead className="w-[70px]">Qtd</TableHead>
               <TableHead className="w-[100px]">Valor (€)</TableHead>
               <TableHead className="w-[90px]">IVA</TableHead>

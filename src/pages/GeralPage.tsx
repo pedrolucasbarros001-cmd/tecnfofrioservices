@@ -30,6 +30,7 @@ import { ForceStateModal } from '@/components/modals/ForceStateModal';
 import { ContactClientModal } from '@/components/modals/ContactClientModal';
 import { RescheduleServiceModal } from '@/components/modals/RescheduleServiceModal';
 import { EditServiceDetailsModal } from '@/components/modals/EditServiceDetailsModal';
+import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
@@ -125,6 +126,7 @@ export default function GeralPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [budgetService, setBudgetService] = useState<Service | null>(null);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -637,6 +639,7 @@ export default function GeralPage() {
                           onReschedule={() => handleReschedule(service)}
                           onEditDetails={() => handleEditDetails(service)}
                           onCancelPartOrder={() => handleCancelPartOrder(service)}
+                          onCreateBudgetFromAdmin={() => setBudgetService(service)}
                           onCancel={service.status !== 'cancelado' && service.status !== 'finalizado' ? () => handleDeactivateService(service) : undefined}
                           onReopen={service.status === 'cancelado' ? () => handleReopenService(service) : undefined}
                           onAttachDocument={() => {
@@ -767,6 +770,15 @@ export default function GeralPage() {
             serviceId={currentService.id} 
           />
         )}
+
+        {/* Create/Convert Budget Modal for "Official Budgeting from Service" */}
+        <CreateBudgetModal
+          isOpen={!!budgetService}
+          onClose={() => setBudgetService(null)}
+          // By passing sourceService here, CreateBudgetModal will prepopulate 
+          // the customer and parts, and will link it as source_service_id.
+          sourceService={budgetService || undefined} 
+        />
 
         {/* Documents Viewer Modal */}
         {currentService && (
