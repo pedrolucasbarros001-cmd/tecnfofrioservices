@@ -345,7 +345,7 @@ export function StateActionButtons({
           {((service?.status === 'a_precificar' || service?.status === 'por_fazer' || service?.status === 'em_execucao' || service?.status === 'na_oficina') && !service?.awaiting_budget_approval) && (isDono || isSecretaria) && onCreateBudgetFromAdmin && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateBudgetFromAdmin(); }}>
                <FileText className="h-4 w-4 mr-2" />
-               Gerar Orçamento Oficial
+               Gerar Orçamento
             </DropdownMenuItem>
           )}
 

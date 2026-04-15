@@ -795,7 +795,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         skipToast: true,
       });
 
-      toast.success("Enviado para Orçamento Oficial no painel!");
+      toast.success("Enviado para Orçamento no painel!");
       
       invalidateServiceQueries(queryClient, service.id);
       clearState();
@@ -1816,7 +1816,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               ) : (
                 <div className="flex-1 flex gap-2">
                   <Button variant="secondary" className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" onClick={handleCreateBudgetFromService} disabled={isSubmitting}>
-                     <FileText className="h-4 w-4 mr-1"/> Orçamento Oficial
+                     <FileText className="h-4 w-4 mr-1"/> Solicitar Orçamento
                   </Button>
                   <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm} disabled={isSubmitting}>
                     Concluir Serviço <ArrowRight className="h-4 w-4 ml-1" />

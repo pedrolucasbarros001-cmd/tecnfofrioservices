@@ -590,7 +590,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
 
       await supabase.from('services').update({ awaiting_budget_approval: true }).eq('id', service.id);
 
-      toast.success("Enviado para Orçamento Oficial no painel!");
+      toast.success("Enviado para Orçamento no painel!");
       
       invalidateServiceQueries(queryClient, service.id);
       clearState();
@@ -1253,7 +1253,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
               ) : (
                 <div className="flex-1 flex gap-2">
                   <Button variant="secondary" className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" onClick={handleCreateBudgetFromService} disabled={isSubmitting}>
-                    <FileText className="h-4 w-4 mr-1" /> Orçamento Oficial
+                    <FileText className="h-4 w-4 mr-1" /> Solicitar Orçamento
                   </Button>
                   <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => safeSetStep("pedir_peca")} disabled={isSubmitting}>
                     Continuar <ArrowRight className="h-4 w-4 ml-1" />
