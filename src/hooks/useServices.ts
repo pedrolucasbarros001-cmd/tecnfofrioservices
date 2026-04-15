@@ -48,10 +48,17 @@ export function useServices(options: UseServicesOptions = {}) {
         query = query.eq('technician_id', technicianId);
       }
 
-      const { data, error } = await query.limit(200);
+      // BUG-04 FIX: Increased from 200 to 500. If we hit the limit, warn the user.
+      const LIMIT = 500;
+      const { data, error } = await query.limit(LIMIT);
 
       if (error) throw error;
       let services = (data as unknown as Service[]) || [];
+
+      // Warn when result is exactly at limit — data may be silently truncated
+      if (services.length === LIMIT) {
+        toast.warning('Atenção: a lista está truncada. Use filtros para ver todos os serviços.');
+      }
       if (status === 'em_debito') {
         services = services.filter(s =>
           (s.final_price ?? 0) > 0 && (s.amount_paid ?? 0) < (s.final_price ?? 0)

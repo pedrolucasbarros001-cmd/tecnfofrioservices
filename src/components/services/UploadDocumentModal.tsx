@@ -81,10 +81,13 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
       }
 
       toast.success('Documento anexado com sucesso!');
-      
-      // Notify other components that a document was added
-      queryClient.invalidateQueries({ queryKey: ['serviceDetails', serviceId] });
-      queryClient.invalidateQueries({ queryKey: ['serviceDocuments', serviceId] });
+
+      // FIX: Invalidate the correct query keys actually used by the system.
+      // 'service-full' is used by useFullServiceData() (ServiceDetailSheet/CustomerDetailSheet).
+      // 'service-documents' is used by any document-specific sub-query.
+      // The old keys ('serviceDetails', 'serviceDocuments') never matched anything — this was a silent bug.
+      queryClient.invalidateQueries({ queryKey: ['service-full', serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['service-documents', serviceId] });
 
       handleClose();
     } catch (error: any) {

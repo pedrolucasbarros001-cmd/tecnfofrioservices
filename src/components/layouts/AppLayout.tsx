@@ -25,13 +25,22 @@ export function AppLayout() {
   // ─── Realtime centralizado ───────────────────────────────────────────────
   // Um único conjunto de canais cobre todo o sistema. Debounce de 800ms já
   // está no hook; tabs em background são ignoradas automaticamente.
+  //
+  // FIX: Added 'technician-services' (ServicosPage agenda) and 'services-all'
+  // (PerformancePage) — these were missing, causing F5-only updates for technicians.
   useRealtime('services', [
     ['services'],
     ['services-paginated'],
     ['agenda-services'],
+    ['technician-services'],
+    ['technician-office-services'],
+    ['available-workshop-services'],  // TechnicianOfficePage — open pool
+    ['services-all'],
+    ['dashboard-stats'],              // DashboardPage COUNT queries
   ]);
   useRealtime('service_parts', [['all-pending-parts']]);
-  useRealtime('budgets', [['budgets']]);
+  // budgets channel also invalidates dashboard-stats (it counts budgets too)
+  useRealtime('budgets', [['budgets'], ['dashboard-stats']]);
   useRealtime('notifications', [['unread-notifications', user?.id ?? ''], ['notifications']]);
 
   // Sanitize UI when returning from idle/tab switch

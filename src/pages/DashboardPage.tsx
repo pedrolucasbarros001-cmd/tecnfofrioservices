@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
@@ -51,117 +52,67 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
-  const [stats, setStats] = useState<DashboardStats>({
-    por_fazer: 0,
-    em_execucao: 0,
-    na_oficina: 0,
-    para_pedir_peca: 0,
-    em_espera_de_peca: 0,
-    concluidos: 0,
-    a_precificar: 0,
-    em_debito: 0,
-    finalizado: 0,
-    orcamentos: 0,
-  });
-  const [loading, setLoading] = useState(true);
 
+  // Redirect non-owners (kept in a separate effect from data fetching)
   useEffect(() => {
-    // Redirect non-owners
     if (role && role !== 'dono') {
       navigate(role === 'secretaria' ? '/geral' : '/servicos', { replace: true });
-      return;
     }
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
   }, [role, navigate]);
 
-  async function fetchStats() {
-    try {
-      // Fetch services stats (incluindo final_price e amount_paid para cálculo de débito)
-      const { data: services, error: servicesError } = await supabase
-        .from('services')
-        .select('status, pending_pricing, final_price, amount_paid, is_warranty, service_location');
+  // React Query manages lifecycle — AppLayout Realtime channel will invalidate
+  // ['dashboard-stats'] on any services/budgets change, so no setInterval needed.
+  const { data: stats, isLoading: loading } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      // Use HEAD COUNT queries (zero data transfer) — no rows returned.
+      const [
+        porFazerRes,
+        emExecucaoRes,
+        paraOrçamentarRes,
+        emEsperaPecaRes,
+        paraPedirPecaRes,
+        finalizadoRes,
+        naOficinaRes,
+        concluidosRes,
+        emDebitoRes,
+        budgetsRes,
+      ] = await Promise.all([
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'por_fazer'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'em_execucao'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('pending_pricing', true).eq('final_price', 0),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'em_espera_de_peca'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'para_pedir_peca'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'finalizado'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').neq('status', 'finalizado').neq('status', 'concluidos'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').eq('status', 'concluidos'),
+        supabase.from('services').select('*', { count: 'exact', head: true }).gt('final_price', 0).eq('is_warranty', false).filter('amount_paid', 'lt', 'final_price'),
+        supabase.from('budgets').select('*', { count: 'exact', head: true }),
+      ]);
 
-      if (servicesError) throw servicesError;
-
-      // Fetch budgets count
-      const { count: budgetsCount, error: budgetsError } = await supabase
-        .from('budgets')
-        .select('*', { count: 'exact', head: true });
-
-      if (budgetsError) throw budgetsError;
-
-      const counts: DashboardStats = {
-        por_fazer: 0,
-        em_execucao: 0,
-        na_oficina: 0,
-        para_pedir_peca: 0,
-        em_espera_de_peca: 0,
-        concluidos: 0,
-        a_precificar: 0,
-        em_debito: 0,
-        finalizado: 0,
-        orcamentos: budgetsCount || 0,
+      return {
+        por_fazer: porFazerRes.count ?? 0,
+        em_execucao: emExecucaoRes.count ?? 0,
+        a_precificar: paraOrçamentarRes.count ?? 0,
+        em_espera_de_peca: emEsperaPecaRes.count ?? 0,
+        para_pedir_peca: paraPedirPecaRes.count ?? 0,
+        finalizado: finalizadoRes.count ?? 0,
+        na_oficina: naOficinaRes.count ?? 0,
+        concluidos: concluidosRes.count ?? 0,
+        em_debito: emDebitoRes.count ?? 0,
+        orcamentos: budgetsRes.count ?? 0,
       };
+    },
+    // 30s stale — Realtime will kick in proactively for most changes
+    staleTime: 1000 * 30,
+    enabled: role === 'dono',
+  });
 
-      services?.forEach((service) => {
-        const status = service.status as string;
-        const finalPrice = service.final_price || 0;
-        const amountPaid = service.amount_paid || 0;
-        const isWarranty = service.is_warranty || false;
-
-        // --- Financial overlays (independent of operational status) ---
-        // "Orçamentar" = pending_pricing=true (needs pricing)
-        // "Orçamentar" = pending_pricing=true AND no price set yet
-        if (service.pending_pricing && finalPrice === 0) {
-          counts.a_precificar++;
-        }
-
-        // "Em Débito" = has price, not warranty, and not fully paid
-        if (!isWarranty && finalPrice > 0 && amountPaid < finalPrice) {
-          counts.em_debito++;
-        }
-
-        // --- Operational status counts ---
-        // "Oficina" card = location-based: any service physically in workshop, not finalized/concluded
-        if (service.service_location === 'oficina' && status !== 'finalizado' && status !== 'concluidos') {
-          counts.na_oficina++;
-        }
-
-        // "Oficina Reparados" = workshop AND concluded status
-        if (service.service_location === 'oficina' && status === 'concluidos') {
-          counts.concluidos++;
-        }
-
-        // Direct status-based counts (these statuses are NOT location-dependent)
-        switch (status) {
-          case 'por_fazer':
-            counts.por_fazer++;
-            break;
-          case 'em_execucao':
-            counts.em_execucao++;
-            break;
-          case 'para_pedir_peca':
-            counts.para_pedir_peca++;
-            break;
-          case 'em_espera_de_peca':
-            counts.em_espera_de_peca++;
-            break;
-          case 'finalizado':
-            counts.finalizado++;
-            break;
-        }
-      });
-
-      setStats(counts);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const safeStats: DashboardStats = stats ?? {
+    por_fazer: 0, em_execucao: 0, na_oficina: 0,
+    para_pedir_peca: 0, em_espera_de_peca: 0, concluidos: 0,
+    a_precificar: 0, em_debito: 0, finalizado: 0, orcamentos: 0,
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -177,7 +128,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" data-tour="dashboard-cards" data-demo="dashboard-cards">
         {DASHBOARD_CARDS.map((card) => {
           const Icon = card.icon;
-          const count = stats[card.key as keyof DashboardStats];
+          const count = safeStats[card.key as keyof DashboardStats];
           const isLit = count > 0;
 
           return (

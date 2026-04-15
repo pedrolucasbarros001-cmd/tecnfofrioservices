@@ -13,13 +13,17 @@ import { supabase } from '@/integrations/supabase/client';
 export default function PerformancePage() {
   const { data: technicians = [] } = useTechnicians(false);
 
+  // BUG-03 FIX: Only fetch the fields needed for charts + service list.
+  // Removed cascaded JOINs (customers, profiles) — technician names come from useTechnicians().
+  // Added .limit(500) to prevent browser timeout with large datasets.
   const { data: services = [] } = useQuery({
     queryKey: ['services-all'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('services')
-        .select('*, customer:customers(*), technician:technicians!services_technician_id_fkey(*, profile:profiles(*))')
-        .order('created_at', { ascending: false });
+        .select('id, code, technician_id, customer_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, service_location, scheduled_date, appliance_type, fault_description, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       return data || [];

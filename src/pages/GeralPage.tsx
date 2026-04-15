@@ -200,10 +200,12 @@ export default function GeralPage() {
     },
   });
 
-  // Fetch document counts per service for the attachment indicator
+  // Fetch document counts per service for the attachment indicator.
+  // Key is tied to the page+filter context (not the raw ID list) so React Query
+  // can cache it correctly without thrashing on every page change.
   const serviceIds = services.map(s => s.id).filter(Boolean);
   const { data: documentCountsMap = {} } = useQuery({
-    queryKey: ['service-document-counts', serviceIds.join(',')],
+    queryKey: ['service-document-counts', currentPage, effectiveStatus, selectedLocation, debouncedSearch],
     queryFn: async () => {
       if (serviceIds.length === 0) return {};
       const { data, error } = await supabase
@@ -218,7 +220,7 @@ export default function GeralPage() {
       return map;
     },
     enabled: serviceIds.length > 0,
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 60, // 1 minute — documents rarely change during a session
   });
 
   const updateService = useUpdateService();
