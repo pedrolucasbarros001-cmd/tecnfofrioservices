@@ -3,8 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { invalidateServiceQueries } from '@/lib/queryInvalidation';
-import { invalidateCustomerQueries } from '@/lib/queryInvalidation';
+import { invalidateServiceQueries, invalidateCustomerQueries } from '@/lib/queryInvalidation';
 import { Loader2, Shield, AlertTriangle, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -34,6 +33,15 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+interface CustomerSuggestion {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
 interface TechQuickServiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +53,9 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
   const [showAddress, setShowAddress] = useState(false);
   const [existingCustomer, setExistingCustomer] = useState<{ id: string; name: string } | null>(null);
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
+  const [nameSuggestions, setNameSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [lookingUpName, setLookingUpName] = useState(false);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -66,6 +77,7 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
 
   const isWarranty = form.watch('is_warranty');
   const phone = form.watch('customer_phone');
+  const customerName = form.watch('customer_name');
 
   // Debounced phone lookup
   useEffect(() => {
@@ -87,7 +99,6 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
         if (data) {
           setExistingCustomer(data);
           form.setValue('customer_name', data.name);
-          // Auto-fill address if customer has one saved
           if (data.address) form.setValue('customer_address', data.address);
           if (data.postal_code) form.setValue('customer_postal_code', data.postal_code);
           if (data.city) form.setValue('customer_city', data.city);
@@ -103,6 +114,51 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
 
     return () => clearTimeout(timeout);
   }, [phone, form]);
+
+  // Debounced name lookup
+  useEffect(() => {
+    if (!customerName || customerName.trim().length < 3 || existingCustomer) {
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setLookingUpName(true);
+      try {
+        const { data } = await supabase
+          .from('customers')
+          .select('id, name, phone, address, postal_code, city')
+          .ilike('name', `%${customerName.trim()}%`)
+          .limit(5);
+
+        if (data && data.length > 0) {
+          setNameSuggestions(data);
+          setShowNameSuggestions(true);
+        } else {
+          setNameSuggestions([]);
+          setShowNameSuggestions(false);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLookingUpName(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [customerName, existingCustomer]);
+
+  const selectCustomerSuggestion = useCallback((customer: CustomerSuggestion) => {
+    form.setValue('customer_name', customer.name);
+    if (customer.phone) form.setValue('customer_phone', customer.phone);
+    if (customer.address) form.setValue('customer_address', customer.address);
+    if (customer.postal_code) form.setValue('customer_postal_code', customer.postal_code);
+    if (customer.city) form.setValue('customer_city', customer.city);
+    setExistingCustomer({ id: customer.id, name: customer.name });
+    setNameSuggestions([]);
+    setShowNameSuggestions(false);
+  }, [form]);
 
   const onSubmit = useCallback(async (values: FormData) => {
     setSubmitting(true);
@@ -133,6 +189,8 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
       form.reset();
       setExistingCustomer(null);
       setShowAddress(false);
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao criar serviço');
@@ -172,9 +230,45 @@ export function TechQuickServiceModal({ open, onOpenChange }: TechQuickServiceMo
 
               {/* Name */}
               <FormField control={form.control} name="customer_name" render={({ field }) => (
-                <FormItem>
+                <FormItem className="relative">
                   <FormLabel>Nome do cliente *</FormLabel>
-                  <FormControl><Input placeholder="Nome completo" {...field} /></FormControl>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        placeholder="Nome completo"
+                        {...field}
+                        onFocus={() => {
+                          if (nameSuggestions.length > 0) setShowNameSuggestions(true);
+                        }}
+                        onBlur={() => {
+                          // Delay to allow click on suggestion
+                          setTimeout(() => setShowNameSuggestions(false), 200);
+                        }}
+                      />
+                      {lookingUpName && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                    </div>
+                  </FormControl>
+                  {showNameSuggestions && nameSuggestions.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {nameSuggestions.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent text-sm flex flex-col gap-0.5 border-b last:border-b-0"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectCustomerSuggestion(c);
+                          }}
+                        >
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.phone || 'Sem telefone'}
+                            {c.city ? ` · ${c.city}` : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

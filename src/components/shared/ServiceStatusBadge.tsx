@@ -4,7 +4,9 @@ import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types
 import { cn } from '@/lib/utils';
 
 interface ServiceStatusBadgeProps {
-    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type' | 'amount_paid'>;
+    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type' | 'amount_paid'> & {
+        owner_confirmed?: boolean;
+    };
     className?: string;
 }
 
@@ -26,33 +28,28 @@ export function computeIsDebt(service: Pick<Service, 'status' | 'final_price' | 
     );
 }
 
+export function computePendingConfirmation(service: Pick<Service, 'status' | 'final_price' | 'amount_paid'> & { owner_confirmed?: boolean }) {
+    return (
+        service.status !== 'cancelado' &&
+        (service.final_price ?? 0) > 0 &&
+        (service.amount_paid ?? 0) >= (service.final_price ?? 0) &&
+        service.owner_confirmed === false
+    );
+}
+
 /**
  * Mostra o badge de estado do serviço.
- *
- * Regra de precificação:
- * Se o serviço ainda não tem preço definido (pending_pricing=true e final_price=0),
- * exibe um badge "A Precificar" a laranja COEXISTINDO com o estado de execução.
- * Não substitui nem bloqueia nenhum fluxo.
  */
 export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatusBadgeProps>(
     ({ service, className }, ref) => {
-        // primary operational badge
         const statusConfig = SERVICE_STATUS_CONFIG[service.status as ServiceStatus] || {
             label: service.status,
             color: 'bg-muted text-muted-foreground',
         };
 
-        // derive extra flags independently of status
-        const needsPricing =
-            !service.status ||
-            service.status !== 'cancelado' &&
-            service.pending_pricing === true &&
-            (service.final_price ?? 0) === 0;
-
-        const isDebt =
-            service.status !== 'cancelado' &&
-            (service.final_price ?? 0) > 0 &&
-            (service.amount_paid ?? 0) < (service.final_price ?? 0);
+        const needsPricing = computeNeedsPricing(service);
+        const isDebt = computeIsDebt(service);
+        const pendingConfirmation = computePendingConfirmation(service);
 
         return (
             <span ref={ref} className={cn('inline-flex flex-wrap items-center gap-1', className)}>
@@ -67,6 +64,11 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                 {isDebt && (
                     <Badge className="text-xs bg-red-100 text-red-700 border border-red-300">
                         Em Débito
+                    </Badge>
+                )}
+                {pendingConfirmation && (
+                    <Badge className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300">
+                        Pgto. Pendente
                     </Badge>
                 )}
             </span>
