@@ -83,7 +83,7 @@ export default function SecretaryConcluidosPage() {
         .update({
           owner_confirmed: true,
           owner_confirmed_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', service.id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['services'] });

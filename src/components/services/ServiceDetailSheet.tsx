@@ -479,7 +479,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     try {
       const { error } = await supabase
         .from('services')
-        .update({ owner_confirmed: true, owner_confirmed_at: new Date().toISOString() })
+        .update({ owner_confirmed: true, owner_confirmed_at: new Date().toISOString() } as any)
         .eq('id', service.id);
       if (error) throw error;
       invalidateServiceQueries(queryClient, service.id);
