@@ -525,7 +525,7 @@ export default function ServicePrintPage() {
         )}
 
         {/* Pricing Summary */}
-        {service.final_price && service.final_price > 0 && (
+        {service.final_price > 0 && (
           <>
             <Separator className="my-1" />
             <section className="mb-2">
@@ -543,7 +543,7 @@ export default function ServicePrintPage() {
                     <span>{safeNumber(service?.labor_cost).toFixed(2)} €</span>
                   </div>
                 )}
-                {service.discount && service.discount > 0 && (
+                {service.discount > 0 && (
                   <div className="flex justify-between col-span-2 text-green-600">
                     <span>Desconto:</span>
                     <span>-{service.discount.toFixed(2)} €</span>
