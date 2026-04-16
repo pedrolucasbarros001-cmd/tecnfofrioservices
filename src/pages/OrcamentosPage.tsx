@@ -388,7 +388,6 @@ export default function OrcamentosPage() {
         </CardContent>
       </Card>
 
-      {/* Create Budget Modal */}
       <CreateBudgetModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}

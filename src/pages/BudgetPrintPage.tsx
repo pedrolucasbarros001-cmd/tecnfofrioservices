@@ -412,7 +412,7 @@ export default function BudgetPrintPage() {
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">IVA:</span>
+              <span className="text-muted-foreground">({pricingDetails.items[0]?.tax || 23}%) IVA:</span>
               <span>{formatCurrency(pricingDetails.iva)}</span>
             </div>
             <Separator />

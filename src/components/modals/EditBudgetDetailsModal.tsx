@@ -52,6 +52,14 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
   const [discountValue, setDiscountValue] = useState(0);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [notes, setNotes] = useState('');
+  const [isInsuranceBudget, setIsInsuranceBudget] = useState(false);
+
+  // Customer states
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerNif, setCustomerNif] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
 
   useEffect(() => {
     if (open && budget) {
@@ -73,6 +81,18 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
         }
         setDiscountValue(parsed.discountValue || parsed.discount || 0);
         setDiscountType(parsed.discountType === 'percent' ? 'percent' : 'euro');
+        setIsInsuranceBudget(budget.is_insurance_budget || false);
+        
+        if (budget.customer) {
+          setSelectedCustomer(budget.customer);
+          setCustomerName(budget.customer.name || '');
+          setCustomerPhone(budget.customer.phone || '');
+          setCustomerNif(budget.customer.nif || '');
+        } else {
+          setCustomerName('');
+          setCustomerPhone('');
+          setCustomerNif('');
+        }
       } catch {
         setItems([{ description: '', details: '', qty: 1, price: 0, tax: 0, type: 'part' }]);
         setDiscountValue(0);
@@ -93,6 +113,23 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
     const iva = items.reduce((sum, it) => sum + (it.qty * it.price) * (it.tax / 100), 0);
     return { subtotal, discount, iva, total: subtotal - discount + iva };
   }, [items, discountValue, discountType]);
+
+  // Customer search logic
+  useEffect(() => {
+    const searchCustomers = async () => {
+      if (selectedCustomer || customerName.length < 3) {
+        setCustomerSuggestions([]);
+        return;
+      }
+      const { data } = await supabase.from('customers')
+        .select('*')
+        .ilike('name', `%${customerName}%`)
+        .limit(5);
+      setCustomerSuggestions(data || []);
+    };
+    const debounce = setTimeout(searchCustomers, 300);
+    return () => clearTimeout(debounce);
+  }, [customerName, selectedCustomer]);
 
   const formatCurrency = (v: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -126,6 +163,8 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
           estimated_labor: laborTotal,
           estimated_parts: partsTotal,
           estimated_total: totals.total,
+          is_insurance_budget: isInsuranceBudget,
+          customer_id: selectedCustomer?.id || budget.customer_id,
           notes: notes || null,
         })
         .eq('id', budget.id);
@@ -150,7 +189,86 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6">
-          <div className="space-y-4">
+          <div className="space-y-6 pt-4">
+            {/* Customer Data Section */}
+            <div className="space-y-3 p-4 bg-muted/30 border rounded-lg">
+              <div className="text-sm font-semibold flex items-center justify-between">
+                <span>Dados do Cliente</span>
+                {selectedCustomer && (
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedCustomer(null)}>
+                    Alterar
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="relative">
+                  <Label className="text-[10px] uppercase text-muted-foreground">Nome</Label>
+                  <Input 
+                    value={customerName} 
+                    onChange={e => setCustomerName(e.target.value)} 
+                    placeholder="Nome" 
+                    className="h-8 text-sm"
+                    disabled={!!selectedCustomer}
+                  />
+                  {!selectedCustomer && customerSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-background border rounded shadow-md max-h-40 overflow-auto text-sm">
+                      {customerSuggestions.map(c => (
+                        <button 
+                          key={c.id} 
+                          className="w-full text-left p-2 hover:bg-accent border-b last:border-0"
+                          onClick={() => {
+                            setSelectedCustomer(c);
+                            setCustomerName(c.name);
+                            setCustomerPhone(c.phone || '');
+                            setCustomerNif(c.nif || '');
+                            setCustomerSuggestions([]);
+                          }}
+                        >
+                          <p className="font-bold">{c.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{c.phone}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase text-muted-foreground">Telefone</Label>
+                  <Input 
+                    value={customerPhone} 
+                    onChange={e => setCustomerPhone(e.target.value)} 
+                    placeholder="Telefone" 
+                    className="h-8 text-sm"
+                    disabled={!!selectedCustomer}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase text-muted-foreground">NIF</Label>
+                  <Input 
+                    value={customerNif} 
+                    onChange={e => setCustomerNif(e.target.value)} 
+                    placeholder="NIF" 
+                    className="h-8 text-sm"
+                    disabled={!!selectedCustomer}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t mt-3">
+                <input
+                  type="checkbox"
+                  id="edit-is-insurance"
+                  checked={isInsuranceBudget}
+                  onChange={(e) => setIsInsuranceBudget(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary"
+                />
+                <Label htmlFor="edit-is-insurance" className="text-sm font-semibold cursor-pointer">
+                  Orçamento para Seguro (Insurance)
+                </Label>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Items table */}
             <div className="space-y-2">
               <div className="grid grid-cols-[1fr_1fr_60px_80px_70px_32px] gap-2 text-xs font-medium text-muted-foreground px-1">

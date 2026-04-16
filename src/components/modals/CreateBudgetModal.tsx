@@ -71,6 +71,7 @@ const formSchema = z.object({
   items: z.array(itemSchema).min(1, 'Adicione pelo menos um artigo'),
   discount_value: z.number().optional().default(0),
   discount_type: z.enum(['fixed', 'percentage']).optional().default('fixed'),
+  is_insurance_budget: z.boolean().optional().default(false),
   notes: z.string().optional(),
 });
 
@@ -101,6 +102,8 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const createCustomer = useCreateCustomer();
 
@@ -116,6 +119,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       ],
       discount_value: 0,
       discount_type: 'fixed' as const,
+      is_insurance_budget: false,
       notes: '',
     },
   });
@@ -128,6 +132,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
   const watchItems = form.watch('items');
   const customerPhone = form.watch('customer_phone');
   const customerNif = form.watch('customer_nif');
+  const customerName = form.watch('customer_name');
 
   // Prepopulate from sourceService if provided
   useEffect(() => {
@@ -161,46 +166,50 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
     }
   }, [open, sourceService, form]);
 
-  // Auto-detect customer by phone or NIF
+  // Auto-detect customer suggestions by name, phone or NIF
   useEffect(() => {
-    const searchCustomer = async () => {
-      if (selectedCustomer) return;
-
-      const searchPhone = customerPhone?.replace(/\s/g, '');
-      const searchNif = customerNif?.replace(/\s/g, '');
-
-      if ((!searchPhone || searchPhone.length < 6) && (!searchNif || searchNif.length < 6)) {
-        setFoundCustomer(null);
-        setShowFoundCustomerBox(false);
+    const searchCustomers = async () => {
+      if (selectedCustomer) {
+        setCustomerSuggestions([]);
         return;
       }
 
+      const name = customerName?.trim() || '';
+      const phone = customerPhone?.replace(/\s/g, '') || '';
+      const nif = customerNif?.replace(/\s/g, '') || '';
+
+      if (name.length < 3 && phone.length < 3 && nif.length < 3) {
+        setCustomerSuggestions([]);
+        return;
+      }
+
+      setIsSearching(true);
       try {
         let query = supabase.from('customers').select('*');
+        
+        const filters = [];
+        if (name.length >= 3) filters.push(`name.ilike.%${name}%`);
+        if (phone.length >= 3) filters.push(`phone.ilike.%${phone}%`);
+        if (nif.length >= 3) filters.push(`nif.ilike.%${nif}%`);
 
-        if (searchPhone && searchPhone.length >= 6) {
-          query = query.ilike('phone', `%${searchPhone}%`);
-        } else if (searchNif && searchNif.length >= 6) {
-          query = query.ilike('nif', `%${searchNif}%`);
-        }
-
-        const { data, error } = await query.limit(1).maybeSingle();
-
-        if (!error && data) {
-          setFoundCustomer(data as Customer);
-          setShowFoundCustomerBox(true);
-        } else {
-          setFoundCustomer(null);
-          setShowFoundCustomerBox(false);
+        if (filters.length > 0) {
+          const { data, error } = await query.or(filters.join(',')).limit(10);
+          if (!error && data) {
+            setCustomerSuggestions(data as Customer[]);
+          } else {
+            setCustomerSuggestions([]);
+          }
         }
       } catch (e) {
-        console.error('Error searching customer:', e);
+        console.error('Error searching customers:', e);
+      } finally {
+        setIsSearching(false);
       }
     };
 
-    const debounce = setTimeout(searchCustomer, 500);
+    const debounce = setTimeout(searchCustomers, 300);
     return () => clearTimeout(debounce);
-  }, [customerPhone, customerNif, selectedCustomer]);
+  }, [customerName, customerPhone, customerNif, selectedCustomer]);
 
   // Calculate totals
   const calculateItemSubtotal = (item: typeof watchItems[0]) => {
@@ -222,20 +231,17 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
   const total = subtotal - discountAmount + totalTax;
 
-  const handleSelectFoundCustomer = () => {
-    if (!foundCustomer) return;
-    setSelectedCustomer(foundCustomer);
-    form.setValue('customer_name', foundCustomer.name);
-    form.setValue('customer_phone', foundCustomer.phone || '');
-    form.setValue('customer_nif', foundCustomer.nif || '');
-    form.setValue('customer_email', foundCustomer.email || '');
-    setShowFoundCustomerBox(false);
-    setFoundCustomer(null);
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    form.setValue('customer_name', customer.name);
+    form.setValue('customer_phone', customer.phone || '');
+    form.setValue('customer_nif', customer.nif || '');
+    form.setValue('customer_email', customer.email || '');
+    setCustomerSuggestions([]);
   };
 
   const handleIgnoreFoundCustomer = () => {
-    setShowFoundCustomerBox(false);
-    setFoundCustomer(null);
+    setCustomerSuggestions([]);
   };
 
   const processSubmit = async (values: FormValues, customerId?: string) => {
@@ -270,12 +276,13 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
         estimated_total: total,
         status: 'pendente',
         pricing_description: JSON.stringify(pricingData),
+        is_insurance_budget: values.is_insurance_budget,
         notes: values.notes || null,
         source_service_id: sourceService?.id || null,
         appliance_type: sourceService?.appliance_type || null,
         brand: sourceService?.brand || null,
         model: sourceService?.model || null,
-        fault_description: sourceService?.fault_description || null,
+        fault_description: sourceService?.fault_description || (sourceService as any)?.detected_fault || null,
       });
 
       if (error) throw error;
@@ -399,23 +406,26 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                       </div>
                     )}
 
-                    {/* Cliente encontrado */}
-                    {!selectedCustomer && showFoundCustomerBox && foundCustomer && (
-                      <div className="p-4 bg-accent/50 border border-accent rounded-lg space-y-3">
-                        <p className="font-medium">Cliente existente encontrado!</p>
-                        <div className="text-sm text-muted-foreground bg-background/50 p-2 rounded">
-                          <p><strong>Nome:</strong> {foundCustomer.name}</p>
-                          {foundCustomer.phone && <p><strong>Tel:</strong> {foundCustomer.phone}</p>}
-                          {foundCustomer.nif && <p><strong>NIF:</strong> {foundCustomer.nif}</p>}
+                    {/* Customer suggestions dropdown */}
+                    {!selectedCustomer && customerSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                        <div className="p-2 text-xs font-semibold text-muted-foreground bg-muted/50 border-b">
+                          Clientes Registados
                         </div>
-                        <div className="flex gap-2">
-                          <Button type="button" size="sm" onClick={handleSelectFoundCustomer}>
-                            Associar Cliente
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={handleIgnoreFoundCustomer}>
-                            Criar Novo
-                          </Button>
-                        </div>
+                        {customerSuggestions.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-accent flex flex-col transition-colors border-b last:border-0"
+                            onClick={() => handleSelectCustomer(c)}
+                          >
+                            <span className="font-bold text-primary">{c.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {c.phone && `📞 ${c.phone}`} {c.nif && `| NIF: ${c.nif}`}
+                            </span>
+                            {c.address && <span className="text-[10px] text-muted-foreground/80 truncate">{c.address}</span>}
+                          </button>
+                        ))}
                       </div>
                     )}
 
@@ -468,6 +478,32 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                         />
                       </div>
                     )}
+
+                    {/* Insurance Checkbox */}
+                    <FormField
+                      control={form.control}
+                      name="is_insurance_budget"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-blue-50/30">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
+                              checked={field.value}
+                              onChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm font-semibold text-primary">
+                              Orçamento para Seguro (Insurance)
+                            </FormLabel>
+                            <FormDescription className="text-xs">
+                              Ative esta opção se este orçamento for destinado a uma seguradora.
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   <Separator />

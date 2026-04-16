@@ -239,6 +239,7 @@ export interface Budget {
   converted_service_id: string | null;
   source_service_id: string | null;
   valid_until: string | null;
+  is_insurance_budget: boolean | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

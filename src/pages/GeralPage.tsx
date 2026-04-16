@@ -773,8 +773,8 @@ export default function GeralPage() {
 
         {/* Create/Convert Budget Modal for "Official Budgeting from Service" */}
         <CreateBudgetModal
-          isOpen={!!budgetService}
-          onClose={() => setBudgetService(null)}
+          open={!!budgetService}
+          onOpenChange={() => setBudgetService(null)}
           // By passing sourceService here, CreateBudgetModal will prepopulate 
           // the customer and parts, and will link it as source_service_id.
           sourceService={budgetService || undefined} 

@@ -95,7 +95,7 @@ interface WorkshopFormData {
   productSerial: string;
   productPNC: string;
   productType: string;
-  partInstalled: boolean;
+  isInsuranceBudget: boolean;
   [key: string]: unknown;
 }
 
@@ -123,6 +123,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
     productPNC: "",
     productType: "",
     partInstalled: false,
+    isInsuranceBudget: false,
   });
   const [derivedResumeStep, setDerivedResumeStep] = useState<ModalStep | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -402,7 +403,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         if (insertErr) throw insertErr;
       }
 
-      setFormData(prev => ({ ...prev, articlesLocked: true }));
+      // setFormData(prev => ({ ...prev, articlesLocked: true }));
       invalidateServiceQueries(queryClient, service.id);
       toast.success("Artigos registados e confirmados!");
     } catch (error) {
@@ -578,6 +579,8 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
         estimated_total: totalFinal,
         status: 'pendente',
         source_service_id: service.id,
+        is_insurance_budget: formData.isInsuranceBudget || false,
+        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       });
       if (budgetErr) throw budgetErr;
 
@@ -629,6 +632,7 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
       productPNC: "",
       productType: "",
       partInstalled: false,
+      isInsuranceBudget: false,
     });
     onClose();
   };
@@ -1241,6 +1245,21 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                   </p>
                 </div>
               </div>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors mt-2 bg-orange-50/50">
+                <div className="flex h-5 items-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
+                    checked={formData.isInsuranceBudget}
+                    onChange={(e) => setFormData(p => ({ ...p, isInsuranceBudget: e.target.checked }))}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold">Orçamento para Seguro</span>
+                  <span className="text-xs text-muted-foreground">Marque esta opção se o serviço for para seguradora.</span>
+                </div>
+              </label>
             </div>
             <DialogFooter className="flex gap-2 mt-4">
               <Button variant="outline" className="flex-1" onClick={() => safeSetStep("registo_artigos")}>

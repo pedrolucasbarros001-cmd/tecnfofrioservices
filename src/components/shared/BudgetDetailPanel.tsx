@@ -164,6 +164,11 @@ export function BudgetDetailPanel({
                 <Badge className={statusConfig?.color || 'bg-gray-500'}>
                   {statusConfig?.label || budget.status}
                 </Badge>
+                {budget.is_insurance_budget && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    Seguro
+                  </Badge>
+                )}
               </div>
               <Button 
                 variant="outline" 
@@ -183,6 +188,40 @@ export function BudgetDetailPanel({
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6">
+              {/* Customer Info Section */}
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Dados do Cliente
+                </h3>
+                <div className="grid grid-cols-2 gap-y-2 text-sm">
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs uppercase">Nome</p>
+                    <p className="font-medium">{budget.customer?.name || "Sem cliente associado"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">Telefone</p>
+                    <p className="font-medium">{budget.customer?.phone || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase">NIF</p>
+                    <p className="font-medium">{budget.customer?.nif || "N/A"}</p>
+                  </div>
+                  {budget.customer?.email && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs uppercase">Email</p>
+                      <p className="font-medium">{budget.customer?.email}</p>
+                    </div>
+                  )}
+                  {budget.customer?.address && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs uppercase">Morada</p>
+                      <p className="font-medium">{budget.customer?.address}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Articles Section */}
               <div className="rounded-lg border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20 p-4">
                 <div className="flex items-center justify-between mb-3">
