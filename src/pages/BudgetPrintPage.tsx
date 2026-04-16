@@ -353,12 +353,12 @@ export default function BudgetPrintPage() {
           <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Artigos</h2>
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="text-left py-1.5 px-1 font-medium w-[15%]">Ref.</th>
-                <th className="text-left py-1.5 px-1 font-medium w-[45%]">Descrição</th>
-                <th className="text-center py-1.5 px-1 font-medium w-[10%]">Qtd</th>
-                <th className="text-right py-1.5 px-1 font-medium w-[15%]">Valor Unit.</th>
-                <th className="text-right py-1.5 px-1 font-medium w-[15%]">Total</th>
+              <tr className="border-b bg-slate-50">
+                <th className="text-left py-1.5 px-2 font-semibold w-[15%]">Ref.</th>
+                <th className="text-left py-1.5 px-2 font-semibold w-[40%]">Descrição</th>
+                <th className="text-center py-1.5 px-2 font-semibold w-[10%]">Qtd</th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[15%]">Valor Unit.</th>
+                <th className="text-right py-1.5 px-2 font-semibold w-[20%]">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -371,19 +371,19 @@ export default function BudgetPrintPage() {
                   const lineTotal = lineSubtotal;
 
                   return (
-                    <tr key={index} className="border-b">
-                      <td className="py-1.5 px-1">{item.ref || '-'}</td>
-                      <td className="py-1.5 px-1">
-                        {item.description}
+                    <tr key={index} className="border-b transition-colors hover:bg-slate-50/50 align-middle">
+                      <td className="py-2 px-2">{item.ref || '-'}</td>
+                      <td className="py-2 px-2">
+                        <div className="font-medium text-slate-900">{item.description}</div>
                         {item.details && (
-                          <span className="text-muted-foreground block text-[10px]">
+                          <div className="text-muted-foreground text-[10px] leading-tight">
                             {item.details}
-                          </span>
+                          </div>
                         )}
                       </td>
-                      <td className="py-1.5 px-1 text-center">{item.qty}</td>
-                      <td className="py-1.5 px-1 text-right">{formatCurrency(item.price)}</td>
-                      <td className="py-1.5 px-1 text-right font-medium">{formatCurrency(lineTotal)}</td>
+                      <td className="py-2 px-2 text-center">{item.qty}</td>
+                      <td className="py-2 px-2 text-right">{formatCurrency(item.price)}</td>
+                      <td className="py-2 px-2 text-right font-bold text-slate-900">{formatCurrency(lineTotal)}</td>
                     </tr>
                   );
                 })

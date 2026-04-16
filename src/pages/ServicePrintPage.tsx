@@ -440,23 +440,23 @@ export default function ServicePrintPage() {
               <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Artigos do Serviço</h2>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1 w-[15%]">Ref.</th>
-                    <th className="text-left py-1 w-[45%]">Descrição</th>
-                    <th className="text-center py-1 w-[10%]">Qtd</th>
-                    <th className="text-right py-1 w-[15%]">Valor Unit.</th>
-                    <th className="text-right py-1 w-[15%]">Total</th>
+                  <tr className="border-b bg-slate-50">
+                    <th className="text-left py-1.5 px-2 w-[15%]">Ref.</th>
+                    <th className="text-left py-1.5 px-2 w-[40%]">Descrição</th>
+                    <th className="text-center py-1.5 px-2 w-[10%]">Qtd</th>
+                    <th className="text-right py-1.5 px-2 w-[15%]">Valor Unit.</th>
+                    <th className="text-right py-1.5 px-2 w-[20%]">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pricingDetails.hasItemizedPricing && pricingDetails.items.length > 0 ? (
                     pricingDetails.items.map((item: any, idx: number) => (
-                      <tr key={idx} className="border-b border-dashed">
-                        <td className="py-1">{item.ref || item.article || '-'}</td>
-                        <td className="py-1">{item.desc || item.description || '-'}</td>
-                        <td className="py-1 text-center">{item.qty || item.quantity || 1}</td>
-                        <td className="py-1 text-right">{(item.unit_price || item.price || 0).toFixed(2)} €</td>
-                        <td className="py-1 text-right">{((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)} €</td>
+                      <tr key={idx} className="border-b border-dashed align-middle transition-colors hover:bg-slate-50/50">
+                        <td className="py-1.5 px-2">{item.ref || item.article || '-'}</td>
+                        <td className="py-1.5 px-2">{item.desc || item.description || '-'}</td>
+                        <td className="py-1.5 px-2 text-center">{item.qty || item.quantity || 1}</td>
+                        <td className="py-1.5 px-2 text-right">{(item.unit_price || item.price || 0).toFixed(2)} €</td>
+                        <td className="py-1.5 px-2 text-right font-medium">{((item.qty || item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)} €</td>
                       </tr>
                     ))
                   ) : (
@@ -551,7 +551,7 @@ export default function ServicePrintPage() {
                 )}
                 {displayIVA > 0 && (
                   <div className="flex justify-between col-span-2">
-                    <span className="text-muted-foreground">IVA:</span>
+                    <span className="text-muted-foreground">({usedParts[0]?.iva_rate || (pricingDetails.items[0] as any)?.tax_rate || (pricingDetails.items[0] as any)?.tax || 23}%) IVA:</span>
                     <span>{displayIVA.toFixed(2)} €</span>
                   </div>
                 )}

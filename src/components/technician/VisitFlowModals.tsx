@@ -772,6 +772,33 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
       }
       
       const budgetCode = `ORC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const pricingData = {
+        items: (formData.articles as ArticleEntry[]).map(a => ({
+          description: a.description,
+          details: a.notes || '',
+          qty: a.quantity,
+          price: a.unit_price,
+          tax: formData.taxRate || 23,
+          ref: a.reference || '',
+          type: 'part'
+        })),
+        discount: discountAmount,
+        discountType: formData.discountType,
+        discountValue: parseFloat(formData.discountValue as string) || 0,
+      };
+
+      // Add labor if adminPricing exists
+      if (adminPricing && adminPricingTotal > 0) {
+        pricingData.items.push({
+          description: 'Mão de Obra',
+          details: '',
+          qty: 1,
+          price: adminPricingTotal,
+          tax: 23,
+          ref: 'LABOR',
+          type: 'labor'
+        } as any);
+      }
 
       // Create Pending Budget linked to this service
       const { error: budgetErr } = await supabase.from('budgets').insert({
@@ -781,15 +808,19 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         brand: formData.productBrand || service.brand,
         model: formData.productModel || service.model,
         fault_description: formData.detectedFault || (service as any).detected_fault,
-        estimated_labor: adminPricingTotal,
-        estimated_parts: articlesSubtotal,
-        estimated_total: totalFinal,
+        estimated_labor: isNaN(adminPricingTotal) ? 0 : adminPricingTotal,
+        estimated_parts: isNaN(articlesSubtotal) ? 0 : articlesSubtotal,
+        estimated_total: isNaN(totalFinal) ? 0 : totalFinal,
         status: 'pendente',
         source_service_id: service.id,
         is_insurance_budget: formData.isInsuranceBudget || false,
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        pricing_description: JSON.stringify(pricingData),
       });
-      if (budgetErr) throw budgetErr;
+      if (budgetErr) {
+        toast.error(`Erro ao criar orçamento: ${budgetErr.message}`);
+        throw budgetErr;
+      }
 
       // "Lock" the service waiting for budget approval
       await updateService.mutateAsync({
@@ -1826,20 +1857,19 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
               <Button variant="outline" className="flex-1" onClick={() => safeSetStep("pedir_peca")}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
               </Button>
-              {!formData.articlesLocked ? (
-                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
-                  <CheckCircle2 className="h-4 w-4 mr-1" /> {isSubmitting ? "A guardar..." : "Confirmar Artigos"}
+              <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                {!formData.articlesLocked && (
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleConfirmArticles} disabled={isSubmitting}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> {isSubmitting ? "A guardar..." : "Confirmar Artigos"}
+                  </Button>
+                )}
+                <Button variant="secondary" className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" onClick={handleCreateBudgetFromService} disabled={isSubmitting}>
+                   <FileText className="h-4 w-4 mr-1"/> Solicitar Orçamento
                 </Button>
-              ) : (
-                <div className="flex-1 flex gap-2">
-                  <Button variant="secondary" className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" onClick={handleCreateBudgetFromService} disabled={isSubmitting}>
-                     <FileText className="h-4 w-4 mr-1"/> Solicitar Orçamento
-                  </Button>
-                  <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm} disabled={isSubmitting}>
-                    Concluir Serviço <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              )}
+                <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={handleResumoReparacaoConfirm} disabled={isSubmitting}>
+                  Concluir Serviço <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </DialogFooter>
           </div>
         );
