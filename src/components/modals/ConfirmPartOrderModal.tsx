@@ -273,13 +273,14 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                         </div>
                         <div className="col-span-4 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
-                          <Input
+                          <Textarea
                             placeholder="Artigo"
                             defaultValue={part.part_name}
                             onChange={(e) => {
                               part.part_name = e.target.value;
                             }}
-                            className="h-8 text-sm"
+                            className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                            rows={1}
                           />
                         </div>
                         <div className="col-span-2 space-y-1">
@@ -364,11 +365,12 @@ export function ConfirmPartOrderModal({ service, open, onOpenChange }: ConfirmPa
                     </div>
                     <div className="col-span-4 space-y-1">
                       <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
-                      <Input
+                      <Textarea
                         placeholder="Artigo"
                         value={part.name}
                         onChange={(e) => updateNewPart(index, 'name', e.target.value)}
-                        className="h-8 text-sm"
+                        className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                        rows={1}
                       />
                     </div>
                     <div className="col-span-2 space-y-1">

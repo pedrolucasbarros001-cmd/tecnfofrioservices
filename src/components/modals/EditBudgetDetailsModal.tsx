@@ -282,17 +282,19 @@ export function EditBudgetDetailsModal({ open, onOpenChange, budget, onSuccess }
               </div>
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-[1fr_1fr_60px_80px_70px_32px] gap-2 items-center">
-                  <Input
+                  <Textarea
                     value={item.description}
                     onChange={e => updateItem(index, 'description', e.target.value)}
                     placeholder="Artigo"
-                    className="h-8 text-sm"
+                    className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                    rows={1}
                   />
-                  <Input
+                  <Textarea
                     value={item.details}
                     onChange={e => updateItem(index, 'details', e.target.value)}
                     placeholder="Detalhes"
-                    className="h-8 text-sm"
+                    className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                    rows={1}
                   />
                   <Input
                     type="number"

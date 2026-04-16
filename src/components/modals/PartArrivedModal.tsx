@@ -229,7 +229,7 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                         </div>
                         <div className="col-span-4 space-y-1">
                           <Label className="text-[10px] uppercase text-muted-foreground">Descrição *</Label>
-                          <Input
+                          <Textarea
                             placeholder="Artigo"
                             value={part.part_name}
                             onChange={(e) => {
@@ -237,7 +237,8 @@ export function PartArrivedModal({ service, open, onOpenChange }: PartArrivedMod
                               newList[index] = { ...part, part_name: e.target.value };
                               setEditableParts(newList);
                             }}
-                            className="h-8 text-sm"
+                            className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                            rows={1}
                           />
                         </div>
                         <div className="col-span-2 space-y-1">

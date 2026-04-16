@@ -27,6 +27,7 @@ import {
   FormItem,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -538,9 +539,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                                     render={({ field }) => (
                                       <FormItem>
                                         <FormControl>
-                                          <Input
+                                          <Textarea
                                             placeholder="Ex: Compressor"
-                                            className="h-9"
+                                            className="min-h-[36px] h-9 resize-y py-2"
+                                            rows={1}
                                             {...field}
                                           />
                                         </FormControl>
@@ -557,9 +559,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                                     render={({ field }) => (
                                       <FormItem>
                                         <FormControl>
-                                          <Input
+                                          <Textarea
                                             placeholder="Detalhe"
-                                            className="h-9"
+                                            className="min-h-[36px] h-9 resize-y py-2"
+                                            rows={1}
                                             {...field}
                                           />
                                         </FormControl>

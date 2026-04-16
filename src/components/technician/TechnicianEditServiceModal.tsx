@@ -499,11 +499,12 @@ function PartFormRow({ part, onUpdate, onRemove, isRequested = false }: {
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Input
+        <Textarea
           placeholder="Descrição do artigo *"
           value={part.part_name}
           onChange={e => onUpdate('part_name', e.target.value)}
-          className="text-xs h-8"
+          className="text-xs min-h-[32px] h-8 resize-y py-1 px-2"
+          rows={1}
         />
         <Input
           placeholder="Código/Ref"

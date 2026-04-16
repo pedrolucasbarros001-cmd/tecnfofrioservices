@@ -1053,11 +1053,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                                   </div>
                                   <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
-                                    <Input
+                                    <Textarea
                                       placeholder="Artigo"
                                       value={article.description}
                                       disabled={formData.articlesLocked || article.isExisting}
-                                      className="h-8 text-sm"
+                                      className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                                      rows={1}
                                       onChange={(e) => updateArticle(article.allIndex, 'description', e.target.value)}
                                     />
                                   </div>
@@ -1108,11 +1109,12 @@ export function WorkshopFlowModals({ service, isOpen, onClose, onComplete, mode 
                                   </div>
                                   <div className="col-span-4 space-y-1">
                                     <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
-                                    <Input
+                                    <Textarea
                                       placeholder="Artigo"
                                       value={article.description}
                                       disabled={true}
-                                      className="h-8 text-sm"
+                                      className="min-h-[32px] h-8 text-sm resize-y py-1 px-2"
+                                      rows={1}
                                     />
                                   </div>
                                   <div className="col-span-2 space-y-1">

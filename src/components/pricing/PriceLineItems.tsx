@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { UseFormReturn, useFieldArray } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import {
   FormControl,
@@ -147,10 +148,11 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input
+                            <Textarea
                               placeholder="Descrição do artigo"
-                              className="h-8 text-sm"
+                              className="min-h-[38px] h-8 text-sm resize-y py-1.5"
                               disabled={disabled}
+                              rows={1}
                               {...field}
                             />
                           </FormControl>
