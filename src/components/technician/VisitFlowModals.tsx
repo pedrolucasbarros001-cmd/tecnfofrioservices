@@ -771,7 +771,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         if (partInsertErr) throw partInsertErr;
       }
       
-      const budgetCode = `ORC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const budgetCode = service.code?.replace(/^TF-/, 'ORC-') || `ORC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const pricingData = {
         items: (formData.articles as ArticleEntry[]).map(a => ({
           description: a.description,

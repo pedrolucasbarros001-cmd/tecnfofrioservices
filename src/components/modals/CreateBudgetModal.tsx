@@ -271,6 +271,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
         .reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
       const { error } = await supabase.from('budgets').insert({
+        code: sourceService?.code?.replace(/^TF-/, 'ORC-'),
         customer_id: customerId || null,
         estimated_labor: laborTotal,
         estimated_parts: partsTotal,
