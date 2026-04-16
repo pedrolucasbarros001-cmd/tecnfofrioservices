@@ -141,6 +141,7 @@ export type Database = {
           model: string | null
           notes: string | null
           pricing_description: string | null
+          source_service_id: string | null
           status: string | null
           subtotal: number | null
           tax_total: number | null
@@ -164,6 +165,7 @@ export type Database = {
           model?: string | null
           notes?: string | null
           pricing_description?: string | null
+          source_service_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_total?: number | null
@@ -187,6 +189,7 @@ export type Database = {
           model?: string | null
           notes?: string | null
           pricing_description?: string | null
+          source_service_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_total?: number | null
@@ -220,6 +223,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_source_service_id_fkey"
+            columns: ["source_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_source_service_id_fkey"
+            columns: ["source_service_id"]
+            isOneToOne: false
+            referencedRelation: "technician_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_source_service_id_fkey"
+            columns: ["source_service_id"]
+            isOneToOne: false
+            referencedRelation: "tv_monitor_services"
             referencedColumns: ["id"]
           },
         ]
@@ -746,6 +770,7 @@ export type Database = {
         Row: {
           amount_paid: number | null
           appliance_type: string | null
+          awaiting_budget_approval: boolean | null
           brand: string | null
           code: string | null
           contact_email: string | null
@@ -799,6 +824,7 @@ export type Database = {
         Insert: {
           amount_paid?: number | null
           appliance_type?: string | null
+          awaiting_budget_approval?: boolean | null
           brand?: string | null
           code?: string | null
           contact_email?: string | null
@@ -852,6 +878,7 @@ export type Database = {
         Update: {
           amount_paid?: number | null
           appliance_type?: string | null
+          awaiting_budget_approval?: boolean | null
           brand?: string | null
           code?: string | null
           contact_email?: string | null
