@@ -341,8 +341,8 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {/* Gerar Orçamento Oficial via Admin - Dono or Secretaria */}
-          {((service?.status === 'a_precificar' || service?.status === 'por_fazer' || service?.status === 'em_execucao' || service?.status === 'na_oficina') && !service?.awaiting_budget_approval) && (isDono || isSecretaria) && onCreateBudgetFromAdmin && (
+          {/* Gerar Orçamento Seguro via Admin - Acesso Nível Dono */}
+          {((service?.status === 'a_precificar' || service?.status === 'por_fazer' || service?.status === 'em_execucao' || service?.status === 'na_oficina') && !service?.awaiting_budget_approval) && isDono && onCreateBudgetFromAdmin && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateBudgetFromAdmin(); }}>
                <FileText className="h-4 w-4 mr-2" />
                Gerar Orçamento

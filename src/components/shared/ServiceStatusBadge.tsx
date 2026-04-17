@@ -73,7 +73,7 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                 )}
                 {service.awaiting_budget_approval && (
                     <Badge className="text-xs bg-amber-500 hover:bg-amber-600 text-white border border-amber-600 font-bold px-2 py-0.5">
-                        Aguardando Orçamento Oficial
+                        Aguardando Orçamento Seguro
                     </Badge>
                 )}
             </span>

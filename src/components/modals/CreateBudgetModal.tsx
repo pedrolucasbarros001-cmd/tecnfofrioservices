@@ -23,10 +23,10 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -91,9 +91,10 @@ interface CreateBudgetModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   sourceService?: Service & { fault_description?: string; customer?: Customer | null; };
+  initialCustomer?: Customer;
 }
 
-export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService }: CreateBudgetModalProps) {
+export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService, initialCustomer }: CreateBudgetModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [discountValue, setDiscountValue] = useState('');
@@ -165,8 +166,15 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       };
       
       fetchParts();
+    } else if (open && initialCustomer) {
+      setSelectedCustomer(initialCustomer);
+      form.setValue('customer_name', initialCustomer.name);
+      form.setValue('customer_phone', initialCustomer.phone || '');
+      form.setValue('customer_nif', initialCustomer.nif || '');
+      form.setValue('customer_email', initialCustomer.email || '');
+      form.setValue('items', [{ name: 'Diagnóstico / Mão de Obra', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'labor' }]);
     }
-  }, [open, sourceService, form]);
+  }, [open, sourceService, initialCustomer, form]);
 
   // Auto-detect customer suggestions by name, phone or NIF
   useEffect(() => {

@@ -136,8 +136,11 @@ export function CustomerDetailSheet({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const { role } = useAuth();
+  const isDono = role === 'dono';
   const queryClient = useQueryClient();
   const updateCustomer = useUpdateCustomer();
+  const [showDirectBudgetModal, setShowDirectBudgetModal] = useState(false);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -655,6 +658,14 @@ export function CustomerDetailSheet({
         onClose={() => setShowUploadModal(false)}
         serviceId={currentServiceId || ''}
       />
+
+      {isDono && (
+        <CreateBudgetModal
+          open={showDirectBudgetModal}
+          onOpenChange={setShowDirectBudgetModal}
+          initialCustomer={customer}
+        />
+      )}
     </>
   );
 }
@@ -904,7 +915,10 @@ function CreateServiceFromCustomerModal({
         </DialogHeader>
 
         {step === 'type' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-8 px-6">
+          <div className={cn(
+            "grid gap-4 py-8 px-6",
+            isDono ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+          )}>
             <button
               onClick={() => {
                 form.setValue('service_type', 'reparacao');
@@ -960,6 +974,24 @@ function CreateServiceFromCustomerModal({
                 <p className="text-xs text-muted-foreground mt-1 text-balance">Entrega e recolha</p>
               </div>
             </button>
+
+            {isDono && (
+              <button
+                onClick={() => {
+                  setShowCreateServiceModal(false);
+                  setShowDirectBudgetModal(true);
+                }}
+                className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-100 transition-all group"
+              >
+                <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileText className="h-7 w-7 text-amber-600" />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-semibold text-base">Orçamento</h3>
+                  <p className="text-xs text-amber-700/70 mt-1 text-balance">Criar orçamento direto</p>
+                </div>
+              </button>
+            )}
           </div>
         ) : step === 'location' ? (
           <div className="grid grid-cols-2 gap-6 py-8 px-6">
