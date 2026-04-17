@@ -180,7 +180,9 @@ export function BudgetDetailPanel({
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Criado em {format(new Date(budget.created_at), "d 'de' MMMM 'de' yyyy", { locale: pt })}
+              {budget.created_at && !isNaN(new Date(budget.created_at).getTime())
+                ? `Criado em ${format(new Date(budget.created_at), "d 'de' MMMM 'de' yyyy", { locale: pt })}`
+                : 'Data de criação indisponível'}
             </p>
           </SheetHeader>
 
