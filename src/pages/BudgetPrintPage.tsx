@@ -1,8 +1,7 @@
 import { useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { safeFormat } from '@/utils/safeDateFormat';
 import { Download, Loader2, Printer, ArrowLeft, MapPin, Phone, Mail, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -271,7 +270,7 @@ export default function BudgetPrintPage() {
         <div className="mb-2">
           <p className="text-base font-mono font-bold">Orçamento: {budget.code}</p>
           <p className="text-xs text-muted-foreground">
-            Data: {format(new Date(budget.created_at), "dd/MM/yyyy", { locale: pt })}
+            Data: {safeFormat(budget.created_at, "dd/MM/yyyy")}
           </p>
         </div>
 
@@ -439,7 +438,7 @@ export default function BudgetPrintPage() {
           {budget.valid_until && (
             <p>
               <strong>Válido até:</strong>{' '}
-              {format(new Date(budget.valid_until), "dd 'de' MMMM 'de' yyyy", { locale: pt })}
+              {safeFormat(budget.valid_until, "dd 'de' MMMM 'de' yyyy")}
             </p>
           )}
           <p>

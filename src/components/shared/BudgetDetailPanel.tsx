@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { safeFormat } from '@/utils/safeDateFormat';
 import {
   Printer,
   Check,
@@ -181,7 +180,7 @@ export function BudgetDetailPanel({
             </div>
             <p className="text-sm text-muted-foreground">
               {budget.created_at && !isNaN(new Date(budget.created_at).getTime())
-                ? `Criado em ${format(new Date(budget.created_at), "d 'de' MMMM 'de' yyyy", { locale: pt })}`
+                ? `Criado em ${safeFormat(budget.created_at, "d 'de' MMMM 'de' yyyy")}`
                 : 'Data de criação indisponível'}
             </p>
           </SheetHeader>

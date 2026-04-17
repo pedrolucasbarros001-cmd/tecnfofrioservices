@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toLocalDateString, parseLocalDate } from '@/utils/dateUtils';
+import { safeFormat } from '@/utils/safeDateFormat';
 import { pt } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -601,7 +602,7 @@ export function CustomerDetailSheet({
                                     <span>•</span>
                                     <span>
                                       {doc.created_at
-                                        ? format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: pt })
+                                        ? safeFormat(doc.created_at, 'dd/MM/yyyy')
                                         : '-'}
                                     </span>
                                   </div>

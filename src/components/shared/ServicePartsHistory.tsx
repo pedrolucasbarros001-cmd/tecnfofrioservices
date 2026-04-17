@@ -1,5 +1,4 @@
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { safeFormat } from '@/utils/safeDateFormat';
 import type { GroupedParts } from '@/hooks/useServiceFinancialData';
 
 interface ServicePartsHistoryProps {
@@ -22,7 +21,7 @@ export function ServicePartsHistory({ groupedParts, historySubtotal }: ServicePa
               {group.location} • {group.technicianName}
             </span>
             <span>
-              {format(new Date(group.date), "dd/MM/yyyy", { locale: pt })}
+              {safeFormat(group.date, "dd/MM/yyyy")}
             </span>
           </div>
           <div className="space-y-1">
