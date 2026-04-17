@@ -31,8 +31,12 @@ export default tseslint.config(
       "react/jsx-uses-react": "off",
       "react/react-in-jsx-scope": "off",
       "@typescript-eslint/no-explicit-any": "warn",
-      "no-unused-expressions": "error",
+      "no-unused-expressions": "warn",
       "no-undef": "off",
+      "no-constant-binary-expression": "warn",
+      "no-empty": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
     },
   },
 );

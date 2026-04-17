@@ -228,7 +228,7 @@ export function usePaginatedServices(options: UsePaginatedServicesOptions = {}) 
         };
 
         // Query 1: Services matching searchTerm in service fields
-        let serviceFieldsQuery = buildFilteredQuery()
+        const serviceFieldsQuery = buildFilteredQuery()
           .or(`code.ilike.%${searchTerm}%,appliance_type.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,serial_number.ilike.%${searchTerm}%,fault_description.ilike.%${searchTerm}%,detected_fault.ilike.%${searchTerm}%,work_performed.ilike.%${searchTerm}%`);
 
         const { data: servicesByFields, error: error1 } = await serviceFieldsQuery;

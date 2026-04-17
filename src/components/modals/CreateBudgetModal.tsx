@@ -195,7 +195,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
       setIsSearching(true);
       try {
-        let query = supabase.from('customers').select('*');
+        const query = supabase.from('customers').select('*');
         
         const filters = [];
         if (name.length >= 3) filters.push(`name.ilike.%${name}%`);

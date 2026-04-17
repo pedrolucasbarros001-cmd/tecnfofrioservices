@@ -136,9 +136,10 @@ export function DemoRunner() {
                 const el = document.querySelector(waitForSelector) as HTMLElement | null;
                 if (el) {
                     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-                    // Now find the highlight selector
                     if (selector) {
-                        findAndObserve(selector) || pollForElement(selector);
+                        if (!findAndObserve(selector)) {
+                            pollForElement(selector);
+                        }
                     }
                 } else if (attempts > 50) {
                     // 5s timeout — show central card

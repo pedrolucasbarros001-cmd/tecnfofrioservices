@@ -272,7 +272,7 @@ export function VisitFlowModals({ service, isOpen, onClose, onComplete, mode = "
         if (parts && parts.length > 0) {
           // Resolve technician names for history display
           const uniqueUserIds = [...new Set(parts.map(p => (p as any).registered_by).filter(Boolean))];
-          let nameMap: Record<string, string> = {};
+          const nameMap: Record<string, string> = {};
           if (uniqueUserIds.length > 0) {
             const { data: profiles } = await supabase
               .from("profiles")

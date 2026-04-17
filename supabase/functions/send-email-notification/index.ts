@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     let service_id = body.service_id;
     let action_type = body.action_type;
-    let custom_message = body.custom_message;
+    const custom_message = body.custom_message;
 
     if (!service_id && body.record) {
       service_id = body.record.id;

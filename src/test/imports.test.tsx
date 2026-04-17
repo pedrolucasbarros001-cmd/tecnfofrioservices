@@ -17,7 +17,7 @@ describe('imports críticos', () => {
 
   it('ErrorBoundary exporta', async () => {
     const mod = await import('@/components/ErrorBoundary');
-    expect(mod.ErrorBoundary || mod.default).toBeDefined();
+    expect(mod.ErrorBoundary).toBeDefined();
   });
 
   it('App exporta', async () => {
