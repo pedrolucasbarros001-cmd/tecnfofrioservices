@@ -138,6 +138,7 @@ export type Database = {
           estimated_total: number | null
           fault_description: string | null
           id: string
+          is_insurance_budget: boolean | null
           model: string | null
           notes: string | null
           pricing_description: string | null
@@ -162,6 +163,7 @@ export type Database = {
           estimated_total?: number | null
           fault_description?: string | null
           id?: string
+          is_insurance_budget?: boolean | null
           model?: string | null
           notes?: string | null
           pricing_description?: string | null
@@ -186,6 +188,7 @@ export type Database = {
           estimated_total?: number | null
           fault_description?: string | null
           id?: string
+          is_insurance_budget?: boolean | null
           model?: string | null
           notes?: string | null
           pricing_description?: string | null

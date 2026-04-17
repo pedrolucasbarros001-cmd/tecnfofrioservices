@@ -25,6 +25,8 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -47,11 +49,10 @@ import {
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateCustomer } from '@/hooks/useCustomers';
 import { toast } from 'sonner';
-import type { Customer } from '@/types/database';
+import type { Customer, Service } from '@/types/database';
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Nome do artigo é obrigatório'),

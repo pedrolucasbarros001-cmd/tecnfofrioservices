@@ -21,7 +21,7 @@ export default function PerformancePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('services')
-        .select('id, code, technician_id, customer_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, service_location, scheduled_date, appliance_type, fault_description, created_at')
+        .select('id, code, technician_id, customer_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, awaiting_budget_approval, service_location, scheduled_date, appliance_type, fault_description, created_at, customer:customers(id, name)')
         .order('created_at', { ascending: false })
         .limit(500);
 
@@ -222,6 +222,7 @@ export default function PerformancePage() {
                                   pending_pricing: service.pending_pricing,
                                   final_price: service.final_price ?? 0,
                                   amount_paid: service.amount_paid ?? 0,
+                                  awaiting_budget_approval: (service as any).awaiting_budget_approval ?? false,
                                   service_location: service.service_location as any,
                                   service_type: service.service_type as any,
                                 }}
