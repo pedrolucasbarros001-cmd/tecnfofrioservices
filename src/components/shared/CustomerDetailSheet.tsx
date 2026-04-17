@@ -645,6 +645,11 @@ export function CustomerDetailSheet({
         onOpenChange={setShowCreateServiceModal}
         customer={customer}
         onSuccess={handleServiceUpdated}
+        isDono={isDono}
+        onSwitchToBudget={() => {
+          setShowCreateServiceModal(false);
+          setShowDirectBudgetModal(true);
+        }}
       />
 
       {/* Service Detail Sheet */}
@@ -678,6 +683,8 @@ interface CreateServiceFromCustomerModalProps {
   onOpenChange: (open: boolean) => void;
   customer: Customer;
   onSuccess?: () => void;
+  isDono: boolean;
+  onSwitchToBudget: () => void;
 }
 
 const serviceFormSchema = z.object({
@@ -717,6 +724,8 @@ function CreateServiceFromCustomerModal({
   onOpenChange,
   customer,
   onSuccess,
+  isDono,
+  onSwitchToBudget,
 }: CreateServiceFromCustomerModalProps) {
   const [step, setStep] = useState<'type' | 'location' | 'form'>('type');
   const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
@@ -979,10 +988,7 @@ function CreateServiceFromCustomerModal({
 
             {isDono && (
               <button
-                onClick={() => {
-                  setShowCreateServiceModal(false);
-                  setShowDirectBudgetModal(true);
-                }}
+                onClick={onSwitchToBudget}
                 className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-100 transition-all group"
               >
                 <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">

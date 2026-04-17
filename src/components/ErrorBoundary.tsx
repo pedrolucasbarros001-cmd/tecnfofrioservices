@@ -1,4 +1,5 @@
 import React from 'react';
+import { logErrorRemote } from '@/utils/errorLogger';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logErrorRemote({ error, componentStack: errorInfo.componentStack || undefined });
     this.setState({ errorInfo });
   }
 
