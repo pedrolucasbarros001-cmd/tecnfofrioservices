@@ -239,71 +239,53 @@ export default function BudgetPrintPage() {
           />
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-1.5 relative z-10">
-          <img
-            src={tecnofrioLogoFull}
-            alt="TECNOFRIO"
-            className="h-10 object-contain"
-          />
+        {/* Header Section from Image */}
+        <div className="flex justify-between items-start mb-4 relative z-10 border-b-2 border-slate-900 pb-4">
+          {/* Company Side */}
+          <div className="w-1/2 space-y-1">
+            <img
+              src={tecnofrioLogoFull}
+              alt="TECNOFRIO"
+              className="h-10 object-contain mb-1"
+            />
+            <h1 className="text-sm font-bold uppercase tracking-tight">
+              {COMPANY_INFO.name}
+            </h1>
+            <div className="text-[10px] space-y-0.5 text-slate-700 leading-tight">
+              <p>{COMPANY_INFO.address.toUpperCase()}</p>
+              <p>{COMPANY_INFO.postalCode} {COMPANY_INFO.city.toUpperCase()}</p>
+              <p>
+                NIF: {COMPANY_INFO.nif} TELF. {COMPANY_INFO.phone.replace(/\s+/g, '')}
+              </p>
+              <p>E-mail : {COMPANY_INFO.email}</p>
+            </div>
+          </div>
+
+          {/* Customer Side */}
+          <div className="w-[45%] text-[11px] pt-10">
+            <div className="space-y-1">
+              <p className="font-semibold">Ex.mo Senhor(a)</p>
+              <p className="text-sm font-bold uppercase">{budget.customer?.name || '---'}</p>
+              {budget.customer?.address && <p>{budget.customer.address}</p>}
+              <p>{budget.customer?.postal_code || ''} {budget.customer?.city || ''}</p>
+              {budget.customer?.nif && <p>NIF: {budget.customer.nif}</p>}
+              {budget.customer?.phone && <p>TM - {budget.customer.phone}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Document Title */}
+        <div className="mb-6 flex items-end justify-between">
+          <h2 className="text-xl font-bold border-b-2 border-slate-900 pr-8">
+            Relatório / Orçamento
+          </h2>
           <div className="text-right">
-            <h1 className="text-lg font-bold">Orçamento</h1>
+            <p className="text-sm font-mono font-bold">{budget.code}</p>
+            <p className="text-xs text-muted-foreground">
+              Data: {safeFormat(budget.created_at, "dd/MM/yyyy")}
+            </p>
           </div>
         </div>
-
-        {/* Company Contact Info */}
-        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-1.5 border-y py-1 bg-muted/30">
-          <div className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            <span>{COMPANY_INFO.fullAddress}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Phone className="h-3 w-3" />
-            <span>{COMPANY_INFO.phone}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Mail className="h-3 w-3" />
-            <span>{COMPANY_INFO.email}</span>
-          </div>
-        </div>
-
-        <div className="mb-2">
-          <p className="text-base font-mono font-bold">Orçamento: {budget.code}</p>
-          <p className="text-xs text-muted-foreground">
-            Data: {safeFormat(budget.created_at, "dd/MM/yyyy")}
-          </p>
-        </div>
-
-        {/* Customer Data */}
-        <section className="mb-2">
-          <h2 className="text-xs font-semibold mb-1.5 border-b pb-0.5">Dados do Cliente</h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-            <div>
-              <span className="text-muted-foreground">Nome:</span>{' '}
-              <span className="font-medium">{budget.customer?.name || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Contribuinte:</span>{' '}
-              <span className="font-medium">{budget.customer?.nif || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Telefone:</span>{' '}
-              <span className="font-medium">{budget.customer?.phone || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Email:</span>{' '}
-              <span className="font-medium">{budget.customer?.email || 'N/A'}</span>
-            </div>
-            <div className="col-span-2">
-              <span className="text-muted-foreground">Morada:</span>{' '}
-              <span className="font-medium">
-                {[budget.customer?.address, budget.customer?.postal_code, budget.customer?.city]
-                  .filter(Boolean)
-                  .join(', ') || 'N/A'}
-              </span>
-            </div>
-          </div>
-        </section>
 
         <Separator className="my-1" />
 

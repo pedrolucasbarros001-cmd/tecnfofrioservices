@@ -92,9 +92,10 @@ interface CreateBudgetModalProps {
   onSuccess?: () => void;
   sourceService?: Service & { fault_description?: string; customer?: Customer | null; };
   initialCustomer?: Customer;
+  budgetToReuse?: any;
 }
 
-export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService, initialCustomer }: CreateBudgetModalProps) {
+export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService, initialCustomer, budgetToReuse }: CreateBudgetModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [discountValue, setDiscountValue] = useState('');
@@ -166,6 +167,36 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       };
       
       fetchParts();
+    } else if (open && budgetToReuse) {
+      if (budgetToReuse.customer) {
+        setSelectedCustomer(budgetToReuse.customer);
+        form.setValue('customer_name', budgetToReuse.customer.name);
+        form.setValue('customer_phone', budgetToReuse.customer.phone || '');
+        form.setValue('customer_nif', budgetToReuse.customer.nif || '');
+        form.setValue('customer_email', budgetToReuse.customer.email || '');
+      }
+      form.setValue('notes', `Cópia do orçamento ${budgetToReuse.code}`);
+      
+      try {
+        const parsed = budgetToReuse.pricing_description ? JSON.parse(budgetToReuse.pricing_description) : {};
+        const items = parsed.items || [];
+        if (items.length > 0) {
+          form.setValue('items', items.map((item: any) => ({
+             name: item.description || '',
+             description: item.details || '',
+             quantity: item.qty || 1,
+             unit_price: item.price || 0,
+             tax_rate: item.tax || 23,
+             type: item.type || 'part'
+          })));
+        }
+        if (parsed.discountValue) {
+           setDiscountValue(parsed.discountValue.toString());
+           setDiscountType(parsed.discountType || 'euro');
+        }
+      } catch (e) {
+        console.error('Error parsing reuse pricing:', e);
+      }
     } else if (open && initialCustomer) {
       setSelectedCustomer(initialCustomer);
       form.setValue('customer_name', initialCustomer.name);

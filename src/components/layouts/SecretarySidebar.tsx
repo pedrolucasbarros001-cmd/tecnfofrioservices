@@ -29,6 +29,7 @@ const menuItems = [
   { title: 'Oficina', url: '/oficina', icon: Wrench },
   { title: 'Oficina Reparados', url: '/concluidos', icon: CheckCircle2 },
   { title: 'Orçamentar', url: '/precificar', icon: DollarSign },
+  { title: 'Orçamentos', url: '/orcamentos', icon: List },
   { title: 'Em Débito', url: '/em-debito', icon: AlertCircle },
   { title: 'Clientes', url: '/clientes', icon: Users },
   { title: 'Preferências', url: '/preferencias', icon: Settings },

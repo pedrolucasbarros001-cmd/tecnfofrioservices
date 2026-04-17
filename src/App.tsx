@@ -119,7 +119,7 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/orcamentos" element={
-            <ProtectedRoute allowedRoles={['dono']}>
+            <ProtectedRoute allowedRoles={['dono', 'secretaria', 'tecnico']}>
               <OrcamentosPage />
             </ProtectedRoute>
           } />

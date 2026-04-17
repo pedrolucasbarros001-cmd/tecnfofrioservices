@@ -65,6 +65,7 @@ export default function OrcamentosPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [budgetToEdit, setBudgetToEdit] = useState<any | null>(null);
+  const [budgetToReuse, setBudgetToReuse] = useState<any | null>(null);
 
   const { data: budgets = [], isLoading } = useQuery({
     queryKey: ['budgets'],
@@ -203,7 +204,10 @@ export default function OrcamentosPage() {
           <h1 className="text-2xl font-bold tracking-tight">Orçamentos</h1>
           <p className="text-muted-foreground">Gerir orçamentos e propostas</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
+        <Button onClick={() => {
+          setBudgetToReuse(null);
+          setShowCreateModal(true);
+        }}>
           <Plus className="h-4 w-4 mr-2" />
           Criar Orçamento
         </Button>
@@ -366,6 +370,16 @@ export default function OrcamentosPage() {
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBudgetToReuse(budget);
+                                setShowCreateModal(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2 text-purple-500" />
+                              Reutilizar Informações
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               className="text-red-600 focus:text-red-600"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -392,6 +406,7 @@ export default function OrcamentosPage() {
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['budgets'] })}
+        budgetToReuse={budgetToReuse}
       />
 
       {/* Convert Budget Modal */}

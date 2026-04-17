@@ -10,6 +10,7 @@ const menuItems = [
   { title: 'Serviços', url: '/servicos', icon: ClipboardList },
   { title: 'Oficina', url: '/oficina-tecnico', icon: Wrench },
   { title: 'Histórico', url: '/technician/history', icon: History },
+  { title: 'Orçamentos', url: '/orcamentos', icon: ClipboardList },
   { title: 'Perfil', url: '/perfil', icon: User },
   { title: 'Preferências', url: '/preferencias', icon: Settings },
 ];
