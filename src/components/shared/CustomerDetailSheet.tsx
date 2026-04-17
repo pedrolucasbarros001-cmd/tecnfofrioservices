@@ -99,6 +99,7 @@ import { SERVICE_STATUS_CONFIG } from '@/types/database';
 import { StateActionButtons } from '@/components/services/StateActionButtons';
 import { UploadDocumentModal } from '@/components/services/UploadDocumentModal';
 import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
+import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
 import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/components/pricing/PriceLineItems';
 import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
 import { useAuth } from '@/contexts/AuthContext';
