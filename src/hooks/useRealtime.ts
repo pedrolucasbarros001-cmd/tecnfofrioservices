@@ -2,7 +2,7 @@ import { useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const DEBOUNCE_MS = 800; // debounce instead of throttle — ensures last event is always processed
+const DEBOUNCE_MS = 200; // debounce instead of throttle — ensures last event is always processed
 
 export function useRealtime(
   table: string,
