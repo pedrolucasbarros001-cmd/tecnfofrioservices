@@ -2,7 +2,7 @@ import { useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const DEBOUNCE_MS = 800; // debounce instead of throttle — ensures last event is always processed
+const DEBOUNCE_MS = 200; // debounce instead of throttle — ensures last event is always processed
 
 export function useRealtime(
   table: string,
@@ -20,7 +20,10 @@ export function useRealtime(
 
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event, schema: 'public', table }, () => {
+      .on('postgres_changes', { event, schema: 'public', table }, (payload) => {
+        if (import.meta.env.DEV) {
+          console.debug(`[realtime] ${table} ${event}`, payload);
+        }
         if (document.visibilityState === 'hidden') return;
 
         // Debounce: cancel previous timer and reschedule

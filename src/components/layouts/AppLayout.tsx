@@ -37,11 +37,22 @@ export function AppLayout() {
     ['available-workshop-services'],  // TechnicianOfficePage — open pool
     ['services-all'],
     ['dashboard-stats'],              // DashboardPage COUNT queries
+    ['technician-history'],           // TechnicianHistoryPage
+    ['tv-monitor-services'],          // TVMonitorPage
+    ['pending-transfer-requests'],    // Transferências entre técnicos
+    ['activity-logs'],                // Logs de actividade actualizam na sidebar de detalhe
   ]);
   useRealtime('service_parts', [['all-pending-parts']]);
   // budgets channel also invalidates dashboard-stats (it counts budgets too)
   useRealtime('budgets', [['budgets'], ['dashboard-stats']]);
   useRealtime('notifications', [['unread-notifications', user?.id ?? ''], ['notifications']]);
+
+  // Customers: para cliente criado numa página aparecer noutra
+  useRealtime('customers', [['customers'], ['customers-paginated']]);
+
+  // Activity logs: para logs aparecerem em tempo real na sidebar
+  // de detalhe de serviço
+  useRealtime('activity_logs', [['activity-logs'], ['public-activity-logs']]);
 
   // Sanitize UI when returning from idle/tab switch
   useEffect(() => {
