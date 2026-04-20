@@ -246,6 +246,7 @@ export default function OficinaPage() {
                         Reatribuir
                       </Button>
                     </div>
+                  ) : (
                     <div className="flex items-center justify-between bg-blue-500/10 p-3 rounded-lg border border-blue-200">
                       <div className="flex items-center gap-2 text-blue-600">
                         <UserPlus className="h-4 w-4" />

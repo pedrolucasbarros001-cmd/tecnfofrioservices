@@ -223,6 +223,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
   const finalPrice = Math.max(0, baseTotal - discountAmount + adjustmentAmount);
 
+  const handleSubmit = async (values: FormValues) => {
     if (!selectedCustomer && !foundCustomer) {
       setPendingFormValues(values);
       setShowCreateCustomerDialog(true);

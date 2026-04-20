@@ -354,6 +354,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
     }
   };
 
+  const handleSubmit = async (values: FormValues) => {
     // Se tem dados de cliente mas não está associado, perguntar se quer criar
     const hasCustomerData = values.customer_name || values.customer_phone;
     if (hasCustomerData && !selectedCustomer) {
