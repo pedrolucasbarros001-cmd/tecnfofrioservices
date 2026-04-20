@@ -415,6 +415,13 @@ export default function BudgetPrintPage() {
           </>
         )}
 
+        {/* Signature Area */}
+        <div className="mt-16 mb-12 flex justify-center">
+          <div className="w-64 border-t border-slate-900 pt-1 text-center">
+            <p className="text-xs font-bold uppercase text-slate-900">Assinatura do Cliente</p>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="mt-4 pt-2 border-t text-xs text-muted-foreground text-center space-y-1">
           {budget.valid_until && (
