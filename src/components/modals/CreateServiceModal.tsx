@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
+import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight, ImagePlus, Paperclip, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { toLocalDateString } from '@/utils/dateUtils';
@@ -113,6 +113,11 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
   const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+
+  const MAX_PHOTOS = 5;
+  const MAX_FILES = 5;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
@@ -282,8 +287,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         contact_email: values.customer_email || null,
       });
 
-      // Upload workshop photos if any
-      if (workshopPhotos.length > 0 && values.service_location === 'oficina' && newService?.id) {
+      // Upload photos (now allowed for both visita and oficina)
+      if (workshopPhotos.length > 0 && newService?.id) {
+        const photoType = values.service_location === 'oficina' ? 'aparelho' : 'antes';
         for (const file of workshopPhotos) {
           try {
             const fileExt = file.name.split('.').pop();
@@ -300,11 +306,41 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
               await supabase.from('service_photos').insert({
                 service_id: newService.id,
                 file_url: urlData.publicUrl,
-                photo_type: 'aparelho',
+                photo_type: photoType,
+                description: 'Foto adicionada na criação do serviço',
               });
             }
           } catch (photoErr) {
             console.error('Error uploading photo:', photoErr);
+          }
+        }
+      }
+
+      // Upload attached documents (any file type)
+      if (attachedFiles.length > 0 && newService?.id) {
+        for (const file of attachedFiles) {
+          try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newService.id}/${crypto.randomUUID()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('service_documents')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (!uploadError) {
+              await supabase.from('service_documents').insert({
+                service_id: newService.id,
+                file_name: file.name,
+                file_url: filePath,
+                file_type: file.type || fileExt || 'unknown',
+                file_size: file.size,
+                uploaded_by: user?.id,
+              });
+            }
+          } catch (fileErr) {
+            console.error('Error uploading document:', fileErr);
           }
         }
       }
@@ -341,6 +377,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
     setShowFoundCustomerBox(false);
     setPendingFormValues(null);
     setWorkshopPhotos([]);
+    setAttachedFiles([]);
   };
 
   return (
@@ -631,15 +668,19 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                       />
                     </div>
 
-                    {/* Workshop Photo Upload */}
-                    {serviceLocation === 'oficina' && (
-                      <div className="p-4 bg-orange-50/50 rounded-lg border border-orange-100 space-y-3">
-                        <h4 className="font-medium text-orange-800 flex items-center gap-2 text-sm">
-                          Fotos do Equipamento (máx. 5)
+                    {/* Photos + Attachments — available for both visita and oficina */}
+                    <div className="p-4 bg-blue-50/40 rounded-lg border border-blue-100 space-y-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-blue-900 flex items-center gap-2 text-sm">
+                          <ImagePlus className="h-4 w-4" />
+                          Fotos do Equipamento ({workshopPhotos.length}/{MAX_PHOTOS})
                         </h4>
+                        <p className="text-xs text-muted-foreground -mt-1">
+                          Tire ou selecione até {MAX_PHOTOS} fotos do aparelho, etiqueta ou estado inicial.
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {workshopPhotos.map((file, idx) => (
-                            <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                            <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border bg-background group">
                               <img
                                 src={URL.createObjectURL(file)}
                                 alt={`Foto ${idx + 1}`}
@@ -648,15 +689,17 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                               <button
                                 type="button"
                                 onClick={() => setWorkshopPhotos(prev => prev.filter((_, i) => i !== idx))}
-                                className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
+                                className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs leading-none"
+                                aria-label="Remover foto"
                               >
                                 ×
                               </button>
                             </div>
                           ))}
-                          {workshopPhotos.length < 5 && (
-                            <label className="w-20 h-20 rounded-lg border-2 border-dashed border-orange-300 flex items-center justify-center cursor-pointer hover:bg-orange-100/50 transition-colors">
-                              <UserPlus className="h-6 w-6 text-orange-400" />
+                          {workshopPhotos.length < MAX_PHOTOS && (
+                            <label className="w-20 h-20 rounded-lg border-2 border-dashed border-blue-300 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-100/50 transition-colors gap-1">
+                              <ImagePlus className="h-5 w-5 text-blue-500" />
+                              <span className="text-[10px] text-blue-600 font-medium">Adicionar</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -664,7 +707,12 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                                 className="hidden"
                                 onChange={(e) => {
                                   const files = Array.from(e.target.files || []);
-                                  setWorkshopPhotos(prev => [...prev, ...files].slice(0, 5));
+                                  const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+                                  if (oversized.length > 0) {
+                                    toast.error(`${oversized.length} foto(s) excedem 10MB e foram ignoradas.`);
+                                  }
+                                  const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+                                  setWorkshopPhotos(prev => [...prev, ...valid].slice(0, MAX_PHOTOS));
                                   e.target.value = '';
                                 }}
                               />
@@ -672,7 +720,64 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           )}
                         </div>
                       </div>
-                    )}
+
+                      <div className="border-t border-blue-100 pt-4 space-y-3">
+                        <h4 className="font-medium text-blue-900 flex items-center gap-2 text-sm">
+                          <Paperclip className="h-4 w-4" />
+                          Anexar Ficheiros ({attachedFiles.length}/{MAX_FILES})
+                        </h4>
+                        <p className="text-xs text-muted-foreground -mt-1">
+                          PDF, Word, Excel, imagens ou outros — até {MAX_FILES} ficheiros, máx. 10MB cada.
+                        </p>
+                        {attachedFiles.length > 0 && (
+                          <div className="space-y-1.5">
+                            {attachedFiles.map((file, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-2 rounded-md border bg-background text-xs"
+                              >
+                                <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                                  <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                  <span className="truncate font-medium" title={file.name}>{file.name}</span>
+                                  <span className="text-muted-foreground flex-shrink-0">
+                                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
+                                  className="p-1 hover:bg-destructive/10 rounded text-destructive flex-shrink-0"
+                                  aria-label="Remover ficheiro"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {attachedFiles.length < MAX_FILES && (
+                          <label className="flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-dashed border-blue-300 cursor-pointer hover:bg-blue-100/50 transition-colors text-sm text-blue-700 font-medium">
+                            <Paperclip className="h-4 w-4" />
+                            Selecionar ficheiros
+                            <input
+                              type="file"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+                                if (oversized.length > 0) {
+                                  toast.error(`${oversized.length} ficheiro(s) excedem 10MB e foram ignorados.`);
+                                }
+                                const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+                                setAttachedFiles(prev => [...prev, ...valid].slice(0, MAX_FILES));
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Row 5: Avaria (full width) */}
                     <FormField
