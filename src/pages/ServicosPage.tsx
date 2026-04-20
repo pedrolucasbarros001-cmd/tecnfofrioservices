@@ -21,6 +21,7 @@ import { ServiceDetailSheet } from '@/components/services/ServiceDetailSheet';
 import { CustomerLink } from '@/components/shared/CustomerLink';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
+import { toast } from 'sonner';
 import type { Service } from '@/types/database';
 
 type FlowType = 'visit' | 'installation' | 'delivery' | null;
@@ -162,6 +163,36 @@ export default function ServicosPage() {
     invalidateServiceQueries(queryClient);
   };
 
+  const handleAssumir = async (serviceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!profile) return;
+
+    try {
+      // 1. Get technician id for current profile
+      const { data: tech, error: techError } = await supabase
+        .from('technicians')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+
+      if (techError || !tech) throw new Error('Técnico não encontrado');
+
+      // 2. Assign technician to service
+      const { error: updateError } = await supabase
+        .from('services')
+        .update({ technician_id: tech.id })
+        .eq('id', serviceId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Serviço assumido com sucesso!');
+      invalidateServiceQueries(queryClient);
+    } catch (err) {
+      console.error('Error assuming service:', err);
+      toast.error('Erro ao assumir serviço');
+    }
+  };
+
   // Get button config based on service type
   const getServiceConfig = (service: Service) => {
     if (service.service_type === 'entrega') {
@@ -201,7 +232,12 @@ export default function ServicosPage() {
 
     return (
       <Card
-        className={cn('border-l-4 transition-shadow hover:shadow-md cursor-pointer', serviceConfig.cardBorder, service.status === 'cancelado' && 'opacity-40 grayscale')}
+        className={cn(
+          'border-l-4 transition-shadow hover:shadow-md cursor-pointer', 
+          serviceConfig.cardBorder, 
+          service.status === 'cancelado' && 'opacity-40 grayscale',
+          !service.technician_id && 'bg-blue-50/50 border-2 border-blue-200'
+        )}
         data-tour="service-cards"
         data-demo="service-cards"
       >
@@ -282,7 +318,16 @@ export default function ServicosPage() {
             </div>
 
             {/* Start/Continue/Block Button */}
-            {isAwaitingPart ? (
+            {!service.technician_id ? (
+              <Button
+                size="sm"
+                className="w-full h-9 text-sm mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md animate-in zoom-in-95 duration-300"
+                onClick={(e) => handleAssumir(service.id, e)}
+              >
+                <UserPlus className="h-4 w-4 mr-1.5" />
+                Assumir Serviço
+              </Button>
+            ) : isAwaitingPart ? (
               <Button
                 size="sm"
                 className="w-full h-9 text-sm mt-2 bg-muted text-muted-foreground cursor-not-allowed hover:bg-muted"

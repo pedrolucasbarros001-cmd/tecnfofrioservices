@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Wrench, Send, UserPlus, Clock, AlertCircle, Search } from 'lucide-react';
+import { Wrench, Send, UserPlus, Clock, AlertCircle, Search, Play } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,10 @@ import { useServices, prefetchFullServiceData } from '@/hooks/useServices';
 import { SERVICE_STATUS_CONFIG, type Service } from '@/types/database';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { CustomerLink } from '@/components/shared/CustomerLink';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function OficinaPage() {
@@ -27,6 +31,7 @@ export default function OficinaPage() {
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
   const [currentService, setCurrentService] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const { profile } = useAuth();
 
   const queryClient = useQueryClient();
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
@@ -67,6 +72,36 @@ export default function OficinaPage() {
     e?.stopPropagation();
     setServiceToAssign(service);
     setShowAssignModal(true);
+  };
+
+  const handleAssumir = async (serviceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!profile) return;
+
+    try {
+      // 1. Get technician id for current profile
+      const { data: tech, error: techError } = await supabase
+        .from('technicians')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+
+      if (techError || !tech) throw new Error('Técnico não encontrado');
+
+      // 2. Assign technician to service
+      const { error: updateError } = await supabase
+        .from('services')
+        .update({ technician_id: tech.id })
+        .eq('id', serviceId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Serviço assumido com sucesso!');
+      invalidateServiceQueries(queryClient);
+    } catch (err) {
+      console.error('Error assuming service:', err);
+      toast.error('Erro ao assumir serviço');
+    }
   };
 
   return (
@@ -124,7 +159,8 @@ export default function OficinaPage() {
                 key={service.id}
                 className={cn(
                   "cursor-pointer hover:shadow-lg transition-all border-l-4",
-                  service.is_urgent ? "border-l-red-500" : "border-l-purple-500"
+                  service.is_urgent ? "border-l-red-500" : "border-l-purple-500",
+                  !service.technician_id && 'bg-blue-50/50 border-2 border-blue-200 shadow-blue-100/50'
                 )}
                 onClick={() => handleServiceClick(service)}
                 onMouseEnter={() => handlePrefetch(service.id)}
@@ -210,19 +246,18 @@ export default function OficinaPage() {
                         Reatribuir
                       </Button>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between bg-yellow-500/10 p-3 rounded-lg">
-                      <div className="flex items-center gap-2 text-yellow-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Sem Técnico</span>
+                    <div className="flex items-center justify-between bg-blue-500/10 p-3 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-2 text-blue-600">
+                        <UserPlus className="h-4 w-4" />
+                        <span className="text-sm font-bold">Livre para assumir</span>
                       </div>
                       <Button
                         size="sm"
-                        onClick={(e) => handleAssignClick(e, service)}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                        onClick={(e) => handleAssumir(service.id, e)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold animate-pulse"
                       >
-                        <UserPlus className="h-4 w-4 mr-1" />
-                        Atribuir
+                        <Play className="h-4 w-4 mr-1" />
+                        ASSUMIR
                       </Button>
                     </div>
                   )}

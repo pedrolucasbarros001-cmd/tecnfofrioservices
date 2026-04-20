@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, UserPlus, Tag } from 'lucide-react';
+import { CalendarIcon, Check, UserPlus, Tag, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { humanizeError } from '@/utils/errorMessages';
 import { toLocalDateString } from '@/utils/dateUtils';
 import {
@@ -54,7 +55,7 @@ import { Calendar } from '@/components/ui/calendar';
 
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useCreateCustomer } from '@/hooks/useCustomers';
+import { useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
@@ -118,6 +119,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
   const createService = useCreateService();
 
   const form = useForm<FormValues>({
@@ -132,6 +134,14 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
       items: [{ ...DEFAULT_LINE_ITEM }],
     },
   });
+
+  const values = form.watch();
+  const hasMissingInfo = selectedCustomer && (
+    !values.customer_nif || 
+    !values.customer_phone || 
+    !values.customer_email ||
+    !values.customer_address
+  );
 
   const customerPhone = form.watch('customer_phone');
   const customerNif = form.watch('customer_nif');
@@ -213,11 +223,30 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
   const adjustmentAmount = parseFloat(adjustment.replace(',', '.')) || 0;
   const finalPrice = Math.max(0, baseTotal - discountAmount + adjustmentAmount);
 
-  const handleSubmit = async (values: FormValues) => {
     if (!selectedCustomer && !foundCustomer) {
       setPendingFormValues(values);
       setShowCreateCustomerDialog(true);
       return;
+    }
+
+    if (selectedCustomer) {
+      const hasChanges = 
+        values.customer_name !== selectedCustomer.name ||
+        values.customer_nif !== (selectedCustomer.nif || '') ||
+        values.customer_phone !== (selectedCustomer.phone || '') ||
+        values.customer_email !== (selectedCustomer.email || '') ||
+        values.customer_address !== (selectedCustomer.address || '');
+
+      if (hasChanges) {
+        await updateCustomer.mutateAsync({
+          id: selectedCustomer.id,
+          name: values.customer_name || selectedCustomer.name,
+          nif: values.customer_nif || null,
+          phone: values.customer_phone || selectedCustomer.phone,
+          email: values.customer_email || null,
+          address: values.customer_address || null,
+        });
+      }
     }
 
     await processSubmit(values, selectedCustomer?.id);
@@ -346,6 +375,15 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                {hasMissingInfo && (
+                  <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-900 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-800 font-bold">Informação em falta</AlertTitle>
+                    <AlertDescription className="text-amber-700">
+                      O perfil deste cliente está incompleto. Por favor, aproveite para preencher o NIF, Telefone ou Email.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-6 py-4">
                   {/* Customer Section */}
                   <div className="space-y-4">
@@ -408,7 +446,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Nome do Cliente *</FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
+                              <Input {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -421,7 +459,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Contribuinte</FormLabel>
                             <FormControl>
-                              <Input placeholder="NIF" {...field} disabled={!!selectedCustomer} />
+                              <Input placeholder="NIF" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -437,7 +475,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Telefone *</FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
+                              <Input {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -450,7 +488,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Email</FormLabel>
                             <FormControl>
-                              <Input type="email" {...field} disabled={!!selectedCustomer} />
+                              <Input type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -466,7 +504,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Morada *</FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
+                              <Input {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -479,7 +517,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                           <FormItem>
                             <FormLabel>Código Postal</FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={!!selectedCustomer} />
+                              <Input {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

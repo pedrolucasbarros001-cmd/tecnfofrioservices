@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight, ImagePlus, Paperclip, FileText, X } from 'lucide-react';
+import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight, ImagePlus, Paperclip, FileText, X, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { humanizeError } from '@/utils/errorMessages';
 import { toLocalDateString } from '@/utils/dateUtils';
 import {
@@ -54,7 +55,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 
 import { cn } from '@/lib/utils';
-import { useCreateCustomer } from '@/hooks/useCustomers';
+import { useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { useCreateService } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
@@ -121,6 +122,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
   const createService = useCreateService();
   const { user } = useAuth();
   const [userProfile, setUserProfile] = useState<{ full_name: string | null } | null>(null);
@@ -144,6 +146,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       customer_name: '',
       customer_phone: '',
       customer_email: '',
+      customer_address: '',
+      customer_postal_code: '',
+      customer_city: '',
       appliance_type: '',
       fault_description: '',
       is_warranty: false,
@@ -151,6 +156,16 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       service_location: 'cliente',
     },
   });
+
+  const values = form.watch();
+  const hasMissingInfo = selectedCustomer && (
+    !values.customer_nif || 
+    !values.customer_address || 
+    !values.customer_postal_code || 
+    !values.customer_city || 
+    !values.customer_phone || 
+    !values.customer_email
+  );
 
   const isWarranty = form.watch('is_warranty');
   const serviceLocation = form.watch('service_location');
@@ -224,6 +239,30 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
       setPendingFormValues(values);
       setShowCreateCustomerDialog(true);
       return;
+    }
+
+    if (selectedCustomer) {
+      const hasChanges = 
+        values.customer_name !== selectedCustomer.name ||
+        values.customer_nif !== (selectedCustomer.nif || '') ||
+        values.customer_phone !== (selectedCustomer.phone || '') ||
+        values.customer_email !== (selectedCustomer.email || '') ||
+        values.customer_address !== (selectedCustomer.address || '') ||
+        values.customer_postal_code !== (selectedCustomer.postal_code || '') ||
+        values.customer_city !== (selectedCustomer.city || '');
+
+      if (hasChanges) {
+        await updateCustomer.mutateAsync({
+          id: selectedCustomer.id,
+          name: values.customer_name || selectedCustomer.name,
+          nif: values.customer_nif || null,
+          phone: values.customer_phone || selectedCustomer.phone,
+          email: values.customer_email || null,
+          address: values.customer_address || null,
+          postal_code: values.customer_postal_code || null,
+          city: values.customer_city || null,
+        });
+      }
     }
 
     await processSubmit(values, selectedCustomer?.id);
@@ -433,6 +472,15 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                  {hasMissingInfo && (
+                    <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-900 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800 font-bold">Informação em falta</AlertTitle>
+                      <AlertDescription className="text-amber-700">
+                        O perfil deste cliente está incompleto. Por favor, aproveite para preencher o NIF, Morada ou Email.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="space-y-4 py-4">
                     {/* Customer Selected Box */}
                     {selectedCustomer && (
@@ -508,7 +556,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           <FormItem>
                             <FormLabel>Nome *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Nome do cliente" {...field} disabled={!!selectedCustomer} />
+                              <Input placeholder="Nome do cliente" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -521,7 +569,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           <FormItem>
                             <FormLabel>Contribuinte</FormLabel>
                             <FormControl>
-                              <Input placeholder="NIF" {...field} disabled={!!selectedCustomer} />
+                              <Input placeholder="NIF" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -538,7 +586,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           <FormItem>
                             <FormLabel>Telefone *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Telefone" {...field} disabled={!!selectedCustomer} />
+                              <Input placeholder="Telefone" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -551,7 +599,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           <FormItem>
                             <FormLabel>Email</FormLabel>
                             <FormControl>
-                              <Input placeholder="Email" type="email" {...field} disabled={!!selectedCustomer} />
+                              <Input placeholder="Email" type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

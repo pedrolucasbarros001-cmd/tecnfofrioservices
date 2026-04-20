@@ -4,7 +4,7 @@ import { SERVICE_STATUS_CONFIG, type Service, type ServiceStatus } from '@/types
 import { cn } from '@/lib/utils';
 
 interface ServiceStatusBadgeProps {
-    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type' | 'amount_paid' | 'awaiting_budget_approval'> & {
+    service: Pick<Service, 'status' | 'pending_pricing' | 'final_price' | 'service_location' | 'service_type' | 'amount_paid' | 'awaiting_budget_approval' | 'technician_id'> & {
         owner_confirmed?: boolean;
     };
     className?: string;
@@ -74,6 +74,11 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                 {service.awaiting_budget_approval && (
                     <Badge className="text-xs bg-amber-500 hover:bg-amber-600 text-white border border-amber-600 font-bold px-2 py-0.5">
                         Aguardando Orçamento Seguro
+                    </Badge>
+                )}
+                {!service.technician_id && service.status !== 'concluido' && service.status !== 'cancelado' && (
+                    <Badge className="text-xs bg-blue-500 text-white border border-blue-600 font-bold px-2 py-0.5 animate-pulse">
+                        Disponível
                     </Badge>
                 )}
             </span>

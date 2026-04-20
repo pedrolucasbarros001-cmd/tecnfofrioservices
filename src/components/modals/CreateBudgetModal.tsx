@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Check, UserPlus, User, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, Check, UserPlus, User, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +51,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { useCreateCustomer } from '@/hooks/useCustomers';
+import { useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers';
 import { toast } from 'sonner';
 import type { Customer, Service } from '@/types/database';
 
@@ -110,6 +111,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
   const [isSearching, setIsSearching] = useState(false);
 
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -127,6 +129,13 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       notes: '',
     },
   });
+
+  const values = form.watch();
+  const hasMissingInfo = selectedCustomer && (
+    !values.customer_nif || 
+    !values.customer_phone || 
+    !values.customer_email
+  );
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -345,13 +354,30 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
     }
   };
 
-  const handleSubmit = async (values: FormValues) => {
     // Se tem dados de cliente mas não está associado, perguntar se quer criar
     const hasCustomerData = values.customer_name || values.customer_phone;
     if (hasCustomerData && !selectedCustomer) {
       setPendingFormValues(values);
       setShowCreateCustomerDialog(true);
       return;
+    }
+
+    if (selectedCustomer) {
+      const hasChanges = 
+        values.customer_name !== selectedCustomer.name ||
+        values.customer_nif !== (selectedCustomer.nif || '') ||
+        values.customer_phone !== (selectedCustomer.phone || '') ||
+        values.customer_email !== (selectedCustomer.email || '');
+
+      if (hasChanges) {
+        await updateCustomer.mutateAsync({
+          id: selectedCustomer.id,
+          name: values.customer_name || selectedCustomer.name,
+          nif: values.customer_nif || null,
+          phone: values.customer_phone || selectedCustomer.phone,
+          email: values.customer_email || null,
+        });
+      }
     }
 
     await processSubmit(values, selectedCustomer?.id);
@@ -414,6 +440,15 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
               <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
+                {hasMissingInfo && (
+                  <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-900">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-800 font-bold">Informação em falta</AlertTitle>
+                    <AlertDescription className="text-amber-700 font-medium">
+                      O perfil deste cliente está incompleto. Por favor, aproveite para preencher o NIF, Telefone ou Email.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-6 py-4 pr-4">
 
                   {/* Dados do Cliente (Opcional) */}
