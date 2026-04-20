@@ -287,8 +287,9 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
         contact_email: values.customer_email || null,
       });
 
-      // Upload workshop photos if any
-      if (workshopPhotos.length > 0 && values.service_location === 'oficina' && newService?.id) {
+      // Upload photos (now allowed for both visita and oficina)
+      if (workshopPhotos.length > 0 && newService?.id) {
+        const photoType = values.service_location === 'oficina' ? 'aparelho' : 'antes';
         for (const file of workshopPhotos) {
           try {
             const fileExt = file.name.split('.').pop();
@@ -305,11 +306,41 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
               await supabase.from('service_photos').insert({
                 service_id: newService.id,
                 file_url: urlData.publicUrl,
-                photo_type: 'aparelho',
+                photo_type: photoType,
+                description: 'Foto adicionada na criação do serviço',
               });
             }
           } catch (photoErr) {
             console.error('Error uploading photo:', photoErr);
+          }
+        }
+      }
+
+      // Upload attached documents (any file type)
+      if (attachedFiles.length > 0 && newService?.id) {
+        for (const file of attachedFiles) {
+          try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newService.id}/${crypto.randomUUID()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('service_documents')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (!uploadError) {
+              await supabase.from('service_documents').insert({
+                service_id: newService.id,
+                file_name: file.name,
+                file_url: filePath,
+                file_type: file.type || fileExt || 'unknown',
+                file_size: file.size,
+                uploaded_by: user?.id,
+              });
+            }
+          } catch (fileErr) {
+            console.error('Error uploading document:', fileErr);
           }
         }
       }
@@ -346,6 +377,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
     setShowFoundCustomerBox(false);
     setPendingFormValues(null);
     setWorkshopPhotos([]);
+    setAttachedFiles([]);
   };
 
   return (
