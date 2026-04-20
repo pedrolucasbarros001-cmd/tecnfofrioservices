@@ -20,7 +20,10 @@ export function useRealtime(
 
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event, schema: 'public', table }, () => {
+      .on('postgres_changes', { event, schema: 'public', table }, (payload) => {
+        if (import.meta.env.DEV) {
+          console.debug(`[realtime] ${table} ${event}`, payload);
+        }
         if (document.visibilityState === 'hidden') return;
 
         // Debounce: cancel previous timer and reschedule
