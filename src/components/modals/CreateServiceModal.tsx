@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight } from 'lucide-react';
+import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight, ImagePlus, Paperclip, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { humanizeError } from '@/utils/errorMessages';
 import { toLocalDateString } from '@/utils/dateUtils';
@@ -113,6 +113,11 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
   const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+
+  const MAX_PHOTOS = 5;
+  const MAX_FILES = 5;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   const { data: technicians = [] } = useTechnicians();
   const createCustomer = useCreateCustomer();
