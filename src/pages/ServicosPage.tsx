@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Play, Phone, Plus } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Phone, Play, Plus, UserPlus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

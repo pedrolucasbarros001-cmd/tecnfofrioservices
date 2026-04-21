@@ -76,7 +76,7 @@ export const ServiceStatusBadge = React.forwardRef<HTMLSpanElement, ServiceStatu
                         Aguardando Orçamento Seguro
                     </Badge>
                 )}
-                {!service.technician_id && service.status !== 'concluido' && service.status !== 'cancelado' && (
+                {!service.technician_id && service.status !== 'concluidos' && service.status !== 'finalizado' && service.status !== 'cancelado' && (
                     <Badge className="text-xs bg-blue-500 text-white border border-blue-600 font-bold px-2 py-0.5 animate-pulse">
                         Disponível
                     </Badge>

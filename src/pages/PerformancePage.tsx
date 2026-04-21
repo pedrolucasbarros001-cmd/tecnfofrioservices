@@ -225,6 +225,7 @@ export default function PerformancePage() {
                                   awaiting_budget_approval: (service as any).awaiting_budget_approval ?? false,
                                   service_location: service.service_location as any,
                                   service_type: service.service_type as any,
+                                  technician_id: service.technician_id ?? null,
                                 }}
                               />
                             </div>
