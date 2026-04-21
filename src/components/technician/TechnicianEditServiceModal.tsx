@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/activityLogUtils';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -22,6 +23,8 @@ import { technicianUpdateService } from '@/utils/technicianRpc';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import type { Service, ServicePart } from '@/types/database';
+
+type ServicesUpdate = Database['public']['Tables']['services']['Update'];
 
 interface TechnicianEditServiceModalProps {
   service: Service;
@@ -129,7 +132,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       const changes: string[] = [];
 
       // Update service fields
-      const updates: Partial<Service> = {};
+      const updates: ServicesUpdate = {};
       if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: "${service.brand || '(vazio)'}" → "${brand}"`); }
       if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: "${service.model || '(vazio)'}" → "${model}"`); }
       if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: "${service.serial_number || '(vazio)'}" → "${serialNumber}"`); }
