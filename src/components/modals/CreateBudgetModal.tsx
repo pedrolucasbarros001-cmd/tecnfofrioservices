@@ -132,9 +132,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
   const values = form.watch();
   const hasMissingInfo = selectedCustomer && (
-    !values.customer_nif || 
-    !values.customer_phone || 
-    !values.customer_email
+    !values.customer_phone ||
+    !selectedCustomer.address ||
+    !selectedCustomer.postal_code ||
+    !selectedCustomer.city
   );
 
   const { fields, append, remove } = useFieldArray({
