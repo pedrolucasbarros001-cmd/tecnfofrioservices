@@ -137,10 +137,10 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
 
   const values = form.watch();
   const hasMissingInfo = selectedCustomer && (
-    !values.customer_nif || 
-    !values.customer_phone || 
-    !values.customer_email ||
-    !values.customer_address
+    !values.customer_phone ||
+    !values.customer_address ||
+    !values.customer_postal_code ||
+    !values.customer_city
   );
 
   const customerPhone = form.watch('customer_phone');
@@ -236,7 +236,9 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
         values.customer_nif !== (selectedCustomer.nif || '') ||
         values.customer_phone !== (selectedCustomer.phone || '') ||
         values.customer_email !== (selectedCustomer.email || '') ||
-        values.customer_address !== (selectedCustomer.address || '');
+        values.customer_address !== (selectedCustomer.address || '') ||
+        values.customer_postal_code !== (selectedCustomer.postal_code || '') ||
+        values.customer_city !== (selectedCustomer.city || '');
 
       if (hasChanges) {
         await updateCustomer.mutateAsync({
@@ -246,6 +248,8 @@ export function CreateDeliveryModal({ open, onOpenChange }: CreateDeliveryModalP
           phone: values.customer_phone || selectedCustomer.phone,
           email: values.customer_email || null,
           address: values.customer_address || null,
+          postal_code: values.customer_postal_code || null,
+          city: values.customer_city || null,
         });
       }
     }

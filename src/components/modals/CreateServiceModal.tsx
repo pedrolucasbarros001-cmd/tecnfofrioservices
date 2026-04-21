@@ -159,12 +159,10 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
 
   const values = form.watch();
   const hasMissingInfo = selectedCustomer && (
-    !values.customer_nif || 
-    !values.customer_address || 
-    !values.customer_postal_code || 
-    !values.customer_city || 
-    !values.customer_phone || 
-    !values.customer_email
+    !values.customer_phone ||
+    !values.customer_address ||
+    !values.customer_postal_code ||
+    !values.customer_city
   );
 
   const isWarranty = form.watch('is_warranty');
