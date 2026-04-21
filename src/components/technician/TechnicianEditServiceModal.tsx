@@ -129,7 +129,7 @@ export function TechnicianEditServiceModal({ service, open, onOpenChange }: Tech
       const changes: string[] = [];
 
       // Update service fields
-      const updates: Record<string, any> = {};
+      const updates: Partial<Service> = {};
       if (brand !== (service.brand || '')) { updates.brand = brand; changes.push(`Marca: "${service.brand || '(vazio)'}" → "${brand}"`); }
       if (model !== (service.model || '')) { updates.model = model; changes.push(`Modelo: "${service.model || '(vazio)'}" → "${model}"`); }
       if (serialNumber !== (service.serial_number || '')) { updates.serial_number = serialNumber; changes.push(`Nº Série: "${service.serial_number || '(vazio)'}" → "${serialNumber}"`); }
