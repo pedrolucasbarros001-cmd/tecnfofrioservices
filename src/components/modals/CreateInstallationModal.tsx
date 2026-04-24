@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, UserPlus, Tag, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Check, UserPlus, Tag, AlertTriangle, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { humanizeError } from '@/utils/errorMessages';
@@ -111,6 +111,9 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
+  const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
+  const MAX_PHOTOS = 5;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   // Pricing Modifiers
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
@@ -343,6 +346,32 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         }
       }
 
+      // Upload photos to service-photos bucket and link in service_photos
+      if (newService?.id && workshopPhotos.length > 0) {
+        for (const file of workshopPhotos) {
+          try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newService.id}/${crypto.randomUUID()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('service-photos')
+              .upload(filePath, file);
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('service-photos')
+                .getPublicUrl(filePath);
+              await supabase.from('service_photos').insert({
+                service_id: newService.id,
+                file_url: urlData.publicUrl,
+                photo_type: 'aparelho',
+                description: 'Foto inicial (instalação)',
+              });
+            }
+          } catch (e) {
+            console.error('Error uploading installation photo:', e);
+          }
+        }
+      }
+
       handleClose();
     } catch (error: any) {
       console.error('Error creating installation:', error);
@@ -366,6 +395,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
     setPendingFormValues(null);
     setDiscountValue('');
     setAdjustment('');
+    setWorkshopPhotos([]);
   };
 
   return (
