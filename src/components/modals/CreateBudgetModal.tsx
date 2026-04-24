@@ -440,7 +440,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
-              <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] px-6">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                 {hasMissingInfo && (
                   <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-900">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -873,7 +873,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                     />
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
 
               <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
                 <Button type="button" variant="outline" onClick={handleClose}>
