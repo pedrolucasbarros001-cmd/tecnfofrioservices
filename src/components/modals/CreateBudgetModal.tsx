@@ -346,9 +346,9 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       toast.success('Orçamento criado com sucesso!');
       handleClose();
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating budget:', error);
-      toast.error('Erro ao criar orçamento');
+      toast.error(`Erro ao criar orçamento: ${error?.message || 'Erro desconhecido'}`);
     } finally {
       setIsLoading(false);
     }
