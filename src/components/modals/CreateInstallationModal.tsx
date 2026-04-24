@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { CalendarIcon, Check, UserPlus, Tag, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Check, UserPlus, Tag, AlertTriangle, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { humanizeError } from '@/utils/errorMessages';
@@ -111,6 +111,9 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
   const [pendingFormValues, setPendingFormValues] = useState<FormValues | null>(null);
+  const [workshopPhotos, setWorkshopPhotos] = useState<File[]>([]);
+  const MAX_PHOTOS = 5;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   // Pricing Modifiers
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
@@ -343,6 +346,32 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
         }
       }
 
+      // Upload photos to service-photos bucket and link in service_photos
+      if (newService?.id && workshopPhotos.length > 0) {
+        for (const file of workshopPhotos) {
+          try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newService.id}/${crypto.randomUUID()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('service-photos')
+              .upload(filePath, file);
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('service-photos')
+                .getPublicUrl(filePath);
+              await supabase.from('service_photos').insert({
+                service_id: newService.id,
+                file_url: urlData.publicUrl,
+                photo_type: 'aparelho',
+                description: 'Foto inicial (instalação)',
+              });
+            }
+          } catch (e) {
+            console.error('Error uploading installation photo:', e);
+          }
+        }
+      }
+
       handleClose();
     } catch (error: any) {
       console.error('Error creating installation:', error);
@@ -366,6 +395,7 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
     setPendingFormValues(null);
     setDiscountValue('');
     setAdjustment('');
+    setWorkshopPhotos([]);
   };
 
   return (
@@ -819,6 +849,58 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                         </FormItem>
                       )}
                     />
+
+                    {/* Photos do Equipamento — até 5 imagens */}
+                    <div className="p-4 bg-blue-50/40 rounded-lg border border-blue-100 space-y-3">
+                      <h4 className="font-medium text-blue-900 flex items-center gap-2 text-sm">
+                        <ImagePlus className="h-4 w-4" />
+                        Fotos do Equipamento ({workshopPhotos.length}/{MAX_PHOTOS})
+                      </h4>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Tire ou selecione até {MAX_PHOTOS} fotos do aparelho, etiqueta ou estado inicial.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {workshopPhotos.map((file, idx) => (
+                          <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border bg-background group">
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setWorkshopPhotos(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs leading-none"
+                              aria-label="Remover foto"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {workshopPhotos.length < MAX_PHOTOS && (
+                          <label className="w-20 h-20 rounded-lg border-2 border-dashed border-blue-300 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-100/50 transition-colors gap-1">
+                            <ImagePlus className="h-5 w-5 text-blue-500" />
+                            <span className="text-[10px] text-blue-600 font-medium">Adicionar</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+                                if (oversized.length > 0) {
+                                  toast.error(`${oversized.length} foto(s) excedem 10MB e foram ignoradas.`);
+                                }
+                                const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+                                setWorkshopPhotos(prev => [...prev, ...valid].slice(0, MAX_PHOTOS));
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
