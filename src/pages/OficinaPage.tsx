@@ -31,7 +31,7 @@ export default function OficinaPage() {
   const [serviceToAssign, setServiceToAssign] = useState<Service | null>(null);
   const [currentService, setCurrentService] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
 
   const queryClient = useQueryClient();
   const { data: services = [], isLoading } = useServices({ location: 'oficina' });
@@ -250,16 +250,28 @@ export default function OficinaPage() {
                     <div className="flex items-center justify-between bg-blue-500/10 p-3 rounded-lg border border-blue-200">
                       <div className="flex items-center gap-2 text-blue-600">
                         <UserPlus className="h-4 w-4" />
-                        <span className="text-sm font-bold">Livre para assumir</span>
+                        <span className="text-sm font-bold">
+                          {role === 'tecnico' ? 'Livre para assumir' : 'Sem técnico'}
+                        </span>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={(e) => handleAssumir(service.id, e)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold animate-pulse"
-                      >
-                        <Play className="h-4 w-4 mr-1" />
-                        ASSUMIR
-                      </Button>
+                      {role === 'tecnico' ? (
+                        <Button
+                          size="sm"
+                          onClick={(e) => handleAssumir(service.id, e)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold animate-pulse"
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          ASSUMIR
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => handleAssignClick(e, service)}
+                        >
+                          Atribuir Técnico
+                        </Button>
+                      )}
                     </div>
                   )}
 
