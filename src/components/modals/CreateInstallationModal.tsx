@@ -849,6 +849,58 @@ export function CreateInstallationModal({ open, onOpenChange }: CreateInstallati
                         </FormItem>
                       )}
                     />
+
+                    {/* Photos do Equipamento — até 5 imagens */}
+                    <div className="p-4 bg-blue-50/40 rounded-lg border border-blue-100 space-y-3">
+                      <h4 className="font-medium text-blue-900 flex items-center gap-2 text-sm">
+                        <ImagePlus className="h-4 w-4" />
+                        Fotos do Equipamento ({workshopPhotos.length}/{MAX_PHOTOS})
+                      </h4>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Tire ou selecione até {MAX_PHOTOS} fotos do aparelho, etiqueta ou estado inicial.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {workshopPhotos.map((file, idx) => (
+                          <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border bg-background group">
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setWorkshopPhotos(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs leading-none"
+                              aria-label="Remover foto"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {workshopPhotos.length < MAX_PHOTOS && (
+                          <label className="w-20 h-20 rounded-lg border-2 border-dashed border-blue-300 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-100/50 transition-colors gap-1">
+                            <ImagePlus className="h-5 w-5 text-blue-500" />
+                            <span className="text-[10px] text-blue-600 font-medium">Adicionar</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+                                if (oversized.length > 0) {
+                                  toast.error(`${oversized.length} foto(s) excedem 10MB e foram ignoradas.`);
+                                }
+                                const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+                                setWorkshopPhotos(prev => [...prev, ...valid].slice(0, MAX_PHOTOS));
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
