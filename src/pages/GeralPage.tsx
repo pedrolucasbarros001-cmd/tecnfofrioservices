@@ -108,6 +108,7 @@ export default function GeralPage() {
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
 
   // Modals - Management
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -471,6 +472,9 @@ export default function GeralPage() {
               <DropdownMenuItem onClick={() => setShowDeliveryModal(true)}>
                 Nova Entrega Direta
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowBudgetModal(true)}>
+                Novo Orçamento
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -675,6 +679,11 @@ export default function GeralPage() {
         <CreateServiceModal open={showServiceModal} onOpenChange={setShowServiceModal} />
         <CreateInstallationModal open={showInstallationModal} onOpenChange={setShowInstallationModal} />
         <CreateDeliveryModal open={showDeliveryModal} onOpenChange={setShowDeliveryModal} />
+        <CreateBudgetModal
+          open={showBudgetModal}
+          onOpenChange={setShowBudgetModal}
+          onSuccess={() => invalidateServiceQueries(queryClient)}
+        />
 
         {/* Management Modals - lazy rendered (only mount when needed) */}
         {showAssignModal && currentService && (
