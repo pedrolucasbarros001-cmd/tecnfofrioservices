@@ -1,48 +1,67 @@
-# Plano: 3 melhorias na criação de serviços e orçamentos
+# Plano: 4 correções operacionais
 
-## 1. Corrigir "erro ao criar orçamento" (URGENTE)
+## 1. "Atribuição desaparece no dia seguinte" (investigação + correção)
 
-**Causa raiz identificada:** A coluna `budgets.code` tem um índice UNIQUE (`budgets_code_key`). No `CreateBudgetModal.processSubmit` (linha 324), o código está a ser derivado do serviço de origem:
+**Hipótese principal (precisa confirmação):** o serviço continua atribuído no banco, mas **não aparece na agenda** porque o filtro de `agenda-services` em `GeralPage.tsx` (linha ~167) exclui status `concluidos`, `a_precificar`, `finalizado` e `cancelado`. Se o técnico move o serviço para `a_precificar` ou `concluidos`, ele desaparece da agenda mesmo sem perder data/técnico.
 
-```ts
-code: sourceService?.code?.replace(/^TF-/, 'ORC-')
-```
+**Hipótese secundária:** a função `lift_service_to_workshop` (levantar para oficina) limpa explicitamente `technician_id`, `scheduled_date` e `scheduled_shift`. Se o técnico aciona "Levantar para Oficina" no fim do dia, no dia seguinte aparece sem atribuição.
 
-Isto produz, por exemplo, `ORC-00261` a partir de `TF-00261`. Mas a base de dados já tem orçamentos com códigos sequenciais `ORC-NNNNN` gerados automaticamente pelo trigger `set_budget_code` (ex: `ORC-00261`, `ORC-00279`, `ORC-00283` já existem). Quando o número coincide, o INSERT viola a unique constraint e devolve "Erro ao criar orçamento".
+**Verificação a fazer (a pedir ao utilizador antes de mexer):** confirmar se, ao "desaparecer", o serviço ainda existe (e em que status) ou se simplesmente sumiu da agenda. Se confirmado:
 
-**Correção:** Remover por completo o campo `code` do payload do INSERT. O trigger `set_budget_code` (BEFORE INSERT WHEN code IS NULL) gera sempre um código único e sequencial.
+- Manter `lift_service_to_workshop` como está (é intencional limpar agenda quando vai para oficina).
+- Em `GeralPage.tsx` (consulta `agenda-services`), incluir também serviços com data agendada já passada que continuam ativos, para o utilizador ver atrasos. Já está — o problema é só o status. Avaliar adicionar `na_oficina` com data, ou criar uma vista "Atrasados" sem depender só do dia.
 
-- Em `src/components/modals/CreateBudgetModal.tsx` (linha ~323), retirar a linha `code: sourceService?.code?.replace(/^TF-/, 'ORC-'),` do objeto enviado ao `supabase.from('budgets').insert(...)`.
+→ **Antes de codificar, confirmo o cenário exato com o utilizador** (ver pergunta no fim).
 
-## 2. Atalho "Novo Orçamento" no dropdown da página Geral
+## 2. Adicionar pagamento por cheque
 
-Em `src/pages/GeralPage.tsx`:
+Suporte ao método `cheque` em todo o fluxo de pagamentos.
 
-- No dropdown "Novo Serviço" (linhas 457–475), adicionar um quarto item: **"Novo Orçamento"**.
-- Adicionar estado `showBudgetModal` e renderizar `<CreateBudgetModal open={showBudgetModal} onOpenChange={setShowBudgetModal} />` (sem `sourceService`, criação livre).
-- O import de `CreateBudgetModal` já existe.
+**Schema:**
+- Migration: nada a alterar — `service_payments.payment_method` é `text` livre. (Confirmar que não há CHECK constraint via `supabase--read_query`.)
 
-## 3. Upload de até 5 fotos na criação de Instalação e Entrega
+**Código:**
+- `src/types/database.ts` (linha 29): adicionar `'cheque'` ao tipo `PaymentMethod`.
+- `src/components/modals/RegisterPaymentModal.tsx`: incluir `{ value: 'cheque', label: 'Cheque' }` em `PAYMENT_METHODS` e em `METHOD_LABELS`.
+- `src/components/technician/FieldPaymentStep.tsx`: incluir a opção em `PAYMENT_METHODS`.
+- Verificar e atualizar qualquer outro local com lista de métodos (procurar `'mbway'` no projeto).
 
-A criação de **Reparação** (`CreateServiceModal`) já suporta multi-upload de até 5 fotos (`MAX_PHOTOS=5`, `<input type="file" multiple>`, validação de 10MB) e upload para o bucket `service-photos` com inserção em `service_photos`.
+## 3. Duplicação de pagamentos entre técnico e secretaria
 
-Replicar o mesmo bloco em:
-- `src/components/modals/CreateInstallationModal.tsx`
-- `src/components/modals/CreateDeliveryModal.tsx`
+**Análise:** o `RegisterPaymentModal` já tem proteção de 2 minutos por (`service_id`+`amount`+`payment_method`), mas:
+- A proteção não cruza com `service_payments` reportados pelo técnico em campo (`is_pending_validation=true`) que ficam pendentes de validação.
+- A secretaria pode registar um pagamento "novo" em vez de **validar** o pagamento pendente do técnico → fica duplicado.
 
-Cada modal recebe:
-- Estado `workshopPhotos: File[]` com limite 5 e tamanho ≤10MB.
-- Bloco visual idêntico ao da Reparação (grid de pré-visualizações + botão "Adicionar" com `<input multiple accept="image/*">`).
-- Após criar o serviço (no `onSuccess` do insert), iterar pelas fotos, fazer `supabase.storage.from('service-photos').upload(...)`, obter a `publicUrl` e inserir em `service_photos` com `photo_type='aparelho'`.
-- Limpar `workshopPhotos` no reset/close do modal.
+**Correções:**
+- Em `RegisterPaymentModal.handleSubmit`, antes do INSERT, se existir um `service_payments` com `is_pending_validation=true` para o mesmo serviço com valor próximo (±0.01) e método igual, mostrar aviso bloqueante: *"Existe pagamento pendente do técnico de €X — valida ou rejeita primeiro."* — com botão "Ir para validação" que rola até à secção amarela.
+- Banner visual no topo do modal quando há `pendingPayments.length > 0` (já são listados, mas não bloqueiam a criação).
+- Estender a janela de proteção contra duplicado: também considerar `received_by` diferente (técnico vs secretária) nos últimos 10 minutos com mesmo valor+método.
+
+## 4. Orçamentos a serem marcados como seguro
+
+**Verificação no banco (já feita):** os últimos 15 orçamentos têm todos `is_insurance_budget=false`. **Os dados estão corretos no Supabase.**
+
+**Hipótese:** o utilizador pode estar a confundir o badge visual ou a impressão. Vou:
+- Inspecionar `BudgetPrintPage.tsx` e `BudgetDetailPanel.tsx` para confirmar que o tratamento visual depende mesmo de `is_insurance_budget`.
+- Conferir se em `WorkshopFlowModals` ou `VisitFlowModals` (que enviam `is_insurance_budget` no insert) há algum default forçado a `true`.
+- Verificar `EditBudgetDetailsModal` para garantir que ao editar não força a flag.
+- Se nada estiver a forçar `true`, alinhar com utilizador: provavelmente é confusão de UX (campos "Marca/Processo de garantia" aparecem em todos e podem dar essa impressão).
 
 ## Detalhes técnicos
 
 | Ficheiro | Alteração |
 |---|---|
-| `src/components/modals/CreateBudgetModal.tsx` | Remover `code:` do INSERT (deixar o trigger `set_budget_code` gerar). |
-| `src/pages/GeralPage.tsx` | +1 estado `showBudgetModal`, +1 `<DropdownMenuItem>` "Novo Orçamento", +1 `<CreateBudgetModal>` montado. |
-| `src/components/modals/CreateInstallationModal.tsx` | Adicionar bloco de fotos (estado, UI, upload pós-criação). |
-| `src/components/modals/CreateDeliveryModal.tsx` | Adicionar bloco de fotos (estado, UI, upload pós-criação). |
+| `src/types/database.ts` | adicionar `'cheque'` ao `PaymentMethod` |
+| `src/components/modals/RegisterPaymentModal.tsx` | método cheque + bloqueio quando existe pagamento pendente do técnico |
+| `src/components/technician/FieldPaymentStep.tsx` | método cheque |
+| `src/pages/GeralPage.tsx` (após confirmação do cenário 1) | ajuste no filtro de `agenda-services` |
+| Inspecionar (sem editar a princípio): `BudgetPrintPage.tsx`, `WorkshopFlowModals.tsx`, `VisitFlowModals.tsx` |
 
-Não há alterações de schema nem novas migrations — o bucket `service-photos` e a tabela `service_photos` já existem.
+Sem alterações de schema.
+
+## Pergunta para o utilizador (antes de implementar a #1)
+
+Quando dizes que "no dia seguinte a atribuição, dia e hora desaparecem", o serviço:
+- (a) deixa de aparecer na **agenda semanal** mas ainda existe em "Serviços" (com técnico e data lá)?
+- (b) realmente perde técnico/data no banco (aparece sem técnico em qualquer ecrã)?
+- (c) acontece sempre depois de uma ação específica (ex.: "Levantar para Oficina", técnico finalizar a visita, ir para "A Precificar")?

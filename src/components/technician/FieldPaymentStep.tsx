@@ -37,6 +37,7 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
     { value: 'multibanco', label: 'Multibanco' },
     { value: 'transferencia', label: 'Transferência' },
     { value: 'mbway', label: 'MB Way' },
+    { value: 'cheque', label: 'Cheque' },
 ];
 
 interface FieldPaymentStepProps {
