@@ -50,6 +50,7 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'multibanco', label: 'Multibanco' },
   { value: 'transferencia', label: 'Transferência' },
   { value: 'mbway', label: 'MB Way' },
+  { value: 'cheque', label: 'Cheque' },
 ];
 
 const METHOD_LABELS: Record<string, string> = {
@@ -57,6 +58,7 @@ const METHOD_LABELS: Record<string, string> = {
   multibanco: 'Multibanco',
   transferencia: 'Transferência',
   mbway: 'MB Way',
+  cheque: 'Cheque',
 };
 
 export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPaymentModalProps) {
