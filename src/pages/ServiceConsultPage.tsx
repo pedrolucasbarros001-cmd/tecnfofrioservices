@@ -59,6 +59,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   multibanco: 'Multibanco',
   transferencia: 'Transferência',
   mbway: 'MB WAY',
+  cheque: 'Cheque',
 };
 
 type FullService = Service & {
