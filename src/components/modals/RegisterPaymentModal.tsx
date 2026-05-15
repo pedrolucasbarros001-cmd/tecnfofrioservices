@@ -95,21 +95,35 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
   const handleSubmit = async () => {
     if (!service || paymentValue <= 0) return;
 
+    // Block creation when there is a pending technician-reported payment with similar amount/method
+    const matchingPending = (pendingPayments || []).find(
+      (p) =>
+        Math.abs(Number(p.amount) - paymentValue) < 0.01 &&
+        (p.payment_method || '') === paymentMethod
+    );
+    if (matchingPending) {
+      toast.warning(
+        `Já existe um pagamento pendente do técnico de €${Number(matchingPending.amount).toFixed(2)} (${METHOD_LABELS[matchingPending.payment_method || ''] || matchingPending.payment_method}). Valida-o em vez de criar um novo para evitar duplicação.`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Check for duplicate payment
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      // Check for duplicate payment (same value+method on this service in the last 10 minutes,
+      // independent of who registered it — covers technician+secretary double entry)
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: duplicates } = await supabase
         .from('service_payments')
-        .select('id')
+        .select('id, received_by')
         .eq('service_id', service.id)
         .eq('amount', paymentValue)
         .eq('payment_method', paymentMethod)
-        .gte('created_at', twoMinutesAgo)
+        .gte('created_at', tenMinutesAgo)
         .limit(1);
 
       if (duplicates && duplicates.length > 0) {
-        toast.warning(`Já existe um pagamento de €${paymentValue.toFixed(2)} (${paymentMethod}) registado nos últimos 2 minutos.`);
+        toast.warning(`Já existe um pagamento de €${paymentValue.toFixed(2)} (${METHOD_LABELS[paymentMethod] || paymentMethod}) registado nos últimos 10 minutos. Verifica antes de duplicar.`);
         setIsSubmitting(false);
         return;
       }
