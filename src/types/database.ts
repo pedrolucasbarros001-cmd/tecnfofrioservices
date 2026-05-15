@@ -26,7 +26,7 @@ export type ServiceStatus =
 
 export type ScheduledShift = 'manha' | 'tarde' | 'noite' | string;
 
-export type PaymentMethod = 'dinheiro' | 'multibanco' | 'transferencia' | 'mbway';
+export type PaymentMethod = 'dinheiro' | 'multibanco' | 'transferencia' | 'mbway' | 'cheque';
 
 export type PhotoType =
   | 'visita'       // Genérica (legado)
