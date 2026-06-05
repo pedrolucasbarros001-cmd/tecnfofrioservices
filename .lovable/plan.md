@@ -1,67 +1,47 @@
-# Plano: 4 correções operacionais
 
-## 1. "Atribuição desaparece no dia seguinte" (investigação + correção)
+## Contexto
 
-**Hipótese principal (precisa confirmação):** o serviço continua atribuído no banco, mas **não aparece na agenda** porque o filtro de `agenda-services` em `GeralPage.tsx` (linha ~167) exclui status `concluidos`, `a_precificar`, `finalizado` e `cancelado`. Se o técnico move o serviço para `a_precificar` ou `concluidos`, ele desaparece da agenda mesmo sem perder data/técnico.
+No código atual `cheque` já está listado em `RegisterPaymentModal.tsx` (linhas 48–62) e em `FieldPaymentStep.tsx`, e o tipo `PaymentMethod` já o inclui. O insert na BD não tem CHECK constraint sobre `payment_method`, portanto não há bloqueio de schema. Para o orçamento seguro, a RLS de `INSERT` em `budgets` permite `dono | secretaria | tecnico`, sem restrições adicionais sobre `is_insurance_budget`.
 
-**Hipótese secundária:** a função `lift_service_to_workshop` (levantar para oficina) limpa explicitamente `technician_id`, `scheduled_date` e `scheduled_shift`. Se o técnico aciona "Levantar para Oficina" no fim do dia, no dia seguinte aparece sem atribuição.
+Isto significa que **provavelmente o problema é runtime/UX**, não estrutural. Preciso de capturar o erro real antes de mudar código.
 
-**Verificação a fazer (a pedir ao utilizador antes de mexer):** confirmar se, ao "desaparecer", o serviço ainda existe (e em que status) ou se simplesmente sumiu da agenda. Se confirmado:
+## Plano de execução
 
-- Manter `lift_service_to_workshop` como está (é intencional limpar agenda quando vai para oficina).
-- Em `GeralPage.tsx` (consulta `agenda-services`), incluir também serviços com data agendada já passada que continuam ativos, para o utilizador ver atrasos. Já está — o problema é só o status. Avaliar adicionar `na_oficina` com data, ou criar uma vista "Atrasados" sem depender só do dia.
+### 1. Diagnóstico do "Pagamento cheque está em desenvolvimento"
 
-→ **Antes de codificar, confirmo o cenário exato com o utilizador** (ver pergunta no fim).
+1. Pedir um print/exato do que aparece (toast, modal, etiqueta "em breve").
+2. Confirmar em runtime que o `<Select>` mostra a opção e que o submit chega ao `INSERT` (adicionar `console.log` temporário em `handleSubmit`).
+3. Cenários prováveis:
+   - **Cache do bundle antigo** — a sessão da secretaria pode ter versão pré-cheque. Fix: pedir refresh forçado (Ctrl+Shift+R) e validar.
+   - **Toast "Já existe pagamento pendente"** — a guarda em `RegisterPaymentModal.tsx:104-109` bloqueia se há pagamento do técnico com mesmo valor+método. Pode parecer "não funciona". Fix UX: alterar o toast bloqueante para deixar prosseguir quando o utilizador é dono/secretaria e escolher conscientemente (botão "Registar mesmo assim").
+   - **Bug invisível**: caso o `humanizeError` esteja a mostrar mensagem genérica, log do erro real para a consola.
 
-## 2. Adicionar pagamento por cheque
+### 2. Diagnóstico do "Secretaria não cria orçamento Seguro"
 
-Suporte ao método `cheque` em todo o fluxo de pagamentos.
+1. Pedir o **texto exato do toast vermelho** (`Erro ao criar orçamento: …`). É a chave.
+2. Hipóteses prováveis (por ordem de probabilidade):
+   - **`source_service_id` lockado por outro orçamento pendente** — após criar, faz `UPDATE services SET awaiting_budget_approval=true` (linha 343). Se `awaiting_budget_approval` já era true, a UI bloqueia abrir de novo. Verificar.
+   - **RLS no UPDATE de `services`** — secretaria está autorizada, mas confirmar que o erro não vem desse passo (`is_dono OR is_secretaria OR assigned_tech`).
+   - **Validação Zod do formulário** ao marcar "Seguro" — alguma combinação de campos obrigatórios fica vazia (ex.: cliente sem NIF). Inspecionar branch `is_insurance_budget=true` no `handleSubmit`/`handleCreateBudget`.
+   - **Política de view de `budgets`** — depois do insert a UI lê de volta com `select`. A view-policy exige `is_dono OR is_secretaria OR (source_service_id IS NOT NULL AND can_access_service(...))`. Secretaria passa, mas se `select` falhar silenciosamente pode parecer "erro". Validar.
+3. Reproduzir num utilizador com role `secretaria` (eu posso forçar via test DB) e capturar o erro do `postgres_logs`.
 
-**Schema:**
-- Migration: nada a alterar — `service_payments.payment_method` é `text` livre. (Confirmar que não há CHECK constraint via `supabase--read_query`.)
+### 3. Correções propostas após confirmar causa
 
-**Código:**
-- `src/types/database.ts` (linha 29): adicionar `'cheque'` ao tipo `PaymentMethod`.
-- `src/components/modals/RegisterPaymentModal.tsx`: incluir `{ value: 'cheque', label: 'Cheque' }` em `PAYMENT_METHODS` e em `METHOD_LABELS`.
-- `src/components/technician/FieldPaymentStep.tsx`: incluir a opção em `PAYMENT_METHODS`.
-- Verificar e atualizar qualquer outro local com lista de métodos (procurar `'mbway'` no projeto).
-
-## 3. Duplicação de pagamentos entre técnico e secretaria
-
-**Análise:** o `RegisterPaymentModal` já tem proteção de 2 minutos por (`service_id`+`amount`+`payment_method`), mas:
-- A proteção não cruza com `service_payments` reportados pelo técnico em campo (`is_pending_validation=true`) que ficam pendentes de validação.
-- A secretaria pode registar um pagamento "novo" em vez de **validar** o pagamento pendente do técnico → fica duplicado.
-
-**Correções:**
-- Em `RegisterPaymentModal.handleSubmit`, antes do INSERT, se existir um `service_payments` com `is_pending_validation=true` para o mesmo serviço com valor próximo (±0.01) e método igual, mostrar aviso bloqueante: *"Existe pagamento pendente do técnico de €X — valida ou rejeita primeiro."* — com botão "Ir para validação" que rola até à secção amarela.
-- Banner visual no topo do modal quando há `pendingPayments.length > 0` (já são listados, mas não bloqueiam a criação).
-- Estender a janela de proteção contra duplicado: também considerar `received_by` diferente (técnico vs secretária) nos últimos 10 minutos com mesmo valor+método.
-
-## 4. Orçamentos a serem marcados como seguro
-
-**Verificação no banco (já feita):** os últimos 15 orçamentos têm todos `is_insurance_budget=false`. **Os dados estão corretos no Supabase.**
-
-**Hipótese:** o utilizador pode estar a confundir o badge visual ou a impressão. Vou:
-- Inspecionar `BudgetPrintPage.tsx` e `BudgetDetailPanel.tsx` para confirmar que o tratamento visual depende mesmo de `is_insurance_budget`.
-- Conferir se em `WorkshopFlowModals` ou `VisitFlowModals` (que enviam `is_insurance_budget` no insert) há algum default forçado a `true`.
-- Verificar `EditBudgetDetailsModal` para garantir que ao editar não força a flag.
-- Se nada estiver a forçar `true`, alinhar com utilizador: provavelmente é confusão de UX (campos "Marca/Processo de garantia" aparecem em todos e podem dar essa impressão).
-
-## Detalhes técnicos
-
-| Ficheiro | Alteração |
+| Sintoma confirmado | Fix |
 |---|---|
-| `src/types/database.ts` | adicionar `'cheque'` ao `PaymentMethod` |
-| `src/components/modals/RegisterPaymentModal.tsx` | método cheque + bloqueio quando existe pagamento pendente do técnico |
-| `src/components/technician/FieldPaymentStep.tsx` | método cheque |
-| `src/pages/GeralPage.tsx` (após confirmação do cenário 1) | ajuste no filtro de `agenda-services` |
-| Inspecionar (sem editar a princípio): `BudgetPrintPage.tsx`, `WorkshopFlowModals.tsx`, `VisitFlowModals.tsx` |
+| Cache antigo | Bump versão do bundle (alterar `src/main.tsx` ou pedir reload) |
+| Bloqueio por pendente | Tornar bloqueio em aviso com confirmação |
+| Erro RLS no insert/update | Ajustar política específica |
+| Falha de validação Zod oculta | Mostrar `form.formState.errors` no toast, marcar campo |
+| `awaiting_budget_approval` já a true | Adicionar botão "Cancelar orçamento pendente" antes de criar novo |
 
-Sem alterações de schema.
+### 4. Não tocar
 
-## Pergunta para o utilizador (antes de implementar a #1)
+- Não alterar lista de métodos de pagamento (já contém cheque).
+- Não alterar RLS de `budgets` sem confirmação do erro real (risco de regressão).
+- Comportamento do "Levantar para Oficina" e do tracker de duplicação fica como está.
 
-Quando dizes que "no dia seguinte a atribuição, dia e hora desaparecem", o serviço:
-- (a) deixa de aparecer na **agenda semanal** mas ainda existe em "Serviços" (com técnico e data lá)?
-- (b) realmente perde técnico/data no banco (aparece sem técnico em qualquer ecrã)?
-- (c) acontece sempre depois de uma ação específica (ex.: "Levantar para Oficina", técnico finalizar a visita, ir para "A Precificar")?
+## Pergunta que preciso de resposta antes de codificar
+
+**Mensagem exata do toast vermelho ao guardar o orçamento Seguro** (ou print do ecrã). Sem isto, qualquer fix em `budgets` é palpite. Para o cheque, basta-me saber se vês a opção no dropdown e o que aparece ao clicar "Registar".
