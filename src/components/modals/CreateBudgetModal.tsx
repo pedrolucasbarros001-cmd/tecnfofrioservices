@@ -347,8 +347,9 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       handleClose();
       onSuccess?.();
     } catch (error: any) {
-      console.error('Error creating budget:', error);
-      toast.error(`Erro ao criar orçamento: ${error?.message || 'Erro desconhecido'}`);
+      console.error('[CreateBudgetModal] Error creating budget (raw):', error);
+      const detail = error?.message || error?.error_description || error?.hint || error?.details || 'Erro desconhecido';
+      toast.error(`Erro ao criar orçamento: ${detail}`);
     } finally {
       setIsLoading(false);
     }
@@ -439,7 +440,17 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+            <form onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+              console.error('[CreateBudgetModal] Validation errors:', errors);
+              const firstError = Object.entries(errors)[0];
+              if (firstError) {
+                const [field, err] = firstError as [string, any];
+                const msg = err?.message || err?.root?.message || 'Verifica os campos obrigatórios.';
+                toast.error(`Não foi possível guardar: ${field} — ${msg}`);
+              } else {
+                toast.error('Formulário inválido. Verifica os campos obrigatórios.');
+              }
+            })} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                 {hasMissingInfo && (
                   <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-900">

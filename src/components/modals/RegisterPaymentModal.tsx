@@ -177,9 +177,10 @@ export function RegisterPaymentModal({ service, open, onOpenChange }: RegisterPa
       }
       onOpenChange(false);
       resetForm();
-    } catch (error) {
-      console.error('Error registering payment:', error);
-      toast.error(humanizeError(error));
+    } catch (error: any) {
+      console.error('[RegisterPaymentModal] Error registering payment (raw):', error, { paymentMethod, paymentValue });
+      const detail = error?.message || error?.error_description || error?.hint || error?.details;
+      toast.error(detail ? `Erro ao registar pagamento: ${detail}` : humanizeError(error));
     } finally {
       setIsSubmitting(false);
     }
