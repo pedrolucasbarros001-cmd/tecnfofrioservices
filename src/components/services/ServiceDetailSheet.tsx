@@ -454,6 +454,61 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
+  // Dono-only: remover artigo já registado do histórico (linha individual)
+  const handleDeleteArticle = async (part: any) => {
+    try {
+      const lineTotal = (Number(part.cost) || 0) * (Number(part.quantity) || 1);
+      const { error } = await supabase
+        .from('service_parts')
+        .delete()
+        .eq('id', part.id);
+      if (error) throw error;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'servico_editado',
+        description: `Dono removeu artigo do histórico: ${part.part_name || 'Artigo'} (€${lineTotal.toFixed(2)})`,
+        isPublic: false,
+      });
+
+      invalidateServiceQueries(queryClient, service.id);
+      toast.success('Artigo removido do histórico');
+    } catch (err: any) {
+      console.error('Error deleting article:', err);
+      toast.error(err?.message || 'Erro ao remover artigo');
+    }
+  };
+
+  // Dono-only: remover toda uma intervenção (grupo de artigos)
+  const handleDeleteArticleGroup = async (parts: any[]) => {
+    try {
+      const ids = parts.map(p => p.id);
+      const total = parts.reduce((s, p) => s + (Number(p.cost) || 0) * (Number(p.quantity) || 1), 0);
+      const { error } = await supabase
+        .from('service_parts')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'servico_editado',
+        description: `Dono removeu intervenção completa do histórico (${parts.length} artigo(s), €${total.toFixed(2)})`,
+        isPublic: false,
+      });
+
+      invalidateServiceQueries(queryClient, service.id);
+      toast.success('Intervenção removida do histórico');
+    } catch (err: any) {
+      console.error('Error deleting article group:', err);
+      toast.error(err?.message || 'Erro ao remover intervenção');
+    }
+  };
+
+
+
 
   const handleDeletePhoto = async (photoId: string) => {
     try {
@@ -898,9 +953,26 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                 <User className="h-3 w-3" />
                                 <span>{authorName}</span>
                               </div>
-                              {firstDate && !isNaN(new Date(firstDate).getTime()) && (
-                                <span>{safeFormat(firstDate, 'dd/MM/yyyy', { locale: pt })}</span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {firstDate && !isNaN(new Date(firstDate).getTime()) && (
+                                  <span>{safeFormat(firstDate, 'dd/MM/yyyy', { locale: pt })}</span>
+                                )}
+                                {role === 'dono' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Remover toda a intervenção"
+                                    onClick={() => {
+                                      if (window.confirm(`Remover esta intervenção completa (${nonRequestedParts.length} artigo(s))? Esta acção não pode ser desfeita.`)) {
+                                        handleDeleteArticleGroup(nonRequestedParts);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
 
                             <table className="w-full text-xs">
@@ -911,6 +983,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                   <th className="text-center py-1 font-normal">Qtd</th>
                                   <th className="text-right py-1 font-normal">Preço</th>
                                   <th className="text-right py-1 font-normal">Total</th>
+                                  {role === 'dono' && <th className="w-8" />}
                                 </tr>
                               </thead>
                               <tbody>
@@ -923,11 +996,29 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                                       <td className="py-2 text-center">{part.quantity}</td>
                                       <td className="py-2 text-right">{(Number(part.cost) || 0).toFixed(2)}€</td>
                                       <td className="py-2 text-right font-semibold">{(Number(lineTotal) || 0).toFixed(2)}€</td>
+                                      {role === 'dono' && (
+                                        <td className="py-2 text-right">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            title="Remover artigo"
+                                            onClick={() => {
+                                              if (window.confirm(`Remover o artigo "${part.part_name}"? Esta acção não pode ser desfeita.`)) {
+                                                handleDeleteArticle(part);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </td>
+                                      )}
                                     </tr>
                                   );
                                 })}
                               </tbody>
                             </table>
+
                             <div className="flex justify-end text-[11px] font-bold border-t pt-1 mt-1 text-primary">
                               Subtotal: {(Number(groupSubtotal) || 0).toFixed(2)} €
                             </div>
