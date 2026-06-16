@@ -467,7 +467,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
-        actionType: 'edicao',
+        actionType: 'servico_editado',
         description: `Dono removeu artigo do histórico: ${part.part_name || 'Artigo'} (€${lineTotal.toFixed(2)})`,
         isPublic: false,
       });
@@ -494,7 +494,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
       await logActivity({
         serviceId: service.id,
         actorId: user?.id,
-        actionType: 'edicao',
+        actionType: 'servico_editado',
         description: `Dono removeu intervenção completa do histórico (${parts.length} artigo(s), €${total.toFixed(2)})`,
         isPublic: false,
       });
