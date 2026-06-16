@@ -454,6 +454,61 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
     }
   };
 
+  // Dono-only: remover artigo já registado do histórico (linha individual)
+  const handleDeleteArticle = async (part: any) => {
+    try {
+      const lineTotal = (Number(part.cost) || 0) * (Number(part.quantity) || 1);
+      const { error } = await supabase
+        .from('service_parts')
+        .delete()
+        .eq('id', part.id);
+      if (error) throw error;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'edicao',
+        description: `Dono removeu artigo do histórico: ${part.part_name || 'Artigo'} (€${lineTotal.toFixed(2)})`,
+        isPublic: false,
+      });
+
+      invalidateServiceQueries(queryClient, service.id);
+      toast.success('Artigo removido do histórico');
+    } catch (err: any) {
+      console.error('Error deleting article:', err);
+      toast.error(err?.message || 'Erro ao remover artigo');
+    }
+  };
+
+  // Dono-only: remover toda uma intervenção (grupo de artigos)
+  const handleDeleteArticleGroup = async (parts: any[]) => {
+    try {
+      const ids = parts.map(p => p.id);
+      const total = parts.reduce((s, p) => s + (Number(p.cost) || 0) * (Number(p.quantity) || 1), 0);
+      const { error } = await supabase
+        .from('service_parts')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+
+      await logActivity({
+        serviceId: service.id,
+        actorId: user?.id,
+        actionType: 'edicao',
+        description: `Dono removeu intervenção completa do histórico (${parts.length} artigo(s), €${total.toFixed(2)})`,
+        isPublic: false,
+      });
+
+      invalidateServiceQueries(queryClient, service.id);
+      toast.success('Intervenção removida do histórico');
+    } catch (err: any) {
+      console.error('Error deleting article group:', err);
+      toast.error(err?.message || 'Erro ao remover intervenção');
+    }
+  };
+
+
+
 
   const handleDeletePhoto = async (photoId: string) => {
     try {
