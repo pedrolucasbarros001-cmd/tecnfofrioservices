@@ -140,6 +140,8 @@ export function CustomerDetailSheet({
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const { role } = useAuth();
   const isDono = role === 'dono';
+  const isSecretaria = role === 'secretaria';
+  const canCreateBudget = isDono || isSecretaria;
   const queryClient = useQueryClient();
   const updateCustomer = useUpdateCustomer();
   const [showDirectBudgetModal, setShowDirectBudgetModal] = useState(false);
