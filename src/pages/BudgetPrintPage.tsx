@@ -321,7 +321,7 @@ export default function BudgetPrintPage() {
         )}
 
         {/* Fault Description */}
-        {budget.fault_description && (
+        {budget.is_insurance_budget && budget.fault_description && (
           <>
             <section className="mb-2">
               <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Descrição do Orçamento</h2>
