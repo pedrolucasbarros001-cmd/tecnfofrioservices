@@ -1,37 +1,46 @@
-## Diagnóstico
-
-Confirmei na base de dados que **todos os orçamentos recentes estão correctamente guardados como `is_insurance_budget = false`** (zero registos com `true`). O dado está certo — o problema é puramente visual:
-
-1. A **folha de impressão** (`/print/budget/:id`) renderiza sempre com o título **"Relatório / Orçamento"** e o bloco "Descrição do Orçamento" da avaria, que é o layout do modelo de **Seguro**. Não muda quando o orçamento é simples.
-2. O **modal de tipo de serviço** no atalho a partir do perfil do cliente (`CreateServiceFromCustomerModal` em `CustomerDetailSheet.tsx`) tem o cartão "Orçamento" gated por `isDono`, pelo que a secretaria não o vê. (A página `/orcamentos` tem o seu próprio botão "Criar Orçamento" — não é alterada aqui.)
-
 ## O que vou fazer
 
-### 1. Layout de impressão sensível ao tipo de orçamento (`src/pages/BudgetPrintPage.tsx`)
+Adicionar notificação sonora para todos os utilizadores (telemóvel e computador), com um toggle visível no cabeçalho do painel de Notificações para ligar/desligar.
 
-- Título dinâmico:
-  - `is_insurance_budget === true` → **"Relatório / Orçamento"** (modelo seguro, como hoje).
-  - `is_insurance_budget === false` (ou null) → **"Orçamento"** (modelo simples).
-- Seção "Descrição do Orçamento" (texto da avaria) passa a renderizar apenas quando `is_insurance_budget === true`. No modelo simples deixa de aparecer — fica só Equipamento + Artigos + Totais + Notas.
-- A seção "Equipamento" mantém-se em ambos os modelos (continua condicional aos campos existirem).
-- Sem mudanças de dados, query ou rotas — apenas renderização condicional.
+### 1. Hook `src/hooks/useNotificationSound.ts` (novo)
 
-### 2. Botão "Orçamento" para a secretaria no atalho do cliente (`src/components/shared/CustomerDetailSheet.tsx`)
+- Estado `soundEnabled` persistido em `localStorage` (chave `notification-sound-enabled`, default `true`).
+- Função `setSoundEnabled(v)` que actualiza estado + localStorage.
+- Função `playNotificationSound()` que usa a **Web Audio API** para gerar um bip curto (2 tons agradáveis, ~300ms) — sem ficheiro de áudio, sem dependências, funciona em qualquer browser desktop e mobile.
+- Mantém um `AudioContext` singleton lazy. No primeiro toque/click do utilizador (`resume()`) destrava o áudio no iOS/Safari.
 
-- Atualmente o cartão "Orçamento" no `CreateServiceFromCustomerModal` aparece com `{isDono && (...)}` e o `CreateBudgetModal` também só monta se `isDono`.
-- Alterar a regra de visibilidade para **`isDono || isSecretaria`**:
-  - Adicionar `const isSecretaria = role === 'secretaria';`.
-  - Passar `canCreateBudget = isDono || isSecretaria` ao `CreateServiceFromCustomerModal` e substituir os `isDono` que controlam o cartão "Orçamento", a grelha (`grid-cols-2 sm:grid-cols-4`) e a montagem do `CreateBudgetModal`.
-- O `CreateBudgetModal` já existe, já abre com a checkbox de Seguro **desmarcada por defeito** e já grava `is_insurance_budget: false` quando não marcada — nenhuma alteração na lógica de criação.
-- Técnico continua sem ver o cartão "Orçamento" (mantém-se restrito).
+### 2. Componente `src/components/shared/NotificationSoundToggle.tsx` (novo)
+
+- Botão ícone pequeno (`Volume2` / `VolumeX` do lucide).
+- Toggle do `soundEnabled`. Quando o utilizador activa, toca um bip de teste curto (também serve para "destravar" o áudio em iOS).
+- Tooltip "Som de notificação: Ativado/Desativado".
+
+### 3. `src/components/shared/NotificationPanel.tsx`
+
+- Inserir `<NotificationSoundToggle />` no cabeçalho, **entre o badge de contagem e o botão "Marcar todas"** (como na imagem), usando `flex-1 justify-end` para o agrupar à direita junto ao "Marcar todas".
+
+### 4. `src/components/layouts/AppLayout.tsx`
+
+- Adicionar `useEffect` com subscrição Supabase Realtime a `postgres_changes` evento `INSERT` na tabela `notifications` filtrada por `user_id=eq.${user.id}`.
+- Quando chega novo registo **e `soundEnabled === true`** → chamar `playNotificationSound()`.
+- Cleanup com `supabase.removeChannel`.
+- Mantém o `useRealtime('notifications', ...)` existente para invalidar queries — não é alterado.
+
+## Detalhes técnicos
+
+- **Sem ficheiros de áudio**: o bip é sintetizado em runtime (osciladores 880Hz → 660Hz, envelope curto). Evita download de assets e problemas de autoplay com `<audio src>`.
+- **Mobile (iOS/Android)**: WebAudio exige gesto do utilizador antes do primeiro `play`. Como a preferência fica persistida e o toggle envolve um clique, o `AudioContext.resume()` é chamado no toggle e está pronto para futuras notificações na sessão.
+- **Performance**: a subscrição realtime já existe globalmente no `AppLayout`; só adicionamos um segundo canal específico para o `playSound` (mais simples do que cruzar com o hook existente que só invalida cache).
+- **Sem alterações DB / RLS**: a tabela `notifications` e a sua publicação realtime já existem.
 
 ## Fora de âmbito
 
-- Não mexo na criação do orçamento via fluxo do técnico (`VisitFlowModals` / `WorkshopFlowModals`) — já grava `is_insurance_budget = false` corretamente.
-- Não mexo na página `/orcamentos` nem no badge "Seguro" no `BudgetDetailPanel` (já condicional à flag e correto).
-- Não toco em RLS, schema ou migrações.
+- Notificações push do browser (Web Push API) — exige permissões e Service Worker; podemos abordar separadamente se quiseres.
+- Escolha de toques personalizados — fica para iteração futura.
 
-## Ficheiros a editar
+## Ficheiros
 
-- `src/pages/BudgetPrintPage.tsx` — título e bloco "Descrição do Orçamento" condicionais a `budget.is_insurance_budget`.
-- `src/components/shared/CustomerDetailSheet.tsx` — permitir secretaria ver o cartão "Orçamento" e abrir `CreateBudgetModal`.
+- **Novo:** `src/hooks/useNotificationSound.ts`
+- **Novo:** `src/components/shared/NotificationSoundToggle.tsx`
+- **Editar:** `src/components/shared/NotificationPanel.tsx` (cabeçalho)
+- **Editar:** `src/components/layouts/AppLayout.tsx` (subscrição realtime + play)
