@@ -38,6 +38,7 @@ interface Budget {
   estimated_total: number | null;
   valid_until: string | null;
   pricing_description: string | null;
+  is_insurance_budget: boolean | null;
   customer: Customer | null;
 }
 
@@ -277,7 +278,7 @@ export default function BudgetPrintPage() {
         {/* Document Title */}
         <div className="mb-6 flex items-end justify-between">
           <h2 className="text-xl font-bold border-b-2 border-slate-900 pr-8">
-            Relatório / Orçamento
+            {budget.is_insurance_budget ? 'Relatório / Orçamento' : 'Orçamento'}
           </h2>
           <div className="text-right">
             <p className="text-sm font-mono font-bold">{budget.code}</p>
@@ -320,7 +321,7 @@ export default function BudgetPrintPage() {
         )}
 
         {/* Fault Description */}
-        {budget.fault_description && (
+        {budget.is_insurance_budget && budget.fault_description && (
           <>
             <section className="mb-2">
               <h2 className="text-xs font-semibold mb-0.5 border-b pb-0.5">Descrição do Orçamento</h2>

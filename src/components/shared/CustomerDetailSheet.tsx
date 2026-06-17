@@ -140,6 +140,8 @@ export function CustomerDetailSheet({
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const { role } = useAuth();
   const isDono = role === 'dono';
+  const isSecretaria = role === 'secretaria';
+  const canCreateBudget = isDono || isSecretaria;
   const queryClient = useQueryClient();
   const updateCustomer = useUpdateCustomer();
   const [showDirectBudgetModal, setShowDirectBudgetModal] = useState(false);
@@ -646,6 +648,7 @@ export function CustomerDetailSheet({
         customer={customer}
         onSuccess={handleServiceUpdated}
         isDono={isDono}
+        canCreateBudget={canCreateBudget}
         onSwitchToBudget={() => {
           setShowCreateServiceModal(false);
           setShowDirectBudgetModal(true);
@@ -666,7 +669,7 @@ export function CustomerDetailSheet({
         serviceId={currentServiceId || ''}
       />
 
-      {isDono && (
+      {canCreateBudget && (
         <CreateBudgetModal
           open={showDirectBudgetModal}
           onOpenChange={setShowDirectBudgetModal}
@@ -684,6 +687,7 @@ interface CreateServiceFromCustomerModalProps {
   customer: Customer;
   onSuccess?: () => void;
   isDono: boolean;
+  canCreateBudget: boolean;
   onSwitchToBudget: () => void;
 }
 
@@ -725,6 +729,7 @@ function CreateServiceFromCustomerModal({
   customer,
   onSuccess,
   isDono,
+  canCreateBudget,
   onSwitchToBudget,
 }: CreateServiceFromCustomerModalProps) {
   const [step, setStep] = useState<'type' | 'location' | 'form'>('type');
@@ -928,7 +933,7 @@ function CreateServiceFromCustomerModal({
         {step === 'type' ? (
           <div className={cn(
             "grid gap-4 py-8 px-6",
-            isDono ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+            canCreateBudget ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
           )}>
             <button
               onClick={() => {
@@ -986,7 +991,7 @@ function CreateServiceFromCustomerModal({
               </div>
             </button>
 
-            {isDono && (
+            {canCreateBudget && (
               <button
                 onClick={onSwitchToBudget}
                 className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-100 transition-all group"
