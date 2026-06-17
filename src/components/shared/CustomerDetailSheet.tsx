@@ -991,7 +991,7 @@ function CreateServiceFromCustomerModal({
               </div>
             </button>
 
-            {isDono && (
+            {canCreateBudget && (
               <button
                 onClick={onSwitchToBudget}
                 className="flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-100 transition-all group"
