@@ -38,6 +38,7 @@ interface Budget {
   estimated_total: number | null;
   valid_until: string | null;
   pricing_description: string | null;
+  is_insurance_budget: boolean | null;
   customer: Customer | null;
 }
 
