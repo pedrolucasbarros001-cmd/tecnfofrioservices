@@ -687,6 +687,7 @@ interface CreateServiceFromCustomerModalProps {
   customer: Customer;
   onSuccess?: () => void;
   isDono: boolean;
+  canCreateBudget: boolean;
   onSwitchToBudget: () => void;
 }
 
