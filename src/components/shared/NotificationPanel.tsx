@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { NotificationSoundToggle } from '@/components/shared/NotificationSoundToggle';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -142,7 +143,7 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md flex flex-col">
         <SheetHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <SheetTitle>Notificações</SheetTitle>
               {unreadCount > 0 && (
@@ -151,17 +152,20 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
                 </Badge>
               )}
             </div>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => markAllAsReadMutation.mutate()}
-                disabled={markAllAsReadMutation.isPending}
-              >
-                <CheckCheck className="h-4 w-4 mr-1" />
-                Marcar todas
-              </Button>
-            )}
+            <div className="flex items-center gap-1 mr-6">
+              <NotificationSoundToggle />
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => markAllAsReadMutation.mutate()}
+                  disabled={markAllAsReadMutation.isPending}
+                >
+                  <CheckCheck className="h-4 w-4 mr-1" />
+                  Marcar todas
+                </Button>
+              )}
+            </div>
           </div>
         </SheetHeader>
 

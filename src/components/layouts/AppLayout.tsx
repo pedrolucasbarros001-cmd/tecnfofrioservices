@@ -15,6 +15,7 @@ import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtime } from '@/hooks/useRealtime';
+import { isNotificationSoundEnabled, playNotificationSound } from '@/hooks/useNotificationSound';
 
 export function AppLayout() {
   const { role, user } = useAuth();
@@ -46,6 +47,31 @@ export function AppLayout() {
   // budgets channel also invalidates dashboard-stats (it counts budgets too)
   useRealtime('budgets', [['budgets'], ['dashboard-stats']]);
   useRealtime('notifications', [['unread-notifications', user?.id ?? ''], ['notifications']]);
+
+  // Play sound on new incoming notification for current user (if enabled)
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`notif-sound-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          if (isNotificationSoundEnabled()) {
+            playNotificationSound();
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Customers: para cliente criado numa página aparecer noutra
   useRealtime('customers', [['customers'], ['customers-paginated']]);
