@@ -278,7 +278,7 @@ export default function BudgetPrintPage() {
         {/* Document Title */}
         <div className="mb-6 flex items-end justify-between">
           <h2 className="text-xl font-bold border-b-2 border-slate-900 pr-8">
-            Relatório / Orçamento
+            {budget.is_insurance_budget ? 'Relatório / Orçamento' : 'Orçamento'}
           </h2>
           <div className="text-right">
             <p className="text-sm font-mono font-bold">{budget.code}</p>
