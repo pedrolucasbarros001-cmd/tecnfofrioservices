@@ -933,7 +933,7 @@ function CreateServiceFromCustomerModal({
         {step === 'type' ? (
           <div className={cn(
             "grid gap-4 py-8 px-6",
-            isDono ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+            canCreateBudget ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
           )}>
             <button
               onClick={() => {
