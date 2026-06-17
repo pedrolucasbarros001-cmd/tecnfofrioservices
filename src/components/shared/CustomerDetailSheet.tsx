@@ -648,6 +648,7 @@ export function CustomerDetailSheet({
         customer={customer}
         onSuccess={handleServiceUpdated}
         isDono={isDono}
+        canCreateBudget={canCreateBudget}
         onSwitchToBudget={() => {
           setShowCreateServiceModal(false);
           setShowDirectBudgetModal(true);
@@ -668,7 +669,7 @@ export function CustomerDetailSheet({
         serviceId={currentServiceId || ''}
       />
 
-      {isDono && (
+      {canCreateBudget && (
         <CreateBudgetModal
           open={showDirectBudgetModal}
           onOpenChange={setShowDirectBudgetModal}
