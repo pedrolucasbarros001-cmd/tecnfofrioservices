@@ -729,6 +729,7 @@ function CreateServiceFromCustomerModal({
   customer,
   onSuccess,
   isDono,
+  canCreateBudget,
   onSwitchToBudget,
 }: CreateServiceFromCustomerModalProps) {
   const [step, setStep] = useState<'type' | 'location' | 'form'>('type');
