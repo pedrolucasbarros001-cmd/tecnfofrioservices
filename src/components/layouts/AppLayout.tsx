@@ -15,6 +15,7 @@ import { Bell, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtime } from '@/hooks/useRealtime';
+import { isNotificationSoundEnabled, playNotificationSound } from '@/hooks/useNotificationSound';
 
 export function AppLayout() {
   const { role, user } = useAuth();
