@@ -1,0 +1,2 @@
+ALTER TABLE public.service_payments DROP CONSTRAINT IF EXISTS service_payments_payment_method_check;
+ALTER TABLE public.service_payments ADD CONSTRAINT service_payments_payment_method_check CHECK (payment_method = ANY (ARRAY['dinheiro'::text, 'multibanco'::text, 'transferencia'::text, 'mbway'::text, 'cheque'::text]));
