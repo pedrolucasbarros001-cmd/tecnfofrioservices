@@ -173,7 +173,7 @@ export function EditServiceDetailsModal({ open, onOpenChange, service, onSuccess
         form.reset({ items: [{ ...DEFAULT_LINE_ITEM }] });
       }
 
-      if (existingDiscount) {
+      if (existingDiscount && existingDiscount.value != null) {
         setDiscountType(existingDiscount.type);
         setDiscountValue(existingDiscount.value.toString());
       } else if (service.discount && service.discount > 0) {
