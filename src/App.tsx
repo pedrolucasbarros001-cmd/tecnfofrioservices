@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -238,7 +237,6 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <GlobalErrorHandler>
-              <Toaster />
               <Sonner />
               <BrowserRouter>
                 <AuthProvider>
