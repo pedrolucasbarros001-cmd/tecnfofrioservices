@@ -18,7 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast as sonnerToast } from 'sonner';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido').min(1, 'Email é obrigatório'),
@@ -31,7 +31,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, signOut, role, isAuthenticated, loading } = useAuth();
-  const { toast } = useToast();
+  const toast = ({ title, description }: { variant?: string; title: string; description?: string }) =>
+    sonnerToast.error(title, { description });
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
