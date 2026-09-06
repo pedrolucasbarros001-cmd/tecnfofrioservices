@@ -1,7 +1,8 @@
 # Interaction system rollout
 
-- [ ] Establish global motion tokens and reduced-motion behavior
-- [ ] Upgrade shared buttons, cards, overlays, panels, menus, and controls
-- [ ] Standardize loading and global notification feedback
-- [ ] Add subtle route context transitions
-- [ ] Validate desktop, mobile, keyboard, reduced motion, and quality checks
+- [x] Establish global motion tokens and reduced-motion behavior
+- [x] Upgrade shared buttons, cards, overlays, panels
+- [x] Standardize loading and global notification feedback (single toast system)
+- [x] Add subtle route context transitions
+- [x] Validate type-check, tests, build
+- [ ] Extend refined states to remaining journeys (technician flows, detail sheets)
