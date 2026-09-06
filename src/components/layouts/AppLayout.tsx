@@ -163,7 +163,9 @@ export function AppLayout() {
             )}
           </Button>
         </header>
+        {role === 'dono' && <ServiceBillingNotice />}
         <main className="flex-1 overflow-auto bg-background">
+
           <div key={location.pathname} className="route-enter h-full">
             <Outlet />
           </div>
