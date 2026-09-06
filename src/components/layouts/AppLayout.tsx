@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -19,6 +19,7 @@ import { isNotificationSoundEnabled, playNotificationSound } from '@/hooks/useNo
 
 export function AppLayout() {
   const { role, user } = useAuth();
+  const location = useLocation();
   const { isOpen: isOnboardingOpen } = useOnboarding();
   const { isActive: isDemoActive } = useDemo();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -163,7 +164,9 @@ export function AppLayout() {
           </Button>
         </header>
         <main className="flex-1 overflow-auto bg-background">
-          <Outlet />
+          <div key={location.pathname} className="route-enter h-full">
+            <Outlet />
+          </div>
         </main>
       </SidebarInset>
 
