@@ -9,6 +9,8 @@ import { SecretarySidebar } from './SecretarySidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { GuidedTour } from '@/components/onboarding/GuidedTour';
+import { ServiceBillingNotice } from '@/components/shared/ServiceBillingNotice';
+
 import { DemoRunner } from '@/components/onboarding/DemoRunner';
 import { useDemo } from '@/contexts/DemoContext';
 import { Bell, Menu } from 'lucide-react';
