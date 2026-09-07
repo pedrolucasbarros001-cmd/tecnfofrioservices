@@ -7,10 +7,6 @@ export const SERVICE_BILLING = {
   enabled: true,
   /** Dia fixo do mês em que a renovação vence (1-28). */
   dueDay: 18,
-  /** Valor mensal. */
-  amount: 60,
-  /** Moeda apresentada. */
-  currency: 'EUR' as const,
   /** Dias de antecedência com que o lembrete aparece. */
   noticeDays: 7,
 } as const;
