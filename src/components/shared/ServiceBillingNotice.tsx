@@ -69,21 +69,22 @@ export function ServiceBillingNotice() {
 
   const dueLabel = format(cycle.dueDate, "d 'de' MMMM", { locale: pt });
   const isDueToday = cycle.daysRemaining === 0;
-  const amountLabel = new Intl.NumberFormat('pt-PT', {
-    style: 'currency',
-    currency: SERVICE_BILLING.currency,
-    maximumFractionDigits: 0,
-  }).format(SERVICE_BILLING.amount);
+  const isOverdue = cycle.daysRemaining < 0;
+  const isUpcoming = cycle.daysRemaining > 0;
 
   const message = isDueToday
-    ? `Manutenção e suporte — renovação hoje.`
-    : `Manutenção e suporte — renovação a ${dueLabel}.`;
+    ? 'Lembre-se de renovar a mensalidade hoje para manter tudo a funcionar sem interrupções.'
+    : isOverdue
+      ? `A mensalidade está pendente desde ${dueLabel}. Renove assim que possível para evitar interrupções.`
+      : `Lembre-se de renovar a mensalidade para garantir um funcionamento fluido. Renovação a ${dueLabel}.`;
 
   const remainingLabel = isDueToday
     ? 'Renova hoje'
-    : cycle.daysRemaining === 1
-      ? 'Falta 1 dia'
-      : `Faltam ${cycle.daysRemaining} dias`;
+    : isOverdue
+      ? `Em atraso há ${Math.abs(cycle.daysRemaining)} ${Math.abs(cycle.daysRemaining) === 1 ? 'dia' : 'dias'}`
+      : cycle.daysRemaining === 1
+        ? 'Falta 1 dia'
+        : `Faltam ${cycle.daysRemaining} dias`;
 
   const handleDismiss = () => {
     const key = todayKey();
@@ -101,7 +102,7 @@ export function ServiceBillingNotice() {
       aria-live="polite"
       className={cn(
         'motion-enter border-b px-4 py-2.5',
-        isDueToday
+        isDueToday || isOverdue
           ? 'border-amber-200 bg-amber-50 text-amber-900'
           : 'border-border/60 bg-primary/5 text-foreground'
       )}
@@ -109,13 +110,15 @@ export function ServiceBillingNotice() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex min-w-0 items-start gap-2 sm:items-center">
           <Info
-            className={cn('mt-0.5 h-4 w-4 shrink-0 sm:mt-0', isDueToday ? 'text-amber-600' : 'text-primary')}
+            className={cn('mt-0.5 h-4 w-4 shrink-0 sm:mt-0', isDueToday || isOverdue ? 'text-amber-600' : 'text-primary')}
             aria-hidden="true"
           />
-          <p className="text-sm leading-snug">
-            <span className="font-medium">{message}</span>{' '}
-            <span className="text-muted-foreground">{amountLabel} · suporte contínuo incluído</span>
-          </p>
+          <div className="text-sm leading-snug">
+            <p className="font-medium">{message}</p>
+            <p className="text-muted-foreground">
+              A renovação mantém o plano de hospedagem ativo. Sem ela, o sistema pode ficar indisponível quando os limites de armazenamento forem excedidos.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 sm:ml-auto">
@@ -127,7 +130,7 @@ export function ServiceBillingNotice() {
             aria-hidden="true"
           >
             <div
-              className={cn('h-full rounded-full transition-all', isDueToday ? 'bg-amber-500' : 'bg-primary')}
+              className={cn('h-full rounded-full transition-all', isDueToday || isOverdue ? 'bg-amber-500' : 'bg-primary')}
               style={{ width: `${cycle.progress}%` }}
             />
           </div>
