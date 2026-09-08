@@ -206,14 +206,11 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input
-                              type="number"
-                              min={0.01}
-                              step="any"
-                              className="h-8 text-sm"
+                            <DecimalInput
+                              value={field.value ?? 0}
+                              onChange={field.onChange}
                               disabled={disabled}
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              placeholder="1"
                             />
                           </FormControl>
                         </FormItem>
@@ -227,14 +224,11 @@ export function PriceLineItems({ form, fieldName, disabled = false }: PriceLineI
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              className="h-8 text-sm"
+                            <DecimalInput
+                              value={field.value ?? 0}
+                              onChange={field.onChange}
                               disabled={disabled}
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              placeholder="0,00"
                             />
                           </FormControl>
                         </FormItem>
