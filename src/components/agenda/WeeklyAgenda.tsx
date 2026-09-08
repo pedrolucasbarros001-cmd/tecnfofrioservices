@@ -166,13 +166,16 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
         {viewMode === 'week' ? (
           <div className="grid grid-cols-7 divide-x">
             {daysOfWeek.map((day) => {
+              const dayKey = day.toISOString();
               const dayServices = getServicesForDay(day);
               const sortedServices = getServicesSortedByTime(day);
               const hasServices = dayServices.length > 0;
+              const isExpanded = expandedDays.includes(dayKey);
+              const visibleServices = isExpanded ? sortedServices : sortedServices.slice(0, 5);
 
               return (
                 <div
-                  key={day.toISOString()}
+                  key={dayKey}
                   className={cn(
                     "min-h-[200px] p-2",
                     isToday(day) && "bg-primary/5"
@@ -203,8 +206,11 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                   </div>
 
                   {/* Services sorted by time */}
-                  <div className="space-y-1 max-h-[240px] overflow-y-auto overscroll-contain pr-0.5">
-                    {sortedServices.map(service => (
+                  <div className={cn(
+                    "space-y-1 overflow-y-auto overscroll-contain pr-0.5",
+                    isExpanded ? "max-h-none" : "max-h-[240px]"
+                  )}>
+                    {visibleServices.map(service => (
                       <div key={service.id}>
                         {service.scheduled_shift && (
                           <span className="text-[10px] text-muted-foreground">
@@ -217,17 +223,19 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                         />
                       </div>
                     ))}
-                    {sortedServices.length > 3 && (
+                    {sortedServices.length > 5 && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="w-full h-7 text-xs text-muted-foreground"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDayClick(day);
+                          toggleExpandedDay(dayKey);
                         }}
                       >
-                        Ver todos ({sortedServices.length})
+                        {isExpanded
+                          ? 'Ver menos'
+                          : `Ver todos (${sortedServices.length})`}
                       </Button>
                     )}
 
