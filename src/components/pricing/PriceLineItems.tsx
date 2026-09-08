@@ -1,4 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { parseCurrencyInput } from '@/utils/currencyUtils';
 import { UseFormReturn, useFieldArray } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,6 +48,43 @@ export const DEFAULT_LINE_ITEM: LineItem = {
   unit_price: 0,
   tax_rate: 0,
 };
+
+/**
+ * Numeric input that accepts both "12,50" (PT) and "12.50" while typing.
+ * Keeps a local string so the field never fights the user on mobile keyboards.
+ */
+function DecimalInput({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const [raw, setRaw] = useState<string | null>(null);
+  const display = raw ?? (value === 0 ? '' : String(value).replace('.', ','));
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      className="h-8 text-sm"
+      placeholder={placeholder}
+      disabled={disabled}
+      value={display}
+      onFocus={() => setRaw(display)}
+      onChange={(e) => {
+        const next = e.target.value.replace(/[^\d.,]/g, '');
+        setRaw(next);
+        onChange(parseCurrencyInput(next));
+      }}
+      onBlur={() => setRaw(null)}
+    />
+  );
+}
 
 interface PriceLineItemsProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
