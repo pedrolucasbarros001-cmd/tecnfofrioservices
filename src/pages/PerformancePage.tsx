@@ -13,6 +13,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function PerformancePage() {
   const { data: technicians = [] } = useTechnicians(false);
+  const [expandedTechs, setExpandedTechs] = useState<string[]>([]);
+
+  const toggleExpanded = (techId: string) =>
+    setExpandedTechs((prev) =>
+      prev.includes(techId) ? prev.filter((id) => id !== techId) : [...prev, techId]
+    );
 
   // BUG-03 FIX: Only fetch the fields needed for charts + service list.
   // Removed cascaded JOINs (customers, profiles) — technician names come from useTechnicians().
@@ -177,7 +183,7 @@ export default function PerformancePage() {
                 </div>
 
                 {/* Services List */}
-                <div className="lg:col-span-2 space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="lg:col-span-2 space-y-2 max-h-[300px] overflow-y-auto overscroll-contain pr-1">
                   {tech.data.isEmpty ? (
                     <div className="flex items-center justify-center h-full min-h-[100px] text-muted-foreground text-sm">
                       Nenhum serviço atribuído
