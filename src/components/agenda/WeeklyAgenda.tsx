@@ -196,8 +196,8 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                   </div>
 
                   {/* Services sorted by time */}
-                  <div className="space-y-1">
-                    {sortedServices.slice(0, 5).map(service => (
+                  <div className="space-y-1 max-h-[240px] overflow-y-auto overscroll-contain pr-0.5">
+                    {sortedServices.map(service => (
                       <div key={service.id}>
                         {service.scheduled_shift && (
                           <span className="text-[10px] text-muted-foreground">
@@ -210,10 +210,18 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                         />
                       </div>
                     ))}
-                    {sortedServices.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        +{sortedServices.length - 5} mais
-                      </p>
+                    {sortedServices.length > 3 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full h-7 text-xs text-muted-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDayClick(day);
+                        }}
+                      >
+                        Ver todos ({sortedServices.length})
+                      </Button>
                     )}
 
                     {/* Empty state */}

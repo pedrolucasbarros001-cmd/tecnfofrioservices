@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Package, Wrench, Truck } from 'lucide-react';
 import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
@@ -12,6 +14,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function PerformancePage() {
   const { data: technicians = [] } = useTechnicians(false);
+  const [expandedTechs, setExpandedTechs] = useState<string[]>([]);
+
+  const toggleExpanded = (techId: string) =>
+    setExpandedTechs((prev) =>
+      prev.includes(techId) ? prev.filter((id) => id !== techId) : [...prev, techId]
+    );
 
   // BUG-03 FIX: Only fetch the fields needed for charts + service list.
   // Removed cascaded JOINs (customers, profiles) — technician names come from useTechnicians().
@@ -176,14 +184,17 @@ export default function PerformancePage() {
                 </div>
 
                 {/* Services List */}
-                <div className="lg:col-span-2 space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="lg:col-span-2 space-y-2 max-h-[300px] overflow-y-auto overscroll-contain pr-1">
                   {tech.data.isEmpty ? (
                     <div className="flex items-center justify-center h-full min-h-[100px] text-muted-foreground text-sm">
                       Nenhum serviço atribuído
                     </div>
                   ) : (
                     <>
-                      {tech.data.services.slice(0, 10).map((service) => {
+                      {(expandedTechs.includes(tech.id)
+                        ? tech.data.services
+                        : tech.data.services.slice(0, 10)
+                      ).map((service) => {
                         const serviceType = getServiceType(service);
                         return (
                           <div
@@ -233,9 +244,16 @@ export default function PerformancePage() {
                         );
                       })}
                       {tech.data.services.length > 10 && (
-                        <p className="text-sm text-muted-foreground text-center py-2">
-                          +{tech.data.services.length - 10} serviços adicionais
-                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-sm text-muted-foreground"
+                          onClick={() => toggleExpanded(tech.id)}
+                        >
+                          {expandedTechs.includes(tech.id)
+                            ? 'Ver menos'
+                            : `Ver todos (${tech.data.services.length})`}
+                        </Button>
                       )}
                     </>
                   )}
