@@ -4,6 +4,7 @@ import { Package, Wrench, Truck } from 'lucide-react';
 import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
@@ -190,7 +191,10 @@ export default function PerformancePage() {
                     </div>
                   ) : (
                     <>
-                      {tech.data.services.slice(0, 10).map((service) => {
+                      {(expandedTechs.includes(tech.id)
+                        ? tech.data.services
+                        : tech.data.services.slice(0, 10)
+                      ).map((service) => {
                         const serviceType = getServiceType(service);
                         return (
                           <div
@@ -240,9 +244,16 @@ export default function PerformancePage() {
                         );
                       })}
                       {tech.data.services.length > 10 && (
-                        <p className="text-sm text-muted-foreground text-center py-2">
-                          +{tech.data.services.length - 10} serviços adicionais
-                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-sm text-muted-foreground"
+                          onClick={() => toggleExpanded(tech.id)}
+                        >
+                          {expandedTechs.includes(tech.id)
+                            ? 'Ver menos'
+                            : `Ver todos (${tech.data.services.length})`}
+                        </Button>
                       )}
                     </>
                   )}
