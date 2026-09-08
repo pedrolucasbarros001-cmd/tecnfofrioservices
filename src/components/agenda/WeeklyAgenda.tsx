@@ -35,6 +35,13 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<string[]>([]);
+
+  const toggleExpandedDay = (dayKey: string) => {
+    setExpandedDays((prev) =>
+      prev.includes(dayKey) ? prev.filter((k) => k !== dayKey) : [...prev, dayKey]
+    );
+  };
 
   // Week view calculations
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
