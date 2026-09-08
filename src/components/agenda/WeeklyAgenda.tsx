@@ -196,8 +196,8 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                   </div>
 
                   {/* Services sorted by time */}
-                  <div className="space-y-1">
-                    {sortedServices.slice(0, 5).map(service => (
+                  <div className="space-y-1 max-h-[240px] overflow-y-auto overscroll-contain pr-0.5">
+                    {sortedServices.map(service => (
                       <div key={service.id}>
                         {service.scheduled_shift && (
                           <span className="text-[10px] text-muted-foreground">
