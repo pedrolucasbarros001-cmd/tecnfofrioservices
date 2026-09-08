@@ -210,10 +210,18 @@ export function WeeklyAgenda({ services, onServiceClick }: WeeklyAgendaProps) {
                         />
                       </div>
                     ))}
-                    {sortedServices.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        +{sortedServices.length - 5} mais
-                      </p>
+                    {sortedServices.length > 3 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full h-7 text-xs text-muted-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDayClick(day);
+                        }}
+                      >
+                        Ver todos ({sortedServices.length})
+                      </Button>
                     )}
 
                     {/* Empty state */}
