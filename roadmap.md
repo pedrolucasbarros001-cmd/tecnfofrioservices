@@ -9,3 +9,4 @@
 - [x] Agenda e ranking: scroll direto + botão "Ver todos"
 - [x] Campos de valores aceitam vírgula no telemóvel
 - [x] CI: erro de lint (previewAuthStorage) resolvido
+- [x] Nome/email/telefone do cliente sempre atualizados na ficha, detalhes e impressão
