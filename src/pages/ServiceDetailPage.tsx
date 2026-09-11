@@ -262,12 +262,12 @@ export default function ServiceDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Telefone: </span>
-              <span className="font-medium">{service.contact_phone || service.customer?.phone || "N/A"}</span>
+              <span className="font-medium">{service.customer?.phone || service.contact_phone || "N/A"}</span>
             </div>
-            {(service.contact_email || service.customer?.email) && (
+            {(service.customer?.email || service.contact_email) && (
               <div>
                 <span className="text-muted-foreground">Email: </span>
-                <span className="font-medium">{service.contact_email || service.customer?.email}</span>
+                <span className="font-medium">{service.customer?.email || service.contact_email}</span>
               </div>
             )}
             {(service.service_address || service.customer?.address || service.customer?.city) && (

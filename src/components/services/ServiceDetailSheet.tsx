@@ -793,22 +793,22 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
               >
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {displayService.contact_name || displayService.customer?.name || 'Sem cliente'}
+                  {displayService.customer?.name || displayService.contact_name || 'Sem cliente'}
                 </h3>
                 <div className="space-y-1 mt-2 text-sm">
                   {displayService.customer?.nif && (
                     <p className="text-muted-foreground">NIF: {displayService.customer.nif}</p>
                   )}
-                  {(displayService.contact_phone || displayService.customer?.phone) && (
+                  {(displayService.customer?.phone || displayService.contact_phone) && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Phone className="h-4 w-4" />
-                      <span>{displayService.contact_phone || displayService.customer?.phone}</span>
+                      <span>{displayService.customer?.phone || displayService.contact_phone}</span>
                     </div>
                   )}
-                  {(displayService.contact_email || displayService.customer?.email) && (
+                  {(displayService.customer?.email || displayService.contact_email) && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Mail className="h-4 w-4" />
-                      <span>{displayService.contact_email || displayService.customer?.email}</span>
+                      <span>{displayService.customer?.email || displayService.contact_email}</span>
                     </div>
                   )}
                   {(displayService.service_address || displayService.customer?.address) && (

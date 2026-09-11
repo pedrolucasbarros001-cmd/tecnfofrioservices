@@ -206,8 +206,8 @@ export function TechnicianServiceSheet({
             {(service.customer || service.contact_name) && (
               <div className="space-y-1">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cliente</div>
-                <div className="font-medium text-lg">{service.contact_name || service.customer?.name}</div>
-                {(service.contact_phone || service.customer?.phone) && <div className="text-sm text-muted-foreground">{service.contact_phone || service.customer?.phone}</div>}
+                <div className="font-medium text-lg">{service.customer?.name || service.contact_name}</div>
+                {(service.customer?.phone || service.contact_phone) && <div className="text-sm text-muted-foreground">{service.customer?.phone || service.contact_phone}</div>}
               </div>
             )}
 
