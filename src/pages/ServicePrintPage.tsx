@@ -16,6 +16,7 @@ import { generatePDF } from '@/utils/pdfUtils';
 import { COMPANY_INFO } from '@/utils/companyInfo';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrintSessionBridge } from '@/hooks/usePrintSessionBridge';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 // Helper: descrição amigável para tipos de assinatura
 const getSignatureDescription = (type: string | null): string => {
@@ -622,7 +623,7 @@ export default function ServicePrintPage() {
               <div className="space-y-2">
                 {signatures.map((sig) => (
                   <div key={sig.id} className="flex gap-2 p-1.5 border rounded bg-gray-50">
-                    <img
+                    <SignedImage
                       src={sig.file_url}
                       alt="Assinatura"
                       className="w-24 h-14 object-contain border bg-white rounded"

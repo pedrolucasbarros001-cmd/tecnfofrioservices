@@ -104,6 +104,7 @@ import { CreateBudgetModal } from '@/components/modals/CreateBudgetModal';
 import { PriceLineItems, calculateTotals, DEFAULT_LINE_ITEM, LineItem } from '@/components/pricing/PriceLineItems';
 import { PricingSummary, calculateDiscount } from '@/components/pricing/PricingSummary';
 import { useAuth } from '@/contexts/AuthContext';
+import { openStorageFile } from "@/utils/storageUrl";
 
 interface CustomerDetailSheetProps {
   open: boolean;
@@ -585,9 +586,6 @@ export function CustomerDetailSheet({
                     ) : (
                       <div className="space-y-2">
                         {customerDocuments.map((doc: any) => {
-                          const publicUrl = supabase.storage
-                            .from('service_documents')
-                            .getPublicUrl(doc.file_url).data.publicUrl;
                           return (
                             <div
                               key={doc.id}
@@ -614,7 +612,7 @@ export function CustomerDetailSheet({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(publicUrl, '_blank')}
+                                onClick={() => openStorageFile(doc.file_url, 'service_documents')}
                               >
                                 Baixar
                               </Button>

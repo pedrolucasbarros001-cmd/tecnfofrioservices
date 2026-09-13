@@ -12,6 +12,7 @@ import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PHOTO_TYPE_LABELS, type PhotoType } from '@/types/database';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface AdminPhotoUploadSectionProps {
   serviceId: string;
@@ -139,7 +140,7 @@ export function AdminPhotoUploadSection({ serviceId }: AdminPhotoUploadSectionPr
                 setGalleryOpen(true);
               }}
             >
-              <img
+              <SignedImage
                 src={photo.file_url}
                 alt={photo.description || 'Foto'}
                 className="w-full h-full object-cover"

@@ -86,6 +86,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { humanizeError } from '@/utils/errorMessages';
 import { formatShiftLabel, parseLocalDate } from '@/utils/dateUtils';
+import { useSignedUrl, openStorageFile } from "@/utils/storageUrl";
 
 // Helper: safe date formatting to prevent crashes on "Invalid Date"
 // For pure-date fields (scheduled_date, delivery_date, estimated_arrival)
@@ -146,11 +147,12 @@ const getPhotoTypeLabel = (type: string | null): string => {
 // LazyImage: shows skeleton until image loads, then fades in
 function LazyImage({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
   const [loaded, setLoaded] = React.useState(false);
+  const resolvedSrc = useSignedUrl(typeof src === 'string' ? src : undefined);
   return (
     <div className="relative">
-      {!loaded && <Skeleton className={cn("absolute inset-0", className)} />}
+      {(!loaded || !resolvedSrc) && <Skeleton className={cn("absolute inset-0", className)} />}
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         className={cn(className, "transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
         loading="lazy"
@@ -1325,11 +1327,6 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                 >
                   <div className="space-y-3">
                     {(service as any).documents.map((doc: any) => {
-                      // Usar o URL real para o download
-                      // Assumimos que o bucket e publico ou o cliente ja retornou a url assinada/publica.
-                      // Como configuramos o bucket como publico na DB, a url gerada atraves do path resolvera o ficheiro
-                      const publicUrl = supabase.storage.from('service_documents').getPublicUrl(doc.file_url).data.publicUrl;
-                      
                       return (
                         <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
                           <div className="flex items-center gap-3 overflow-hidden">
@@ -1350,7 +1347,7 @@ export function ServiceDetailSheet({ service, open, onOpenChange, onServiceUpdat
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              onClick={() => window.open(publicUrl, '_blank')}
+                              onClick={() => openStorageFile(doc.file_url, 'service_documents')}
                             >
                               Baixar
                             </Button>

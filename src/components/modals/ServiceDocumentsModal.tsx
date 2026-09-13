@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
+import { openStorageFile } from "@/utils/storageUrl";
 
 interface ServiceDocumentsModalProps {
   open: boolean;
@@ -46,10 +47,7 @@ export function ServiceDocumentsModal({
   });
 
   const handleDownload = (doc: any) => {
-    const publicUrl = supabase.storage
-      .from('service_documents')
-      .getPublicUrl(doc.file_url).data.publicUrl;
-    window.open(publicUrl, '_blank');
+    void openStorageFile(doc.file_url, 'service_documents');
   };
 
   const handleDeleteDocument = async (doc: any) => {

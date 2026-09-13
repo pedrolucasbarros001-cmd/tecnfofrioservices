@@ -13,6 +13,7 @@ import { SERVICE_STATUS_CONFIG, PHOTO_TYPE_LABELS } from '@/types/database';
 import type { Service, Customer, ServicePhoto, ServicePayment, ServicePart, ServiceSignature, PhotoType } from '@/types/database';
 import { COMPANY_INFO } from '@/utils/companyInfo';
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 // Friendly status messages for clients
 const STATUS_CLIENT_MESSAGES: Record<string, { title: string; description: string }> = {
@@ -268,7 +269,7 @@ export default function ServiceConsultPage() {
                     onClick={() => setZoomedPhoto(photo.file_url)}
                     className="relative aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
                   >
-                    <img
+                    <SignedImage
                       src={photo.file_url}
                       alt={photo.description || PHOTO_TYPE_LABELS[photo.photo_type as PhotoType] || 'Foto'}
                       className="w-full h-full object-cover"
@@ -393,7 +394,7 @@ export default function ServiceConsultPage() {
               <div className="grid grid-cols-2 gap-3">
                 {signatures.map((sig) => (
                   <div key={sig.id} className="border border-border rounded-md p-2 text-center">
-                    <img
+                    <SignedImage
                       src={sig.file_url}
                       alt={sig.signer_name || 'Assinatura'}
                       className="h-16 mx-auto object-contain mb-1"
@@ -447,7 +448,7 @@ export default function ServiceConsultPage() {
       <Dialog open={!!zoomedPhoto} onOpenChange={() => setZoomedPhoto(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-2">
           {zoomedPhoto && (
-            <img
+            <SignedImage
               src={zoomedPhoto}
               alt="Foto ampliada"
               className="w-full h-full object-contain max-h-[80vh]"

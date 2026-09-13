@@ -20,6 +20,7 @@ import {
   type CarouselApi,
 } from '@/components/ui/carousel';
 import { PHOTO_TYPE_LABELS, type PhotoType } from '@/types/database';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface Photo {
   id: string;
@@ -108,7 +109,7 @@ export function PhotoGalleryModal({
               {photos.map((photo) => (
                 <CarouselItem key={photo.id} className="flex items-center justify-center h-[100dvh]">
                   <div className="relative flex items-center justify-center w-full h-full p-4">
-                    <img
+                    <SignedImage
                       src={photo.file_url}
                       alt={photo.description || 'Foto do serviço'}
                       className="max-w-full max-h-[85dvh] object-contain select-none shadow-2xl"
