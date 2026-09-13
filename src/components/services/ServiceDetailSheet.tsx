@@ -146,11 +146,12 @@ const getPhotoTypeLabel = (type: string | null): string => {
 // LazyImage: shows skeleton until image loads, then fades in
 function LazyImage({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
   const [loaded, setLoaded] = React.useState(false);
+  const resolvedSrc = useSignedUrl(typeof src === 'string' ? src : undefined);
   return (
     <div className="relative">
-      {!loaded && <Skeleton className={cn("absolute inset-0", className)} />}
+      {(!loaded || !resolvedSrc) && <Skeleton className={cn("absolute inset-0", className)} />}
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         className={cn(className, "transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
         loading="lazy"

@@ -63,6 +63,17 @@ export async function getSignedFileUrl(
 }
 
 /**
+ * Abre um ficheiro privado do Storage num separador novo, através de um link temporário.
+ */
+export async function openStorageFile(
+  value: string | null | undefined,
+  fallbackBucket?: string
+): Promise<void> {
+  const url = await getSignedFileUrl(value, fallbackBucket);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
  * Hook para obter o URL assinado de um ficheiro privado.
  */
 export function useSignedUrl(value: string | null | undefined, fallbackBucket?: string): string {
