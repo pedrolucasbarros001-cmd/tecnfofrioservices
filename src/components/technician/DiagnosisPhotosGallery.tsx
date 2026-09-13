@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { PHOTO_TYPE_LABELS, type PhotoType } from '@/types/database';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface DiagnosisPhotosGalleryProps {
   serviceId: string;
@@ -75,7 +76,7 @@ export function DiagnosisPhotosGallery({ serviceId, className }: DiagnosisPhotos
                 className="relative group cursor-pointer"
                 onClick={() => setSelectedPhoto(photo)}
               >
-                <img
+                <SignedImage
                   src={photo.file_url}
                   alt={photo.description || PHOTO_TYPE_LABELS[type]}
                   className="w-16 h-16 object-cover rounded-lg border"
@@ -103,7 +104,7 @@ export function DiagnosisPhotosGallery({ serviceId, className }: DiagnosisPhotos
         <DialogContent className="max-w-3xl p-2 z-[100]">
           {selectedPhoto && (
             <div className="relative">
-              <img
+              <SignedImage
                 src={selectedPhoto.file_url}
                 alt={selectedPhoto.description || 'Foto do serviço'}
                 className="w-full h-auto max-h-[80vh] object-contain rounded-lg"

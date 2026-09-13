@@ -27,6 +27,7 @@ import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { TechnicianEditServiceModal } from '@/components/technician/TechnicianEditServiceModal';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface TechnicianServiceSheetProps {
   service: Service | null;
@@ -303,7 +304,7 @@ export function TechnicianServiceSheet({
                         setGalleryOpen(true);
                       }}
                     >
-                      <img
+                      <SignedImage
                         src={photo.file_url}
                         alt={photo.description || 'Foto do serviço'}
                         className="w-full h-full object-cover transition-transform group-hover:scale-105"

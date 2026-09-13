@@ -17,6 +17,7 @@ import type { Service, ServicePart, ServicePayment, ServiceSignature } from '@/t
 import tecnofrioLogoFull from '@/assets/tecnofrio-logo-full.png';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 import { generatePDF } from '@/utils/pdfUtils';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface ServicePrintModalProps {
   service: Service | null;
@@ -449,7 +450,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {signatures.map((sig) => (
                   <div key={sig.id} style={{ display: 'flex', gap: '16px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9fafb' }}>
-                    <img
+                    <SignedImage
                       src={sig.file_url}
                       alt="Assinatura"
                       style={{ width: '120px', height: '80px', objectFit: 'contain', border: '1px solid #e5e7eb', backgroundColor: 'white', borderRadius: '4px' }}
@@ -827,7 +828,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
                 <div className="space-y-3">
                   {signatures.map((sig) => (
                     <div key={sig.id} className="flex gap-4 p-3 border rounded bg-gray-50">
-                      <img
+                      <SignedImage
                         src={sig.file_url}
                         alt="Assinatura"
                         className="w-32 h-20 object-contain border bg-white rounded"

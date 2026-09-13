@@ -46,6 +46,7 @@ interface ActivityLog {
 import tecnofrioLogoFull from "@/assets/tecnofrio-logo-full.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { openInNewTabPreservingQuery } from "@/utils/openInNewTab";
+import { SignedImage } from "@/components/shared/SignedImage";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -426,7 +427,7 @@ export default function ServiceDetailPage() {
                     onClick={() => setSelectedPhotoIndex(index)}
                     className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition"
                   >
-                    <img
+                    <SignedImage
                       src={photo.file_url}
                       alt={photo.description || "Foto do serviço"}
                       className="w-full h-full object-cover"
@@ -463,7 +464,7 @@ export default function ServiceDetailPage() {
                 {signatures.map((sig) => (
                   <div key={sig.id} className="border rounded-lg p-2">
                     <div className="aspect-[3/2] bg-muted rounded overflow-hidden mb-2">
-                      <img
+                      <SignedImage
                         src={sig.file_url}
                         alt={`Assinatura de ${sig.signer_name || "Cliente"}`}
                         className="w-full h-full object-contain"

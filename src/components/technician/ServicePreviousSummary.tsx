@@ -20,6 +20,7 @@ import { pt } from 'date-fns/locale';
 import type { Service, PhotoType } from '@/types/database';
 import { PHOTO_TYPE_LABELS } from '@/types/database';
 import { PhotoGalleryModal } from '@/components/shared/PhotoGalleryModal';
+import { SignedImage } from "@/components/shared/SignedImage";
 
 interface ServicePreviousSummaryProps {
   service: Service;
@@ -194,7 +195,7 @@ export function ServicePreviousSummary({
                         setGalleryOpen(true);
                       }}
                     >
-                      <img
+                      <SignedImage
                         src={photo.file_url}
                         alt={photo.description || 'Foto do serviço'}
                         className="w-full h-16 object-cover"
