@@ -239,12 +239,20 @@ export default function PerformancePage() {
                     <div className="flex items-center justify-center h-full min-h-[100px] text-muted-foreground text-sm">
                       Nenhum serviço atribuído
                     </div>
+                  ) : !expandedTechs.includes(tech.id) ? (
+                    <div className="flex items-center justify-center h-full min-h-[100px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-sm text-muted-foreground"
+                        onClick={() => toggleExpanded(tech.id)}
+                      >
+                        {`Ver todos (${tech.data.total})`}
+                      </Button>
+                    </div>
                   ) : (
                     <>
-                      {(expandedTechs.includes(tech.id)
-                        ? tech.data.services
-                        : tech.data.services.slice(0, 10)
-                      ).map((service) => {
+                      {tech.data.services.map((service) => {
                         const serviceType = getServiceType(service);
                         return (
                           <div
@@ -283,7 +291,7 @@ export default function PerformancePage() {
                                   pending_pricing: service.pending_pricing,
                                   final_price: service.final_price ?? 0,
                                   amount_paid: service.amount_paid ?? 0,
-                                  awaiting_budget_approval: (service as any).awaiting_budget_approval ?? false,
+                                  awaiting_budget_approval: service.awaiting_budget_approval ?? false,
                                   service_location: service.service_location as any,
                                   service_type: service.service_type as any,
                                   technician_id: service.technician_id ?? null,
@@ -293,18 +301,14 @@ export default function PerformancePage() {
                           </div>
                         );
                       })}
-                      {tech.data.services.length > 10 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-sm text-muted-foreground"
-                          onClick={() => toggleExpanded(tech.id)}
-                        >
-                          {expandedTechs.includes(tech.id)
-                            ? 'Ver menos'
-                            : `Ver todos (${tech.data.services.length})`}
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-sm text-muted-foreground"
+                        onClick={() => toggleExpanded(tech.id)}
+                      >
+                        Ver menos
+                      </Button>
                     </>
                   )}
                 </div>
