@@ -342,6 +342,16 @@ export function CustomerDetailSheet({
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger
+                  value="orcamentos"
+                  className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
+                >
+                  <FileText className="h-4 w-4" />
+                  Orçamentos
+                  <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
+                    {budgets.length}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger
                   value="anexos"
                   className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
                 >
