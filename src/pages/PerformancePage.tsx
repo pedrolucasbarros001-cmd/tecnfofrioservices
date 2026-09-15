@@ -21,20 +21,65 @@ export default function PerformancePage() {
       prev.includes(techId) ? prev.filter((id) => id !== techId) : [...prev, techId]
     );
 
-  // BUG-03 FIX: Only fetch the fields needed for charts + service list.
-  // Removed cascaded JOINs (customers, profiles) — technician names come from useTechnicians().
-  // Added .limit(500) to prevent browser timeout with large datasets.
-  const { data: services = [] } = useQuery({
-    queryKey: ['services-all'],
+  // Totais agregados no servidor (1 RPC leve) em vez de carregar centenas de linhas.
+  // As linhas individuais só são carregadas quando um técnico é expandido ("Ver todos").
+  interface PerfSummaryRow {
+    technician_id: string;
+    technician_name: string | null;
+    technician_color: string | null;
+    total_services: number;
+    completed_services: number;
+    revenue: number;
+    repairs: number;
+    sales: number;
+    installations: number;
+    pending_pricing: number;
+  }
+
+  interface PerfServiceRow {
+    id: string;
+    code: string;
+    technician_id: string | null;
+    service_type: string | null;
+    is_sale: boolean | null;
+    is_installation: boolean | null;
+    status: string;
+    pending_pricing: boolean | null;
+    final_price: number | null;
+    amount_paid: number | null;
+    awaiting_budget_approval: boolean | null;
+    service_location: string | null;
+    scheduled_date: string | null;
+    appliance_type: string | null;
+    fault_description: string | null;
+    customer: { id: string; name: string } | null;
+  }
+
+  const { data: summaries = [] } = useQuery({
+    queryKey: ['performance-summary'],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('technician_performance_summary', {
+        _from: null,
+        _to: null,
+      });
+      if (error) throw error;
+      return (data || []) as PerfSummaryRow[];
+    },
+  });
+
+  const { data: expandedServices = [] } = useQuery({
+    queryKey: ['performance-services', expandedTechs],
+    enabled: expandedTechs.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('services')
-        .select('id, code, technician_id, customer_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, awaiting_budget_approval, service_location, scheduled_date, appliance_type, fault_description, created_at, customer:customers(id, name)')
+        .select('id, code, technician_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, awaiting_budget_approval, service_location, scheduled_date, appliance_type, fault_description, customer:customers(id, name)')
+        .in('technician_id', expandedTechs)
         .order('created_at', { ascending: false })
         .limit(500);
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as PerfServiceRow[];
     },
   });
 
@@ -45,29 +90,34 @@ export default function PerformancePage() {
   };
 
   const getTechnicianData = (techId: string) => {
-    const techServices = services.filter((s) => s.technician_id === techId);
+    const summary = summaries.find((s) => s.technician_id === techId);
+    const total = summary ? Number(summary.total_services) : 0;
+    const entregasCount = summary ? Number(summary.sales) : 0;
+    const instalacoesCount = summary ? Number(summary.installations) : 0;
+    const reparacoesCount = summary ? Number(summary.repairs) : 0;
 
-    const entregas = techServices.filter((s) => getServiceType(s) === 'entregas');
-    const instalacoes = techServices.filter((s) => getServiceType(s) === 'instalacoes');
-    const reparacoes = techServices.filter((s) => getServiceType(s) === 'reparacoes');
-
-    const hasData = techServices.length > 0;
-    const chartData = hasData
+    const isEmpty = total === 0;
+    const chartData = !isEmpty
       ? [
-        { name: 'Entregas', value: entregas.length, color: '#10b981' },
-        { name: 'Instalações', value: instalacoes.length, color: '#f59e0b' },
-        { name: 'Reparações', value: reparacoes.length, color: '#3b82f6' },
+        { name: 'Entregas', value: entregasCount, color: '#10b981' },
+        { name: 'Instalações', value: instalacoesCount, color: '#f59e0b' },
+        { name: 'Reparações', value: reparacoesCount, color: '#3b82f6' },
       ].filter((item) => item.value > 0)
       : [{ name: 'Sem serviços', value: 1, color: 'hsl(var(--muted))' }];
 
+    // Linhas detalhadas: apenas quando o técnico está expandido
+    const services = expandedTechs.includes(techId)
+      ? expandedServices.filter((s) => s.technician_id === techId)
+      : [];
+
     return {
-      services: techServices,
-      entregas,
-      instalacoes,
-      reparacoes,
+      services,
+      entregasCount,
+      instalacoesCount,
+      reparacoesCount,
       chartData,
-      total: techServices.length,
-      isEmpty: !hasData,
+      total,
+      isEmpty,
     };
   };
 
