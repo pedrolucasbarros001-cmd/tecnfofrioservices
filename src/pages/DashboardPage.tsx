@@ -77,6 +77,7 @@ export default function DashboardPage() {
         concluidosRes,
         emDebitoRes,
         budgetsRes,
+        debtCountRes,
       ] = await Promise.all([
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'por_fazer'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'em_execucao'),
@@ -86,15 +87,12 @@ export default function DashboardPage() {
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'finalizado'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').neq('status', 'finalizado').neq('status', 'concluidos'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('service_location', 'oficina').eq('status', 'concluidos'),
-        supabase.from('services').select('*').gt('final_price', 0),
+        (supabase.rpc as any)('count_services_in_debt'),
         supabase.from('budgets').select('*', { count: 'exact', head: true }),
       ]);
 
-      const emDebitoCount = (emDebitoRes.data || []).filter(s => {
-        const finalPrice = s.final_price || 0;
-        const amountPaid = s.amount_paid || 0;
-        return finalPrice > 0 && amountPaid < finalPrice;
-      }).length;
+      // Contagem feita no servidor — devolve apenas um número
+      const emDebitoCount = (debtCountRes.data as number | null) ?? 0;
 
       return {
         por_fazer: porFazerRes.count ?? 0,
