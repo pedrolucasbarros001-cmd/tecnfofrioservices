@@ -75,9 +75,8 @@ export default function DashboardPage() {
         finalizadoRes,
         naOficinaRes,
         concluidosRes,
-        emDebitoRes,
-        budgetsRes,
         debtCountRes,
+        budgetsRes,
       ] = await Promise.all([
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'por_fazer'),
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('status', 'em_execucao'),
