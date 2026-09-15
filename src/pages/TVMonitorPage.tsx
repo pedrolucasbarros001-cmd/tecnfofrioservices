@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import {
@@ -73,26 +73,9 @@ export default function TVMonitorPage() {
             if (error) throw error;
             return (data || []) as TVMonitorService[];
         },
-        refetchInterval: false // Desativado em favor do Realtime
+        refetchInterval: 45000 // Atualização leve a cada 45s (sem canal Realtime permanente)
     });
 
-    // Realtime filtrado: só serviços de oficina
-    const queryClient = useQueryClient();
-    useEffect(() => {
-        const channel = supabase
-            .channel('tv-monitor-oficina')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'services',
-                filter: 'service_location=eq.oficina'
-            }, () => {
-                queryClient.invalidateQueries({ queryKey: ['tv-monitor-services'] });
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [queryClient]);
 
     // Atividade: polling leve a cada 60s (sem Realtime)
     const { data: activityLogs = [] } = usePublicActivityLogs(10, 60000);

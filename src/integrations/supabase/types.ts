@@ -1217,6 +1217,7 @@ export type Database = {
         Args: { _service_id: string; _user_id: string }
         Returns: boolean
       }
+      count_services_in_debt: { Args: never; Returns: number }
       get_technician_profile_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
@@ -1261,6 +1262,21 @@ export type Database = {
         Returns: {
           service_code: string
           service_id: string
+        }[]
+      }
+      technician_performance_summary: {
+        Args: { _from?: string; _to?: string }
+        Returns: {
+          completed_services: number
+          installations: number
+          pending_pricing: number
+          repairs: number
+          revenue: number
+          sales: number
+          technician_color: string
+          technician_id: string
+          technician_name: string
+          total_services: number
         }[]
       }
       technician_update_service: {

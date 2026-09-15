@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { compressImage } from '@/utils/imageCompression';
 
 interface CameraCaptureProps {
   open: boolean;
@@ -42,6 +43,7 @@ export function CameraCapture({
       });
 
       Promise.all(readers)
+        .then(results => Promise.all(results.map(r => compressImage(r))))
         .then(results => {
           setCapturedImages(prev => [...prev, ...results].slice(0, 5));
           setIsProcessing(false);
