@@ -798,6 +798,16 @@ export function CustomerDetailSheet({
           initialCustomer={customer}
         />
       )}
+
+      <BudgetDetailPanel
+        open={showBudgetDetail}
+        onOpenChange={setShowBudgetDetail}
+        budget={selectedBudget}
+        onUpdate={() => {
+          refetchBudgets();
+          queryClient.invalidateQueries({ queryKey: ['budgets'] });
+        }}
+      />
     </>
   );
 }
