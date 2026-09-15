@@ -146,6 +146,8 @@ export function CustomerDetailSheet({
   const queryClient = useQueryClient();
   const updateCustomer = useUpdateCustomer();
   const [showDirectBudgetModal, setShowDirectBudgetModal] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
+  const [showBudgetDetail, setShowBudgetDetail] = useState(false);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -215,7 +217,25 @@ export function CustomerDetailSheet({
     enabled: !!customer?.id && open,
   });
 
+  // Orçamentos deste cliente (aparecem na ficha, tal como os serviços)
+  const { data: budgets = [], isLoading: loadingBudgets, refetch: refetchBudgets } = useQuery({
+    queryKey: ['customer-budgets', customer?.id],
+    queryFn: async () => {
+      if (!customer?.id) return [];
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('*, customer:customers(*)')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: !!customer?.id && open,
+  });
+
   const handleDeleteDocument = async (doc: any) => {
+
     setDeletingDocId(doc.id);
     try {
       const { error: storageError } = await supabase.storage
