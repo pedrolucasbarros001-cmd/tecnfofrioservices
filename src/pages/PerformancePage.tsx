@@ -190,15 +190,15 @@ export default function PerformancePage() {
                 <div className="flex gap-6">
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-1">Entregas</p>
-                    <p className="text-xl font-bold text-green-600">{tech.data.entregas.length}</p>
+                    <p className="text-xl font-bold text-green-600">{tech.data.entregasCount}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-1">Instalações</p>
-                    <p className="text-xl font-bold text-orange-600">{tech.data.instalacoes.length}</p>
+                    <p className="text-xl font-bold text-orange-600">{tech.data.instalacoesCount}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-1">Reparações</p>
-                    <p className="text-xl font-bold text-blue-600">{tech.data.reparacoes.length}</p>
+                    <p className="text-xl font-bold text-blue-600">{tech.data.reparacoesCount}</p>
                   </div>
                 </div>
               </div>
