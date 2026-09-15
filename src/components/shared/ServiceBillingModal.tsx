@@ -96,10 +96,7 @@ export function ServiceBillingModal() {
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Ver depois
-          </Button>
+        <DialogFooter>
           <Button onClick={() => setOpen(false)}>Entendido</Button>
         </DialogFooter>
       </DialogContent>
