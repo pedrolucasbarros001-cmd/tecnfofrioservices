@@ -10,6 +10,7 @@ import { TechnicianSidebar } from './TechnicianSidebar';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { GuidedTour } from '@/components/onboarding/GuidedTour';
 import { ServiceBillingNotice } from '@/components/shared/ServiceBillingNotice';
+import { ServiceBillingModal } from '@/components/shared/ServiceBillingModal';
 
 import { DemoRunner } from '@/components/onboarding/DemoRunner';
 import { useDemo } from '@/contexts/DemoContext';
@@ -165,7 +166,12 @@ export function AppLayout() {
             )}
           </Button>
         </header>
-        {role === 'dono' && <ServiceBillingNotice />}
+        {role === 'dono' && (
+          <>
+            <ServiceBillingNotice />
+            <ServiceBillingModal />
+          </>
+        )}
         <main className="flex-1 overflow-auto bg-background">
 
           <div key={location.pathname} className="route-enter h-full">
