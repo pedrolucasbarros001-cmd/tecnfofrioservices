@@ -1,46 +1,45 @@
-# Reduzir custos: menos dados transferidos
+# Lembrete de renovação mais eficaz (sem incomodar)
 
-A análise está correta nos pontos que verifiquei no código. Confirmei:
+O lembrete actual é uma faixa fina no topo, sempre com o mesmo aspecto, fácil de ignorar. A ideia é que ele "suba de tom" conforme a data se aproxima e passa, e que apareça um aviso ao abrir o sistema — mas só quando faz sentido, e no máximo uma vez por dia.
 
-- O painel principal carrega **todos os serviços com preço** apenas para contar os que estão em dívida (`select('*')` sem filtro de colunas).
-- A página de Performance carrega até **500 serviços completos** de cada vez.
-- As fotos são enviadas **sem redução de tamanho** (uma foto de telemóvel pode ter 3-5 MB).
-- Há **6 canais de atualização em tempo real** abertos por cada pessoa com sessão iniciada, mais um no ecrã da oficina.
-- `select('*')` aparece em dezenas de ficheiros.
+Continua visível apenas para o dono. Nada muda para técnicos, secretaria ou monitor.
 
-Proposta, por ordem de impacto.
+## Níveis de urgência (a cor acompanha o tempo)
 
-## 1. Painel principal: contar no servidor
+| Quando | Faixa no topo | Aviso ao abrir |
+|---|---|---|
+| Faltam 7 a 4 dias | Azul discreto (como hoje) | Não aparece |
+| Faltam 3 a 1 dias | Âmbar suave | Uma vez por dia |
+| Dia da renovação | Laranja | Uma vez por dia |
+| Em atraso 1 a 2 dias | Laranja forte | Uma vez por dia |
+| Em atraso 3+ dias | Vermelho | Uma vez por dia |
 
-Substituir a leitura de todos os serviços com preço por uma função de base de dados que devolve apenas o número de serviços em dívida. Passa de milhares de linhas para um único número em cada abertura do painel.
+A cor aplica-se só à faixa, ao ícone e à barrinha de progresso — o resto do sistema mantém o azul de sempre. Nunca há ecrã a piscar, som, nem bloqueio de utilização: o sistema continua totalmente utilizável em qualquer nível.
 
-## 2. Comprimir fotos antes de enviar
+## Regras anti-spam
 
-Antes do envio, redimensionar cada foto para no máximo 1600 px de largura e gravar em JPEG com qualidade ~0.75. Reduz 80-90% do peso sem perder detalhe útil para diagnóstico. Aplica-se a todos os pontos de captura (visita, oficina, administração), porque todos passam pela mesma função de envio.
+- O aviso ao abrir só surge a partir de 3 dias antes da data — antes disso basta a faixa.
+- Aparece no máximo **uma vez por dia**, mesmo que feche e volte a abrir a app, mude de página ou use outro separador.
+- Ao fechar o aviso, ele não volta nesse dia. A faixa no topo permanece (é o lembrete passivo).
+- Fechar a faixa continua a valer só para o dia corrente, como hoje.
+- Em atraso, o aviso continua a aparecer uma vez por dia — mas sempre com botão de fechar, nunca preso.
 
-## 3. Página de Performance por agregados
+## O aviso ao abrir
 
-Trocar a leitura das 500 linhas por uma função de base de dados que devolve os totais já somados por técnico. Encaixa na reescrita já prevista para esta página.
+Janela pequena e calma, com:
+- Título curto conforme o nível ("Renovação em 2 dias", "Renovação hoje", "Renovação em atraso").
+- A mesma explicação de hoje: a renovação mantém o plano de hospedagem activo; sem ela o sistema pode ficar indisponível.
+- Contagem de dias e a data da renovação.
+- Dois botões: "Entendido" (fecha até amanhã) e "Ver depois" (fecha, igual).
 
-## 4. Rever `select('*')` nas listas mais usadas
-
-Limitar às colunas realmente mostradas nas listas de Serviços, Clientes e Orçamentos. As restantes ficam para depois.
-
-## 5. Ecrã da oficina (TV)
-
-Trocar as atualizações em tempo real por uma recarga a cada 45 segundos. Ninguém interage com esse ecrã, por isso o atraso é irrelevante.
-
-Deixo de fora reduzir os canais em tempo real das pessoas que trabalham na app — perde-se a sensação de imediato que já está montada, e o ganho é incerto sem ver a fatura.
-
-## Antes de começar
-
-Vale confirmar no painel da Supabase (Definições → Faturação) qual das categorias está realmente a pesar. Os passos 1 e 2 valem a pena de qualquer forma; os 3 a 5 podem ser reordenados conforme o que a fatura mostrar.
+Sem valores nem moeda, como combinado.
 
 ## Detalhes técnicos
 
-- Migração: `count_services_in_debt()` e `technician_performance_summary(_from date, _to date)` como funções `stable security definer` com `search_path = public`, com `grant execute` a `authenticated`.
-- `DashboardPage.tsx`: substituir a query `em_debito` por `supabase.rpc('count_services_in_debt')`.
-- Novo `src/utils/imageCompression.ts`: `compressImage(dataUrl, { maxWidth: 1600, quality: 0.75 })` via canvas; chamado no início de `uploadServicePhoto` em `src/utils/photoUpload.ts` e no insert direto de `PhotoCaptureStep.tsx`.
-- `PerformancePage.tsx`: consumir o RPC agregado em vez do `.limit(500)`.
-- `TVMonitorPage.tsx`: remover o canal Realtime e usar `refetchInterval: 45000`.
-- Listas: restringir colunas em `useServices`, `useCustomers` e página de orçamentos.
+- `src/config/serviceBilling.ts`: acrescentar `modalDays: 3` (antecedência a partir da qual o modal aparece) mantendo `enabled`, `dueDay`, `noticeDays`.
+- Extrair o cálculo de ciclo de `ServiceBillingNotice.tsx` para `src/hooks/useServiceBillingCycle.ts`, devolvendo `{ dueDate, daysRemaining, progress, level }` com `level: 'info' | 'soon' | 'due' | 'late' | 'critical'`. Reutilizado pela faixa e pelo modal, sem duplicar lógica de datas (continua a usar datas locais, sem `parseISO`).
+- Mapa de estilos por `level` num único objecto (classes de borda/fundo/texto/ícone/barra) para faixa e modal partilharem a mesma paleta.
+- Novo `src/components/shared/ServiceBillingModal.tsx` usando o `Dialog` existente; montado em `AppLayout.tsx` ao lado da faixa, também sob `role === 'dono'`.
+- Anti-spam: chave `tecnofrio:service-billing-modal-shown` em `localStorage` com a data `YYYY-MM-DD`; o modal só abre se a chave for diferente de hoje, e a chave é escrita no momento em que abre (não ao fechar), garantindo uma vez por dia mesmo com recarregamentos ou vários separadores. A chave da faixa mantém-se separada.
+- Abertura com pequeno atraso (~1200 ms) após o layout montar, para não competir com o carregamento inicial.
+- Sem alterações de base de dados, permissões ou fluxos de serviço.
