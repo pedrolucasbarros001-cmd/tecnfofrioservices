@@ -605,6 +605,99 @@ export function CustomerDetailSheet({
                     )}
                   </TabsContent>
 
+                  {/* Orçamentos Content */}
+                  <TabsContent value="orcamentos" className="mt-0">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold">Orçamentos do Cliente</h3>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { refetchBudgets(); }}>
+                          <Clock className="h-4 w-4 mr-2" /> Atualizar
+                        </Button>
+                        {canCreateBudget && (
+                          <Button size="sm" onClick={() => setShowDirectBudgetModal(true)}>
+                            <Plus className="h-4 w-4 mr-2" /> Novo Orçamento
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {loadingBudgets ? (
+                      <p className="text-center py-8 text-muted-foreground">A carregar orçamentos...</p>
+                    ) : budgets.length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                        <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                        <p className="text-muted-foreground">Nenhum orçamento registado para este cliente.</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[120px]">Código</TableHead>
+                              <TableHead>Aparelho</TableHead>
+                              <TableHead>Avaria</TableHead>
+                              <TableHead>Data</TableHead>
+                              <TableHead>Valor</TableHead>
+                              <TableHead className="text-right">Estado</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {budgets.map((budget: any) => {
+                              const statusStyle =
+                                budget.status === 'aprovado'
+                                  ? 'bg-green-50 text-green-700 border-green-200'
+                                  : budget.status === 'recusado'
+                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                    : budget.status === 'convertido'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : 'bg-amber-50 text-amber-700 border-amber-200';
+                              const statusLabel =
+                                budget.status === 'aprovado'
+                                  ? 'Aprovado'
+                                  : budget.status === 'recusado'
+                                    ? 'Recusado'
+                                    : budget.status === 'convertido'
+                                      ? 'Convertido'
+                                      : 'Pendente';
+
+                              return (
+                                <TableRow
+                                  key={budget.id}
+                                  className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                  onClick={() => {
+                                    setSelectedBudget(budget);
+                                    setShowBudgetDetail(true);
+                                  }}
+                                >
+                                  <TableCell className="font-mono font-medium text-primary">
+                                    {budget.code || '-'}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {[budget.appliance_type, budget.brand].filter(Boolean).join(' ') || '-'}
+                                  </TableCell>
+                                  <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                                    {budget.fault_description || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {budget.created_at ? safeFormat(budget.created_at, 'dd/MM/yyyy') : '-'}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {(budget.estimated_total || 0).toFixed(2)} €
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', statusStyle)}>
+                                      {statusLabel}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </TabsContent>
+
+
                   {/* Anexos Content */}
                   <TabsContent value="anexos" className="mt-0">
                     <h3 className="text-lg font-semibold mb-4">Documentos Anexados</h3>
