@@ -341,8 +341,9 @@ export function StateActionButtons({
             </DropdownMenuItem>
           )}
 
-          {/* Gerar Orçamento Seguro via Admin - Acesso Nível Dono */}
-          {((service?.status === 'a_precificar' || service?.status === 'por_fazer' || service?.status === 'em_execucao' || service?.status === 'na_oficina') && !service?.awaiting_budget_approval) && isDono && onCreateBudgetFromAdmin && (
+          {/* Gerar Orçamento (incl. seguro) - Dono ou Secretaria, também após a assistência feita */}
+          {(['a_precificar', 'por_fazer', 'em_execucao', 'na_oficina', 'para_pedir_peca', 'em_espera_de_peca', 'concluidos', 'finalizado'] as const).includes(service?.status as any)
+            && !service?.awaiting_budget_approval && (isDono || isSecretaria) && onCreateBudgetFromAdmin && (
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateBudgetFromAdmin(); }}>
                <FileText className="h-4 w-4 mr-2" />
                Gerar Orçamento
