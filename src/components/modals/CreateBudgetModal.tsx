@@ -338,7 +338,12 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
       if (error) throw error;
 
-      if (sourceService?.id) {
+      // Serviços já terminados não voltam a filas de pendentes: o orçamento
+      // fica ligado ao serviço mas o estado operacional mantém-se intacto.
+      const isTerminalService = ['concluidos', 'finalizado', 'cancelado'].includes(
+        (sourceService as any)?.status ?? ''
+      );
+      if (sourceService?.id && !isTerminalService) {
          // Lock the service
          await supabase.from('services').update({ awaiting_budget_approval: true }).eq('id', sourceService.id);
       }
