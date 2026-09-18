@@ -1,31 +1,53 @@
 import { useState } from 'react';
-import { Info, X } from 'lucide-react';
+import { Info, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import {
   BILLING_LEVEL_STYLES,
   remainingLabel,
-  todayKey,
   useServiceBillingCycle,
 } from '@/hooks/useServiceBillingCycle';
 
-const STORAGE_KEY = 'tecnofrio:service-billing-notice-dismissed';
-
 export function ServiceBillingNotice() {
-  const [dismissedKey, setDismissedKey] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return null;
+  const cycle = useServiceBillingCycle();
+  const queryClient = useQueryClient();
+
+  // Identifier for the current billing cycle month (e.g. "2026-10")
+  const cycleKey = `${cycle.dueDate.getFullYear()}-${String(cycle.dueDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['system_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (key: string) => {
+      const { error } = await supabase.from('system_settings').upsert({ id: 1, last_paid_billing_cycle: key });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system_settings'] });
+      toast.success('Pagamento confirmado. Lembrete ocultado até o próximo ciclo.');
+    },
+    onError: () => {
+      toast.error('Ocorreu um erro ao confirmar o pagamento.');
     }
   });
 
-  const cycle = useServiceBillingCycle();
+  const isPaid = settings?.last_paid_billing_cycle === cycleKey;
 
-  if (!cycle.showNotice) return null;
-  if (dismissedKey === todayKey()) return null;
+  // Don't render anything if the banner shouldn't show, if it's loading, or if the current cycle is already paid.
+  if (!cycle.showNotice || isPaid || isLoading) return null;
 
   const styles = BILLING_LEVEL_STYLES[cycle.level];
   const dueLabel = format(cycle.dueDate, "d 'de' MMMM", { locale: pt });
@@ -38,14 +60,8 @@ export function ServiceBillingNotice() {
       ? `A mensalidade está pendente desde ${dueLabel}. Renove assim que possível para evitar interrupções.`
       : `Lembre-se de renovar a mensalidade para garantir um funcionamento fluido. Renovação a ${dueLabel}.`;
 
-  const handleDismiss = () => {
-    const key = todayKey();
-    try {
-      localStorage.setItem(STORAGE_KEY, key);
-    } catch {
-      /* ignore */
-    }
-    setDismissedKey(key);
+  const handleConfirmPayment = () => {
+    mutation.mutate(cycleKey);
   };
 
   return (
@@ -78,14 +94,16 @@ export function ServiceBillingNotice() {
               style={{ width: `${cycle.progress}%` }}
             />
           </div>
-          <button
-            type="button"
-            onClick={handleDismiss}
-            aria-label="Dispensar lembrete até amanhã"
-            className="rounded-md p-1 opacity-70 transition-colors hover:bg-foreground/5 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Button 
+            variant="default"
+            size="sm"
+            onClick={handleConfirmPayment}
+            disabled={mutation.isPending}
+            className="gap-2 bg-green-600 text-white hover:bg-green-700 h-8"
           >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+            <Check className="h-4 w-4" />
+            {mutation.isPending ? 'Salvando...' : 'Confirmar Pagamento'}
+          </Button>
         </div>
       </div>
     </div>

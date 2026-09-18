@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CalendarClock } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 import {
   Dialog,
@@ -32,9 +35,23 @@ const OPEN_DELAY_MS = 1200;
 export function ServiceBillingModal() {
   const cycle = useServiceBillingCycle();
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const cycleKey = `${cycle.dueDate.getFullYear()}-${String(cycle.dueDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['system_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isPaid = settings?.last_paid_billing_cycle === cycleKey;
 
   useEffect(() => {
-    if (!cycle.showModal) return;
+    if (!cycle.showModal || isPaid || isLoading) return;
 
     const today = todayKey();
     let alreadyShown = false;
@@ -55,9 +72,24 @@ export function ServiceBillingModal() {
     }, OPEN_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [cycle.showModal]);
+  }, [cycle.showModal, isPaid, isLoading]);
 
-  if (!cycle.showModal) return null;
+  const mutation = useMutation({
+    mutationFn: async (key: string) => {
+      const { error } = await supabase.from('system_settings').upsert({ id: 1, last_paid_billing_cycle: key });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system_settings'] });
+      toast.success('Pagamento confirmado. Lembrete ocultado até o próximo ciclo.');
+      setOpen(false);
+    },
+    onError: () => {
+      toast.error('Ocorreu um erro ao confirmar o pagamento.');
+    }
+  });
+
+  if (!cycle.showModal || isPaid) return null;
 
   const styles = BILLING_LEVEL_STYLES[cycle.level];
   const dueLabel = format(cycle.dueDate, "d 'de' MMMM", { locale: pt });
@@ -96,8 +128,18 @@ export function ServiceBillingModal() {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button onClick={() => setOpen(false)}>Entendido</Button>
+        <DialogFooter className="sm:justify-between">
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Entendido
+          </Button>
+          <Button 
+            onClick={() => mutation.mutate(cycleKey)}
+            disabled={mutation.isPending}
+            className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Check className="h-4 w-4" />
+            {mutation.isPending ? 'Salvando...' : 'Confirmar Pagamento'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
