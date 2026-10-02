@@ -970,6 +970,24 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          id: number
+          last_paid_billing_cycle: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_paid_billing_cycle?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_paid_billing_cycle?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       technicians: {
         Row: {
           active: boolean | null
