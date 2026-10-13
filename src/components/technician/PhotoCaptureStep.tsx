@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CameraCapture } from '@/components/shared/CameraCapture';
 import { uploadServicePhoto } from '@/utils/photoUpload';
+import { SignedImage } from '@/components/shared/SignedImage';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -86,7 +87,7 @@ export function PhotoCaptureStep({
         )}>
           {photos.map((photo, idx) => (
             <div key={idx} className="relative group">
-              <img
+              <SignedImage
                 src={photo}
                 alt={`${title} ${idx + 1}`}
                 className={cn(
