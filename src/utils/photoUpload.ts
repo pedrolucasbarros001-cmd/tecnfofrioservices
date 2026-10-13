@@ -17,7 +17,7 @@ export async function uploadServicePhoto(
   const blob = await response.blob();
 
   // 2. Upload to Storage
-  const fileName = `${serviceId}/${photoType}_${Date.now()}.jpg`;
+  const fileName = `${serviceId}/${photoType}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
   const { error: uploadError } = await supabase.storage
     .from('service-photos')
     .upload(fileName, blob, {

@@ -98,8 +98,9 @@ export function TechnicianServiceSheet({
     enabled: !!service?.id && open,
   });
 
-  const handlePhotoCapture = (imageData: string) => {
-    setCapturedPhotos(prev => prev.length < MAX_PHOTOS ? [...prev, imageData] : prev);
+  const handlePhotoCapture = (data: string | string[]) => {
+    const images = Array.isArray(data) ? data : [data];
+    setCapturedPhotos(prev => [...prev, ...images].slice(0, MAX_PHOTOS));
     setShowCamera(false);
   };
 
