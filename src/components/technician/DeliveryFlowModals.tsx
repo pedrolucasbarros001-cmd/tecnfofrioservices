@@ -177,7 +177,9 @@ export function DeliveryFlowModals({ service, isOpen, onClose, onComplete }: Del
     }
   };
 
-  const handlePhotoCapture = async (imageData: string) => {
+  const handlePhotoCapture = async (data: string | string[]) => {
+    const imageData = Array.isArray(data) ? data[0] : data;
+    if (!imageData) return;
     try {
       await ensureValidSession();
       const { uploadServicePhoto } = await import('@/utils/photoUpload');

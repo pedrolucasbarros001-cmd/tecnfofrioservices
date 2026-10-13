@@ -3,7 +3,7 @@ import { Camera, Image, Plus, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CameraCapture } from '@/components/shared/CameraCapture';
-import { supabase } from '@/integrations/supabase/client';
+import { uploadServicePhoto } from '@/utils/photoUpload';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
@@ -35,21 +35,20 @@ export function PhotoCaptureStep({
   const [showCamera, setShowCamera] = useState(false);
   const queryClient = useQueryClient();
 
-  const handlePhotoCapture = async (imageData: string) => {
+  const handlePhotoCapture = async (data: string | string[]) => {
     try {
-      await supabase.from('service_photos').insert({
-        service_id: serviceId,
-        photo_type: photoType,
-        file_url: imageData,
-        description: title,
-      });
-      
+      const images = Array.isArray(data) ? data : [data];
+      const urls: string[] = [];
+      for (const img of images) {
+        urls.push(await uploadServicePhoto(serviceId, img, photoType, title));
+      }
+
       invalidateServiceQueries(queryClient, serviceId);
-      
+
       if (multiple) {
-        onPhotosChange([...photos, imageData]);
+        onPhotosChange([...photos, ...urls]);
       } else {
-        onPhotosChange([imageData]);
+        onPhotosChange(urls.slice(-1));
       }
       
       setShowCamera(false);

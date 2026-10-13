@@ -190,7 +190,9 @@ export function InstallationFlowModals({ service, isOpen, onClose, onComplete }:
     }
   };
 
-  const handlePhotoCapture = async (imageData: string) => {
+  const handlePhotoCapture = async (data: string | string[]) => {
+    const imageData = Array.isArray(data) ? data[0] : data;
+    if (!imageData) return;
     try {
       await ensureValidSession();
       const photoType = cameraMode === 'antes' ? 'instalacao_antes' : 'instalacao_depois';
