@@ -22,11 +22,20 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const bucket = "service-photos";
 
-  if (body.action === "list") {
-    const { data, error } = await admin.schema("storage").from("objects")
-      .select("name, metadata").eq("bucket_id", bucket).order("name").range(body.from ?? 0, (body.from ?? 0) + 199);
+  if (body.action === "folders") {
+    const out: string[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await admin.storage.from(bucket).list("", { limit: 1000, offset: off });
+      if (error) return json({ error: error.message }, 500);
+      out.push(...(data || []).filter((o: any) => !o.id).map((o: any) => o.name));
+      if (!data || data.length < 1000) break;
+    }
+    return json({ folders: out });
+  }
+  if (body.action === "files") {
+    const { data, error } = await admin.storage.from(bucket).list(String(body.folder), { limit: 1000 });
     if (error) return json({ error: error.message }, 500);
-    return json({ items: (data || []).map((o: any) => ({ name: o.name, size: Number(o.metadata?.size || 0) })) });
+    return json({ items: (data || []).filter((o: any) => o.id).map((o: any) => ({ name: `${body.folder}/${o.name}`, size: Number(o.metadata?.size || 0) })) });
   }
   if (body.action === "sign") {
     const path = String(body.path);
