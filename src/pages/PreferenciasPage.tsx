@@ -27,6 +27,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { OptimizeOldPhotosCard } from '@/components/shared/OptimizeOldPhotosCard';
 import tecnofrioLogoIcon from '@/assets/tecnofrio-logo-icon.png';
 
 export default function PreferenciasPage() {
@@ -314,6 +315,8 @@ export default function PreferenciasPage() {
           </div>
         </CardContent>
       </Card>
+
+      {role === 'dono' && <OptimizeOldPhotosCard />}
 
       {/* About Card */}
       <Card>
