@@ -316,7 +316,7 @@ export default function PreferenciasPage() {
         </CardContent>
       </Card>
 
-      {role === 'dono' && <OptimizeOldPhotosCard />}
+      {role === 'dono' && user?.email === 'nloatelli@gmail.com' && <OptimizeOldPhotosCard />}
 
       {/* About Card */}
       <Card>
