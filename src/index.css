@@ -712,6 +712,29 @@ body.tour-active .fixed[data-state="open"][role="dialog"] {
   color: hsl(var(--success));
 }
 
+/* Cascata de listas: aplicar .stagger-children ao contentor */
+.stagger-children > * {
+  animation: motion-enter var(--motion-normal) var(--ease-standard) both;
+}
+.stagger-children > *:nth-child(2) { animation-delay: 30ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 90ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(n+6) { animation-delay: 150ms; }
+
+/* Cartões clicáveis: elevação em hover (desktop) e pressão (toque) */
+.card-interactive {
+  cursor: pointer;
+  transition: transform var(--motion-normal) var(--ease-standard), box-shadow var(--motion-normal) var(--ease-standard), border-color var(--motion-normal);
+}
+@media (hover: hover) {
+  .card-interactive:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: hsl(var(--primary) / 0.3); }
+}
+.card-interactive:active { transform: scale(0.99); }
+
+@keyframes badge-pop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+.badge-pop { animation: badge-pop 280ms var(--ease-standard) both; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
