@@ -114,11 +114,11 @@ export default {
   		},
   		fontFamily: {
   			sans: [
-  				'Inter',
-  				'ui-sans-serif',
-  				'system-ui',
   				'-apple-system',
   				'BlinkMacSystemFont',
+  				'SF Pro Text',
+  				'ui-sans-serif',
+  				'system-ui',
   				'Segoe UI',
   				'Roboto',
   				'Helvetica Neue',

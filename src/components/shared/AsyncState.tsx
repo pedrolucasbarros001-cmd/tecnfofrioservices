@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Inbox, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type AsyncStateVariant = "loading" | "empty" | "error" | "success";
@@ -52,6 +53,13 @@ export function AsyncState({
         <p className="text-sm font-semibold text-foreground">{title ?? content.title}</p>
         <p className="max-w-sm text-sm text-muted-foreground">{description ?? content.description}</p>
       </div>
+      {variant === "loading" && (
+        <div className="w-full max-w-sm space-y-3 pt-3" aria-hidden="true">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-4/5" />
+          {!compact && <Skeleton className="h-3 w-3/5" />}
+        </div>
+      )}
       {variant === "error" && onAction && (
         <Button variant="outline" size="sm" onClick={onAction}>
           {actionLabel}

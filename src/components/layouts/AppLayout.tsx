@@ -14,7 +14,7 @@ import { ServiceBillingModal } from '@/components/shared/ServiceBillingModal';
 
 import { DemoRunner } from '@/components/onboarding/DemoRunner';
 import { useDemo } from '@/contexts/DemoContext';
-import { Bell, Menu } from 'lucide-react';
+import { Bell, Menu, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtime } from '@/hooks/useRealtime';
@@ -141,19 +141,25 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       {getSidebar()}
-      <SidebarInset className="flex flex-col min-h-screen">
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-md px-4">
-          <SidebarTrigger className="-ml-1">
+      <SidebarInset className="flex min-w-0 flex-col min-h-svh">
+        <header className="native-chrome sticky top-0 z-40 flex min-h-14 items-center gap-3 border-b border-border/60 px-3 sm:px-5">
+          <SidebarTrigger className="h-11 w-11 sm:h-9 sm:w-9" aria-label="Abrir ou recolher menu">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
 
-          <div className="flex-1" />
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+            <span className="hidden font-semibold text-muted-foreground sm:inline">Tecnofrio</span>
+            <ChevronRight className="hidden h-3 w-3 text-muted-foreground/60 sm:block" aria-hidden="true" />
+            <span className="truncate font-semibold">{{ '/dashboard': 'Dashboard', '/geral': 'Geral', '/oficina': 'Oficina', '/clientes': 'Clientes', '/orcamentos': 'Orçamentos', '/performance': 'Performance', '/colaboradores': 'Colaboradores', '/preferencias': 'Preferências', '/servicos': 'Serviços', '/perfil': 'Perfil', '/concluidos': 'Concluídos', '/debito': 'Débito', '/precificar': 'Precificar' }[location.pathname] ?? 'Tecnofrio'}</span>
+          </div>
 
           {/* Notifications */}
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-9 w-9 rounded-full"
+            className="relative h-11 w-11 rounded-lg sm:h-9 sm:w-9"
+            aria-label="Notificações"
+            title="Notificações"
             onClick={() => setShowNotifications(true)}
             data-tour="notifications-btn"
             data-demo="notifications-btn"
@@ -172,7 +178,7 @@ export function AppLayout() {
             <ServiceBillingModal />
           </>
         )}
-        <main className="flex-1 overflow-auto bg-background">
+        <main className="min-w-0 flex-1 bg-background">
 
           <div key={location.pathname} className="route-enter h-full">
             <Outlet />
