@@ -57,7 +57,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   ({ side = "right", className, children, hideClose = false, ...props }, ref) => (
     <SheetPortal>
       <SheetOverlay />
-      <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+      <SheetPrimitive.Content ref={ref} data-sheet-side={side} className={cn(sheetVariants({ side }), className)} {...props}>
         {children}
         {!hideClose && (
           <SheetPrimitive.Close className="native-close absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
@@ -73,7 +73,7 @@ SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 const SheetHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+    <div ref={ref} className={cn("flex flex-col space-y-2 pr-10 text-left", className)} {...props} />
   )
 );
 SheetHeader.displayName = "SheetHeader";

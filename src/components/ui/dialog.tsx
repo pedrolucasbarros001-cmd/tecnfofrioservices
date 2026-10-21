@@ -39,14 +39,19 @@ const isRadixPortalInteraction = (target: EventTarget | null): boolean => {
   );
 };
 
+interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  presentation?: "adaptive" | "centered" | "fullscreen";
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, presentation = "adaptive", onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      data-presentation={presentation}
       onPointerDownOutside={(e) => {
         if (isRadixPortalInteraction(e.target)) {
           e.preventDefault();
@@ -84,7 +89,7 @@ DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
+    <div ref={ref} data-dialog-footer="" className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
   )
 );
 DialogFooter.displayName = "DialogFooter";

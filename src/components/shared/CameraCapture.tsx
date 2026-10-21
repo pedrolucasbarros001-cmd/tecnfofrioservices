@@ -79,7 +79,7 @@ export function CameraCapture({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent className="sm:max-w-[500px] w-[95vw] p-0 overflow-hidden">
+      <DialogContent presentation="centered" className="sm:max-w-[500px] w-[95vw] p-0 overflow-hidden">
         <DialogHeader className="p-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Camera className="h-5 w-5" />
