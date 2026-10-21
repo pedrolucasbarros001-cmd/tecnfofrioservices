@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Fase 2: adaptar janelas ao telemóvel e computador, preservando impressão, câmara, assinaturas e navegação; verificar interações
+- [x] Fase 2: janelas inferiores no telemóvel e centradas no computador; seleção, confirmações, Escape e navegação verificados a 1280, 428 e 375 px; ferramentas especiais preservadas
 - [x] Refinar a base visual partilhada (controlos, janelas, carregamentos e navegação); controlos verificados a 1280, 428 e 375 px
 - [ ] Verificar páginas e fluxos com sessão real de cada perfil — bloqueado: autenticação externa não disponível para testes neste projeto
 

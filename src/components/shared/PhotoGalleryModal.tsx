@@ -71,7 +71,7 @@ export function PhotoGalleryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden z-50">
+      <DialogContent presentation="fullscreen" className="max-w-full w-full h-full max-h-[100dvh] p-0 bg-black/95 border-none rounded-none [&>button]:hidden z-50">
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
           <Button
