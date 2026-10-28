@@ -32,7 +32,7 @@ export function ServiceBillingNotice() {
 
   const mutation = useMutation({
     mutationFn: async (key: string) => {
-      const { error } = await supabase.from('system_settings').upsert({ id: 1, last_paid_billing_cycle: key });
+      const { error } = await supabase.from('system_settings').update({ last_paid_billing_cycle: key, updated_at: new Date().toISOString() }).eq('id', 1);
       if (error) throw error;
     },
     onSuccess: () => {
