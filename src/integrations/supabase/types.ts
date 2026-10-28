@@ -125,6 +125,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          appliance_id: string | null
           appliance_type: string | null
           brand: string | null
           code: string | null
@@ -150,6 +151,7 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          appliance_id?: string | null
           appliance_type?: string | null
           brand?: string | null
           code?: string | null
@@ -175,6 +177,7 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          appliance_id?: string | null
           appliance_type?: string | null
           brand?: string | null
           code?: string | null
@@ -200,6 +203,13 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "budgets_appliance_id_fkey"
+            columns: ["appliance_id"]
+            isOneToOne: false
+            referencedRelation: "customer_appliances"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budgets_converted_service_id_fkey"
             columns: ["converted_service_id"]
@@ -247,6 +257,62 @@ export type Database = {
             columns: ["source_service_id"]
             isOneToOne: false
             referencedRelation: "tv_monitor_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_appliances: {
+        Row: {
+          appliance_type: string | null
+          brand: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          location: string | null
+          model: string | null
+          notes: string | null
+          pnc: string | null
+          purchase_date: string | null
+          serial_number: string | null
+          updated_at: string
+          warranty_until: string | null
+        }
+        Insert: {
+          appliance_type?: string | null
+          brand?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          location?: string | null
+          model?: string | null
+          notes?: string | null
+          pnc?: string | null
+          purchase_date?: string | null
+          serial_number?: string | null
+          updated_at?: string
+          warranty_until?: string | null
+        }
+        Update: {
+          appliance_type?: string | null
+          brand?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          location?: string | null
+          model?: string | null
+          notes?: string | null
+          pnc?: string | null
+          purchase_date?: string | null
+          serial_number?: string | null
+          updated_at?: string
+          warranty_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_appliances_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -772,6 +838,7 @@ export type Database = {
       services: {
         Row: {
           amount_paid: number | null
+          appliance_id: string | null
           appliance_type: string | null
           awaiting_budget_approval: boolean | null
           brand: string | null
@@ -826,6 +893,7 @@ export type Database = {
         }
         Insert: {
           amount_paid?: number | null
+          appliance_id?: string | null
           appliance_type?: string | null
           awaiting_budget_approval?: boolean | null
           brand?: string | null
@@ -880,6 +948,7 @@ export type Database = {
         }
         Update: {
           amount_paid?: number | null
+          appliance_id?: string | null
           appliance_type?: string | null
           awaiting_budget_approval?: boolean | null
           brand?: string | null
@@ -933,6 +1002,13 @@ export type Database = {
           work_performed?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "services_appliance_id_fkey"
+            columns: ["appliance_id"]
+            isOneToOne: false
+            referencedRelation: "customer_appliances"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_customer_id_fkey"
             columns: ["customer_id"]
@@ -1261,6 +1337,18 @@ export type Database = {
       start_workshop_service: {
         Args: { _service_id: string }
         Returns: undefined
+      }
+      suggest_customer_appliances: {
+        Args: { _customer_id: string }
+        Returns: {
+          appliance_type: string
+          brand: string
+          last_service: string
+          model: string
+          pnc: string
+          serial_number: string
+          services_count: number
+        }[]
       }
       technician_create_service: {
         Args: {

@@ -1,0 +1,1 @@
+ALTER FUNCTION public.suggest_customer_appliances(uuid) SECURITY INVOKER;
