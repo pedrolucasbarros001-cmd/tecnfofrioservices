@@ -6,7 +6,7 @@ import {
   DollarSign, AlertCircle, CheckSquare, FileText, BarChart2,
   Timer, CalendarDays, ArrowRight, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Users, Hourglass, Minus,
-  RefreshCw, UserCheck, UserX, UserPlus, Repeat2,
+  RefreshCw, UserX, UserPlus, RotateCcw,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -750,7 +750,7 @@ export default function DashboardPage() {
                 <Card className="motion-enter">
                   <CardContent className="p-4 flex flex-col gap-1">
                     <div className="flex items-center gap-1.5">
-                      <Repeat2 className="h-3.5 w-3.5 text-green-500" />
+                      <RotateCcw className="h-3.5 w-3.5 text-green-500" />
                       <p className="text-xs text-muted-foreground">Recorrentes</p>
                     </div>
                     <p className="text-2xl font-bold">{clientRec.recorrentes}</p>
