@@ -6,12 +6,14 @@ import {
   DollarSign, AlertCircle, CheckSquare, FileText, BarChart2,
   Timer, CalendarDays, ArrowRight, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Users, Hourglass, Minus,
-  RefreshCw, UserX, UserPlus, RotateCcw,
+  RefreshCw, UserX, UserPlus, RotateCcw, Play,
+  Zap, Target, Activity,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
@@ -24,6 +26,12 @@ import {
   useServiceBottlenecks,
   useBudgetOpportunities,
   useClientRecurrence,
+  useFinancialSummary,
+  useActivityMetrics,
+  useBudgetDetail,
+  useTeamOverview,
+  useDashboardAlerts,
+  useBottleneckDetail,
 } from '@/hooks/useDashboardMetrics';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ServiceStatusChart } from '@/components/dashboard/ServiceStatusChart';
@@ -370,6 +378,24 @@ function RevenueTrendBadge({ current, previous }: { current: number; previous: n
   );
 }
 
+// ─── Delta badge comparação com período anterior ──────────────────────────────
+function DeltaBadge({ current, previous }: { current: number | null; previous: number | null }) {
+  if (current == null || previous == null || previous === 0) return null;
+  const pct = ((current - previous) / previous) * 100;
+  const isUp = pct >= 0;
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+      isUp
+        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+        : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    )}>
+      {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+      {Math.abs(pct).toFixed(0)}%
+    </span>
+  );
+}
+
 // ─── Tipos do dashboard ───────────────────────────────────────────────────────
 interface DashboardStats {
   por_fazer: number;
@@ -385,16 +411,16 @@ interface DashboardStats {
 }
 
 const DASHBOARD_CARDS = [
-  { key: 'por_fazer' as const,      label: 'Aberto',         icon: ClipboardList, route: '/geral?status=por_fazer' },
-  { key: 'em_execucao' as const,    label: 'Em Execução',    icon: Play,          route: '/geral?status=em_execucao' },
-  { key: 'na_oficina' as const,     label: 'Oficina',        icon: Building2,     route: '/oficina' },
-  { key: 'para_pedir_peca' as const,label: 'Pedir Peça',     icon: Package,       route: '/geral?status=para_pedir_peca' },
-  { key: 'em_espera_de_peca' as const, label: 'Espera Peça', icon: Clock,         route: '/geral?status=em_espera_de_peca' },
-  { key: 'concluidos' as const,     label: 'Concluídos Oficina', icon: Truck,     route: '/concluidos' },
-  { key: 'a_precificar' as const,   label: 'Orçamentar',     icon: DollarSign,    route: '/precificar' },
-  { key: 'em_debito' as const,      label: 'Em Débito',      icon: AlertCircle,   route: '/em-debito' },
-  { key: 'finalizado' as const,     label: 'Finalizados',    icon: CheckSquare,   route: '/geral?status=finalizado' },
-  { key: 'orcamentos' as const,     label: 'Orçamentos',     icon: FileText,      route: '/orcamentos' },
+  { key: 'por_fazer' as const,      label: 'Aberto',             icon: ClipboardList, route: '/geral?status=por_fazer' },
+  { key: 'em_execucao' as const,    label: 'Em Execução',        icon: Play,          route: '/geral?status=em_execucao' },
+  { key: 'na_oficina' as const,     label: 'Oficina',            icon: Building2,     route: '/oficina' },
+  { key: 'para_pedir_peca' as const,label: 'Pedir Peça',         icon: Package,       route: '/geral?status=para_pedir_peca' },
+  { key: 'em_espera_de_peca' as const, label: 'Espera Peça',     icon: Clock,         route: '/geral?status=em_espera_de_peca' },
+  { key: 'concluidos' as const,     label: 'Concluídos Oficina', icon: Truck,         route: '/concluidos' },
+  { key: 'a_precificar' as const,   label: 'Orçamentar',         icon: DollarSign,    route: '/precificar' },
+  { key: 'em_debito' as const,      label: 'Em Débito',          icon: AlertCircle,   route: '/em-debito' },
+  { key: 'finalizado' as const,     label: 'Finalizados',        icon: CheckSquare,   route: '/geral?status=finalizado' },
+  { key: 'orcamentos' as const,     label: 'Orçamentos',         icon: FileText,      route: '/orcamentos' },
 ];
 
 // ─── Página principal ─────────────────────────────────────────────────────────
@@ -404,6 +430,7 @@ export default function DashboardPage() {
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
   const isDono = role === 'dono';
 
+  // ── Hooks base (compatibilidade) ──────────────────────────────────────────
   const { data: health,      isLoading: healthLoading } = useBusinessHealth();
   const { data: revenueTrend = [], isLoading: trendLoading } = useRevenueTrend();
   const { data: operational, isLoading: opLoading }    = useOperationalMetrics();
@@ -411,6 +438,14 @@ export default function DashboardPage() {
   const { data: bottlenecks = [] }                     = useServiceBottlenecks();
   const { data: budgetOpp }                            = useBudgetOpportunities();
   const { data: clientRec }                            = useClientRecurrence();
+
+  // ── Hooks spec v2 ─────────────────────────────────────────────────────────
+  const { data: financialSummary } = useFinancialSummary(30);
+  const { data: activityMetrics }  = useActivityMetrics(30);
+  const { data: budgetDetail }     = useBudgetDetail(30);
+  const { data: teamOverview }     = useTeamOverview(30);
+  const { data: dashAlerts }       = useDashboardAlerts();
+  const { data: bottleneckDetail } = useBottleneckDetail();
 
   useEffect(() => {
     if (role && role !== 'dono') {
@@ -459,7 +494,7 @@ export default function DashboardPage() {
     a_precificar: 0, em_debito: 0, finalizado: 0, orcamentos: 0,
   };
 
-  // ── Alertas directivos calculados a partir dos dados existentes ──────────
+  // ── Alertas directivos (fallback para dados base quando spec RPC não disponível) ──
   const actionAlerts: ActionAlert[] = [];
   if (isDono && health) {
     if ((health.por_faturar_count ?? 0) > 0) {
@@ -518,6 +553,9 @@ export default function DashboardPage() {
     }
   }
 
+  const fmt = (n: number) =>
+    n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
@@ -539,25 +577,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── CENTRO DE ACÇÃO ─────────────────────────────────────────────────── */}
-      {isDono && actionAlerts.length > 0 && (
-        <section aria-label="Centro de Ação">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h2 className="text-sm font-semibold">Centro de Ação</h2>
-            <span className="text-xs text-muted-foreground">
-              — {actionAlerts.length} {actionAlerts.length === 1 ? 'ponto requer' : 'pontos requerem'} atenção
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {actionAlerts.map((alert) => (
-              <ActionAlertCard key={alert.id} alert={alert} />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ── ESTADO DE TODOS OS SERVIÇOS ──────────────────────────────────────── */}
+      {/* Os 10 cards permanecem exactamente como estão — não alterar */}
       <section aria-label="Estado dos serviços">
         <div className="flex items-center gap-2 mb-3">
           <BarChart2 className="h-4 w-4 text-muted-foreground" />
@@ -581,14 +602,37 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ── SAÚDE FINANCEIRA (só dono) ──────────────────────────────────────── */}
+      {/* ── SECÇÃO 1.8: ALERTAS E OPORTUNIDADES (só dono) ──────────────────── */}
+      {isDono && actionAlerts.length > 0 && (
+        <section aria-label="Alertas e oportunidades">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="text-sm font-semibold">Centro de Ação</h2>
+            <span className="text-xs text-muted-foreground">
+              — {actionAlerts.length} {actionAlerts.length === 1 ? 'ponto requer' : 'pontos requerem'} atenção
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {actionAlerts.map((alert) => (
+              <ActionAlertCard key={alert.id} alert={alert} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── SECÇÃO 1.1: RESUMO FINANCEIRO (só dono) ─────────────────────────── */}
       {isDono && (
-        <section aria-label="Saúde financeira" className="space-y-4">
+        <section aria-label="Resumo financeiro" className="space-y-4">
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Saúde financeira</h2>
+            <h2 className="text-sm font-semibold">Resumo financeiro</h2>
             <div className="flex-1 h-px bg-border" />
-            {health?.clientes_novos_mes && health.clientes_novos_mes > 0 ? (
+            {financialSummary && (
+              <span className="text-xs text-muted-foreground">
+                últimos {financialSummary.days} dias
+              </span>
+            )}
+            {!financialSummary && health?.clientes_novos_mes && health.clientes_novos_mes > 0 ? (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 +{health.clientes_novos_mes} cliente{health.clientes_novos_mes !== 1 ? 's' : ''} novos
@@ -596,42 +640,174 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          {/* Breakdown financeiro */}
-          <FinancialBreakdown health={health} navigate={navigate} />
+          {/* Resumo financeiro v2 (RPC novo) ou fallback para breakdown base */}
+          {financialSummary ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-grid">
+              {/* Recebido */}
+              <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
+                <div className="flex items-center gap-2 mb-1 justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Recebido
+                    </span>
+                  </div>
+                  <DeltaBadge current={financialSummary.recebido} previous={financialSummary.recebido_prev} />
+                </div>
+                <p className="text-xl font-bold text-green-600 dark:text-green-400 tabular-nums">
+                  {fmt(financialSummary.recebido)}
+                </p>
+                <p className="text-xs text-muted-foreground">efectivamente recebido</p>
+              </div>
 
-          {/* Métricas de conversão */}
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="motion-enter">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Conversão de orçamentos</p>
-                <p className="text-2xl font-bold">
-                  {healthLoading ? '—' : `${health?.budget_conversion_rate ?? 0}%`}
+              {/* Por receber */}
+              <div
+                className={cn(
+                  'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
+                  financialSummary.por_receber > 0 && 'border-l-4 border-l-amber-400',
+                )}
+                onClick={() => navigate('/em-debito')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Por receber
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                  {fmt(financialSummary.por_receber)}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Ticket médio</p>
-                <p className="text-2xl font-bold">
-                  {healthLoading
-                    ? '—'
-                    : (health?.avg_ticket ?? 0).toLocaleString('pt-PT', {
-                        style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-                      })}
+                <p className="text-xs text-muted-foreground">
+                  {financialSummary.por_receber_count} clientes com débito
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">serviços finalizados</p>
-              </CardContent>
-            </Card>
+                {financialSummary.por_receber > 0 && (
+                  <span className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                    <ArrowRight className="h-3 w-3" /> Cobrar
+                  </span>
+                )}
+              </div>
+
+              {/* Por faturar */}
+              <div
+                className={cn(
+                  'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
+                  financialSummary.por_faturar_count > 0 && 'border-l-4 border-l-red-400',
+                )}
+                onClick={() => navigate('/precificar')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Por faturar
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums">
+                  {financialSummary.por_faturar_count}{' '}
+                  <span className="text-sm font-normal">serviços</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {fmt(financialSummary.por_faturar)} em valor estimado
+                </p>
+                {financialSummary.por_faturar_count > 0 && (
+                  <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                    <ArrowRight className="h-3 w-3" /> Definir preço
+                  </span>
+                )}
+              </div>
+
+              {/* Ticket médio */}
+              <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
+                <div className="flex items-center gap-2 mb-1 justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Ticket médio
+                    </span>
+                  </div>
+                  <DeltaBadge
+                    current={financialSummary.ticket_medio}
+                    previous={financialSummary.ticket_medio_prev}
+                  />
+                </div>
+                <p className="text-xl font-bold tabular-nums">
+                  {financialSummary.ticket_medio != null
+                    ? fmt(financialSummary.ticket_medio)
+                    : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground">por serviço faturado</p>
+              </div>
+            </div>
+          ) : (
+            /* Fallback: breakdown base enquanto RPC novo não está disponível */
+            <FinancialBreakdown health={health} navigate={navigate} />
+          )}
+
+          {/* Métricas de conversão (fallback) */}
+          {!financialSummary && (
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Conversão de orçamentos</p>
+                  <p className="text-2xl font-bold">
+                    {healthLoading ? '—' : `${health?.budget_conversion_rate ?? 0}%`}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
+                </CardContent>
+              </Card>
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Ticket médio</p>
+                  <p className="text-2xl font-bold">
+                    {healthLoading
+                      ? '—'
+                      : (health?.avg_ticket ?? 0).toLocaleString('pt-PT', {
+                          style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
+                        })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">serviços finalizados</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── SECÇÃO 1.2: ATIVIDADE E EVOLUÇÃO (só dono) ──────────────────────── */}
+      {isDono && (
+        <section aria-label="Atividade e evolução" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Atividade e evolução</h2>
+            <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* Gráfico de tendência */}
-          <RevenueChart data={revenueTrend} loading={trendLoading} />
-
-          {/* Gráfico operacional + métricas */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ServiceStatusChart data={operational?.by_status ?? null} loading={opLoading} />
-            <div className="flex flex-col gap-3">
+          {/* Métricas de atividade — v2 quando disponível */}
+          {activityMetrics ? (
+            <div className="grid grid-cols-3 gap-3 mb-2">
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Iniciados</p>
+                  <p className="text-2xl font-bold">{activityMetrics.iniciados}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
+                </CardContent>
+              </Card>
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Concluídos</p>
+                  <p className="text-2xl font-bold">{activityMetrics.concluidos}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
+                </CardContent>
+              </Card>
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Em Execução</p>
+                  <p className="text-2xl font-bold">{activityMetrics.em_execucao}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">agora</p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 mb-2">
               <Card className="motion-enter">
                 <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground mb-1">Serviços esta semana</p>
@@ -649,185 +825,533 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-          </div>
-
-          {/* Gargalos */}
-          <BottlenecksSection data={bottlenecks} />
-
-          {/* ── ORÇAMENTOS E OPORTUNIDADES ─────────────────────────────────── */}
-          {budgetOpp && (
-            <section aria-label="Orçamentos e oportunidades">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Orçamentos e oportunidades</h2>
-                <div className="flex-1 h-px bg-border" />
-                {budgetOpp.taxa_aceitacao != null && (
-                  <span className="text-xs text-muted-foreground">
-                    {budgetOpp.taxa_aceitacao}% taxa de aceitação (90d)
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Valor potencial */}
-                <Card className="motion-enter cursor-pointer hover:border-blue-400 transition-colors" onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Valor em aberto</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {budgetOpp.valor_total_pendente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{budgetOpp.total_pendentes} orçamento{budgetOpp.total_pendentes !== 1 ? 's' : ''} pendente{budgetOpp.total_pendentes !== 1 ? 's' : ''}</p>
-                  </CardContent>
-                </Card>
-
-                {/* Sem resposta +7 dias */}
-                <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '')} onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
-                    <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
-                      {budgetOpp.sem_resposta_7d}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {budgetOpp.valor_sem_resposta_7d > 0
-                        ? budgetOpp.valor_sem_resposta_7d.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) + ' parados'
-                        : 'sem valor em espera'}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Sem resposta +14 dias */}
-                <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_14d > 0 ? 'border-red-400 hover:border-red-500' : '')} onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +14d</p>
-                    <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_14d > 0 ? 'text-red-600' : 'text-muted-foreground')}>
-                      {budgetOpp.sem_resposta_14d}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {budgetOpp.mais_antigo_dias != null
-                        ? `mais antigo há ${budgetOpp.mais_antigo_dias}d`
-                        : 'nenhum em espera'}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Aprovados vs rejeitados este mês */}
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Últimos 30 dias</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm font-bold text-green-600">✓ {budgetOpp.aprovados_30d}</span>
-                      <span className="text-xs text-muted-foreground">aprovados</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-red-500">✗ {budgetOpp.rejeitados_30d}</span>
-                      <span className="text-xs text-muted-foreground">rejeitados</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </section>
           )}
 
-          {/* ── CLIENTES E RECORRÊNCIA ─────────────────────────────────────── */}
-          {clientRec && (
-            <section aria-label="Clientes e recorrência">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Clientes e recorrência</h2>
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">{clientRec.total_clientes} clientes na base</span>
-              </div>
+          {/* Gráfico de tendência de receita */}
+          <RevenueChart data={revenueTrend} loading={trendLoading} />
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-                <Card className="motion-enter">
-                  <CardContent className="p-4 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <UserPlus className="h-3.5 w-3.5 text-blue-500" />
-                      <p className="text-xs text-muted-foreground">Novos este mês</p>
-                    </div>
-                    <p className="text-2xl font-bold">{clientRec.novos_mes}</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <RotateCcw className="h-3.5 w-3.5 text-green-500" />
-                      <p className="text-xs text-muted-foreground">Recorrentes</p>
-                    </div>
-                    <p className="text-2xl font-bold">{clientRec.recorrentes}</p>
-                    <p className="text-xs text-muted-foreground">≥ 2 serviços</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
-                      <p className="text-xs text-muted-foreground">Reativados</p>
-                    </div>
-                    <p className="text-2xl font-bold">{clientRec.reativados}</p>
-                    <p className="text-xs text-muted-foreground">voltaram nos últimos 90d</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <UserX className="h-3.5 w-3.5 text-red-400" />
-                      <p className="text-xs text-muted-foreground">Inativos</p>
-                    </div>
-                    <p className="text-2xl font-bold">{clientRec.inativos}</p>
-                    <p className="text-xs text-muted-foreground">sem serviço em 90d</p>
-                  </CardContent>
-                </Card>
-              </div>
+          {/* Distribuição por estado */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ServiceStatusChart data={operational?.by_status ?? null} loading={opLoading} />
 
-              {/* Distribuição e métricas de valor */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-2">Frequência de visitas</p>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">1 visita</span>
-                        <span className="font-medium">{clientRec.dist_1_servico}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">2 – 5 visitas</span>
-                        <span className="font-medium text-blue-600">{clientRec.dist_2_5_servicos}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">6 ou mais</span>
-                        <span className="font-medium text-green-600">{clientRec.dist_6_mais}</span>
-                      </div>
+            {/* Distribuição por tipo (v2) ou métricas operacionais (fallback) */}
+            {activityMetrics?.por_tipo && activityMetrics.por_tipo.length > 0 ? (
+              <Card className="motion-enter">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Por tipo de serviço</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {activityMetrics.por_tipo.map((t) => (
+                    <div key={t.service_type} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground capitalize">
+                        {t.service_type?.replace(/_/g, ' ') ?? 'Outro'}
+                      </span>
+                      <span className="font-semibold tabular-nums">{t.count}</span>
                     </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Serviços esta semana</p>
+                    <p className="text-2xl font-bold">{operational?.services_this_week ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">entradas desde segunda-feira</p>
                   </CardContent>
                 </Card>
                 <Card className="motion-enter">
                   <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Média de intervenções</p>
-                    <p className="text-2xl font-bold">{clientRec.media_intervencoes ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">por cliente com serviços</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Receita média por cliente</p>
+                    <p className="text-xs text-muted-foreground mb-1">Resolução média</p>
                     <p className="text-2xl font-bold">
-                      {clientRec.receita_media_por_cliente != null
-                        ? clientRec.receita_media_por_cliente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                        : '—'}
+                      {operational ? `${operational.avg_resolution_days}d` : '—'}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">lifetime · clientes com pagamento</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">do início ao fecho</p>
                   </CardContent>
                 </Card>
               </div>
-            </section>
-          )}
-
-          {/* Equipa */}
-          <TeamPerformanceTable data={team} loading={teamLoading} />
+            )}
+          </div>
         </section>
       )}
 
-      {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────── */}
+      {/* ── SECÇÃO 1.3: ORÇAMENTOS E CONVERSÃO (só dono) ───────────────────── */}
+      {isDono && (
+        <section aria-label="Orçamentos e conversão">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Orçamentos e conversão</h2>
+            <div className="flex-1 h-px bg-border" />
+            {(budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao) != null && (
+              <span className="text-xs text-muted-foreground">
+                {budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao}% taxa de aceitação
+              </span>
+            )}
+          </div>
+
+          {budgetDetail ? (
+            /* Versão completa com RPC v2 */
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Criados */}
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Criados (30d)</p>
+                    <p className="text-xl font-bold">{budgetDetail.criados_count}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmt(budgetDetail.criados_valor)}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Aceites */}
+                <Card className="motion-enter cursor-pointer hover:border-green-400 transition-colors" onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Aceites</p>
+                    <p className="text-xl font-bold text-green-600">{budgetDetail.aceites_count}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmt(budgetDetail.aceites_valor)}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Pendentes */}
+                <Card className={cn(
+                  'motion-enter cursor-pointer transition-colors',
+                  budgetDetail.pendentes_count > 0 ? 'border-blue-400 hover:border-blue-500' : '',
+                )} onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Pendentes</p>
+                    <p className={cn('text-xl font-bold', budgetDetail.pendentes_count > 0 ? 'text-blue-600' : '')}>
+                      {budgetDetail.pendentes_count}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmt(budgetDetail.pendentes_valor)} em aberto
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Sem resposta +7d */}
+                <Card className={cn(
+                  'motion-enter cursor-pointer transition-colors',
+                  budgetDetail.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '',
+                )} onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
+                    <p className={cn('text-xl font-bold', budgetDetail.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {budgetDetail.sem_resposta_7d}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {budgetDetail.sem_resposta_7d_valor > 0
+                        ? fmt(budgetDetail.sem_resposta_7d_valor) + ' parados'
+                        : budgetDetail.sem_resposta_14d > 0
+                          ? `${budgetDetail.sem_resposta_14d} há +14d`
+                          : 'sem valor em espera'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Orçamentos antigos pendentes */}
+              {budgetDetail.pendentes_antigos && budgetDetail.pendentes_antigos.length > 0 && (
+                <Card className="motion-enter">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                      Pendentes mais antigos
+                      {budgetDetail.mais_antigo_dias != null && (
+                        <span className="text-amber-600">— mais antigo há {budgetDetail.mais_antigo_dias}d</span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 pt-0">
+                    {budgetDetail.pendentes_antigos.slice(0, 5).map((b) => (
+                      <div key={b.id} className="flex items-center justify-between py-1 text-xs border-b border-border last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-muted-foreground">{b.code}</span>
+                          <span className="truncate">{b.customer_name ?? '—'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {b.estimated_total != null && (
+                            <span className="font-semibold">{fmt(b.estimated_total)}</span>
+                          )}
+                          <Badge variant="outline" className={cn(
+                            'text-[10px]',
+                            b.dias_pendente >= 14 ? 'border-red-400 text-red-600' : 'border-amber-400 text-amber-600',
+                          )}>
+                            {b.dias_pendente}d
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : budgetOpp ? (
+            /* Fallback: versão base */
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Card className="motion-enter cursor-pointer hover:border-blue-400 transition-colors" onClick={() => navigate('/orcamentos')}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Valor em aberto</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {budgetOpp.valor_total_pendente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{budgetOpp.total_pendentes} orçamento{budgetOpp.total_pendentes !== 1 ? 's' : ''} pendente{budgetOpp.total_pendentes !== 1 ? 's' : ''}</p>
+                </CardContent>
+              </Card>
+
+              <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '')} onClick={() => navigate('/orcamentos')}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
+                  <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
+                    {budgetOpp.sem_resposta_7d}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {budgetOpp.valor_sem_resposta_7d > 0
+                      ? budgetOpp.valor_sem_resposta_7d.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) + ' parados'
+                      : 'sem valor em espera'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_14d > 0 ? 'border-red-400 hover:border-red-500' : '')} onClick={() => navigate('/orcamentos')}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Sem resposta +14d</p>
+                  <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_14d > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+                    {budgetOpp.sem_resposta_14d}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {budgetOpp.mais_antigo_dias != null
+                      ? `mais antigo há ${budgetOpp.mais_antigo_dias}d`
+                      : 'nenhum em espera'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="motion-enter">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Últimos 30 dias</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm font-bold text-green-600">✓ {budgetOpp.aprovados_30d}</span>
+                    <span className="text-xs text-muted-foreground">aprovados</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-red-500">✗ {budgetOpp.rejeitados_30d}</span>
+                    <span className="text-xs text-muted-foreground">rejeitados</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+        </section>
+      )}
+
+      {/* ── SECÇÃO 1.4: CLIENTES E RECORRÊNCIA (só dono) ────────────────────── */}
+      {isDono && clientRec && (
+        <section aria-label="Clientes e recorrência">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Clientes e recorrência</h2>
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">{clientRec.total_clientes} clientes na base</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <Card className="motion-enter">
+              <CardContent className="p-4 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5 text-blue-500" />
+                  <p className="text-xs text-muted-foreground">Novos este mês</p>
+                </div>
+                <p className="text-2xl font-bold">{clientRec.novos_mes}</p>
+              </CardContent>
+            </Card>
+            <Card className="motion-enter">
+              <CardContent className="p-4 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <RotateCcw className="h-3.5 w-3.5 text-green-500" />
+                  <p className="text-xs text-muted-foreground">Recorrentes</p>
+                </div>
+                <p className="text-2xl font-bold">{clientRec.recorrentes}</p>
+                <p className="text-xs text-muted-foreground">≥ 2 serviços</p>
+              </CardContent>
+            </Card>
+            <Card className="motion-enter">
+              <CardContent className="p-4 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                  <p className="text-xs text-muted-foreground">Reativados</p>
+                </div>
+                <p className="text-2xl font-bold">{clientRec.reativados}</p>
+                <p className="text-xs text-muted-foreground">voltaram nos últimos 90d</p>
+              </CardContent>
+            </Card>
+            <Card className="motion-enter">
+              <CardContent className="p-4 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <UserX className="h-3.5 w-3.5 text-red-400" />
+                  <p className="text-xs text-muted-foreground">Inativos</p>
+                </div>
+                <p className="text-2xl font-bold">{clientRec.inativos}</p>
+                <p className="text-xs text-muted-foreground">sem serviço em 90d</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Distribuição e métricas de valor */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="motion-enter">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-2">Frequência de visitas</p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">1 visita</span>
+                    <span className="font-medium">{clientRec.dist_1_servico}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">2 – 5 visitas</span>
+                    <span className="font-medium text-blue-600">{clientRec.dist_2_5_servicos}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">6 ou mais</span>
+                    <span className="font-medium text-green-600">{clientRec.dist_6_mais}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="motion-enter">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Média de intervenções</p>
+                <p className="text-2xl font-bold">{clientRec.media_intervencoes ?? '—'}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">por cliente com serviços</p>
+              </CardContent>
+            </Card>
+            <Card className="motion-enter">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Receita média por cliente</p>
+                <p className="text-2xl font-bold">
+                  {clientRec.receita_media_por_cliente != null
+                    ? clientRec.receita_media_por_cliente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                    : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">lifetime · clientes com pagamento</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
+      {/* ── SECÇÃO 1.6: GARGALOS OPERACIONAIS (só dono) ────────────────────── */}
+      {isDono && (
+        <section aria-label="Gargalos operacionais">
+          <div className="flex items-center gap-2 mb-3">
+            <Hourglass className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Gargalos operacionais</h2>
+            <div className="flex-1 h-px bg-border" />
+            {bottleneckDetail && (
+              <span className="text-xs text-muted-foreground">
+                {bottleneckDetail.total_abertos} em aberto
+                {bottleneckDetail.tempo_medio_resolucao != null && (
+                  <> · resolução média {bottleneckDetail.tempo_medio_resolucao}d</>
+                )}
+              </span>
+            )}
+          </div>
+
+          {bottleneckDetail ? (
+            /* Versão completa v2 */
+            <div className="space-y-3">
+              {/* Indicadores de urgência */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className={cn('motion-enter', bottleneckDetail.parados_5d > 0 ? 'border-red-400' : '')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Parados +5 dias</p>
+                    <p className={cn('text-2xl font-bold', bottleneckDetail.parados_5d > 0 ? 'text-red-600' : '')}>
+                      {bottleneckDetail.parados_5d}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className={cn('motion-enter', bottleneckDetail.parados_10d > 0 ? 'border-red-500' : '')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Parados +10 dias</p>
+                    <p className={cn('text-2xl font-bold', bottleneckDetail.parados_10d > 0 ? 'text-red-700' : '')}>
+                      {bottleneckDetail.parados_10d}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">À espera de peça</p>
+                    <p className="text-2xl font-bold">{bottleneckDetail.aguardar_peca}</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Por agendar</p>
+                    <p className="text-2xl font-bold">{bottleneckDetail.por_agendar}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Distribuição por estado */}
+              {bottleneckDetail.por_estado && bottleneckDetail.por_estado.length > 0 && (
+                <Card className="motion-enter">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Tempo médio por estado</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(() => {
+                      const maxDays = Math.max(...(bottleneckDetail.por_estado?.map((b) => b.media_dias) ?? [1]), 1);
+                      return bottleneckDetail.por_estado!
+                        .sort((a, b) => b.media_dias - a.media_dias)
+                        .map((item, i) => (
+                          <div key={item.status} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium">
+                                {STATUS_LABELS[item.status] ?? item.status}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">
+                                {item.count} serviços · média{' '}
+                                <span className={cn(
+                                  'font-semibold',
+                                  item.media_dias >= 7 ? 'text-red-600 dark:text-red-400'
+                                  : item.media_dias >= 3 ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-foreground',
+                                )}>
+                                  {item.media_dias}d
+                                </span>
+                                {item.max_dias > item.media_dias + 2 && (
+                                  <span className="text-muted-foreground ml-1">(máx {item.max_dias}d)</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={cn(
+                                  'h-full rounded-full bottleneck-bar',
+                                  item.media_dias >= 7 ? 'bg-red-400' : item.media_dias >= 3 ? 'bg-amber-400' : 'bg-blue-400',
+                                )}
+                                style={{
+                                  width: `${Math.max((item.media_dias / maxDays) * 100, 4)}%`,
+                                  animationDelay: `${i * 80 + 200}ms`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ));
+                    })()}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            /* Fallback: gargalos base */
+            <BottlenecksSection data={bottlenecks} />
+          )}
+        </section>
+      )}
+
+      {/* ── SECÇÃO 1.7: VISÃO GERAL DA EQUIPA (só dono) ─────────────────────── */}
+      {isDono && (
+        <section aria-label="Visão geral da equipa">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Visão geral da equipa</h2>
+            <div className="flex-1 h-px bg-border" />
+            {teamOverview && (
+              <span className="text-xs text-muted-foreground">
+                {teamOverview.concluidos} concluídos · {teamOverview.em_execucao} em execução
+              </span>
+            )}
+          </div>
+
+          {teamOverview && (
+            <div className="space-y-3">
+              {/* Métricas da equipa */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Concluídos (30d)</p>
+                    <p className="text-2xl font-bold">{teamOverview.concluidos}</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Em Execução</p>
+                    <p className="text-2xl font-bold">{teamOverview.em_execucao}</p>
+                  </CardContent>
+                </Card>
+                <Card className={cn('motion-enter', (teamOverview.sem_tecnico ?? 0) > 0 ? 'border-amber-400' : '')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Sem técnico</p>
+                    <p className={cn('text-2xl font-bold', (teamOverview.sem_tecnico ?? 0) > 0 ? 'text-amber-600' : '')}>
+                      {teamOverview.sem_tecnico ?? 0}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">FTFR (equipa)</p>
+                    <p className="text-2xl font-bold">
+                      {teamOverview.ftfr_pct != null ? `${teamOverview.ftfr_pct}%` : '—'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">resolução à 1ª visita</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Distribuição de carga por técnico */}
+              {teamOverview.distribuicao_carga && teamOverview.distribuicao_carga.length > 0 && (
+                <Card className="motion-enter">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Carga por técnico</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {teamOverview.distribuicao_carga.map((tech) => {
+                      const maxTotal = Math.max(...teamOverview.distribuicao_carga!.map((t) => t.total), 1);
+                      return (
+                        <div key={tech.technician_name} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              {tech.technician_color && (
+                                <span
+                                  className="w-2 h-2 rounded-full inline-block"
+                                  style={{ backgroundColor: tech.technician_color }}
+                                />
+                              )}
+                              <span className="font-medium">{tech.technician_name}</span>
+                            </div>
+                            <span className="text-muted-foreground">
+                              {tech.concluidos} concluídos / {tech.total} total
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.max((tech.total / maxTotal) * 100, 4)}%`,
+                                backgroundColor: tech.technician_color ?? 'hsl(var(--primary))',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Tabela de equipa (sempre visível como detalhe) */}
+          <div className={teamOverview ? 'mt-3' : ''}>
+            <TeamPerformanceTable data={team} loading={teamLoading} />
+          </div>
+        </section>
+      )}
+
+      {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────────── */}
       <Card data-tour="activity-history">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">

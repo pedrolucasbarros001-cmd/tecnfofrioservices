@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Package, Wrench, Truck, TrendingUp, CheckCircle2, Clock, Star, FileCheck, RotateCcw, Zap, Trophy, AlertTriangle } from 'lucide-react';
+import {
+  Package, Wrench, Truck, TrendingUp, CheckCircle2, Clock, Star,
+  FileCheck, RotateCcw, Zap, Trophy, AlertTriangle, BarChart3, Users, Target,
+} from 'lucide-react';
 import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +13,24 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { useTechnicianQuality, useWarrantyReturns } from '@/hooks/useDashboardMetrics';
+import {
+  useTechnicianQuality,
+  useWarrantyReturns,
+  useFTFRMetrics,
+  useDocQualityMetrics,
+  useProductivityMetrics,
+} from '@/hooks/useDashboardMetrics';
+
+// ── Period options ─────────────────────────────────────────────────────────────
+const PERIOD_OPTIONS = [
+  { label: '30 dias', value: 30 },
+  { label: '60 dias', value: 60 },
+  { label: '90 dias', value: 90 },
+  { label: '180 dias', value: 180 },
+];
 
 export default function PerformancePage() {
+  const [days, setDays] = useState(90);
   const { data: technicians = [] } = useTechnicians(false);
   const [expandedTechs, setExpandedTechs] = useState<string[]>([]);
 
@@ -163,8 +181,13 @@ export default function PerformancePage() {
     data: getTechnicianData(tech.id),
   }));
 
-  const { data: qualityData = [] } = useTechnicianQuality(90);
+  const { data: qualityData = [] } = useTechnicianQuality(days);
   const { data: warrantyData = [] } = useWarrantyReturns(180);
+
+  // ── Novos hooks (spec v2) ─────────────────────────────────────────────────
+  const { data: ftfrData } = useFTFRMetrics(days);
+  const { data: docQualityData } = useDocQualityMetrics(days);
+  const { data: productivityData } = useProductivityMetrics(days);
 
   // Find best performers for highlights
   const highlights = (() => {
@@ -183,9 +206,29 @@ export default function PerformancePage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Performance de Técnicos</h1>
-        <p className="text-muted-foreground">Carga de trabalho, qualidade e resultados por técnico</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">Performance de Técnicos</h1>
+          <p className="text-muted-foreground">Carga de trabalho, qualidade e resultados por técnico</p>
+        </div>
+
+        {/* Period selector */}
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setDays(opt.value)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                days === opt.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Totais da equipa */}
@@ -235,12 +278,74 @@ export default function PerformancePage() {
         </div>
       )}
 
-      {/* ── Indicadores de Qualidade ──────────────────────────────────────── */}
+      {/* ── 2.2 Secção FTFR — Resolução à 1ª visita ──────────────────────── */}
+      {ftfrData && ftfrData.por_tecnico && ftfrData.por_tecnico.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-blue-500" />
+            <h2 className="text-lg font-semibold">Resolução à 1ª Visita (FTFR)</h2>
+            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
+            {ftfrData.equipa_ftfr != null && (
+              <span className={cn(
+                'ml-auto text-2xl font-bold',
+                ftfrData.equipa_ftfr >= 70 ? 'text-emerald-600' :
+                ftfrData.equipa_ftfr >= 50 ? 'text-amber-500' : 'text-red-500'
+              )}>
+                {ftfrData.equipa_ftfr}% <span className="text-sm font-normal text-muted-foreground">equipa</span>
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-3">
+            {ftfrData.por_tecnico.map((t) => {
+              const pct = t.ftfr_pct ?? 0;
+              const color = pct >= 70 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+              return (
+                <Card key={t.technician_id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-2.5 h-10 rounded-full shrink-0"
+                        style={{ background: t.technician_color ?? '#94a3b8' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-semibold text-sm">{t.technician_name}</p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                            <span>{t.resolvido_1a}/{t.total_elegivel} resolvidos</span>
+                            {t.com_retorno > 0 && (
+                              <span className="text-rose-500 flex items-center gap-1">
+                                <RotateCcw className="h-3 w-3" />
+                                {t.com_retorno} retornos
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: color }}
+                          />
+                        </div>
+                        <p className="text-right text-xs font-semibold mt-0.5" style={{ color }}>
+                          {t.ftfr_pct != null ? `${t.ftfr_pct}%` : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Indicadores de Qualidade (existente) ─────────────────────────── */}
       {qualityData.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">Indicadores de Qualidade</h2>
-            <Badge variant="secondary" className="text-xs">últimos 90 dias</Badge>
+            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
           </div>
 
           {/* Quality grid per technician */}
@@ -384,6 +489,169 @@ export default function PerformancePage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── 2.4 Qualidade de Documentação ─────────────────────────────────── */}
+      {docQualityData && docQualityData.por_tecnico && docQualityData.por_tecnico.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <FileCheck className="h-5 w-5 text-violet-500" />
+            <h2 className="text-lg font-semibold">Qualidade de Documentação</h2>
+            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
+            {docQualityData.equipa_completo_pct != null && (
+              <span className={cn(
+                'ml-auto text-2xl font-bold',
+                docQualityData.equipa_completo_pct >= 80 ? 'text-emerald-600' :
+                docQualityData.equipa_completo_pct >= 50 ? 'text-amber-500' : 'text-red-500'
+              )}>
+                {docQualityData.equipa_completo_pct}% <span className="text-sm font-normal text-muted-foreground">equipa</span>
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            {/* Summary row */}
+            {docQualityData.total_finalizados > 0 && (
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
+                <span>{docQualityData.total_finalizados} serviços concluídos</span>
+                {docQualityData.sem_diagnostico > 0 && (
+                  <span className="text-rose-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {docQualityData.sem_diagnostico} sem diagnóstico
+                  </span>
+                )}
+              </div>
+            )}
+
+            {docQualityData.por_tecnico.map((t) => {
+              const pct = t.completo_pct ?? 0;
+              const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+              return (
+                <Card key={t.technician_id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-2.5 h-10 rounded-full shrink-0"
+                        style={{ background: t.technician_color ?? '#94a3b8' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-semibold text-sm">{t.technician_name}</p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                            <span>{t.com_diagnostico}/{t.total} c/ diagnóstico</span>
+                            {t.sem_diagnostico > 0 && (
+                              <span className="text-rose-500">{t.sem_diagnostico} sem</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: color }}
+                          />
+                        </div>
+                        <p className="text-right text-xs font-semibold mt-0.5" style={{ color }}>
+                          {t.completo_pct != null ? `${t.completo_pct}%` : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 2.6 Produtividade por Técnico ────────────────────────────────── */}
+      {productivityData && productivityData.por_tecnico && productivityData.por_tecnico.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold">Produtividade</h2>
+            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Técnico</th>
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Serviços</th>
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Concluídos</th>
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Clientes</th>
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Instalações</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Receita</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ticket médio</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {productivityData.por_tecnico.map((t) => (
+                      <tr key={t.technician_id} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-8 rounded-full shrink-0"
+                              style={{ background: t.technician_color ?? '#94a3b8' }}
+                            />
+                            <span className="font-medium">{t.technician_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-semibold">{t.total_servicos}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={cn(
+                            'font-semibold',
+                            t.total_servicos > 0 && (t.concluidos / t.total_servicos) >= 0.8
+                              ? 'text-emerald-600' : ''
+                          )}>
+                            {t.concluidos}
+                          </span>
+                          {t.total_servicos > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({Math.round((t.concluidos / t.total_servicos) * 100)}%)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Users className="h-3 w-3 text-muted-foreground" />
+                            <span>{t.clientes_distintos}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {t.instalacoes > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-orange-600">
+                              <Package className="h-3 w-3" />
+                              {t.instalacoes}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold">
+                          {t.receita_total > 0
+                            ? t.receita_total.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                            : <span className="text-muted-foreground font-normal">—</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">
+                          {t.ticket_medio > 0
+                            ? t.ticket_medio.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                            : '—'
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
