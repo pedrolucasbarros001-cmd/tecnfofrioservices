@@ -9,3 +9,4 @@
 - [x] Ficha do cliente: separador de orçamentos (dono e secretaria)
 - [ ] Aparelhos do Cliente (aba na ficha + sugestões de serviços antigos)
 - [ ] Painel de Saúde e vista de Técnicos seguindo o documento enviado pelo utilizador (A_ideia_que_tem...md)
+- [ ] Implementar o dashboard enviado: métricas agregadas, gráficos e equipa para dono/secretaria, preservando atalhos e histórico atuais; não alterar impressões nem fluxos
