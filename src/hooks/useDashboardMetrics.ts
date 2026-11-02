@@ -28,6 +28,7 @@ export interface OperationalMetrics {
 
 export interface TeamMember {
   technician_name: string;
+  technician_color: string | null;
   total_services: number;
   completed: number;
   in_progress: number;
