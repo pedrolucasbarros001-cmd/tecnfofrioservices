@@ -169,3 +169,58 @@ export function useWarrantyReturns(days = 180) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// ─── Budget Opportunities ─────────────────────────────────────────────────────
+
+export interface BudgetOpportunities {
+  total_pendentes: number;
+  valor_total_pendente: number;
+  sem_resposta_7d: number;
+  sem_resposta_14d: number;
+  valor_sem_resposta_7d: number;
+  aprovados_30d: number;
+  rejeitados_30d: number;
+  taxa_aceitacao: number | null;
+  mais_antigo_dias: number | null;
+}
+
+export function useBudgetOpportunities() {
+  return useQuery<BudgetOpportunities>({
+    queryKey: ['dashboard', 'budget-opportunities'],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('get_budget_opportunities');
+      if (error) throw error;
+      return data as BudgetOpportunities;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ─── Client Recurrence ────────────────────────────────────────────────────────
+
+export interface ClientRecurrence {
+  novos_mes: number;
+  recorrentes: number;
+  ativos_90d: number;
+  inativos: number;
+  reativados: number;
+  total_clientes: number;
+  media_intervencoes: number | null;
+  receita_media_por_cliente: number | null;
+  com_multiplos_aparelhos: number;
+  dist_1_servico: number;
+  dist_2_5_servicos: number;
+  dist_6_mais: number;
+}
+
+export function useClientRecurrence() {
+  return useQuery<ClientRecurrence>({
+    queryKey: ['dashboard', 'client-recurrence'],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('get_client_recurrence');
+      if (error) throw error;
+      return data as ClientRecurrence;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  ClipboardList, Play, Building2, Package, Clock, Truck,
+  ClipboardList, Building2, Package, Clock, Truck,
   DollarSign, AlertCircle, CheckSquare, FileText, BarChart2,
   Timer, CalendarDays, ArrowRight, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Users, Hourglass, Minus,
+  RefreshCw, UserCheck, UserX, UserPlus, Repeat2,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -21,11 +22,12 @@ import {
   useOperationalMetrics,
   useTeamPerformance,
   useServiceBottlenecks,
+  useBudgetOpportunities,
+  useClientRecurrence,
 } from '@/hooks/useDashboardMetrics';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ServiceStatusChart } from '@/components/dashboard/ServiceStatusChart';
 import { TeamPerformanceTable } from '@/components/dashboard/TeamPerformanceTable';
-import { ReviewMode } from '@/components/review/ReviewMode';
 
 // ─── useCountUp: anima um número de 0 até target ─────────────────────────────
 function useCountUp(target: number | undefined, duration = 700): number {
@@ -400,8 +402,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
-  const [showReview, setShowReview] = useState(false);
-
   const isDono = role === 'dono';
 
   const { data: health,      isLoading: healthLoading } = useBusinessHealth();
@@ -409,6 +409,8 @@ export default function DashboardPage() {
   const { data: operational, isLoading: opLoading }    = useOperationalMetrics();
   const { data: team = [],   isLoading: teamLoading }  = useTeamPerformance();
   const { data: bottlenecks = [] }                     = useServiceBottlenecks();
+  const { data: budgetOpp }                            = useBudgetOpportunities();
+  const { data: clientRec }                            = useClientRecurrence();
 
   useEffect(() => {
     if (role && role !== 'dono') {
@@ -526,26 +528,15 @@ export default function DashboardPage() {
             Correia &amp; Teixeira · vista de dono
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {health && (
-            <div className="flex items-center gap-2">
-              <RevenueTrendBadge
-                current={health.revenue_this_month}
-                previous={health.revenue_last_month}
-              />
-              <span className="text-xs text-muted-foreground">vs mês anterior</span>
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 text-xs"
-            onClick={() => setShowReview(true)}
-          >
-            <Play className="h-3.5 w-3.5" />
-            Modo Review
-          </Button>
-        </div>
+        {health && (
+          <div className="flex items-center gap-2">
+            <RevenueTrendBadge
+              current={health.revenue_this_month}
+              previous={health.revenue_last_month}
+            />
+            <span className="text-xs text-muted-foreground">vs mês anterior</span>
+          </div>
+        )}
       </div>
 
       {/* ── CENTRO DE ACÇÃO ─────────────────────────────────────────────────── */}
@@ -663,13 +654,178 @@ export default function DashboardPage() {
           {/* Gargalos */}
           <BottlenecksSection data={bottlenecks} />
 
+          {/* ── ORÇAMENTOS E OPORTUNIDADES ─────────────────────────────────── */}
+          {budgetOpp && (
+            <section aria-label="Orçamentos e oportunidades">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Orçamentos e oportunidades</h2>
+                <div className="flex-1 h-px bg-border" />
+                {budgetOpp.taxa_aceitacao != null && (
+                  <span className="text-xs text-muted-foreground">
+                    {budgetOpp.taxa_aceitacao}% taxa de aceitação (90d)
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Valor potencial */}
+                <Card className="motion-enter cursor-pointer hover:border-blue-400 transition-colors" onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Valor em aberto</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {budgetOpp.valor_total_pendente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{budgetOpp.total_pendentes} orçamento{budgetOpp.total_pendentes !== 1 ? 's' : ''} pendente{budgetOpp.total_pendentes !== 1 ? 's' : ''}</p>
+                  </CardContent>
+                </Card>
+
+                {/* Sem resposta +7 dias */}
+                <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '')} onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
+                    <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {budgetOpp.sem_resposta_7d}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {budgetOpp.valor_sem_resposta_7d > 0
+                        ? budgetOpp.valor_sem_resposta_7d.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) + ' parados'
+                        : 'sem valor em espera'}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Sem resposta +14 dias */}
+                <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_14d > 0 ? 'border-red-400 hover:border-red-500' : '')} onClick={() => navigate('/orcamentos')}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +14d</p>
+                    <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_14d > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+                      {budgetOpp.sem_resposta_14d}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {budgetOpp.mais_antigo_dias != null
+                        ? `mais antigo há ${budgetOpp.mais_antigo_dias}d`
+                        : 'nenhum em espera'}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Aprovados vs rejeitados este mês */}
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Últimos 30 dias</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm font-bold text-green-600">✓ {budgetOpp.aprovados_30d}</span>
+                      <span className="text-xs text-muted-foreground">aprovados</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-red-500">✗ {budgetOpp.rejeitados_30d}</span>
+                      <span className="text-xs text-muted-foreground">rejeitados</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          )}
+
+          {/* ── CLIENTES E RECORRÊNCIA ─────────────────────────────────────── */}
+          {clientRec && (
+            <section aria-label="Clientes e recorrência">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Clientes e recorrência</h2>
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">{clientRec.total_clientes} clientes na base</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                <Card className="motion-enter">
+                  <CardContent className="p-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <UserPlus className="h-3.5 w-3.5 text-blue-500" />
+                      <p className="text-xs text-muted-foreground">Novos este mês</p>
+                    </div>
+                    <p className="text-2xl font-bold">{clientRec.novos_mes}</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Repeat2 className="h-3.5 w-3.5 text-green-500" />
+                      <p className="text-xs text-muted-foreground">Recorrentes</p>
+                    </div>
+                    <p className="text-2xl font-bold">{clientRec.recorrentes}</p>
+                    <p className="text-xs text-muted-foreground">≥ 2 serviços</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                      <p className="text-xs text-muted-foreground">Reativados</p>
+                    </div>
+                    <p className="text-2xl font-bold">{clientRec.reativados}</p>
+                    <p className="text-xs text-muted-foreground">voltaram nos últimos 90d</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <UserX className="h-3.5 w-3.5 text-red-400" />
+                      <p className="text-xs text-muted-foreground">Inativos</p>
+                    </div>
+                    <p className="text-2xl font-bold">{clientRec.inativos}</p>
+                    <p className="text-xs text-muted-foreground">sem serviço em 90d</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Distribuição e métricas de valor */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-2">Frequência de visitas</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">1 visita</span>
+                        <span className="font-medium">{clientRec.dist_1_servico}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">2 – 5 visitas</span>
+                        <span className="font-medium text-blue-600">{clientRec.dist_2_5_servicos}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">6 ou mais</span>
+                        <span className="font-medium text-green-600">{clientRec.dist_6_mais}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Média de intervenções</p>
+                    <p className="text-2xl font-bold">{clientRec.media_intervencoes ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">por cliente com serviços</p>
+                  </CardContent>
+                </Card>
+                <Card className="motion-enter">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Receita média por cliente</p>
+                    <p className="text-2xl font-bold">
+                      {clientRec.receita_media_por_cliente != null
+                        ? clientRec.receita_media_por_cliente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+                        : '—'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">lifetime · clientes com pagamento</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          )}
+
           {/* Equipa */}
           <TeamPerformanceTable data={team} loading={teamLoading} />
         </section>
       )}
-
-      {/* ── MODO REVIEW ─────────────────────────────────────────────────────── */}
-      <ReviewMode open={showReview} onClose={() => setShowReview(false)} />
 
       {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────── */}
       <Card data-tour="activity-history">
