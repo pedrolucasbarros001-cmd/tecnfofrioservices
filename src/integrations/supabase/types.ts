@@ -1312,6 +1312,10 @@ export type Database = {
         Returns: boolean
       }
       count_services_in_debt: { Args: never; Returns: number }
+      get_business_health_metrics: { Args: never; Returns: Json }
+      get_operational_metrics: { Args: never; Returns: Json }
+      get_revenue_trend: { Args: never; Returns: Json }
+      get_team_performance: { Args: never; Returns: Json }
       get_technician_profile_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
