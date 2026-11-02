@@ -25,6 +25,7 @@ import {
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ServiceStatusChart } from '@/components/dashboard/ServiceStatusChart';
 import { TeamPerformanceTable } from '@/components/dashboard/TeamPerformanceTable';
+import { ReviewMode } from '@/components/review/ReviewMode';
 
 // ─── useCountUp: anima um número de 0 até target ─────────────────────────────
 function useCountUp(target: number | undefined, duration = 700): number {
@@ -399,6 +400,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
+  const [showReview, setShowReview] = useState(false);
 
   const isDono = role === 'dono';
 
@@ -524,15 +526,26 @@ export default function DashboardPage() {
             Correia &amp; Teixeira · vista de dono
           </p>
         </div>
-        {health && (
-          <div className="flex items-center gap-2">
-            <RevenueTrendBadge
-              current={health.revenue_this_month}
-              previous={health.revenue_last_month}
-            />
-            <span className="text-xs text-muted-foreground">vs mês anterior</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {health && (
+            <div className="flex items-center gap-2">
+              <RevenueTrendBadge
+                current={health.revenue_this_month}
+                previous={health.revenue_last_month}
+              />
+              <span className="text-xs text-muted-foreground">vs mês anterior</span>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs"
+            onClick={() => setShowReview(true)}
+          >
+            <Play className="h-3.5 w-3.5" />
+            Modo Review
+          </Button>
+        </div>
       </div>
 
       {/* ── CENTRO DE ACÇÃO ─────────────────────────────────────────────────── */}
@@ -654,6 +667,9 @@ export default function DashboardPage() {
           <TeamPerformanceTable data={team} loading={teamLoading} />
         </section>
       )}
+
+      {/* ── MODO REVIEW ─────────────────────────────────────────────────────── */}
+      <ReviewMode open={showReview} onClose={() => setShowReview(false)} />
 
       {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────── */}
       <Card data-tour="activity-history">

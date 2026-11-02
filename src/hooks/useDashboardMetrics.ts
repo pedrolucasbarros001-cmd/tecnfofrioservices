@@ -115,3 +115,57 @@ export function useServiceBottlenecks() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// ─── Quality Metrics ──────────────────────────────────────────────────────────
+
+export interface TechnicianQuality {
+  technician_id: string;
+  technician_name: string | null;
+  technician_color: string | null;
+  total_services: number;
+  completed_services: number;
+  completion_rate: number;
+  avg_resolution_days: number | null;
+  reports_complete_pct: number | null;
+  quick_resolutions: number;
+  first_visit_rate: number | null;
+  pending_pricing: number;
+  revenue: number;
+  avg_ticket: number | null;
+}
+
+export interface WarrantyReturn {
+  technician_id: string;
+  technician_name: string | null;
+  warranty_count: number;
+}
+
+export function useTechnicianQuality(days = 90) {
+  return useQuery<TechnicianQuality[]>({
+    queryKey: ['performance', 'quality', days],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)(
+        'get_technician_quality_metrics',
+        { _days: days }
+      );
+      if (error) throw error;
+      return (data as TechnicianQuality[]) ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useWarrantyReturns(days = 180) {
+  return useQuery<WarrantyReturn[]>({
+    queryKey: ['performance', 'warranty', days],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)(
+        'get_warranty_returns',
+        { _days: days }
+      );
+      if (error) throw error;
+      return (data as WarrantyReturn[]) ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}

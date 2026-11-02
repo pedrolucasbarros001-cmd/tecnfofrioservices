@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Package, Wrench, Truck, TrendingUp, CheckCircle2, Clock } from 'lucide-react';
+import { Package, Wrench, Truck, TrendingUp, CheckCircle2, Clock, Star, FileCheck, RotateCcw, Zap, Trophy, AlertTriangle } from 'lucide-react';
 import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useTechnicianQuality, useWarrantyReturns } from '@/hooks/useDashboardMetrics';
 
 export default function PerformancePage() {
   const { data: technicians = [] } = useTechnicians(false);
@@ -162,12 +163,29 @@ export default function PerformancePage() {
     data: getTechnicianData(tech.id),
   }));
 
+  const { data: qualityData = [] } = useTechnicianQuality(90);
+  const { data: warrantyData = [] } = useWarrantyReturns(180);
+
+  // Find best performers for highlights
+  const highlights = (() => {
+    if (qualityData.length === 0) return null;
+    const withActivity = qualityData.filter(q => q.completed_services > 0);
+    if (withActivity.length === 0) return null;
+
+    const bestCompletion = [...withActivity].sort((a, b) => (b.completion_rate ?? 0) - (a.completion_rate ?? 0))[0];
+    const bestFirstVisit  = [...withActivity].filter(q => q.first_visit_rate != null).sort((a, b) => (b.first_visit_rate ?? 0) - (a.first_visit_rate ?? 0))[0];
+    const bestReports     = [...withActivity].filter(q => q.reports_complete_pct != null).sort((a, b) => (b.reports_complete_pct ?? 0) - (a.reports_complete_pct ?? 0))[0];
+    const fastest         = [...withActivity].filter(q => q.avg_resolution_days != null).sort((a, b) => (a.avg_resolution_days ?? 99) - (b.avg_resolution_days ?? 99))[0];
+
+    return { bestCompletion, bestFirstVisit, bestReports, fastest };
+  })();
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Performance de Técnicos</h1>
-        <p className="text-muted-foreground">Carga de trabalho e resultados por técnico</p>
+        <p className="text-muted-foreground">Carga de trabalho, qualidade e resultados por técnico</p>
       </div>
 
       {/* Totais da equipa */}
@@ -216,6 +234,160 @@ export default function PerformancePage() {
           </Card>
         </div>
       )}
+
+      {/* ── Indicadores de Qualidade ──────────────────────────────────────── */}
+      {qualityData.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Indicadores de Qualidade</h2>
+            <Badge variant="secondary" className="text-xs">últimos 90 dias</Badge>
+          </div>
+
+          {/* Quality grid per technician */}
+          <div className="grid gap-3">
+            {qualityData.filter(q => q.total_services > 0).map(q => {
+              const warrantyCount = warrantyData.find(w => w.technician_id === q.technician_id)?.warranty_count ?? 0;
+              return (
+                <Card key={q.technician_id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="flex items-center gap-0 divide-x">
+                      {/* Name */}
+                      <div className="flex items-center gap-3 px-4 py-4 w-[180px] shrink-0">
+                        <div
+                          className="w-2.5 h-10 rounded-full shrink-0"
+                          style={{ background: q.technician_color ?? '#94a3b8' }}
+                        />
+                        <div>
+                          <p className="font-semibold text-sm leading-tight">{q.technician_name ?? 'Técnico'}</p>
+                          <p className="text-xs text-muted-foreground">{q.completed_services}/{q.total_services} concluídos</p>
+                        </div>
+                      </div>
+
+                      {/* Resolução à 1ª visita */}
+                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
+                        <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-0.5">
+                          <Zap className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">1ª Visita</span>
+                        </div>
+                        <p className={cn(
+                          'text-xl font-bold',
+                          (q.first_visit_rate ?? 0) >= 70 ? 'text-emerald-600' :
+                          (q.first_visit_rate ?? 0) >= 50 ? 'text-amber-500' : 'text-red-500'
+                        )}>
+                          {q.first_visit_rate != null ? `${q.first_visit_rate}%` : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">{q.quick_resolutions} rápidos</p>
+                      </div>
+
+                      {/* Relatórios completos */}
+                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
+                        <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 mb-0.5">
+                          <FileCheck className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">Relatórios</span>
+                        </div>
+                        <p className={cn(
+                          'text-xl font-bold',
+                          (q.reports_complete_pct ?? 0) >= 80 ? 'text-emerald-600' :
+                          (q.reports_complete_pct ?? 0) >= 50 ? 'text-amber-500' : 'text-red-500'
+                        )}>
+                          {q.reports_complete_pct != null ? `${q.reports_complete_pct}%` : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">c/ descrição</p>
+                      </div>
+
+                      {/* Tempo médio resolução */}
+                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
+                        <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 mb-0.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">Tempo médio</span>
+                        </div>
+                        <p className={cn(
+                          'text-xl font-bold',
+                          (q.avg_resolution_days ?? 99) <= 2 ? 'text-emerald-600' :
+                          (q.avg_resolution_days ?? 99) <= 5 ? 'text-amber-500' : 'text-red-500'
+                        )}>
+                          {q.avg_resolution_days != null ? `${q.avg_resolution_days}d` : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">por serviço</p>
+                      </div>
+
+                      {/* Retornos/Garantia */}
+                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
+                        <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 mb-0.5">
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">Retornos</span>
+                        </div>
+                        <p className={cn(
+                          'text-xl font-bold',
+                          warrantyCount === 0 ? 'text-emerald-600' :
+                          warrantyCount <= 2 ? 'text-amber-500' : 'text-red-500'
+                        )}>
+                          {warrantyCount}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">em 60 dias</p>
+                      </div>
+
+                      {/* Pendentes precificar */}
+                      {q.pending_pricing > 0 && (
+                        <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
+                          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 mb-0.5">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            <span className="text-xs font-medium">Por faturar</span>
+                          </div>
+                          <p className="text-xl font-bold text-amber-600">{q.pending_pricing}</p>
+                          <p className="text-[10px] text-muted-foreground">serviços</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Destaques individuais */}
+          {highlights && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold">Destaques da equipa</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {highlights.bestFirstVisit && (
+                  <div className="rounded-xl border bg-blue-50/60 dark:bg-blue-900/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold mb-1 flex items-center gap-1"><Zap className="h-3 w-3" /> Melhor 1ª Visita</p>
+                    <p className="font-bold text-sm leading-tight">{highlights.bestFirstVisit.technician_name}</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{highlights.bestFirstVisit.first_visit_rate}%</p>
+                  </div>
+                )}
+                {highlights.bestReports && (
+                  <div className="rounded-xl border bg-violet-50/60 dark:bg-violet-900/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 font-semibold mb-1 flex items-center gap-1"><FileCheck className="h-3 w-3" /> Relatórios</p>
+                    <p className="font-bold text-sm leading-tight">{highlights.bestReports.technician_name}</p>
+                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{highlights.bestReports.reports_complete_pct}%</p>
+                  </div>
+                )}
+                {highlights.fastest && (
+                  <div className="rounded-xl border bg-orange-50/60 dark:bg-orange-900/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-orange-600 dark:text-orange-400 font-semibold mb-1 flex items-center gap-1"><Clock className="h-3 w-3" /> Mais Rápido</p>
+                    <p className="font-bold text-sm leading-tight">{highlights.fastest.technician_name}</p>
+                    <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{highlights.fastest.avg_resolution_days}d</p>
+                  </div>
+                )}
+                {highlights.bestCompletion && (
+                  <div className="rounded-xl border bg-emerald-50/60 dark:bg-emerald-900/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1"><Star className="h-3 w-3" /> Taxa de Conclusão</p>
+                    <p className="font-bold text-sm leading-tight">{highlights.bestCompletion.technician_name}</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{highlights.bestCompletion.completion_rate}%</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="border-t pt-2" />
 
       {/* Cards por técnico */}
       <div className="space-y-6" data-tour="performance-cards" data-demo="performance-cards">

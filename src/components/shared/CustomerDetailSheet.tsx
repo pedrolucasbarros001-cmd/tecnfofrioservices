@@ -32,6 +32,14 @@ import {
   Paperclip,
   Users,
   Trash2,
+  AirVent,
+  CalendarDays,
+  Hash,
+  MapPinned,
+  PlusCircle,
+  ShieldCheck,
+  Pencil,
+  X,
 } from 'lucide-react';
 import {
   Sheet,
@@ -277,6 +285,77 @@ export function CustomerDetailSheet({
     enabled: serviceIds.length > 0 && open,
   });
 
+  // Aparelhos mapeados deste cliente
+  const {
+    data: appliances = [],
+    isLoading: loadingAppliances,
+    refetch: refetchAppliances,
+  } = useQuery({
+    queryKey: ['customer-appliances', customer?.id],
+    queryFn: async () => {
+      if (!customer?.id) return [];
+      const { data, error } = await supabase
+        .from('customer_appliances')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!customer?.id && open,
+  });
+
+  const [showAddAppliance, setShowAddAppliance] = useState(false);
+  const [editingAppliance, setEditingAppliance] = useState<any | null>(null);
+  const [applianceForm, setApplianceForm] = useState({
+    appliance_type: '',
+    brand: '',
+    model: '',
+    serial_number: '',
+    installation_date: '',
+    warranty_until: '',
+    location: '',
+    notes: '',
+  });
+
+  const handleSaveAppliance = async () => {
+    if (!customer?.id || !applianceForm.appliance_type) return;
+    try {
+      if (editingAppliance) {
+        const { error } = await supabase
+          .from('customer_appliances')
+          .update({ ...applianceForm })
+          .eq('id', editingAppliance.id);
+        if (error) throw error;
+        toast.success('Aparelho atualizado');
+      } else {
+        const { error } = await supabase
+          .from('customer_appliances')
+          .insert({ ...applianceForm, customer_id: customer.id });
+        if (error) throw error;
+        toast.success('Aparelho adicionado');
+      }
+      setShowAddAppliance(false);
+      setEditingAppliance(null);
+      setApplianceForm({ appliance_type: '', brand: '', model: '', serial_number: '', installation_date: '', warranty_until: '', location: '', notes: '' });
+      refetchAppliances();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao guardar aparelho');
+    }
+  };
+
+  const handleDeleteAppliance = async (id: string) => {
+    try {
+      const { error } = await supabase.from('customer_appliances').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Aparelho removido');
+      refetchAppliances();
+    } catch (err) {
+      toast.error('Erro ao remover aparelho');
+    }
+  };
+
   if (!customer) return null;
 
   const handleViewService = (service: Service) => {
@@ -361,6 +440,18 @@ export function CustomerDetailSheet({
                   {customerDocuments.length > 0 && (
                     <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
                       {customerDocuments.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="aparelhos"
+                  className="justify-start gap-3 h-10 px-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm transition-all border border-transparent data-[state=active]:border-border"
+                >
+                  <AirVent className="h-4 w-4" />
+                  Aparelhos
+                  {appliances.length > 0 && (
+                    <Badge variant="secondary" className="ml-auto px-1.5 h-5 min-w-[20px] justify-center text-[10px]">
+                      {appliances.length}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -749,6 +840,188 @@ export function CustomerDetailSheet({
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* ── Aparelhos Mapeados ───────────────────────────────────── */}
+                  <TabsContent value="aparelhos" className="mt-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-base font-semibold">Aparelhos Mapeados</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Equipamentos registados neste cliente
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          setEditingAppliance(null);
+                          setApplianceForm({ appliance_type: '', brand: '', model: '', serial_number: '', installation_date: '', warranty_until: '', location: '', notes: '' });
+                          setShowAddAppliance(true);
+                        }}
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                        Adicionar
+                      </Button>
+                    </div>
+
+                    {/* Add / Edit form inline */}
+                    {showAddAppliance && (
+                      <div className="border rounded-xl p-4 mb-5 bg-muted/30 space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium">
+                            {editingAppliance ? 'Editar aparelho' : 'Novo aparelho'}
+                          </span>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowAddAppliance(false)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Aparelho *</label>
+                            <Input
+                              placeholder="ex: Ar Condicionado Split, Câmara Frigorífica…"
+                              value={applianceForm.appliance_type}
+                              onChange={e => setApplianceForm(f => ({ ...f, appliance_type: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Marca</label>
+                            <Input placeholder="Daikin, Mitsubishi…" value={applianceForm.brand} onChange={e => setApplianceForm(f => ({ ...f, brand: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Modelo</label>
+                            <Input placeholder="FTXM35R…" value={applianceForm.model} onChange={e => setApplianceForm(f => ({ ...f, model: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Nº de Série</label>
+                            <Input placeholder="SN123456" value={applianceForm.serial_number} onChange={e => setApplianceForm(f => ({ ...f, serial_number: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Localização</label>
+                            <Input placeholder="Sala, Cozinha, Armazém…" value={applianceForm.location} onChange={e => setApplianceForm(f => ({ ...f, location: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Data de Instalação</label>
+                            <Input type="date" value={applianceForm.installation_date} onChange={e => setApplianceForm(f => ({ ...f, installation_date: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Garantia até</label>
+                            <Input type="date" value={applianceForm.warranty_until} onChange={e => setApplianceForm(f => ({ ...f, warranty_until: e.target.value }))} />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Notas</label>
+                            <Textarea placeholder="Observações, histórico, etc." rows={2} value={applianceForm.notes} onChange={e => setApplianceForm(f => ({ ...f, notes: e.target.value }))} />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button variant="outline" size="sm" onClick={() => setShowAddAppliance(false)}>Cancelar</Button>
+                          <Button size="sm" onClick={handleSaveAppliance} disabled={!applianceForm.appliance_type}>
+                            {editingAppliance ? 'Guardar alterações' : 'Adicionar aparelho'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {loadingAppliances ? (
+                      <div className="text-center py-10 text-muted-foreground text-sm">A carregar aparelhos…</div>
+                    ) : appliances.length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                        <AirVent className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                        <p className="text-sm font-medium text-muted-foreground">Sem aparelhos registados</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione os equipamentos deste cliente para acompanhar histórico e garantias</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {appliances.map((ap: any) => {
+                          const warrantyDate = ap.warranty_until ? new Date(ap.warranty_until) : null;
+                          const warrantyExpired = warrantyDate && warrantyDate < new Date();
+                          const warrantyActive = warrantyDate && !warrantyExpired;
+
+                          return (
+                            <div key={ap.id} className="border rounded-xl p-4 bg-card hover:shadow-sm transition-shadow">
+                              <div className="flex items-start gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 mt-0.5">
+                                  <AirVent className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="font-semibold text-sm leading-tight">{ap.appliance_type}</p>
+                                      {(ap.brand || ap.model) && (
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                          {[ap.brand, ap.model].filter(Boolean).join(' — ')}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      <Button
+                                        variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                        onClick={() => {
+                                          setEditingAppliance(ap);
+                                          setApplianceForm({
+                                            appliance_type: ap.appliance_type || '',
+                                            brand: ap.brand || '',
+                                            model: ap.model || '',
+                                            serial_number: ap.serial_number || '',
+                                            installation_date: ap.installation_date?.slice(0, 10) || '',
+                                            warranty_until: ap.warranty_until?.slice(0, 10) || '',
+                                            location: ap.location || '',
+                                            notes: ap.notes || '',
+                                          });
+                                          setShowAddAppliance(true);
+                                        }}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                        onClick={() => handleDeleteAppliance(ap.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2">
+                                    {ap.serial_number && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Hash className="h-3 w-3" />
+                                        {ap.serial_number}
+                                      </span>
+                                    )}
+                                    {ap.location && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <MapPinned className="h-3 w-3" />
+                                        {ap.location}
+                                      </span>
+                                    )}
+                                    {ap.installation_date && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <CalendarDays className="h-3 w-3" />
+                                        Instalado {safeFormat(ap.installation_date, 'dd/MM/yyyy')}
+                                      </span>
+                                    )}
+                                    {warrantyDate && (
+                                      <span className={`flex items-center gap-1 text-xs font-medium ${warrantyExpired ? 'text-red-500' : 'text-emerald-600'}`}>
+                                        <ShieldCheck className="h-3 w-3" />
+                                        {warrantyExpired
+                                          ? `Garantia expirou em ${safeFormat(ap.warranty_until, 'dd/MM/yyyy')}`
+                                          : `Em garantia até ${safeFormat(ap.warranty_until, 'dd/MM/yyyy')}`}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {ap.notes && (
+                                    <p className="text-xs text-muted-foreground/80 mt-2 border-t pt-2">{ap.notes}</p>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
