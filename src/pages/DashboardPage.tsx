@@ -12,6 +12,9 @@ import {
   AlertCircle,
   CheckSquare,
   FileText,
+  BarChart2,
+  Timer,
+  CalendarDays,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -20,6 +23,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
+import {
+  useBusinessHealth,
+  useRevenueTrend,
+  useOperationalMetrics,
+  useTeamPerformance,
+} from '@/hooks/useDashboardMetrics';
+import { MetricCard } from '@/components/dashboard/MetricCard';
+import { RevenueChart } from '@/components/dashboard/RevenueChart';
+import { ServiceStatusChart } from '@/components/dashboard/ServiceStatusChart';
+import { TeamPerformanceTable } from '@/components/dashboard/TeamPerformanceTable';
 
 
 interface DashboardStats {
@@ -52,6 +65,21 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
+
+  // ── Métricas inteligentes (apenas para dono) ──────────────────────────────
+  const isDono = role === 'dono';
+  const { data: health, isLoading: healthLoading } = useBusinessHealth();
+  const { data: revenueTrend = [], isLoading: trendLoading } = useRevenueTrend();
+  const { data: operational, isLoading: opLoading } = useOperationalMetrics();
+  const { data: team = [], isLoading: teamLoading } = useTeamPerformance();
+
+  // Calcular tendência de receita vs mês anterior
+  const revenueTrend_pct =
+    health && health.revenue_last_month > 0
+      ? ((health.revenue_this_month - health.revenue_last_month) /
+          health.revenue_last_month) *
+        100
+      : null;
 
   // Redirect non-owners (kept in a separate effect from data fetching)
   useEffect(() => {
@@ -160,6 +188,103 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* ── Secção de Métricas Inteligentes (só dono) ─────────────────────────── */}
+      {isDono && (
+        <div className="space-y-5">
+          {/* Divisor */}
+          <div className="flex items-center gap-3">
+            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">Saúde do negócio</h2>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Saúde financeira — 4 cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title="Receita este mês"
+              value={
+                health
+                  ? health.revenue_this_month.toLocaleString('pt-PT', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    })
+                  : '—'
+              }
+              trend={
+                revenueTrend_pct !== null
+                  ? { value: revenueTrend_pct, label: 'vs mês anterior' }
+                  : undefined
+              }
+              icon={DollarSign}
+              loading={healthLoading}
+            />
+            <MetricCard
+              title="Serviços não faturados"
+              value={health?.unbilled_services ?? '—'}
+              subtitle="concluídos sem valor"
+              icon={AlertCircle}
+              alert
+              loading={healthLoading}
+            />
+            <MetricCard
+              title="Conversão de orçamentos"
+              value={health ? `${health.budget_conversion_rate}%` : '—'}
+              subtitle="últimos 30 dias"
+              icon={FileText}
+              loading={healthLoading}
+            />
+            <MetricCard
+              title="Ticket médio"
+              value={
+                health
+                  ? health.avg_ticket.toLocaleString('pt-PT', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    })
+                  : '—'
+              }
+              subtitle="últimos 30 dias"
+              icon={DollarSign}
+              loading={healthLoading}
+            />
+          </div>
+
+          {/* Gráfico de tendência — largura total */}
+          <RevenueChart data={revenueTrend} loading={trendLoading} />
+
+          {/* Operacional — gráfico + 2 mini-métricas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ServiceStatusChart
+              data={operational?.by_status ?? null}
+              loading={opLoading}
+            />
+            <div className="flex flex-col gap-4">
+              <MetricCard
+                title="Serviços esta semana"
+                value={operational?.services_this_week ?? '—'}
+                subtitle="entradas desde segunda-feira"
+                icon={CalendarDays}
+                loading={opLoading}
+              />
+              <MetricCard
+                title="Tempo médio de resolução"
+                value={
+                  operational
+                    ? `${operational.avg_resolution_days} dias`
+                    : '—'
+                }
+                subtitle="últimos 30 dias"
+                icon={Timer}
+                loading={opLoading}
+              />
+            </div>
+          </div>
+
+          {/* Equipa */}
+          <TeamPerformanceTable data={team} loading={teamLoading} />
+        </div>
+      )}
 
       {/* Activity History Section */}
       <Card data-tour="activity-history" data-demo="activity-history">
