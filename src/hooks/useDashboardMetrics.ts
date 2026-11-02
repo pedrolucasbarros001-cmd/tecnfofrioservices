@@ -4,12 +4,24 @@ import { supabase } from '@/integrations/supabase/client';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BusinessHealthMetrics {
+  // Breakdown financeiro correto
+  recebido: number;               // dinheiro efectivamente recebido este mês
+  faturado_por_receber: number;   // faturado mas não pago
+  por_faturar_count: number;      // finalizados sem preço definido
+  orcamentos_pendentes_count: number;
+  orcamentos_pendentes_valor: number;
+  // Comparação mês anterior
   revenue_this_month: number;
   revenue_last_month: number;
+  // Legados / compatibilidade
   unbilled_services: number;
   open_services: number;
   budget_conversion_rate: number;
   avg_ticket: number;
+  // Novos indicadores
+  clientes_novos_mes: number;
+  stuck_services_5d: number;      // serviços parados há +5 dias
+  sem_tecnico: number;            // sem técnico atribuído
 }
 
 export interface RevenueTrendItem {
@@ -33,6 +45,13 @@ export interface TeamMember {
   completed: number;
   in_progress: number;
   revenue_generated: number;
+}
+
+export interface BottleneckItem {
+  status: string;
+  count: number;
+  avg_days: number;
+  max_days: number;
 }
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -80,6 +99,18 @@ export function useTeamPerformance() {
       const { data, error } = await (supabase.rpc as any)('get_team_performance');
       if (error) throw error;
       return (data as TeamMember[]) ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useServiceBottlenecks() {
+  return useQuery<BottleneckItem[]>({
+    queryKey: ['dashboard', 'bottlenecks'],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('get_service_bottlenecks');
+      if (error) throw error;
+      return (data as BottleneckItem[]) ?? [];
     },
     staleTime: 5 * 60 * 1000,
   });
