@@ -1,41 +1,23 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import {
-  ClipboardList, Building2, Package, Clock, Truck,
-  DollarSign, AlertCircle, CheckSquare, FileText, BarChart2,
-  Timer, CalendarDays, ArrowRight, TrendingUp, TrendingDown,
-  AlertTriangle, CheckCircle2, Users, Hourglass, Minus,
-  RefreshCw, UserX, UserPlus, RotateCcw, Play,
-  Zap, Target, Activity,
-} from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { ClipboardList, Building2, Package, Clock, Truck, DollarSign, AlertCircle, CheckSquare, FileText, BarChart2, ArrowRight, AlertTriangle, Play } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { safeFormat } from '@/utils/safeDateFormat';
 import { pt } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
+import { getActionCases, getTeamQuality } from '@/utils/managementInsights';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { cn } from '@/lib/utils';
-import {
-  useBusinessHealth,
-  useRevenueTrend,
-  useOperationalMetrics,
-  useTeamPerformance,
-  useServiceBottlenecks,
-  useBudgetOpportunities,
-  useClientRecurrence,
-  useFinancialSummary,
-  useActivityMetrics,
-  useBudgetDetail,
-  useTeamOverview,
-  useDashboardAlerts,
-  useBottleneckDetail,
-} from '@/hooks/useDashboardMetrics';
+import { useBusinessHealth, useRevenueTrend, useOperationalMetrics, useServiceBottlenecks,
+  useBudgetOpportunities, useClientRecurrence, useFinancialSummary, useBudgetDetail,
+  useDashboardAlerts, useBottleneckDetail, useTechnicianQuality } from '@/hooks/useDashboardMetrics';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
-import { ServiceStatusChart } from '@/components/dashboard/ServiceStatusChart';
-import { TeamPerformanceTable } from '@/components/dashboard/TeamPerformanceTable';
 
 // ─── useCountUp: anima um número de 0 até target ─────────────────────────────
 function useCountUp(target: number | undefined, duration = 700): number {
@@ -99,302 +81,19 @@ function StatusCard({
   );
 }
 
-// ─── Centro de Ação ───────────────────────────────────────────────────────────
-type AlertLevel = 'urgent' | 'attention' | 'info' | 'ok';
-
-interface ActionAlert {
-  id: string;
-  level: AlertLevel;
-  count: number;
-  label: string;
-  sublabel: string;
-  route: string;
-  cta: string;
+function Insight({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return <div className="min-w-0 border-l-2 border-border pl-4 py-2">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="mt-1 text-2xl font-semibold tabular-nums break-words">{value}</p>
+    {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
+  </div>;
 }
 
-function AlertCount({ n }: { n: number }) {
-  const v = useCountUp(n, 500);
-  return <span className="text-2xl font-bold tabular-nums">{v}</span>;
-}
-
-function ActionAlertCard({ alert, className }: { alert: ActionAlert; className?: string }) {
-  const navigate = useNavigate();
-
-  const borderColor =
-    alert.level === 'urgent'    ? 'border-l-red-500' :
-    alert.level === 'attention' ? 'border-l-amber-500' :
-    alert.level === 'info'      ? 'border-l-blue-400' :
-                                  'border-l-green-500';
-
-  const dotClass =
-    alert.level === 'urgent'    ? 'urgency-dot-urgent' :
-    alert.level === 'attention' ? 'urgency-dot-attention' :
-                                  'urgency-dot-info';
-
-  const countColor =
-    alert.level === 'urgent'    ? 'text-red-600 dark:text-red-400' :
-    alert.level === 'attention' ? 'text-amber-600 dark:text-amber-400' :
-                                  'text-blue-600 dark:text-blue-400';
-
-  return (
-    <div
-      className={cn(
-        'alert-card bg-card border border-border border-l-4 rounded-xl p-4',
-        'flex flex-col gap-3 shadow-sm',
-        borderColor,
-        className,
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <span className={dotClass} />
-        <span className={cn('text-xs font-semibold uppercase tracking-wide text-muted-foreground')}>
-          {alert.level === 'urgent' ? 'Urgente' :
-           alert.level === 'attention' ? 'Atenção' : 'Info'}
-        </span>
-      </div>
-      <div>
-        <div className={cn('mb-0.5', countColor)}>
-          <AlertCount n={alert.count} />
-          <span className="ml-1 text-sm font-medium">{alert.label}</span>
-        </div>
-        <p className="text-xs text-muted-foreground">{alert.sublabel}</p>
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-between text-xs font-semibold h-8 px-3 rounded-lg bg-muted/60 hover:bg-muted"
-        onClick={() => navigate(alert.route)}
-      >
-        {alert.cta}
-        <ArrowRight className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
-// ─── Breakdown financeiro (4 blocos) ─────────────────────────────────────────
-function FinancialBreakdown({
-  health, navigate,
-}: {
-  health: ReturnType<typeof useBusinessHealth>['data'];
-  navigate: ReturnType<typeof useNavigate>;
-}) {
-  const recebido = useCountUp(health?.recebido ?? 0, 900);
-  const porReceber = useCountUp(health?.faturado_por_receber ?? 0, 900);
-  const orcamentos = useCountUp(health?.orcamentos_pendentes_valor ?? 0, 900);
-
-  const fmt = (n: number) =>
-    n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-grid">
-      {/* Recebido */}
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Recebido
-          </span>
-        </div>
-        <p className="text-xl font-bold text-green-600 dark:text-green-400 tabular-nums">
-          {fmt(recebido)}
-        </p>
-        <p className="text-xs text-muted-foreground">efectivamente recebido este mês</p>
-      </div>
-
-      {/* Faturado por receber */}
-      <div
-        className={cn(
-          'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
-          (health?.faturado_por_receber ?? 0) > 0 && 'border-l-4 border-l-amber-400',
-        )}
-        onClick={() => navigate('/em-debito')}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Por receber
-          </span>
-        </div>
-        <p className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-          {fmt(porReceber)}
-        </p>
-        <p className="text-xs text-muted-foreground">faturado mas ainda não pago</p>
-        {(health?.faturado_por_receber ?? 0) > 0 && (
-          <span className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-            <ArrowRight className="h-3 w-3" /> Cobrar
-          </span>
-        )}
-      </div>
-
-      {/* Por faturar */}
-      <div
-        className={cn(
-          'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
-          (health?.por_faturar_count ?? 0) > 0 && 'border-l-4 border-l-red-400',
-        )}
-        onClick={() => navigate('/precificar')}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Por faturar
-          </span>
-        </div>
-        <p className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums">
-          {health?.por_faturar_count ?? 0}{' '}
-          <span className="text-sm font-normal">serviços</span>
-        </p>
-        <p className="text-xs text-muted-foreground">finalizados sem preço definido</p>
-        {(health?.por_faturar_count ?? 0) > 0 && (
-          <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
-            <ArrowRight className="h-3 w-3" /> Definir preço
-          </span>
-        )}
-      </div>
-
-      {/* Orçamentos pendentes */}
-      <div
-        className={cn(
-          'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
-        )}
-        onClick={() => navigate('/orcamentos')}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Orçamentos
-          </span>
-        </div>
-        <p className="text-xl font-bold tabular-nums">
-          {fmt(orcamentos)}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {health?.orcamentos_pendentes_count ?? 0} pendentes de aprovação
-        </p>
-        {(health?.orcamentos_pendentes_count ?? 0) > 0 && (
-          <span className="text-xs text-blue-600 flex items-center gap-1 mt-1">
-            <ArrowRight className="h-3 w-3" /> Ver orçamentos
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Gargalos de estado ───────────────────────────────────────────────────────
 const STATUS_LABELS: Record<string, string> = {
-  por_fazer:       'Aberto',
-  em_execucao:     'Em Execução',
-  na_oficina:      'Oficina',
-  para_pedir_peca: 'Pedir Peça',
-  em_espera_de_peca: 'Espera Peça',
-  diagnostico:     'Diagnóstico',
-  aguardando:      'Aguardando',
+  por_fazer: 'Aberto', em_execucao: 'Em Execução', na_oficina: 'Oficina',
+  para_pedir_peca: 'Pedir Peça', em_espera_de_peca: 'Espera Peça',
+  diagnostico: 'Diagnóstico', aguardando: 'Aguardando',
 };
-
-function BottlenecksSection({ data }: { data: ReturnType<typeof useServiceBottlenecks>['data'] }) {
-  if (!data || data.length === 0) return null;
-
-  const maxDays = Math.max(...data.map((b) => b.avg_days), 1);
-
-  const urgency = (days: number) =>
-    days >= 7 ? 'bg-red-400' : days >= 3 ? 'bg-amber-400' : 'bg-blue-400';
-
-  return (
-    <Card className="motion-enter">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Hourglass className="h-4 w-4 text-muted-foreground" />
-          Onde ficam parados os serviços
-          <span className="text-xs font-normal text-muted-foreground ml-1">
-            tempo médio em cada estado
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {data
-          .sort((a, b) => b.avg_days - a.avg_days)
-          .map((item, i) => (
-            <div key={item.status} className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium">
-                  {STATUS_LABELS[item.status] ?? item.status}
-                </span>
-                <span className="text-muted-foreground tabular-nums">
-                  {item.count} serviços · média{' '}
-                  <span
-                    className={cn(
-                      'font-semibold',
-                      item.avg_days >= 7
-                        ? 'text-red-600 dark:text-red-400'
-                        : item.avg_days >= 3
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-foreground',
-                    )}
-                  >
-                    {item.avg_days}d
-                  </span>
-                  {item.max_days > item.avg_days + 2 && (
-                    <span className="text-muted-foreground ml-1">
-                      (máx {item.max_days}d)
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={cn('h-full rounded-full bottleneck-bar', urgency(item.avg_days))}
-                  style={{
-                    width: `${Math.max((item.avg_days / maxDays) * 100, 4)}%`,
-                    animationDelay: `${i * 80 + 200}ms`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Tendência financeira inline ──────────────────────────────────────────────
-function RevenueTrendBadge({ current, previous }: { current: number; previous: number }) {
-  if (!previous || previous === 0) return null;
-  const pct = ((current - previous) / previous) * 100;
-  const isUp = pct >= 0;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
-        isUp
-          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
-      )}
-    >
-      {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-      {Math.abs(pct).toFixed(1)}%
-    </span>
-  );
-}
-
-// ─── Delta badge comparação com período anterior ──────────────────────────────
-function DeltaBadge({ current, previous }: { current: number | null; previous: number | null }) {
-  if (current == null || previous == null || previous === 0) return null;
-  const pct = ((current - previous) / previous) * 100;
-  const isUp = pct >= 0;
-  return (
-    <span className={cn(
-      'inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-      isUp
-        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-        : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
-    )}>
-      {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-      {Math.abs(pct).toFixed(0)}%
-    </span>
-  );
-}
 
 // ─── Tipos do dashboard ───────────────────────────────────────────────────────
 interface DashboardStats {
@@ -430,22 +129,35 @@ export default function DashboardPage() {
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
   const isDono = role === 'dono';
 
-  // ── Hooks base (compatibilidade) ──────────────────────────────────────────
-  const { data: health,      isLoading: healthLoading } = useBusinessHealth();
+  const { data: health, isLoading: healthLoading } = useBusinessHealth();
   const { data: revenueTrend = [], isLoading: trendLoading } = useRevenueTrend();
-  const { data: operational, isLoading: opLoading }    = useOperationalMetrics();
-  const { data: team = [],   isLoading: teamLoading }  = useTeamPerformance();
-  const { data: bottlenecks = [] }                     = useServiceBottlenecks();
-  const { data: budgetOpp }                            = useBudgetOpportunities();
-  const { data: clientRec }                            = useClientRecurrence();
-
-  // ── Hooks spec v2 ─────────────────────────────────────────────────────────
+  const { data: operational } = useOperationalMetrics();
+  const { data: bottlenecks = [] } = useServiceBottlenecks();
+  const { data: budgetOpp } = useBudgetOpportunities();
+  const { data: clientRec } = useClientRecurrence();
   const { data: financialSummary } = useFinancialSummary(30);
-  const { data: activityMetrics }  = useActivityMetrics(30);
-  const { data: budgetDetail }     = useBudgetDetail(30);
-  const { data: teamOverview }     = useTeamOverview(30);
-  const { data: dashAlerts }       = useDashboardAlerts();
+  const { data: budgetDetail } = useBudgetDetail(30);
+  const { data: dashAlerts, isLoading: alertsLoading, isError: alertsError } = useDashboardAlerts();
   const { data: bottleneckDetail } = useBottleneckDetail();
+  const { data: quality = [] } = useTechnicianQuality(30);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const { data: selectedBudget } = useQuery({
+    queryKey: ['budget-action-detail', selectedBudgetId],
+    enabled: selectedBudgetId !== null,
+    queryFn: async () => {
+      if (!selectedBudgetId) return null;
+      const { data, error } = await supabase.from('budgets')
+        .select('*, customer:customers(*)').eq('id', selectedBudgetId).single();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const actionCases = getActionCases(dashAlerts);
+  const teamQuality = getTeamQuality(quality);
+  const delays = (bottleneckDetail?.por_estado?.map(item => ({ status: item.status, average: item.media_dias, maximum: item.max_dias }))
+    ?? bottlenecks.map(item => ({ status: item.status, average: item.avg_days, maximum: item.max_days })))
+    .filter(item => !['finalizado', 'concluidos', 'concluido', 'concluído', 'cancelado'].includes(item.status))
+    .sort((a, b) => b.average - a.average);
 
   useEffect(() => {
     if (role && role !== 'dono') {
@@ -494,65 +206,6 @@ export default function DashboardPage() {
     a_precificar: 0, em_debito: 0, finalizado: 0, orcamentos: 0,
   };
 
-  // ── Alertas directivos (fallback para dados base quando spec RPC não disponível) ──
-  const actionAlerts: ActionAlert[] = [];
-  if (isDono && health) {
-    if ((health.por_faturar_count ?? 0) > 0) {
-      actionAlerts.push({
-        id: 'unbilled', level: 'urgent',
-        count: health.por_faturar_count,
-        label: 'sem faturar',
-        sublabel: 'serviços finalizados sem valor definido',
-        route: '/precificar', cta: 'Definir preços',
-      });
-    }
-    if ((health.stuck_services_5d ?? 0) > 0) {
-      actionAlerts.push({
-        id: 'stuck', level: 'urgent',
-        count: health.stuck_services_5d,
-        label: 'parados há +5 dias',
-        sublabel: 'sem actualização de estado',
-        route: '/geral', cta: 'Ver serviços parados',
-      });
-    }
-    if ((health.faturado_por_receber ?? 0) > 0) {
-      actionAlerts.push({
-        id: 'debt', level: 'attention',
-        count: Math.round(health.faturado_por_receber),
-        label: '€ por cobrar',
-        sublabel: 'faturado mas ainda não recebido',
-        route: '/em-debito', cta: 'Cobrar clientes',
-      });
-    }
-    if (safeStats.a_precificar > 0) {
-      actionAlerts.push({
-        id: 'pricing', level: 'attention',
-        count: safeStats.a_precificar,
-        label: 'por orçamentar',
-        sublabel: 'aguardam valor para o cliente avançar',
-        route: '/precificar', cta: 'Orçamentar',
-      });
-    }
-    if ((health.sem_tecnico ?? 0) > 0) {
-      actionAlerts.push({
-        id: 'no-tech', level: 'attention',
-        count: health.sem_tecnico,
-        label: 'sem técnico',
-        sublabel: 'serviços em aberto sem técnico atribuído',
-        route: '/geral', cta: 'Atribuir técnico',
-      });
-    }
-    if ((health.orcamentos_pendentes_count ?? 0) > 0) {
-      actionAlerts.push({
-        id: 'budgets', level: 'info',
-        count: health.orcamentos_pendentes_count,
-        label: 'orçamentos pendentes',
-        sublabel: 'aguardam resposta do cliente',
-        route: '/orcamentos', cta: 'Ver orçamentos',
-      });
-    }
-  }
-
   const fmt = (n: number) =>
     n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
@@ -566,15 +219,7 @@ export default function DashboardPage() {
             Correia &amp; Teixeira · vista de dono
           </p>
         </div>
-        {health && (
-          <div className="flex items-center gap-2">
-            <RevenueTrendBadge
-              current={health.revenue_this_month}
-              previous={health.revenue_last_month}
-            />
-            <span className="text-xs text-muted-foreground">vs mês anterior</span>
-          </div>
-        )}
+
       </div>
 
       {/* ── ESTADO DE TODOS OS SERVIÇOS ──────────────────────────────────────── */}
@@ -602,754 +247,91 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ── SECÇÃO 1.8: ALERTAS E OPORTUNIDADES (só dono) ──────────────────── */}
-      {isDono && actionAlerts.length > 0 && (
-        <section aria-label="Alertas e oportunidades">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h2 className="text-sm font-semibold">Centro de Ação</h2>
-            <span className="text-xs text-muted-foreground">
-              — {actionAlerts.length} {actionAlerts.length === 1 ? 'ponto requer' : 'pontos requerem'} atenção
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {actionAlerts.map((alert) => (
-              <ActionAlertCard key={alert.id} alert={alert} />
-            ))}
-          </div>
+      {isDono && <>
+        <section aria-label="Centro de Ação" className="space-y-3">
+          <h2 className="text-sm font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" />Centro de Ação</h2>
+          {alertsLoading ? <Skeleton className="h-24 w-full" /> : alertsError ?
+            <p className="text-sm text-muted-foreground">Não foi possível consultar os casos de acompanhamento.</p> : actionCases.length === 0 ?
+            <p className="text-sm text-muted-foreground">Sem casos de acompanhamento sinalizados.</p> :
+            <div className="divide-y border-y border-border">
+              {actionCases.map(item => <div key={item.key} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{item.code} · {item.customer ?? 'Cliente'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{item.reason}{item.days != null && ` · ${item.days} dias`}{item.amount != null && ` · ${fmt(item.amount)} em falta`}</p>
+                </div>
+                <Button variant="outline" size="sm" className="self-start shrink-0" onClick={() => item.kind === 'budget' ? setSelectedBudgetId(item.id) : navigate(`/service-detail/${item.id}`)}>
+                  {item.kind === 'budget' ? 'Abrir orçamento' : 'Abrir serviço'}<ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>)}
+            </div>}
         </section>
-      )}
 
-      {/* ── SECÇÃO 1.1: RESUMO FINANCEIRO (só dono) ─────────────────────────── */}
-      {isDono && (
         <section aria-label="Resumo financeiro" className="space-y-4">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Resumo financeiro</h2>
-            <div className="flex-1 h-px bg-border" />
-            {financialSummary && (
-              <span className="text-xs text-muted-foreground">
-                últimos {financialSummary.days} dias
-              </span>
-            )}
-            {!financialSummary && health?.clientes_novos_mes && health.clientes_novos_mes > 0 ? (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                +{health.clientes_novos_mes} cliente{health.clientes_novos_mes !== 1 ? 's' : ''} novos
-              </span>
-            ) : null}
-          </div>
-
-          {/* Resumo financeiro v2 (RPC novo) ou fallback para breakdown base */}
-          {financialSummary ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-grid">
-              {/* Recebido */}
-              <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
-                <div className="flex items-center gap-2 mb-1 justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Recebido
-                    </span>
-                  </div>
-                  <DeltaBadge current={financialSummary.recebido} previous={financialSummary.recebido_prev} />
-                </div>
-                <p className="text-xl font-bold text-green-600 dark:text-green-400 tabular-nums">
-                  {fmt(financialSummary.recebido)}
-                </p>
-                <p className="text-xs text-muted-foreground">efectivamente recebido</p>
-              </div>
-
-              {/* Por receber */}
-              <div
-                className={cn(
-                  'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
-                  financialSummary.por_receber > 0 && 'border-l-4 border-l-amber-400',
-                )}
-                onClick={() => navigate('/em-debito')}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Por receber
-                  </span>
-                </div>
-                <p className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-                  {fmt(financialSummary.por_receber)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {financialSummary.por_receber_count} clientes com débito
-                </p>
-                {financialSummary.por_receber > 0 && (
-                  <span className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                    <ArrowRight className="h-3 w-3" /> Cobrar
-                  </span>
-                )}
-              </div>
-
-              {/* Por faturar */}
-              <div
-                className={cn(
-                  'bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm cursor-pointer card-interactive',
-                  financialSummary.por_faturar_count > 0 && 'border-l-4 border-l-red-400',
-                )}
-                onClick={() => navigate('/precificar')}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Por faturar
-                  </span>
-                </div>
-                <p className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums">
-                  {financialSummary.por_faturar_count}{' '}
-                  <span className="text-sm font-normal">serviços</span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {fmt(financialSummary.por_faturar)} em valor estimado
-                </p>
-                {financialSummary.por_faturar_count > 0 && (
-                  <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
-                    <ArrowRight className="h-3 w-3" /> Definir preço
-                  </span>
-                )}
-              </div>
-
-              {/* Ticket médio */}
-              <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
-                <div className="flex items-center gap-2 mb-1 justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Ticket médio
-                    </span>
-                  </div>
-                  <DeltaBadge
-                    current={financialSummary.ticket_medio}
-                    previous={financialSummary.ticket_medio_prev}
-                  />
-                </div>
-                <p className="text-xl font-bold tabular-nums">
-                  {financialSummary.ticket_medio != null
-                    ? fmt(financialSummary.ticket_medio)
-                    : '—'}
-                </p>
-                <p className="text-xs text-muted-foreground">por serviço faturado</p>
-              </div>
-            </div>
-          ) : (
-            /* Fallback: breakdown base enquanto RPC novo não está disponível */
-            <FinancialBreakdown health={health} navigate={navigate} />
-          )}
-
-          {/* Métricas de conversão (fallback) */}
-          {!financialSummary && (
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Conversão de orçamentos</p>
-                  <p className="text-2xl font-bold">
-                    {healthLoading ? '—' : `${health?.budget_conversion_rate ?? 0}%`}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
-                </CardContent>
-              </Card>
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Ticket médio</p>
-                  <p className="text-2xl font-bold">
-                    {healthLoading
-                      ? '—'
-                      : (health?.avg_ticket ?? 0).toLocaleString('pt-PT', {
-                          style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-                        })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">serviços finalizados</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          <h2 className="text-sm font-semibold">Resumo financeiro <span className="font-normal text-xs text-muted-foreground">· {financialSummary ? `últimos ${financialSummary.days} dias` : 'mês atual'}</span></h2>
+          {healthLoading && !financialSummary ? <Skeleton className="h-24 w-full" /> :
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Insight label="Recebido" value={financialSummary || health ? fmt(financialSummary?.recebido ?? health?.recebido ?? 0) : '—'} detail="Pagamentos registados no período" />
+              <Insight label="Por receber" value={financialSummary || health ? fmt(financialSummary?.por_receber ?? health?.faturado_por_receber ?? 0) : '—'} detail="Saldo monetário em falta" />
+              {financialSummary && <Insight label="Valor definido" value={fmt(financialSummary.faturado)} detail="Valor dos serviços no período" />}
+            </div>}
         </section>
-      )}
 
-      {/* ── SECÇÃO 1.2: ATIVIDADE E EVOLUÇÃO (só dono) ──────────────────────── */}
-      {isDono && (
         <section aria-label="Atividade e evolução" className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Atividade e evolução</h2>
-            <div className="flex-1 h-px bg-border" />
+          <h2 className="text-sm font-semibold">Atividade e evolução</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Insight label="Ticket médio" value={(financialSummary?.ticket_medio ?? health?.avg_ticket) != null ? fmt(financialSummary?.ticket_medio ?? health?.avg_ticket ?? 0) : '—'} detail="Valor médio por serviço com preço definido" />
+            <Insight label="Evolução da receita" value={health && health.revenue_last_month > 0 ? `${((health.revenue_this_month - health.revenue_last_month) / health.revenue_last_month * 100).toFixed(1)}%` : '—'} detail="Mês atual face ao mês anterior · período em curso" />
           </div>
-
-          {/* Métricas de atividade — v2 quando disponível */}
-          {activityMetrics ? (
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Iniciados</p>
-                  <p className="text-2xl font-bold">{activityMetrics.iniciados}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
-                </CardContent>
-              </Card>
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Concluídos</p>
-                  <p className="text-2xl font-bold">{activityMetrics.concluidos}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">últimos 30 dias</p>
-                </CardContent>
-              </Card>
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Em Execução</p>
-                  <p className="text-2xl font-bold">{activityMetrics.em_execucao}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">agora</p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 mb-2">
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Serviços esta semana</p>
-                  <p className="text-2xl font-bold">{operational?.services_this_week ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">entradas desde segunda-feira</p>
-                </CardContent>
-              </Card>
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Resolução média</p>
-                  <p className="text-2xl font-bold">
-                    {operational ? `${operational.avg_resolution_days}d` : '—'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">do início ao fecho</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Gráfico de tendência de receita */}
           <RevenueChart data={revenueTrend} loading={trendLoading} />
+        </section>
 
-          {/* Distribuição por estado */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ServiceStatusChart data={operational?.by_status ?? null} loading={opLoading} />
-
-            {/* Distribuição por tipo (v2) ou métricas operacionais (fallback) */}
-            {activityMetrics?.por_tipo && activityMetrics.por_tipo.length > 0 ? (
-              <Card className="motion-enter">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold">Por tipo de serviço</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {activityMetrics.por_tipo.map((t) => (
-                    <div key={t.service_type} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground capitalize">
-                        {t.service_type?.replace(/_/g, ' ') ?? 'Outro'}
-                      </span>
-                      <span className="font-semibold tabular-nums">{t.count}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Serviços esta semana</p>
-                    <p className="text-2xl font-bold">{operational?.services_this_week ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">entradas desde segunda-feira</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Resolução média</p>
-                    <p className="text-2xl font-bold">
-                      {operational ? `${operational.avg_resolution_days}d` : '—'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">do início ao fecho</p>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+        <section aria-label="Orçamentos e conversão" className="space-y-4">
+          <h2 className="text-sm font-semibold">Orçamentos e conversão <span className="font-normal text-xs text-muted-foreground">· últimos 30 dias</span></h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Insight label="Taxa de aceitação" value={(budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao) != null ? `${budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao}%` : '—'} />
+            {budgetDetail ? <>
+              <Insight label="Valor aceite" value={fmt(budgetDetail.aceites_valor)} />
+              <Insight label="Valor recusado" value={fmt(budgetDetail.rejeitados_valor)} />
+            </> : <Insight label="Valor em aberto" value={budgetOpp ? fmt(budgetOpp.valor_total_pendente) : '—'} detail="Carteira pendente de decisão" />}
           </div>
         </section>
-      )}
 
-      {/* ── SECÇÃO 1.3: ORÇAMENTOS E CONVERSÃO (só dono) ───────────────────── */}
-      {isDono && (
-        <section aria-label="Orçamentos e conversão">
-          <div className="flex items-center gap-2 mb-3">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Orçamentos e conversão</h2>
-            <div className="flex-1 h-px bg-border" />
-            {(budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao) != null && (
-              <span className="text-xs text-muted-foreground">
-                {budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao}% taxa de aceitação
-              </span>
-            )}
+        {clientRec && <section aria-label="Clientes e recorrência" className="space-y-4">
+          <h2 className="text-sm font-semibold">Clientes e recorrência</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Insight label="Novos este mês" value={String(clientRec.novos_mes)} />
+            <Insight label="Clientes recorrentes" value={String(clientRec.recorrentes)} detail="Clientes que regressaram" />
+            <Insight label="Reativados" value={String(clientRec.reativados)} detail="Voltaram nos últimos 90 dias" />
+            <Insight label="Inativos" value={String(clientRec.inativos)} detail="Sem serviço nos últimos 90 dias" />
           </div>
+          <Insight label="Receita média por cliente" value={clientRec.receita_media_por_cliente != null ? fmt(clientRec.receita_media_por_cliente) : '—'} detail="Histórico dos clientes com pagamento" />
+        </section>}
 
-          {budgetDetail ? (
-            /* Versão completa com RPC v2 */
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Criados */}
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Criados (30d)</p>
-                    <p className="text-xl font-bold">{budgetDetail.criados_count}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmt(budgetDetail.criados_valor)}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Aceites */}
-                <Card className="motion-enter cursor-pointer hover:border-green-400 transition-colors" onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Aceites</p>
-                    <p className="text-xl font-bold text-green-600">{budgetDetail.aceites_count}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmt(budgetDetail.aceites_valor)}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Pendentes */}
-                <Card className={cn(
-                  'motion-enter cursor-pointer transition-colors',
-                  budgetDetail.pendentes_count > 0 ? 'border-blue-400 hover:border-blue-500' : '',
-                )} onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Pendentes</p>
-                    <p className={cn('text-xl font-bold', budgetDetail.pendentes_count > 0 ? 'text-blue-600' : '')}>
-                      {budgetDetail.pendentes_count}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmt(budgetDetail.pendentes_valor)} em aberto
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Sem resposta +7d */}
-                <Card className={cn(
-                  'motion-enter cursor-pointer transition-colors',
-                  budgetDetail.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '',
-                )} onClick={() => navigate('/orcamentos')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
-                    <p className={cn('text-xl font-bold', budgetDetail.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
-                      {budgetDetail.sem_resposta_7d}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {budgetDetail.sem_resposta_7d_valor > 0
-                        ? fmt(budgetDetail.sem_resposta_7d_valor) + ' parados'
-                        : budgetDetail.sem_resposta_14d > 0
-                          ? `${budgetDetail.sem_resposta_14d} há +14d`
-                          : 'sem valor em espera'}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Orçamentos antigos pendentes */}
-              {budgetDetail.pendentes_antigos && budgetDetail.pendentes_antigos.length > 0 && (
-                <Card className="motion-enter">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                      Pendentes mais antigos
-                      {budgetDetail.mais_antigo_dias != null && (
-                        <span className="text-amber-600">— mais antigo há {budgetDetail.mais_antigo_dias}d</span>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-1 pt-0">
-                    {budgetDetail.pendentes_antigos.slice(0, 5).map((b) => (
-                      <div key={b.id} className="flex items-center justify-between py-1 text-xs border-b border-border last:border-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-mono text-muted-foreground">{b.code}</span>
-                          <span className="truncate">{b.customer_name ?? '—'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          {b.estimated_total != null && (
-                            <span className="font-semibold">{fmt(b.estimated_total)}</span>
-                          )}
-                          <Badge variant="outline" className={cn(
-                            'text-[10px]',
-                            b.dias_pendente >= 14 ? 'border-red-400 text-red-600' : 'border-amber-400 text-amber-600',
-                          )}>
-                            {b.dias_pendente}d
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : budgetOpp ? (
-            /* Fallback: versão base */
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Card className="motion-enter cursor-pointer hover:border-blue-400 transition-colors" onClick={() => navigate('/orcamentos')}>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Valor em aberto</p>
-                  <p className="text-xl font-bold text-blue-600">
-                    {budgetOpp.valor_total_pendente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{budgetOpp.total_pendentes} orçamento{budgetOpp.total_pendentes !== 1 ? 's' : ''} pendente{budgetOpp.total_pendentes !== 1 ? 's' : ''}</p>
-                </CardContent>
-              </Card>
-
-              <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_7d > 0 ? 'border-amber-400 hover:border-amber-500' : '')} onClick={() => navigate('/orcamentos')}>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Sem resposta +7d</p>
-                  <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_7d > 0 ? 'text-amber-600' : 'text-muted-foreground')}>
-                    {budgetOpp.sem_resposta_7d}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {budgetOpp.valor_sem_resposta_7d > 0
-                      ? budgetOpp.valor_sem_resposta_7d.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) + ' parados'
-                      : 'sem valor em espera'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className={cn('motion-enter cursor-pointer transition-colors', budgetOpp.sem_resposta_14d > 0 ? 'border-red-400 hover:border-red-500' : '')} onClick={() => navigate('/orcamentos')}>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Sem resposta +14d</p>
-                  <p className={cn('text-xl font-bold', budgetOpp.sem_resposta_14d > 0 ? 'text-red-600' : 'text-muted-foreground')}>
-                    {budgetOpp.sem_resposta_14d}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {budgetOpp.mais_antigo_dias != null
-                      ? `mais antigo há ${budgetOpp.mais_antigo_dias}d`
-                      : 'nenhum em espera'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="motion-enter">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Últimos 30 dias</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm font-bold text-green-600">✓ {budgetOpp.aprovados_30d}</span>
-                    <span className="text-xs text-muted-foreground">aprovados</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-red-500">✗ {budgetOpp.rejeitados_30d}</span>
-                    <span className="text-xs text-muted-foreground">rejeitados</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : null}
+        <section aria-label="Gargalos operacionais" className="space-y-4">
+          <h2 className="text-sm font-semibold">Gargalos operacionais</h2>
+          <Insight label="Intervalo médio até ao fecho" value={(bottleneckDetail?.tempo_medio_resolucao ?? operational?.avg_resolution_days) != null ? `${bottleneckDetail?.tempo_medio_resolucao ?? operational?.avg_resolution_days} dias` : '—'} detail="Estimativa entre criação e última atualização dos serviços terminados" />
+          {delays.length > 0 && <div className="divide-y border-y border-border">
+            <p className="text-xs text-muted-foreground py-2">Tempo desde a última atualização, por etapa</p>
+            {delays.map(item => <div key={item.status} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+              <span>{STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}</span>
+              <span className="tabular-nums text-muted-foreground">Média {item.average}d · máximo {item.maximum}d</span>
+            </div>)}
+          </div>}
         </section>
-      )}
 
-      {/* ── SECÇÃO 1.4: CLIENTES E RECORRÊNCIA (só dono) ────────────────────── */}
-      {isDono && clientRec && (
-        <section aria-label="Clientes e recorrência">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Clientes e recorrência</h2>
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">{clientRec.total_clientes} clientes na base</span>
+        <section aria-label="Visão geral da equipa" className="space-y-4">
+          <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">Visão geral da equipa <span className="font-normal text-xs text-muted-foreground">· últimos 30 dias</span></h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/performance')}>Performance<ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-            <Card className="motion-enter">
-              <CardContent className="p-4 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <UserPlus className="h-3.5 w-3.5 text-blue-500" />
-                  <p className="text-xs text-muted-foreground">Novos este mês</p>
-                </div>
-                <p className="text-2xl font-bold">{clientRec.novos_mes}</p>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <RotateCcw className="h-3.5 w-3.5 text-green-500" />
-                  <p className="text-xs text-muted-foreground">Recorrentes</p>
-                </div>
-                <p className="text-2xl font-bold">{clientRec.recorrentes}</p>
-                <p className="text-xs text-muted-foreground">≥ 2 serviços</p>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
-                  <p className="text-xs text-muted-foreground">Reativados</p>
-                </div>
-                <p className="text-2xl font-bold">{clientRec.reativados}</p>
-                <p className="text-xs text-muted-foreground">voltaram nos últimos 90d</p>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <UserX className="h-3.5 w-3.5 text-red-400" />
-                  <p className="text-xs text-muted-foreground">Inativos</p>
-                </div>
-                <p className="text-2xl font-bold">{clientRec.inativos}</p>
-                <p className="text-xs text-muted-foreground">sem serviço em 90d</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Distribuição e métricas de valor */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="motion-enter">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-2">Frequência de visitas</p>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">1 visita</span>
-                    <span className="font-medium">{clientRec.dist_1_servico}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">2 – 5 visitas</span>
-                    <span className="font-medium text-blue-600">{clientRec.dist_2_5_servicos}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">6 ou mais</span>
-                    <span className="font-medium text-green-600">{clientRec.dist_6_mais}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Média de intervenções</p>
-                <p className="text-2xl font-bold">{clientRec.media_intervencoes ?? '—'}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">por cliente com serviços</p>
-              </CardContent>
-            </Card>
-            <Card className="motion-enter">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Receita média por cliente</p>
-                <p className="text-2xl font-bold">
-                  {clientRec.receita_media_por_cliente != null
-                    ? clientRec.receita_media_por_cliente.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                    : '—'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">lifetime · clientes com pagamento</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Insight label="Fecho em até 2 dias" value={teamQuality.quickResolutionPct != null ? `${teamQuality.quickResolutionPct.toFixed(1)}%` : '—'} />
+            <Insight label="Descrição da avaria preenchida" value={teamQuality.descriptionPct != null ? `${teamQuality.descriptionPct.toFixed(1)}%` : '—'} />
+            <Insight label="Intervalo médio até ao fecho" value={teamQuality.resolutionDays != null ? `${teamQuality.resolutionDays.toFixed(1)} dias` : '—'} />
           </div>
         </section>
-      )}
+      </>}
 
-      {/* ── SECÇÃO 1.6: GARGALOS OPERACIONAIS (só dono) ────────────────────── */}
-      {isDono && (
-        <section aria-label="Gargalos operacionais">
-          <div className="flex items-center gap-2 mb-3">
-            <Hourglass className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Gargalos operacionais</h2>
-            <div className="flex-1 h-px bg-border" />
-            {bottleneckDetail && (
-              <span className="text-xs text-muted-foreground">
-                {bottleneckDetail.total_abertos} em aberto
-                {bottleneckDetail.tempo_medio_resolucao != null && (
-                  <> · resolução média {bottleneckDetail.tempo_medio_resolucao}d</>
-                )}
-              </span>
-            )}
-          </div>
-
-          {bottleneckDetail ? (
-            /* Versão completa v2 */
-            <div className="space-y-3">
-              {/* Indicadores de urgência */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className={cn('motion-enter', bottleneckDetail.parados_5d > 0 ? 'border-red-400' : '')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Parados +5 dias</p>
-                    <p className={cn('text-2xl font-bold', bottleneckDetail.parados_5d > 0 ? 'text-red-600' : '')}>
-                      {bottleneckDetail.parados_5d}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className={cn('motion-enter', bottleneckDetail.parados_10d > 0 ? 'border-red-500' : '')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Parados +10 dias</p>
-                    <p className={cn('text-2xl font-bold', bottleneckDetail.parados_10d > 0 ? 'text-red-700' : '')}>
-                      {bottleneckDetail.parados_10d}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">À espera de peça</p>
-                    <p className="text-2xl font-bold">{bottleneckDetail.aguardar_peca}</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Por agendar</p>
-                    <p className="text-2xl font-bold">{bottleneckDetail.por_agendar}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Distribuição por estado */}
-              {bottleneckDetail.por_estado && bottleneckDetail.por_estado.length > 0 && (
-                <Card className="motion-enter">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold">Tempo médio por estado</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {(() => {
-                      const maxDays = Math.max(...(bottleneckDetail.por_estado?.map((b) => b.media_dias) ?? [1]), 1);
-                      return bottleneckDetail.por_estado!
-                        .sort((a, b) => b.media_dias - a.media_dias)
-                        .map((item, i) => (
-                          <div key={item.status} className="space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-medium">
-                                {STATUS_LABELS[item.status] ?? item.status}
-                              </span>
-                              <span className="text-muted-foreground tabular-nums">
-                                {item.count} serviços · média{' '}
-                                <span className={cn(
-                                  'font-semibold',
-                                  item.media_dias >= 7 ? 'text-red-600 dark:text-red-400'
-                                  : item.media_dias >= 3 ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-foreground',
-                                )}>
-                                  {item.media_dias}d
-                                </span>
-                                {item.max_dias > item.media_dias + 2 && (
-                                  <span className="text-muted-foreground ml-1">(máx {item.max_dias}d)</span>
-                                )}
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={cn(
-                                  'h-full rounded-full bottleneck-bar',
-                                  item.media_dias >= 7 ? 'bg-red-400' : item.media_dias >= 3 ? 'bg-amber-400' : 'bg-blue-400',
-                                )}
-                                style={{
-                                  width: `${Math.max((item.media_dias / maxDays) * 100, 4)}%`,
-                                  animationDelay: `${i * 80 + 200}ms`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ));
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : (
-            /* Fallback: gargalos base */
-            <BottlenecksSection data={bottlenecks} />
-          )}
-        </section>
-      )}
-
-      {/* ── SECÇÃO 1.7: VISÃO GERAL DA EQUIPA (só dono) ─────────────────────── */}
-      {isDono && (
-        <section aria-label="Visão geral da equipa">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Visão geral da equipa</h2>
-            <div className="flex-1 h-px bg-border" />
-            {teamOverview && (
-              <span className="text-xs text-muted-foreground">
-                {teamOverview.concluidos} concluídos · {teamOverview.em_execucao} em execução
-              </span>
-            )}
-          </div>
-
-          {teamOverview && (
-            <div className="space-y-3">
-              {/* Métricas da equipa */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Concluídos (30d)</p>
-                    <p className="text-2xl font-bold">{teamOverview.concluidos}</p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Em Execução</p>
-                    <p className="text-2xl font-bold">{teamOverview.em_execucao}</p>
-                  </CardContent>
-                </Card>
-                <Card className={cn('motion-enter', (teamOverview.sem_tecnico ?? 0) > 0 ? 'border-amber-400' : '')}>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Sem técnico</p>
-                    <p className={cn('text-2xl font-bold', (teamOverview.sem_tecnico ?? 0) > 0 ? 'text-amber-600' : '')}>
-                      {teamOverview.sem_tecnico ?? 0}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="motion-enter">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">FTFR (equipa)</p>
-                    <p className="text-2xl font-bold">
-                      {teamOverview.ftfr_pct != null ? `${teamOverview.ftfr_pct}%` : '—'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">resolução à 1ª visita</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Distribuição de carga por técnico */}
-              {teamOverview.distribuicao_carga && teamOverview.distribuicao_carga.length > 0 && (
-                <Card className="motion-enter">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold">Carga por técnico</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {teamOverview.distribuicao_carga.map((tech) => {
-                      const maxTotal = Math.max(...teamOverview.distribuicao_carga!.map((t) => t.total), 1);
-                      return (
-                        <div key={tech.technician_name} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              {tech.technician_color && (
-                                <span
-                                  className="w-2 h-2 rounded-full inline-block"
-                                  style={{ backgroundColor: tech.technician_color }}
-                                />
-                              )}
-                              <span className="font-medium">{tech.technician_name}</span>
-                            </div>
-                            <span className="text-muted-foreground">
-                              {tech.concluidos} concluídos / {tech.total} total
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${Math.max((tech.total / maxTotal) * 100, 4)}%`,
-                                backgroundColor: tech.technician_color ?? 'hsl(var(--primary))',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Tabela de equipa (sempre visível como detalhe) */}
-          <div className={teamOverview ? 'mt-3' : ''}>
-            <TeamPerformanceTable data={team} loading={teamLoading} />
-          </div>
-        </section>
-      )}
+      <BudgetDetailPanel open={selectedBudgetId !== null && !!selectedBudget} onOpenChange={open => { if (!open) setSelectedBudgetId(null); }} budget={selectedBudget ?? null} />
 
       {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────────── */}
       <Card data-tour="activity-history">
@@ -1374,7 +356,7 @@ export default function DashboardPage() {
                     className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <span className="flex-shrink-0 w-14 text-xs text-muted-foreground tabular-nums">
-                      {isValidDate ? format(new Date(log.created_at), 'HH:mm') : '—'}
+                      {isValidDate ? safeFormat(log.created_at, 'HH:mm') : '—'}
                     </span>
                     <span className="flex-1 text-sm">{log.description}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">

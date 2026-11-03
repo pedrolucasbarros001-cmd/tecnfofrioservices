@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import {
-  Package, Wrench, Truck, TrendingUp, CheckCircle2, Clock, Star,
-  FileCheck, RotateCcw, Zap, Trophy, AlertTriangle, BarChart3, Users, Target,
-} from 'lucide-react';
+import { Package, Wrench, Truck } from 'lucide-react';
 import { formatLocalDate } from '@/utils/dateUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +10,8 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import {
-  useTechnicianQuality,
-  useWarrantyReturns,
-  useFTFRMetrics,
-  useDocQualityMetrics,
-  useProductivityMetrics,
-} from '@/hooks/useDashboardMetrics';
+import { useTechnicianQuality, useWarrantyReturns } from '@/hooks/useDashboardMetrics';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Period options ─────────────────────────────────────────────────────────────
 const PERIOD_OPTIONS = [
@@ -83,31 +75,28 @@ export default function PerformancePage() {
     },
   });
 
-  const { data: expandedServices = [] } = useQuery({
+  const { data: expandedServices = [], isLoading: servicesLoading, isError: servicesError } = useQuery({
     queryKey: ['performance-services', expandedTechs],
     enabled: expandedTechs.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('id, code, technician_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, awaiting_budget_approval, service_location, scheduled_date, appliance_type, fault_description, customer:customers(id, name)')
-        .in('technician_id', expandedTechs)
-        .order('created_at', { ascending: false })
-        .limit(500);
-
-      if (error) throw error;
-      return (data || []) as unknown as PerfServiceRow[];
+      const rows: PerfServiceRow[] = [];
+      for (const techId of expandedTechs) {
+        let offset = 0;
+        while (true) {
+          const { data, error } = await supabase.from('services')
+            .select('id, code, technician_id, service_type, is_sale, is_installation, status, pending_pricing, final_price, amount_paid, awaiting_budget_approval, service_location, scheduled_date, appliance_type, fault_description, customer:customers(id, name)')
+            .eq('technician_id', techId).order('created_at', { ascending: false }).order('id')
+            .range(offset, offset + 499);
+          if (error) throw error;
+          const batch = (data ?? []) as unknown as PerfServiceRow[];
+          rows.push(...batch);
+          if (batch.length < 500) break;
+          offset += 500;
+        }
+      }
+      return rows;
     },
   });
-
-  // ── Totais da equipa ──────────────────────────────────────────────────────
-  const teamTotals = summaries.reduce(
-    (acc, s) => ({
-      total: acc.total + Number(s.total_services),
-      completed: acc.completed + Number(s.completed_services),
-      revenue: acc.revenue + Number(s.revenue),
-    }),
-    { total: 0, completed: 0, revenue: 0 }
-  );
 
   const getServiceType = (service: any) => {
     if (service.service_type === 'entrega' || service.is_sale) return 'entregas';
@@ -181,481 +170,19 @@ export default function PerformancePage() {
     data: getTechnicianData(tech.id),
   }));
 
-  const { data: qualityData = [] } = useTechnicianQuality(days);
-  const { data: warrantyData = [] } = useWarrantyReturns(180);
-
-  // ── Novos hooks (spec v2) ─────────────────────────────────────────────────
-  const { data: ftfrData } = useFTFRMetrics(days);
-  const { data: docQualityData } = useDocQualityMetrics(days);
-  const { data: productivityData } = useProductivityMetrics(days);
-
-  // Find best performers for highlights
-  const highlights = (() => {
-    if (qualityData.length === 0) return null;
-    const withActivity = qualityData.filter(q => q.completed_services > 0);
-    if (withActivity.length === 0) return null;
-
-    const bestCompletion = [...withActivity].sort((a, b) => (b.completion_rate ?? 0) - (a.completion_rate ?? 0))[0];
-    const bestFirstVisit  = [...withActivity].filter(q => q.first_visit_rate != null).sort((a, b) => (b.first_visit_rate ?? 0) - (a.first_visit_rate ?? 0))[0];
-    const bestReports     = [...withActivity].filter(q => q.reports_complete_pct != null).sort((a, b) => (b.reports_complete_pct ?? 0) - (a.reports_complete_pct ?? 0))[0];
-    const fastest         = [...withActivity].filter(q => q.avg_resolution_days != null).sort((a, b) => (a.avg_resolution_days ?? 99) - (b.avg_resolution_days ?? 99))[0];
-
-    return { bestCompletion, bestFirstVisit, bestReports, fastest };
-  })();
+  const { data: qualityData = [], isLoading: qualityLoading, isError: qualityError } = useTechnicianQuality(days);
+  const { data: warrantyData = [], isError: warrantyError } = useWarrantyReturns(days);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Performance de Técnicos</h1>
-          <p className="text-muted-foreground">Carga de trabalho, qualidade e resultados por técnico</p>
+          <p className="text-muted-foreground">Volume por técnico e qualidade de execução</p>
         </div>
 
-        {/* Period selector */}
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
-          {PERIOD_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDays(opt.value)}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                days === opt.value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
       </div>
-
-      {/* Totais da equipa */}
-      {summaries.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Wrench className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total de serviços</p>
-                <p className="text-2xl font-bold">{teamTotals.total}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-md bg-emerald-100 dark:bg-emerald-900/30 p-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Concluídos</p>
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {teamTotals.completed}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Receita gerada</p>
-                <p className="text-2xl font-bold">
-                  {teamTotals.revenue.toLocaleString('pt-PT', {
-                    style: 'currency',
-                    currency: 'EUR',
-                    maximumFractionDigits: 0,
-                  })}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ── 2.2 Secção FTFR — Resolução à 1ª visita ──────────────────────── */}
-      {ftfrData && ftfrData.por_tecnico && ftfrData.por_tecnico.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-blue-500" />
-            <h2 className="text-lg font-semibold">Resolução à 1ª Visita (FTFR)</h2>
-            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
-            {ftfrData.equipa_ftfr != null && (
-              <span className={cn(
-                'ml-auto text-2xl font-bold',
-                ftfrData.equipa_ftfr >= 70 ? 'text-emerald-600' :
-                ftfrData.equipa_ftfr >= 50 ? 'text-amber-500' : 'text-red-500'
-              )}>
-                {ftfrData.equipa_ftfr}% <span className="text-sm font-normal text-muted-foreground">equipa</span>
-              </span>
-            )}
-          </div>
-
-          <div className="grid gap-3">
-            {ftfrData.por_tecnico.map((t) => {
-              const pct = t.ftfr_pct ?? 0;
-              const color = pct >= 70 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
-              return (
-                <Card key={t.technician_id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-2.5 h-10 rounded-full shrink-0"
-                        style={{ background: t.technician_color ?? '#94a3b8' }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-semibold text-sm">{t.technician_name}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                            <span>{t.resolvido_1a}/{t.total_elegivel} resolvidos</span>
-                            {t.com_retorno > 0 && (
-                              <span className="text-rose-500 flex items-center gap-1">
-                                <RotateCcw className="h-3 w-3" />
-                                {t.com_retorno} retornos
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%`, backgroundColor: color }}
-                          />
-                        </div>
-                        <p className="text-right text-xs font-semibold mt-0.5" style={{ color }}>
-                          {t.ftfr_pct != null ? `${t.ftfr_pct}%` : '—'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Indicadores de Qualidade (existente) ─────────────────────────── */}
-      {qualityData.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Indicadores de Qualidade</h2>
-            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
-          </div>
-
-          {/* Quality grid per technician */}
-          <div className="grid gap-3">
-            {qualityData.filter(q => q.total_services > 0).map(q => {
-              const warrantyCount = warrantyData.find(w => w.technician_id === q.technician_id)?.warranty_count ?? 0;
-              return (
-                <Card key={q.technician_id} className="overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-0 divide-x">
-                      {/* Name */}
-                      <div className="flex items-center gap-3 px-4 py-4 w-[180px] shrink-0">
-                        <div
-                          className="w-2.5 h-10 rounded-full shrink-0"
-                          style={{ background: q.technician_color ?? '#94a3b8' }}
-                        />
-                        <div>
-                          <p className="font-semibold text-sm leading-tight">{q.technician_name ?? 'Técnico'}</p>
-                          <p className="text-xs text-muted-foreground">{q.completed_services}/{q.total_services} concluídos</p>
-                        </div>
-                      </div>
-
-                      {/* Resolução à 1ª visita */}
-                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
-                        <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-0.5">
-                          <Zap className="h-3.5 w-3.5" />
-                          <span className="text-xs font-medium">1ª Visita</span>
-                        </div>
-                        <p className={cn(
-                          'text-xl font-bold',
-                          (q.first_visit_rate ?? 0) >= 70 ? 'text-emerald-600' :
-                          (q.first_visit_rate ?? 0) >= 50 ? 'text-amber-500' : 'text-red-500'
-                        )}>
-                          {q.first_visit_rate != null ? `${q.first_visit_rate}%` : '—'}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">{q.quick_resolutions} rápidos</p>
-                      </div>
-
-                      {/* Relatórios completos */}
-                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
-                        <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 mb-0.5">
-                          <FileCheck className="h-3.5 w-3.5" />
-                          <span className="text-xs font-medium">Relatórios</span>
-                        </div>
-                        <p className={cn(
-                          'text-xl font-bold',
-                          (q.reports_complete_pct ?? 0) >= 80 ? 'text-emerald-600' :
-                          (q.reports_complete_pct ?? 0) >= 50 ? 'text-amber-500' : 'text-red-500'
-                        )}>
-                          {q.reports_complete_pct != null ? `${q.reports_complete_pct}%` : '—'}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">c/ descrição</p>
-                      </div>
-
-                      {/* Tempo médio resolução */}
-                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
-                        <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 mb-0.5">
-                          <Clock className="h-3.5 w-3.5" />
-                          <span className="text-xs font-medium">Tempo médio</span>
-                        </div>
-                        <p className={cn(
-                          'text-xl font-bold',
-                          (q.avg_resolution_days ?? 99) <= 2 ? 'text-emerald-600' :
-                          (q.avg_resolution_days ?? 99) <= 5 ? 'text-amber-500' : 'text-red-500'
-                        )}>
-                          {q.avg_resolution_days != null ? `${q.avg_resolution_days}d` : '—'}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">por serviço</p>
-                      </div>
-
-                      {/* Retornos/Garantia */}
-                      <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
-                        <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 mb-0.5">
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          <span className="text-xs font-medium">Retornos</span>
-                        </div>
-                        <p className={cn(
-                          'text-xl font-bold',
-                          warrantyCount === 0 ? 'text-emerald-600' :
-                          warrantyCount <= 2 ? 'text-amber-500' : 'text-red-500'
-                        )}>
-                          {warrantyCount}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">em 60 dias</p>
-                      </div>
-
-                      {/* Pendentes precificar */}
-                      {q.pending_pricing > 0 && (
-                        <div className="flex flex-col items-center justify-center px-5 py-4 flex-1">
-                          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 mb-0.5">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            <span className="text-xs font-medium">Por faturar</span>
-                          </div>
-                          <p className="text-xl font-bold text-amber-600">{q.pending_pricing}</p>
-                          <p className="text-[10px] text-muted-foreground">serviços</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Destaques individuais */}
-          {highlights && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-amber-500" />
-                <h3 className="text-sm font-semibold">Destaques da equipa</h3>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {highlights.bestFirstVisit && (
-                  <div className="rounded-xl border bg-blue-50/60 dark:bg-blue-900/10 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold mb-1 flex items-center gap-1"><Zap className="h-3 w-3" /> Melhor 1ª Visita</p>
-                    <p className="font-bold text-sm leading-tight">{highlights.bestFirstVisit.technician_name}</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{highlights.bestFirstVisit.first_visit_rate}%</p>
-                  </div>
-                )}
-                {highlights.bestReports && (
-                  <div className="rounded-xl border bg-violet-50/60 dark:bg-violet-900/10 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-violet-600 dark:text-violet-400 font-semibold mb-1 flex items-center gap-1"><FileCheck className="h-3 w-3" /> Relatórios</p>
-                    <p className="font-bold text-sm leading-tight">{highlights.bestReports.technician_name}</p>
-                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{highlights.bestReports.reports_complete_pct}%</p>
-                  </div>
-                )}
-                {highlights.fastest && (
-                  <div className="rounded-xl border bg-orange-50/60 dark:bg-orange-900/10 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-orange-600 dark:text-orange-400 font-semibold mb-1 flex items-center gap-1"><Clock className="h-3 w-3" /> Mais Rápido</p>
-                    <p className="font-bold text-sm leading-tight">{highlights.fastest.technician_name}</p>
-                    <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{highlights.fastest.avg_resolution_days}d</p>
-                  </div>
-                )}
-                {highlights.bestCompletion && (
-                  <div className="rounded-xl border bg-emerald-50/60 dark:bg-emerald-900/10 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1"><Star className="h-3 w-3" /> Taxa de Conclusão</p>
-                    <p className="font-bold text-sm leading-tight">{highlights.bestCompletion.technician_name}</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{highlights.bestCompletion.completion_rate}%</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 2.4 Qualidade de Documentação ─────────────────────────────────── */}
-      {docQualityData && docQualityData.por_tecnico && docQualityData.por_tecnico.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <FileCheck className="h-5 w-5 text-violet-500" />
-            <h2 className="text-lg font-semibold">Qualidade de Documentação</h2>
-            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
-            {docQualityData.equipa_completo_pct != null && (
-              <span className={cn(
-                'ml-auto text-2xl font-bold',
-                docQualityData.equipa_completo_pct >= 80 ? 'text-emerald-600' :
-                docQualityData.equipa_completo_pct >= 50 ? 'text-amber-500' : 'text-red-500'
-              )}>
-                {docQualityData.equipa_completo_pct}% <span className="text-sm font-normal text-muted-foreground">equipa</span>
-              </span>
-            )}
-          </div>
-
-          <div className="grid gap-2">
-            {/* Summary row */}
-            {docQualityData.total_finalizados > 0 && (
-              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-                <span>{docQualityData.total_finalizados} serviços concluídos</span>
-                {docQualityData.sem_diagnostico > 0 && (
-                  <span className="text-rose-500 flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {docQualityData.sem_diagnostico} sem diagnóstico
-                  </span>
-                )}
-              </div>
-            )}
-
-            {docQualityData.por_tecnico.map((t) => {
-              const pct = t.completo_pct ?? 0;
-              const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
-              return (
-                <Card key={t.technician_id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-2.5 h-10 rounded-full shrink-0"
-                        style={{ background: t.technician_color ?? '#94a3b8' }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-semibold text-sm">{t.technician_name}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                            <span>{t.com_diagnostico}/{t.total} c/ diagnóstico</span>
-                            {t.sem_diagnostico > 0 && (
-                              <span className="text-rose-500">{t.sem_diagnostico} sem</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%`, backgroundColor: color }}
-                          />
-                        </div>
-                        <p className="text-right text-xs font-semibold mt-0.5" style={{ color }}>
-                          {t.completo_pct != null ? `${t.completo_pct}%` : '—'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── 2.6 Produtividade por Técnico ────────────────────────────────── */}
-      {productivityData && productivityData.por_tecnico && productivityData.por_tecnico.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold">Produtividade</h2>
-            <Badge variant="secondary" className="text-xs">últimos {days} dias</Badge>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/30">
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Técnico</th>
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Serviços</th>
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Concluídos</th>
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Clientes</th>
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Instalações</th>
-                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Receita</th>
-                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ticket médio</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {productivityData.por_tecnico.map((t) => (
-                      <tr key={t.technician_id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-8 rounded-full shrink-0"
-                              style={{ background: t.technician_color ?? '#94a3b8' }}
-                            />
-                            <span className="font-medium">{t.technician_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="font-semibold">{t.total_servicos}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={cn(
-                            'font-semibold',
-                            t.total_servicos > 0 && (t.concluidos / t.total_servicos) >= 0.8
-                              ? 'text-emerald-600' : ''
-                          )}>
-                            {t.concluidos}
-                          </span>
-                          {t.total_servicos > 0 && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({Math.round((t.concluidos / t.total_servicos) * 100)}%)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Users className="h-3 w-3 text-muted-foreground" />
-                            <span>{t.clientes_distintos}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {t.instalacoes > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-orange-600">
-                              <Package className="h-3 w-3" />
-                              {t.instalacoes}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold">
-                          {t.receita_total > 0
-                            ? t.receita_total.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                            : <span className="text-muted-foreground font-normal">—</span>
-                          }
-                        </td>
-                        <td className="px-4 py-3 text-right text-muted-foreground">
-                          {t.ticket_medio > 0
-                            ? t.ticket_medio.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-                            : '—'
-                          }
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <div className="border-t pt-2" />
 
       {/* Cards por técnico */}
       <div className="space-y-6" data-tour="performance-cards" data-demo="performance-cards">
@@ -781,6 +308,8 @@ export default function PerformancePage() {
                           {`Ver todos (${d.total})`}
                         </Button>
                       </div>
+                    ) : servicesLoading ? <Skeleton className="h-24 w-full" /> : servicesError ? (
+                      <p className="text-sm text-muted-foreground">Não foi possível consultar os serviços.</p>
                     ) : (
                       <>
                         {d.services.map((service) => {
@@ -788,14 +317,14 @@ export default function PerformancePage() {
                           return (
                             <div
                               key={service.id}
-                              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-muted/50 rounded-lg"
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
                                 <div className={cn('p-2 rounded-lg', getServiceColor(serviceType))}>
                                   {getServiceIcon(serviceType)}
                                 </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
+                                <div className="min-w-0 break-words">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-mono text-sm font-semibold text-primary">
                                       {service.code}
                                     </span>
@@ -810,7 +339,7 @@ export default function PerformancePage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="text-right shrink-0 ml-2">
+                              <div className="sm:text-right shrink-0 sm:ml-2">
                                 {service.scheduled_date && (
                                   <p className="text-xs text-muted-foreground mb-1">
                                     {formatLocalDate(service.scheduled_date, 'dd/MM/yyyy')}
@@ -849,6 +378,35 @@ export default function PerformancePage() {
           );
         })}
       </div>
+
+      <section aria-label="Qualidade e eficiência" className="space-y-4 border-t pt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Qualidade e eficiência</h2>
+          <div role="group" aria-label="Período da análise de qualidade" className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+            {PERIOD_OPTIONS.map(option => <Button key={option.value} size="sm" variant={days === option.value ? 'secondary' : 'ghost'} aria-pressed={days === option.value} onClick={() => setDays(option.value)}>{option.label}</Button>)}
+          </div>
+        </div>
+        {qualityLoading ? <Skeleton className="h-40 w-full" /> : qualityError ?
+          <p className="text-sm text-muted-foreground">Não foi possível consultar a análise de qualidade.</p> :
+          <div className="divide-y border-y border-border">
+            {technicians.map(tech => {
+              const q = qualityData.find(row => row.technician_id === tech.id);
+              const returns = warrantyData.find(row => row.technician_id === tech.id)?.warranty_count;
+              const measured = q && q.completed_services > 0;
+              return <div key={tech.id} className="py-4 space-y-3">
+                <p className="font-medium">{tech.profile?.full_name ?? 'Técnico'}</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-5">
+                  <div><p className="text-xs text-muted-foreground">Fecho em até 2 dias</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.first_visit_rate != null ? `${q.first_visit_rate}%` : '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Descrição da avaria preenchida</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.reports_complete_pct != null ? `${q.reports_complete_pct}%` : '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Intervalo médio até ao fecho</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.avg_resolution_days != null ? `${q.avg_resolution_days}d` : '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Novos serviços do mesmo cliente</p><p className="mt-1 text-xl font-semibold tabular-nums">{!warrantyError && returns != null ? returns : '—'}</p><p className="text-xs text-muted-foreground mt-1">Até 60 dias após o fecho</p></div>
+                </div>
+                {!measured && <p className="text-xs text-muted-foreground">Sem serviços finalizados para análise neste período.</p>}
+              </div>;
+            })}
+          </div>}
+        <p className="text-xs text-muted-foreground">Período: últimos {days} dias, pela criação do serviço. O intervalo até ao fecho usa a última atualização. Novos serviços do mesmo cliente não confirmam a mesma avaria. Estes dados não medem primeira visita, pontualidade, fotografias ou assinaturas.</p>
+      </section>
 
       {technicians.length === 0 && (
         <Card className="p-12">

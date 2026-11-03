@@ -1312,7 +1312,9 @@ export type Database = {
         Returns: boolean
       }
       count_services_in_debt: { Args: never; Returns: number }
+      get_budget_opportunities: { Args: never; Returns: Json }
       get_business_health_metrics: { Args: never; Returns: Json }
+      get_client_recurrence: { Args: never; Returns: Json }
       get_operational_metrics: { Args: never; Returns: Json }
       get_revenue_trend: { Args: never; Returns: Json }
       get_team_performance: { Args: never; Returns: Json }
