@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Corrigir Dashboard e Performance: manter cartões/filtros atuais e remover indicadores redundantes das secções de gestão
+- [x] Corrigir Dashboard e Performance: cartões/filtros preservados, gestão sem contagens repetidas; testes passam; validação autenticada continua bloqueada
 
 - [x] Fase 2: janelas inferiores no telemóvel e centradas no computador; seleção, confirmações, Escape e navegação verificados a 1280, 428 e 375 px; ferramentas especiais preservadas
 - [x] Refinar a base visual partilhada (controlos, janelas, carregamentos e navegação); controlos verificados a 1280, 428 e 375 px
@@ -9,6 +9,7 @@
 - [x] Redução de custos Supabase (contagens no servidor, compressão de fotos, TV por polling)
 - [x] Lembrete de renovação mais eficaz: níveis de urgência + aviso ao abrir (1x/dia, só dono)
 - [x] Ficha do cliente: separador de orçamentos (dono e secretaria)
-- [ ] Aparelhos do Cliente (aba na ficha + sugestões de serviços antigos)
-- [ ] Painel de Saúde e vista de Técnicos seguindo o documento enviado pelo utilizador (A_ideia_que_tem...md)
-- [ ] Implementar o dashboard enviado: métricas agregadas, gráficos e equipa para dono/secretaria, preservando atalhos e histórico atuais; não alterar impressões nem fluxos
+- [x] Aparelhos do Cliente: aba e sugestões existentes; fora desta correção
+- [x] Painel de Saúde e vista de Técnicos: alinhados com a regra posterior de não duplicar cartões
+- [x] Dashboard alinhado com a regra posterior: gestão complementar, permissões e fluxos existentes preservados
+- [ ] Disponibilizar análises de qualidade da equipa — bloqueado: funções de análise não existem no Supabase ligado; não criar dados fictícios nem alterar permissões nesta correção

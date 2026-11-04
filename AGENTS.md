@@ -3,3 +3,4 @@
 - Keep shared visual materials, shadows and motion in `src/index.css` and apply them through existing UI primitives so all roles share presentation without altering operational flows.
 - Keep modal sizing viewport-aware while retaining Radix focus, dismissal and nested portal handling; print-specific layouts retain their dedicated rules.
 - Use DialogContent presentation for adaptive mobile bottom panels, centered capture/signature tools and fullscreen media; preserve Sheet side navigation and centered confirmations to avoid changing dismissal or operational flows.
+- Keep management insight derivation in pure tested utilities and use RLS-protected read-only fallbacks for unavailable analytics RPCs; preserve operational card queries and permissions.

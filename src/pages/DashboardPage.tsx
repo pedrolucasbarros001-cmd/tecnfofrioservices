@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Building2, Package, Clock, Truck, DollarSign, AlertCircle, CheckSquare, FileText, BarChart2, ArrowRight, AlertTriangle, Play } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { safeFormat } from '@/utils/safeDateFormat';
-import { pt } from 'date-fns/locale';
+import { useManagementFallbacks } from '@/hooks/useManagementFallbacks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -125,11 +124,12 @@ const DASHBOARD_CARDS = [
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { role } = useAuth();
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
   const isDono = role === 'dono';
 
-  const { data: health, isLoading: healthLoading } = useBusinessHealth();
+  const { data: health } = useBusinessHealth();
   const { data: revenueTrend = [], isLoading: trendLoading } = useRevenueTrend();
   const { data: operational } = useOperationalMetrics();
   const { data: bottlenecks = [] } = useServiceBottlenecks();
@@ -140,8 +140,9 @@ export default function DashboardPage() {
   const { data: dashAlerts, isLoading: alertsLoading, isError: alertsError } = useDashboardAlerts();
   const { data: bottleneckDetail } = useBottleneckDetail();
   const { data: quality = [] } = useTechnicianQuality(30);
+  const fallback = useManagementFallbacks(isDono && !financialSummary);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
-  const { data: selectedBudget } = useQuery({
+  const { data: selectedBudget, isLoading: budgetLoading, isError: budgetError } = useQuery({
     queryKey: ['budget-action-detail', selectedBudgetId],
     enabled: selectedBudgetId !== null,
     queryFn: async () => {
@@ -152,7 +153,7 @@ export default function DashboardPage() {
       return data;
     },
   });
-  const actionCases = getActionCases(dashAlerts);
+  const actionCases = getActionCases(dashAlerts ?? fallback.actions.data);
   const teamQuality = getTeamQuality(quality);
   const delays = (bottleneckDetail?.por_estado?.map(item => ({ status: item.status, average: item.media_dias, maximum: item.max_dias }))
     ?? bottlenecks.map(item => ({ status: item.status, average: item.avg_days, maximum: item.max_days })))
@@ -250,7 +251,7 @@ export default function DashboardPage() {
       {isDono && <>
         <section aria-label="Centro de Ação" className="space-y-3">
           <h2 className="text-sm font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" />Centro de Ação</h2>
-          {alertsLoading ? <Skeleton className="h-24 w-full" /> : alertsError ?
+          {alertsLoading || (alertsError && fallback.actions.isLoading) ? <Skeleton className="h-24 w-full" /> : alertsError && fallback.actions.isError ?
             <p className="text-sm text-muted-foreground">Não foi possível consultar os casos de acompanhamento.</p> : actionCases.length === 0 ?
             <p className="text-sm text-muted-foreground">Sem casos de acompanhamento sinalizados.</p> :
             <div className="divide-y border-y border-border">
@@ -267,11 +268,11 @@ export default function DashboardPage() {
         </section>
 
         <section aria-label="Resumo financeiro" className="space-y-4">
-          <h2 className="text-sm font-semibold">Resumo financeiro <span className="font-normal text-xs text-muted-foreground">· {financialSummary ? `últimos ${financialSummary.days} dias` : 'mês atual'}</span></h2>
-          {healthLoading && !financialSummary ? <Skeleton className="h-24 w-full" /> :
+          <h2 className="text-sm font-semibold">Resumo financeiro <span className="font-normal text-xs text-muted-foreground">· últimos {financialSummary?.days ?? 30} dias</span></h2>
+          {fallback.financial.isLoading && !financialSummary ? <Skeleton className="h-24 w-full" /> :
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Insight label="Recebido" value={financialSummary || health ? fmt(financialSummary?.recebido ?? health?.recebido ?? 0) : '—'} detail="Pagamentos registados no período" />
-              <Insight label="Por receber" value={financialSummary || health ? fmt(financialSummary?.por_receber ?? health?.faturado_por_receber ?? 0) : '—'} detail="Saldo monetário em falta" />
+              <Insight label="Recebido" value={financialSummary || fallback.financial.data ? fmt(financialSummary?.recebido ?? fallback.financial.data?.recebido ?? 0) : '—'} detail="Pagamentos registados no período" />
+              <Insight label="Por receber" value={financialSummary || fallback.financial.data ? fmt(financialSummary?.por_receber ?? fallback.financial.data?.por_receber ?? 0) : '—'} detail="Saldo atual em falta nos serviços não finalizados nem cancelados" />
               {financialSummary && <Insight label="Valor definido" value={fmt(financialSummary.faturado)} detail="Valor dos serviços no período" />}
             </div>}
         </section>
@@ -288,7 +289,7 @@ export default function DashboardPage() {
         <section aria-label="Orçamentos e conversão" className="space-y-4">
           <h2 className="text-sm font-semibold">Orçamentos e conversão <span className="font-normal text-xs text-muted-foreground">· últimos 30 dias</span></h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Insight label="Taxa de aceitação" value={(budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao) != null ? `${budgetDetail?.taxa_aceitacao ?? budgetOpp?.taxa_aceitacao}%` : '—'} />
+            <Insight label="Taxa de aceitação" value={(budgetDetail?.taxa_aceitacao ?? health?.budget_conversion_rate) != null ? `${budgetDetail?.taxa_aceitacao ?? health?.budget_conversion_rate}%` : '—'} />
             {budgetDetail ? <>
               <Insight label="Valor aceite" value={fmt(budgetDetail.aceites_valor)} />
               <Insight label="Valor recusado" value={fmt(budgetDetail.rejeitados_valor)} />
@@ -323,15 +324,21 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">Visão geral da equipa <span className="font-normal text-xs text-muted-foreground">· últimos 30 dias</span></h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/performance')}>Performance<ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Insight label="Fecho em até 2 dias" value={teamQuality.quickResolutionPct != null ? `${teamQuality.quickResolutionPct.toFixed(1)}%` : '—'} />
             <Insight label="Descrição da avaria preenchida" value={teamQuality.descriptionPct != null ? `${teamQuality.descriptionPct.toFixed(1)}%` : '—'} />
-            <Insight label="Intervalo médio até ao fecho" value={teamQuality.resolutionDays != null ? `${teamQuality.resolutionDays.toFixed(1)} dias` : '—'} />
           </div>
         </section>
       </>}
 
-      <BudgetDetailPanel open={selectedBudgetId !== null && !!selectedBudget} onOpenChange={open => { if (!open) setSelectedBudgetId(null); }} budget={selectedBudget ?? null} />
+      {selectedBudgetId && budgetLoading && <p role="status" className="text-sm text-muted-foreground">A carregar orçamento…</p>}
+      {selectedBudgetId && budgetError && <p role="alert" className="text-sm text-destructive">Não foi possível abrir o orçamento.</p>}
+      <BudgetDetailPanel open={selectedBudgetId !== null && !!selectedBudget} onOpenChange={open => { if (!open) setSelectedBudgetId(null); }} budget={selectedBudget ?? null} onUpdate={() => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+        queryClient.invalidateQueries({ queryKey: ['budget-action-detail', selectedBudgetId] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      }} />
 
       {/* ── HISTÓRICO DE ACTIVIDADE ─────────────────────────────────────────────── */}
       <Card data-tour="activity-history">
@@ -349,20 +356,17 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-1 stagger-children">
               {activityLogs.map((log) => {
-                const isValidDate = log.created_at && !isNaN(new Date(log.created_at).getTime());
                 return (
                   <div
                     key={log.id}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex flex-wrap sm:flex-nowrap items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <span className="flex-shrink-0 w-14 text-xs text-muted-foreground tabular-nums">
-                      {isValidDate ? safeFormat(log.created_at, 'HH:mm') : '—'}
+                      {safeFormat(log.created_at, 'HH:mm')}
                     </span>
                     <span className="flex-1 text-sm">{log.description}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {isValidDate
-                        ? formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: pt })
-                        : ''}
+                      {safeFormat(log.created_at, 'dd/MM HH:mm')}
                     </span>
                   </div>
                 );
