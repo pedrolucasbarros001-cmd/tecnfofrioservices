@@ -129,7 +129,7 @@ export default function DashboardPage() {
   const { data: activityLogs = [] } = useActivityLogs({ limit: 10 });
   const isDono = role === 'dono';
 
-  const { data: health, isLoading: healthLoading } = useBusinessHealth();
+  const { data: health } = useBusinessHealth();
   const { data: revenueTrend = [], isLoading: trendLoading } = useRevenueTrend();
   const { data: operational } = useOperationalMetrics();
   const { data: bottlenecks = [] } = useServiceBottlenecks();
@@ -324,10 +324,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">Visão geral da equipa <span className="font-normal text-xs text-muted-foreground">· últimos 30 dias</span></h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/performance')}>Performance<ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Insight label="Fecho em até 2 dias" value={teamQuality.quickResolutionPct != null ? `${teamQuality.quickResolutionPct.toFixed(1)}%` : '—'} />
             <Insight label="Descrição da avaria preenchida" value={teamQuality.descriptionPct != null ? `${teamQuality.descriptionPct.toFixed(1)}%` : '—'} />
-            <Insight label="Intervalo médio até ao fecho" value={teamQuality.resolutionDays != null ? `${teamQuality.resolutionDays.toFixed(1)} dias` : '—'} />
           </div>
         </section>
       </>}
