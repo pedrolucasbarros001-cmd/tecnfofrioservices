@@ -30,14 +30,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             })}
           </span>
         </p>
-        {payload[0].payload?.services_count !== undefined && (
-          <p className="text-muted-foreground">
-            Serviços:{' '}
-            <span className="font-medium text-foreground">
-              {payload[0].payload.services_count}
-            </span>
-          </p>
-        )}
       </div>
     );
   }
