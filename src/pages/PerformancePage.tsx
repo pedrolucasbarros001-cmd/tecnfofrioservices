@@ -10,7 +10,7 @@ import { ServiceStatusBadge } from '@/components/shared/ServiceStatusBadge';
 import { useTechnicians } from '@/hooks/useTechnicians';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { useTechnicianQuality, useWarrantyReturns } from '@/hooks/useDashboardMetrics';
+import { TechnicianQualityPanel } from '@/components/performance/TechnicianQualityPanel';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Period options ─────────────────────────────────────────────────────────────
@@ -170,8 +170,6 @@ export default function PerformancePage() {
     data: getTechnicianData(tech.id),
   }));
 
-  const { data: qualityData = [], isLoading: qualityLoading, isError: qualityError } = useTechnicianQuality(days);
-  const { data: warrantyData = [], isError: warrantyError } = useWarrantyReturns(days);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -181,7 +179,9 @@ export default function PerformancePage() {
           <h1 className="text-2xl font-bold tracking-tight">Performance de Técnicos</h1>
           <p className="text-muted-foreground">Volume por técnico e qualidade de execução</p>
         </div>
-
+        <div role="group" aria-label="Período da análise de qualidade" className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+          {PERIOD_OPTIONS.map(option => <Button key={option.value} size="sm" variant={days === option.value ? 'secondary' : 'ghost'} aria-pressed={days === option.value} onClick={() => setDays(option.value)}>{option.label}</Button>)}
+        </div>
       </div>
 
       {/* Cards por técnico */}
@@ -373,40 +373,18 @@ export default function PerformancePage() {
                     )}
                   </div>
                 </div>
+                {expandedTechs.includes(tech.id) && !d.isEmpty && (
+                  <section aria-label="Qualidade e eficiência" className="mt-6 border-t pt-4 space-y-3">
+                    <h4 className="text-sm font-semibold">Qualidade e eficiência</h4>
+                    <TechnicianQualityPanel techId={tech.id} days={days} />
+                  </section>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <section aria-label="Qualidade e eficiência" className="space-y-4 border-t pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Qualidade e eficiência</h2>
-          <div role="group" aria-label="Período da análise de qualidade" className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-            {PERIOD_OPTIONS.map(option => <Button key={option.value} size="sm" variant={days === option.value ? 'secondary' : 'ghost'} aria-pressed={days === option.value} onClick={() => setDays(option.value)}>{option.label}</Button>)}
-          </div>
-        </div>
-        {qualityLoading ? <Skeleton className="h-40 w-full" /> : qualityError ?
-          <p className="text-sm text-muted-foreground">Não foi possível consultar a análise de qualidade.</p> :
-          <div className="divide-y border-y border-border">
-            {technicians.map(tech => {
-              const q = qualityData.find(row => row.technician_id === tech.id);
-              const returns = warrantyData.find(row => row.technician_id === tech.id)?.warranty_count;
-              const measured = q && q.completed_services > 0;
-              return <div key={tech.id} className="py-4 space-y-3">
-                <p className="font-medium">{tech.profile?.full_name ?? 'Técnico'}</p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-5">
-                  <div><p className="text-xs text-muted-foreground">Fecho em até 2 dias</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.first_visit_rate != null ? `${q.first_visit_rate}%` : '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Descrição da avaria preenchida</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.reports_complete_pct != null ? `${q.reports_complete_pct}%` : '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Intervalo médio até ao fecho</p><p className="mt-1 text-xl font-semibold tabular-nums">{measured && q.avg_resolution_days != null ? `${q.avg_resolution_days}d` : '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Novos serviços do mesmo cliente</p><p className="mt-1 text-xl font-semibold tabular-nums">{!warrantyError && returns != null ? returns : '—'}</p><p className="text-xs text-muted-foreground mt-1">Até 60 dias após o fecho</p></div>
-                </div>
-                {!measured && <p className="text-xs text-muted-foreground">Sem serviços finalizados para análise neste período.</p>}
-              </div>;
-            })}
-          </div>}
-        <p className="text-xs text-muted-foreground">Período: últimos {days} dias, pela criação do serviço. O intervalo até ao fecho usa a última atualização. Novos serviços do mesmo cliente não confirmam a mesma avaria. Estes dados não medem primeira visita, pontualidade, fotografias ou assinaturas.</p>
-      </section>
 
       {technicians.length === 0 && (
         <Card className="p-12">
