@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, ensureValidSession, isSessionOrRlsError } from '@/integrations/supabase/client';
 import type { Customer } from '@/types/database';
 import { toast } from 'sonner';
+import { invalidateCustomerQueries } from '@/lib/queryInvalidation';
 
 interface UsePaginatedCustomersOptions {
   page?: number;
@@ -145,9 +146,8 @@ export function useUpdateCustomer() {
       return data as Customer;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['customers-paginated'] });
       toast.success('Cliente atualizado!');
+      invalidateCustomerQueries(queryClient);
     },
     onError: (error) => {
       console.error('Error updating customer:', error);
