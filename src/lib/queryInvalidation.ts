@@ -54,5 +54,6 @@ export function invalidateCustomerQueries(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ['service'] });
   queryClient.invalidateQueries({ queryKey: ['service-print'] });
   queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['budget-print'] });
   invalidateServiceQueries(queryClient, undefined, 'list');
 }
