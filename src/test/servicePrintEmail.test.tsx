@@ -7,7 +7,7 @@ import type { Service } from '@/types/database';
 const contact = vi.hoisted(() => ({ email: 'atual@example.com' as string | null }));
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: (table: string) => ({
+    from: () => ({
       select: () => ({
         eq: () => ({
           single: async () => ({ data: { email: contact.email }, error: null }),
@@ -35,7 +35,7 @@ describe('Email na ficha impressa', () => {
       </QueryClientProvider>
     );
     const view = render(content(true));
-    await waitFor(() => expect(screen.getAllByText('atual@example.com')).toHaveLength(2));
+    await waitFor(() => expect(screen.getByText('atual@example.com')).toBeInTheDocument());
     expect(screen.queryByText('antigo@example.com')).not.toBeInTheDocument();
     view.rerender(content(false));
     contact.email = null;
