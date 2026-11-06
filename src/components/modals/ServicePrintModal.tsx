@@ -42,6 +42,29 @@ const getSignatureDescription = (type: string | null): string => {
 };
 
 export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintModalProps) {
+  // A selected service is a snapshot; read the customer's current email on opening.
+  const customerId = service?.customer_id || service?.customer?.id;
+  const { data: currentContact, isFetching: refreshingContact, isError: contactError } = useQuery({
+    queryKey: ['customer', customerId, 'print-contact'],
+    queryFn: async () => {
+      if (!customerId) return null;
+      const { data, error } = await supabase
+        .from('customers')
+        .select('email')
+        .eq('id', customerId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!customerId && open,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const customerEmail = customerId
+    ? (refreshingContact || contactError ? undefined : currentContact?.email)
+    : service?.contact_email;
+  const contactUnavailable = !!customerId && (refreshingContact || contactError || !currentContact);
+
   // Fetch parts used for this service
   const { data: parts = [] } = useQuery({
     queryKey: ['service-parts', service?.id],
@@ -94,7 +117,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownloadPDF = async () => {
-    if (!printSheetRef.current || !service) return;
+    if (!printSheetRef.current || !service || contactUnavailable) return;
 
     setIsGenerating(true);
     try {
@@ -209,7 +232,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             </div>
             <div>
               <span style={{ color: '#666' }}>Email:</span>{' '}
-              <span style={{ fontWeight: '500' }}>{service.customer?.email || 'N/A'}</span>
+              <span style={{ fontWeight: '500' }}>{customerEmail || 'N/A'}</span>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
               <span style={{ color: '#666' }}>Morada:</span>{' '}
@@ -513,11 +536,12 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               }}
               size="sm"
               variant="outline"
+              disabled={contactUnavailable}
             >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
-            <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating}>
+            <Button onClick={handleDownloadPDF} size="sm" disabled={isGenerating || contactUnavailable}>
               {isGenerating ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -527,6 +551,12 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
             </Button>
           </div>
         </div>
+
+        {contactError && (
+          <p role="alert" className="no-print px-3 py-2 text-sm text-destructive">
+            Não foi possível atualizar o email do cliente. Feche e volte a abrir a ficha para tentar novamente.
+          </p>
+        )}
 
         {/* Conteúdo A4 - isto é o que será impresso */}
         <div ref={printSheetRef} className="print-sheet relative bg-white">
@@ -588,7 +618,7 @@ export function ServicePrintModal({ service, open, onOpenChange }: ServicePrintM
               </div>
               <div>
                 <span className="text-muted-foreground">Email:</span>{' '}
-                <span className="font-medium">{service.customer?.email || 'N/A'}</span>
+                <span className="font-medium">{customerEmail || 'N/A'}</span>
               </div>
               <div className="col-span-2">
                 <span className="text-muted-foreground">Morada:</span>{' '}

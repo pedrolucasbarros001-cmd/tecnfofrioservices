@@ -47,4 +47,13 @@ export function invalidateServiceQueries(
 export function invalidateCustomerQueries(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ['customers'] });
   queryClient.invalidateQueries({ queryKey: ['customers-paginated'] });
+  queryClient.invalidateQueries({ queryKey: ['customer'] });
+  queryClient.invalidateQueries({ queryKey: ['customer-services'] });
+  queryClient.invalidateQueries({ queryKey: ['customer-budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['service-full'] });
+  queryClient.invalidateQueries({ queryKey: ['service'] });
+  queryClient.invalidateQueries({ queryKey: ['service-print'] });
+  queryClient.invalidateQueries({ queryKey: ['budgets'] });
+  queryClient.invalidateQueries({ queryKey: ['budget-print'] });
+  invalidateServiceQueries(queryClient, undefined, 'list');
 }
