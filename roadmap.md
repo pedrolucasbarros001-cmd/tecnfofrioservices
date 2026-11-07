@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Corrigir criação de orçamento para seguro: preservar IVA escolhido e confirmar orçamento guardado sem alterar o estado da assistência
+- [x] Corrigir criação de orçamento para seguro: IVA escolhido preservado, orçamento abre após guardar na Geral e assistência concluída mantém-se; testes passam, verificação com sessão real bloqueada pela autenticação externa
 
 - [x] Corrigir Dashboard e Performance: cartões/filtros preservados, gestão sem contagens repetidas; testes passam; validação autenticada continua bloqueada
 
