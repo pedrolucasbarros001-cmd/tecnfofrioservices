@@ -53,7 +53,10 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers';
 import { toast } from 'sonner';
-import type { Customer, Service } from '@/types/database';
+import type { Budget, Customer, Service } from '@/types/database';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateServiceQueries } from '@/lib/queryInvalidation';
+import { getBudgetSourceItems } from '@/utils/budgetSourceItems';
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Nome do artigo é obrigatório'),
@@ -91,12 +94,14 @@ interface CreateBudgetModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  onCreated?: (budget: Budget & { pricing_description: string | null }) => void;
   sourceService?: Service & { fault_description?: string; customer?: Customer | null; };
   initialCustomer?: Customer;
   budgetToReuse?: any;
 }
 
-export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService, initialCustomer, budgetToReuse }: CreateBudgetModalProps) {
+export function CreateBudgetModal({ open, onOpenChange, onSuccess, onCreated, sourceService, initialCustomer, budgetToReuse }: CreateBudgetModalProps) {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [discountType, setDiscountType] = useState<'euro' | 'percent'>('euro');
   const [discountValue, setDiscountValue] = useState('');
@@ -150,6 +155,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
   // Prepopulate from sourceService if provided
   useEffect(() => {
+    let active = true;
     if (open && sourceService) {
       if (sourceService.customer) {
         setSelectedCustomer(sourceService.customer);
@@ -162,18 +168,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
 
       const fetchParts = async () => {
         const { data } = await supabase.from('service_parts').select('*').eq('service_id', sourceService.id);
-        if (data && data.length > 0) {
-          form.setValue('items', data.map(p => ({
-            name: p.part_name,
-            description: p.part_code || '',
-            quantity: p.quantity || 1,
-            unit_price: p.cost || 0,
-            tax_rate: p.iva_rate || 23,
-            type: 'part'
-          })));
-        } else {
-          form.setValue('items', [{ name: 'Diagnóstico / Mão de Obra', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'labor' }]);
-        }
+        if (active) form.setValue('items', getBudgetSourceItems(sourceService.pricing_description, data ?? []));
       };
       
       fetchParts();
@@ -186,6 +181,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
         form.setValue('customer_email', budgetToReuse.customer.email || '');
       }
       form.setValue('notes', `Cópia do orçamento ${budgetToReuse.code}`);
+      form.setValue('is_insurance_budget', budgetToReuse.is_insurance_budget === true);
       
       try {
         const parsed = budgetToReuse.pricing_description ? JSON.parse(budgetToReuse.pricing_description) : {};
@@ -196,7 +192,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
              description: item.details || '',
              quantity: item.qty || 1,
              unit_price: item.price || 0,
-             tax_rate: item.tax || 23,
+             tax_rate: item.tax_rate ?? item.tax ?? 0,
              type: item.type || 'part'
           })));
         }
@@ -213,9 +209,10 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
       form.setValue('customer_phone', initialCustomer.phone || '');
       form.setValue('customer_nif', initialCustomer.nif || '');
       form.setValue('customer_email', initialCustomer.email || '');
-      form.setValue('items', [{ name: 'Diagnóstico / Mão de Obra', description: '', quantity: 1, unit_price: 0, tax_rate: 23, type: 'labor' }]);
+      form.setValue('items', getBudgetSourceItems(null, []));
     }
-  }, [open, sourceService, initialCustomer, form]);
+    return () => { active = false; };
+  }, [open, sourceService, initialCustomer, budgetToReuse, form]);
 
   // Auto-detect customer suggestions by name, phone or NIF
   useEffect(() => {
@@ -320,7 +317,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
         .filter(item => item.type === 'labor')
         .reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
-      const { error } = await supabase.from('budgets').insert({
+      const { data: createdBudget, error } = await supabase.from('budgets').insert({
         customer_id: customerId || null,
         estimated_labor: laborTotal,
         estimated_parts: partsTotal,
@@ -334,7 +331,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
         brand: sourceService?.brand || null,
         model: sourceService?.model || null,
         fault_description: sourceService?.fault_description || (sourceService as any)?.detected_fault || null,
-      });
+      }).select('*, customer:customers(*)').single();
 
       if (error) throw error;
 
@@ -348,9 +345,13 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
          await supabase.from('services').update({ awaiting_budget_approval: true }).eq('id', sourceService.id);
       }
 
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-budgets'] });
+      invalidateServiceQueries(queryClient, sourceService?.id);
       toast.success('Orçamento criado com sucesso!');
       handleClose();
       onSuccess?.();
+      if (createdBudget) onCreated?.(createdBudget as Budget & { pricing_description: string | null });
     } catch (error: any) {
       console.error('[CreateBudgetModal] Error creating budget (raw):', error);
       const detail = error?.message || error?.error_description || error?.hint || error?.details || 'Erro desconhecido';
@@ -584,7 +585,7 @@ export function CreateBudgetModal({ open, onOpenChange, onSuccess, sourceService
                               type="checkbox"
                               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
                               checked={field.value}
-                              onChange={field.onChange}
+                              onChange={(event) => field.onChange(event.target.checked)}
                             />
                           </FormControl>
                           <div className="space-y-1 leading-none">

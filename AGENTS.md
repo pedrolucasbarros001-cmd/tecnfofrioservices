@@ -5,3 +5,4 @@
 - Use DialogContent presentation for adaptive mobile bottom panels, centered capture/signature tools and fullscreen media; preserve Sheet side navigation and centered confirmations to avoid changing dismissal or operational flows.
 - Keep management insight derivation in pure tested utilities and use RLS-protected read-only fallbacks for unavailable analytics RPCs; preserve operational card queries and permissions.
 - Invalidate customer-joined service and print queries after customer edits, and read current customer contact data when opening print modals; selected service objects are snapshots, not contact sources of truth.
+- Derive budget source lines through the tested pricing mapper, preferring administrative pricing and nullish tax fallbacks so explicit zero rates survive service-to-budget creation.

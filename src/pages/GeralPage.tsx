@@ -45,6 +45,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateServiceQueries } from '@/lib/queryInvalidation';
 import { CustomerLink } from '@/components/shared/CustomerLink';
+import { BudgetDetailPanel } from '@/components/shared/BudgetDetailPanel';
+import type { Budget } from '@/types/database';
 
 export default function GeralPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -128,6 +130,7 @@ export default function GeralPage() {
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [budgetService, setBudgetService] = useState<Service | null>(null);
+  const [createdBudget, setCreatedBudget] = useState<Budget | null>(null);
   // Detail sheet
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -787,6 +790,16 @@ export default function GeralPage() {
           // By passing sourceService here, CreateBudgetModal will prepopulate 
           // the customer and parts, and will link it as source_service_id.
           sourceService={budgetService || undefined} 
+          onCreated={setCreatedBudget}
+        />
+        <BudgetDetailPanel
+          open={!!createdBudget}
+          onOpenChange={(open) => { if (!open) setCreatedBudget(null); }}
+          budget={createdBudget}
+          onUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['budgets'] });
+            invalidateServiceQueries(queryClient);
+          }}
         />
 
         {/* Documents Viewer Modal */}
