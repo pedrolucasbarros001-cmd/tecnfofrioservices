@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Corrigir criação de orçamento para seguro: IVA escolhido preservado, orçamento abre após guardar na Geral e assistência concluída mantém-se; testes passam, verificação com sessão real bloqueada pela autenticação externa
+
 - [x] Corrigir Dashboard e Performance: cartões/filtros preservados, gestão sem contagens repetidas; testes passam; validação autenticada continua bloqueada
 
 - [x] Fase 2: janelas inferiores no telemóvel e centradas no computador; seleção, confirmações, Escape e navegação verificados a 1280, 428 e 375 px; ferramentas especiais preservadas
