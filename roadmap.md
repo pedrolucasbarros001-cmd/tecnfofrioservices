@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Corrigir criação de orçamento para seguro: preservar IVA escolhido e confirmar orçamento guardado sem alterar o estado da assistência
+
 - [x] Corrigir Dashboard e Performance: cartões/filtros preservados, gestão sem contagens repetidas; testes passam; validação autenticada continua bloqueada
 
 - [x] Fase 2: janelas inferiores no telemóvel e centradas no computador; seleção, confirmações, Escape e navegação verificados a 1280, 428 e 375 px; ferramentas especiais preservadas
