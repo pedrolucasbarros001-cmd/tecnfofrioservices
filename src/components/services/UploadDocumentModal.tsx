@@ -23,78 +23,63 @@ interface UploadDocumentModalProps {
 }
 
 export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocumentModalProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      // Limit to 10MB
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('O ficheiro é demasiado grande. O limite é 10MB.');
-        return;
-      }
-      setSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    const ok = files.filter((f) => f.size <= 10 * 1024 * 1024);
+    if (ok.length < files.length) toast.error('Alguns ficheiros excedem 10MB e foram ignorados.');
+    if (ok.length) setSelectedFiles((prev) => [...prev, ...ok]);
+  };
+
+  const clearSelection = () => setSelectedFiles([]);
+  const removeFile = (i: number) => setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i));
+
+  const uploadOne = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${serviceId}/${crypto.randomUUID()}.${fileExt}`;
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from('service_documents')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+    if (storageError) throw storageError;
+    const { error: dbError } = await supabase
+      .from('service_documents' as any)
+      .insert({
+        service_id: serviceId,
+        file_name: file.name,
+        file_url: storageData.path,
+        file_type: file.type || fileExt || 'unknown',
+        file_size: file.size,
+        uploaded_by: user?.id,
+      });
+    if (dbError) {
+      await supabase.storage.from('service_documents').remove([storageData.path]);
+      throw dbError;
     }
   };
 
-  const clearSelection = () => {
-    setSelectedFile(null);
-  };
-
   const handleUpload = async () => {
-    if (!selectedFile || !serviceId) return;
-
+    if (!selectedFiles.length || !serviceId) return;
     setIsUploading(true);
-    try {
-      // 1. Upload the file to Supabase Storage
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${serviceId}/${crypto.randomUUID()}.${fileExt}`;
-      
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('service_documents')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (storageError) throw storageError;
-
-      // 2. Insert record into service_documents table
-      const { error: dbError } = await supabase
-        .from('service_documents' as any)
-        .insert({
-          service_id: serviceId,
-          file_name: selectedFile.name,
-          file_url: storageData.path,
-          file_type: selectedFile.type || fileExt || 'unknown',
-          file_size: selectedFile.size,
-          uploaded_by: user?.id,
-        });
-
-      if (dbError) {
-        // Cleanup storage if db insert fails
-        await supabase.storage.from('service_documents').remove([storageData.path]);
-        throw dbError;
-      }
-
-      toast.success('Documento anexado com sucesso!');
-
-      // FIX: Invalidate the correct query keys actually used by the system.
-      // 'service-full' is used by useFullServiceData() (ServiceDetailSheet/CustomerDetailSheet).
-      // 'service-documents' is used by any document-specific sub-query.
-      // The old keys ('serviceDetails', 'serviceDocuments') never matched anything — this was a silent bug.
-      queryClient.invalidateQueries({ queryKey: ['service-full', serviceId] });
-      queryClient.invalidateQueries({ queryKey: ['service-documents', serviceId] });
-
+    const failed: File[] = [];
+    for (const f of selectedFiles) {
+      try { await uploadOne(f); } catch (error) { console.error('Error uploading document:', error); failed.push(f); }
+    }
+    const done = selectedFiles.length - failed.length;
+    queryClient.invalidateQueries({ queryKey: ['service-full', serviceId] });
+    queryClient.invalidateQueries({ queryKey: ['service-documents', serviceId] });
+    setIsUploading(false);
+    if (failed.length) {
+      if (done) toast.success(`${done} ficheiro(s) anexado(s).`);
+      toast.error(`${failed.length} ficheiro(s) não foram enviados. Tente novamente.`);
+      setSelectedFiles(failed);
+    } else {
+      toast.success(done > 1 ? `${done} ficheiros anexados com sucesso!` : 'Documento anexado com sucesso!');
       handleClose();
-    } catch (error: any) {
-      console.error('Error uploading document:', error);
-      toast.error(error.message || 'Erro ao fazer upload do documento.');
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -114,47 +99,33 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
-          {!selectedFile ? (
-            <div className="flex flex-col items-center justify-center w-full">
-              <Label 
-                htmlFor="dropzone-file" 
-                className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-muted/30 border-muted hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    <span className="font-semibold text-primary">Clique para selecionar</span> ou arraste o ficheiro aqui
-                  </p>
-                  <p className="text-xs text-muted-foreground">Todos os formatos são aceites até 10MB</p>
+          <Label
+            htmlFor="dropzone-file"
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/30 border-muted hover:bg-muted/50 transition-colors"
+          >
+            <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-primary">{selectedFiles.length ? 'Adicionar mais' : 'Clique para selecionar'}</span> — pode escolher vários
+            </p>
+            <p className="text-xs text-muted-foreground">Até 10MB por ficheiro</p>
+            <Input id="dropzone-file" type="file" multiple className="hidden" onChange={handleFileChange} disabled={isUploading} />
+          </Label>
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+              {selectedFiles.map((f, i) => (
+                <div key={`${f.name}-${i}`} className="flex items-center justify-between p-3 border rounded-md">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <File className="flex-shrink-0 w-5 h-5 text-primary" />
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="text-sm font-medium truncate">{f.name}</span>
+                      <span className="text-xs text-muted-foreground">{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="flex-shrink-0" onClick={() => removeFile(i)} disabled={isUploading}>
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Input 
-                  id="dropzone-file" 
-                  type="file" 
-                  className="hidden" 
-                  onChange={handleFileChange}
-                />
-              </Label>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-4 border rounded-md">
-              <div className="flex items-center space-x-3 overflow-hidden">
-                <File className="flex-shrink-0 w-6 h-6 text-primary" />
-                <div className="flex pl-2 overflow-hidden flex-col">
-                  <span className="text-sm font-medium truncate">{selectedFile.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                  </span>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="flex-shrink-0" 
-                onClick={clearSelection}
-                disabled={isUploading}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              ))}
             </div>
           )}
         </div>
@@ -165,7 +136,7 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
           </Button>
           <Button 
             onClick={handleUpload} 
-            disabled={!selectedFile || isUploading}
+            disabled={!selectedFiles.length || isUploading}
           >
             {isUploading ? (
               <>
@@ -173,7 +144,7 @@ export function UploadDocumentModal({ isOpen, onClose, serviceId }: UploadDocume
                 A enviar...
               </>
             ) : (
-              'Anexar Ficheiro'
+              selectedFiles.length > 1 ? `Anexar ${selectedFiles.length} ficheiros` : 'Anexar Ficheiro'
             )}
           </Button>
         </DialogFooter>
