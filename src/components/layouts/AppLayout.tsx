@@ -11,6 +11,7 @@ import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { GuidedTour } from '@/components/onboarding/GuidedTour';
 import { ServiceBillingNotice } from '@/components/shared/ServiceBillingNotice';
 import { ServiceBillingModal } from '@/components/shared/ServiceBillingModal';
+import { ApplianceAnnouncementModal } from '@/components/shared/ApplianceAnnouncementModal';
 
 import { DemoRunner } from '@/components/onboarding/DemoRunner';
 import { useDemo } from '@/contexts/DemoContext';
@@ -178,6 +179,7 @@ export function AppLayout() {
             <ServiceBillingModal />
           </>
         )}
+        {!isOnboardingOpen && !isDemoActive && <ApplianceAnnouncementModal />}
         <main className="min-w-0 flex-1 bg-background">
 
           <div key={location.pathname} className="route-enter h-full">

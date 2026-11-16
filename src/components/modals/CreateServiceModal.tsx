@@ -7,6 +7,7 @@ import { pt } from 'date-fns/locale';
 import { CalendarIcon, Check, MapPin, Package, UserPlus, ChevronRight, ImagePlus, Paperclip, FileText, X, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ApplianceQuickPick } from '@/components/appliances/ApplianceQuickPick';
 import { humanizeError } from '@/utils/errorMessages';
 import { toLocalDateString } from '@/utils/dateUtils';
 import {
@@ -109,6 +110,7 @@ interface CreateServiceModalProps {
 export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalProps) {
   const [step, setStep] = useState<'location' | 'form'>('location');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [pickedApplianceId, setPickedApplianceId] = useState<string | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [showFoundCustomerBox, setShowFoundCustomerBox] = useState(false);
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false);
@@ -410,6 +412,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
     form.reset();
     setStep('location');
     setSelectedCustomer(null);
+    setPickedApplianceId(null);
     setFoundCustomer(null);
     setShowFoundCustomerBox(false);
     setPendingFormValues(null);
@@ -495,6 +498,7 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                           size="sm"
                           onClick={() => {
                             setSelectedCustomer(null);
+                            setPickedApplianceId(null);
                             form.reset({
                               ...form.getValues(),
                               customer_name: '',
@@ -636,6 +640,20 @@ export function CreateServiceModal({ open, onOpenChange }: CreateServiceModalPro
                         />
                       </div>
                     )}
+
+                    <ApplianceQuickPick
+                      customerId={selectedCustomer?.id}
+                      selectedId={pickedApplianceId}
+                      onPick={(a) => {
+                        setPickedApplianceId(a?.id ?? null);
+                        const opts = { shouldValidate: true, shouldDirty: true };
+                        form.setValue('appliance_type', a?.appliance_type ?? '', opts);
+                        form.setValue('brand', a?.brand ?? '', opts);
+                        form.setValue('model', a?.model ?? '', opts);
+                        form.setValue('serial_number', a?.serial_number ?? '', opts);
+                        form.setValue('pnc', a?.pnc ?? '', opts);
+                      }}
+                    />
 
                     {/* Row 4: Tipo de Aparelho + Marca */}
                     <div className="grid grid-cols-2 gap-4">
