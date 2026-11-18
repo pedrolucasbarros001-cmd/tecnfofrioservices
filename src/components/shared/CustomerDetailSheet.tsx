@@ -318,8 +318,25 @@ export function CustomerDetailSheet({
     notes: '',
   });
 
+  const resetApplianceEditor = () => {
+    setShowAddAppliance(false);
+    setEditingAppliance(null);
+    setApplianceForm({ appliance_type: '', brand: '', model: '', serial_number: '', installation_date: '', warranty_until: '', location: '', notes: '' });
+  };
+
+  // The global sheet stays mounted: drafts must not survive closing or switching clients.
+  useEffect(() => {
+    setShowAddAppliance(false);
+    setEditingAppliance(null);
+    setApplianceForm({ appliance_type: '', brand: '', model: '', serial_number: '', installation_date: '', warranty_until: '', location: '', notes: '' });
+  }, [customer?.id, open]);
+
   const handleSaveAppliance = async () => {
-    if (!customer?.id || !applianceForm.appliance_type) return;
+    if (!open || !customer?.id || !applianceForm.appliance_type) return;
+    if (editingAppliance && editingAppliance.customer_id !== customer.id) {
+      resetApplianceEditor();
+      return;
+    }
     try {
       if (editingAppliance) {
         const { error } = await supabase
@@ -335,9 +352,7 @@ export function CustomerDetailSheet({
         if (error) throw error;
         toast.success('Aparelho adicionado');
       }
-      setShowAddAppliance(false);
-      setEditingAppliance(null);
-      setApplianceForm({ appliance_type: '', brand: '', model: '', serial_number: '', installation_date: '', warranty_until: '', location: '', notes: '' });
+      resetApplianceEditor();
       refetchAppliances();
     } catch (err) {
       console.error(err);
@@ -878,7 +893,7 @@ export function CustomerDetailSheet({
                           <span className="text-sm font-medium">
                             {editingAppliance ? 'Editar aparelho' : 'Novo aparelho'}
                           </span>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowAddAppliance(false)}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Fechar edição do aparelho" onClick={resetApplianceEditor}>
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -921,7 +936,7 @@ export function CustomerDetailSheet({
                           </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-1">
-                          <Button variant="outline" size="sm" onClick={() => setShowAddAppliance(false)}>Cancelar</Button>
+                          <Button variant="outline" size="sm" onClick={resetApplianceEditor}>Cancelar</Button>
                           <Button size="sm" onClick={handleSaveAppliance} disabled={!applianceForm.appliance_type}>
                             {editingAppliance ? 'Guardar alterações' : 'Adicionar aparelho'}
                           </Button>
@@ -963,6 +978,7 @@ export function CustomerDetailSheet({
                                     <div className="flex gap-1 shrink-0">
                                       <Button
                                         variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                        aria-label={`Editar aparelho ${ap.appliance_type}`}
                                         onClick={() => {
                                           setEditingAppliance(ap);
                                           setApplianceForm({
